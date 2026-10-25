@@ -49,6 +49,8 @@ namespace gglab
 		}
 	};
 
+	[[nodiscard]] GTAOSettingsPatch ToGTAOSettingsPatch(
+		const FrameSequenceGTAOOverrides& overrides) noexcept;
 	// Returns the GTAO settings with every set override applied and resolved to the
 	// settings' valid ranges.
 	[[nodiscard]] GTAOSettings ApplyFrameSequenceGTAOOverrides(

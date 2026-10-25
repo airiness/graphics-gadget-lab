@@ -6,6 +6,7 @@
 #include "Application/Platform/Windows/Win32NamedPipeServer.h"
 #include "Capture/CaptureBundle.h"
 #include "Capture/CaptureEnvironment.h"
+#include "Parameters/HostViewParameters.h"
 #include "Parameters/ParameterEffectReceipt.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 
@@ -463,9 +464,41 @@ namespace gglab
 			FrameCaptureFrameState frame{ .m_Backend = "vulkan", .m_DemoId = "Demo.LabHost", .m_LabId = "gglab.lab.culling",
 				.m_FrameSerial = 73, .m_FrameIndex = 42, .m_ReferenceViewIds = { "CAM_A", "CAM_B" } };
 			frame.m_Readiness.Add("lab", FrameCaptureGateState::Pending, "Warming up.");
+			frame.m_HostViewControl = { .m_RunIdentity = "0123456789abcdef0123456789abcdef",
+				.m_ContentIdentity = 481, .m_HostViewRevision = 12 };
+			frame.m_HostViewProjection = { { .m_Id = LabParameterId("view.taa.enabled"), .m_Type = LabParameterType::Bool,
+				.m_Value = false, .m_Source = HostViewValueSource::Host, .m_InheritedSource = HostViewValueSource::Tooling,
+				.m_Override = LabValue(false) } };
+			frame.m_Temporal.m_Status = "disabled";
+			frame.m_Temporal.m_DisableReason = "not-requested";
+			frame.m_Temporal.m_Consumers = { { .m_Name = "temporal-aa", .m_Status = "disabled",
+				.m_DisableReason = "not-requested" } };
+			frame.m_Outcome = FrameCaptureFrameOutcome::Submitted;
 			const auto status = Json::parse(SerializeApplicationControlStatus(4, {
 				.m_SessionId = "s1", .m_ProcessId = 99, .m_Hidden = true, .m_Width = 640, .m_Height = 360,
-				.m_CaptureIntake = { .m_ActiveJobs = 2, .m_ReservedReceipts = 3 }, .m_SettledFrames = 5, .m_Frame = &frame }));
+				.m_CaptureIntake = { .m_ActiveJobs = 2, .m_ReservedReceipts = 3 }, .m_SettledFrames = 5, .m_Frame = &frame,
+				.m_HostViewControl = { .m_ContentIdentity = 481, .m_HostViewRevision = 13 } }));
+			const auto& hostView = status["frame"]["hostView"];
+			context.Check(status["frame"]["outcome"] == "submitted" &&
+				status["frame"]["controlState"]["runIdentity"] == "0123456789abcdef0123456789abcdef" &&
+				status["frame"]["controlState"]["hostViewRevision"] == 12 &&
+				status["parameterControl"]["controlState"]["runIdentity"].is_null() &&
+				status["parameterControl"]["controlState"]["hostViewRevision"] == 13 &&
+				hostView.size() == 1 && hostView[0]["id"] == "view.taa.enabled" && hostView[0]["value"] == false &&
+				hostView[0]["source"] == "host" && hostView[0]["inheritedSource"] == "tooling" &&
+				hostView[0]["hostOverride"] == Json({ { "present", true }, { "value", false } }) &&
+				status["frame"]["temporal"]["consumers"][0]["name"] == "temporal-aa" &&
+				status["frame"]["temporal"]["status"] == "disabled",
+				"Status separates the planned frame's control stamp, attribution and outcome from live control state");
+			context.Check(status["capabilities"]["hostViewControlState"]["version"] == 1 &&
+				status["capabilities"]["hostViewControlState"]["valueSources"].size() == 6 &&
+				status["capabilities"]["hostViewControlState"]["frameOutcomes"].size() == 3,
+				"Host view control observation is advertised as an additive capability");
+			const HostViewProjectionEntry inherited{ .m_Id = LabParameterId("view.gtao.radius"),
+				.m_Type = LabParameterType::Float, .m_Value = 1.5f };
+			context.Check(SerializeApplicationControlHostViewProjection({ &inherited, 1 })[0]["hostOverride"] ==
+				Json({ { "present", false } }),
+				"An absent Host override carries no value");
 			context.Check(status["session"]["pid"] == 99 && status["frame"]["labId"] == "gglab.lab.culling" &&
 				status["frame"]["ready"] == false && status["frame"]["settledFrames"] == 5 &&
 				status["frame"]["gates"][0]["state"] == "pending" && status["frame"]["fixedDeltaTime"].is_null() &&

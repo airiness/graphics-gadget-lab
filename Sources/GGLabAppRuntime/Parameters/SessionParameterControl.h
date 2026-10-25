@@ -2,6 +2,7 @@
 #include "Parameters/ParameterBatch.h"
 #include "Parameters/ParameterSource.h"
 #include "Parameters/ParameterFrameState.h"
+#include "Parameters/HostViewParameters.h"
 #include "ApplicationToolingIntegration.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
@@ -51,6 +52,12 @@ namespace gglab
 		[[nodiscard]] const std::string& GetContentId() const noexcept { return m_ContentId; }
 		[[nodiscard]] uint64_t GetContentIdentity() const noexcept { return m_ContentSerial; }
 		[[nodiscard]] uint64_t GetParameterRevision() const noexcept { return m_ParameterRevision; }
+		// Advances once for each committed or discarded change to Host view override
+		// presence or value. NoChange and inherited value changes leave it unchanged.
+		[[nodiscard]] uint64_t GetHostViewRevision() const noexcept { return m_HostViewRevision; }
+		[[nodiscard]] std::span<const LabParameterValue> GetHostViewOverrides() const noexcept;
+		// Host view values as the next frame resolves them, before frame-local patches.
+		[[nodiscard]] std::vector<HostViewProjectionEntry> DescribeHostView() const;
 		[[nodiscard]] const LabParameterSet& GetHostParameters() const noexcept;
 		[[nodiscard]] const LabParameterSet* GetLabParameters() const noexcept;
 		[[nodiscard]] std::span<const WorldLightingProfile> GetLightingProfiles() const noexcept;
@@ -102,6 +109,7 @@ namespace gglab
 		[[nodiscard]] uint64_t AdmitParameterBatch(std::span<const LabParameterValue> values,
 			std::string& error, ParameterBatchOwner owner) noexcept;
 		void SupersedeOverwrittenItems(const ParameterBatch& applied) noexcept;
+		void AdvanceHostViewRevision() noexcept;
 		struct ParameterBatch
 		{
 			ParameterBatchStatus m_Status;
@@ -134,6 +142,8 @@ namespace gglab
 		bool m_MutatingParameterBatch = false;
 		uint64_t m_NextParameterBatchId = 1;
 		uint64_t m_ParameterRevision = 1;
+		// Maintained at the Host override write sites, independent of lazy tracking.
+		uint64_t m_HostViewRevision = 1;
 		bool m_ParameterIntakeFailed = false;
 		bool m_Enabled = false;
 		bool m_Transitioning = false;

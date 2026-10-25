@@ -204,13 +204,18 @@ namespace gglab
 		}
 	}
 
+	GTAOSettingsPatch ToGTAOSettingsPatch(const FrameSequenceGTAOOverrides& overrides) noexcept
+	{
+		return { .m_DirectionCount = overrides.m_DirectionCount,
+			.m_StepCount = overrides.m_StepCount,
+			.m_TemporalAccumulation = overrides.m_TemporalAccumulation,
+			.m_TemporalMaxSamples = overrides.m_TemporalMaxSamples };
+	}
+
 	GTAOSettings ApplyFrameSequenceGTAOOverrides(
 		const FrameSequenceGTAOOverrides& overrides, GTAOSettings settings) noexcept
 	{
-		return ApplyGTAOSettingsPatch({ .m_DirectionCount = overrides.m_DirectionCount,
-			.m_StepCount = overrides.m_StepCount,
-			.m_TemporalAccumulation = overrides.m_TemporalAccumulation,
-			.m_TemporalMaxSamples = overrides.m_TemporalMaxSamples }, settings);
+		return ApplyGTAOSettingsPatch(ToGTAOSettingsPatch(overrides), settings);
 	}
 
 	TemporalAASettings ApplyFrameSequenceTemporalAAOverrides(

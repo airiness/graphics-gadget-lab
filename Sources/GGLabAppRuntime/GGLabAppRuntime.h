@@ -7,6 +7,7 @@
 #include "Capture/CaptureEnvironment.h"
 #include "Capture/CaptureJobTypes.h"
 #include "Capture/CapturePlan.h"
+#include "Parameters/HostViewParameters.h"
 #include "Parameters/ParameterBatch.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
@@ -263,6 +264,10 @@ namespace gglab
 			std::span<const LabParameterValue> values, std::string& error) noexcept;
 		[[nodiscard]] std::optional<ParameterBatchStatus> TakeParameterBatchResult(uint64_t id) noexcept;
 		[[nodiscard]] const ParameterBatchStatus* GetExternalParameterBatchStatus() const noexcept;
+		// Created once with runtime services and shared by capture artifacts and session
+		// control; empty before composition or when creation failed.
+		[[nodiscard]] const std::string& GetRunIdentity() const noexcept { return m_RunIdentity; }
+		[[nodiscard]] HostViewControlStamp GetHostViewControlStamp() const;
 		// Borrowed read-only views; null before composition. Commands enter through
 		// AppRuntime so a C++ host cannot bypass admission or forge owner callbacks.
 		[[nodiscard]] const SessionParameterControl* GetParameterControl() const noexcept
@@ -310,6 +315,7 @@ namespace gglab
 		CaptureJobLimits m_CaptureJobLimits{};
 		CaptureHostEnvironment m_HostEnvironment{};
 		std::chrono::system_clock::time_point m_StartedAt{};
+		std::string m_RunIdentity;
 		ApplicationContentRegistration m_ContentRegistration{};
 		std::unique_ptr<RenderHost> m_RenderHost;
 		const std::thread::id m_OwnerThread = std::this_thread::get_id();

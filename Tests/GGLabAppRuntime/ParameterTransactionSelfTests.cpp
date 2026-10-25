@@ -3,12 +3,17 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Parameters/ParameterEffectReceipt.h"
 #include "Parameters/HostViewParameters.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettingsPatch.h"
 #include "GGLabTestCore/SelfTest.h"
 
+#include <algorithm>
 #include <array>
 #include <limits>
+#include <span>
 #include <string>
+#include <string_view>
 #include <utility>
+#include <variant>
 
 namespace gglab
 {
@@ -264,6 +269,71 @@ namespace gglab
 			}
 		}
 
+		void RunHostViewAttributionTests(SelfTestContext& context) noexcept
+		{
+			ResolvedViewRenderSettings view;
+			view.m_TemporalAA.m_MaxHistoryFeedback = 0.6f;
+			view.m_Lighting.m_GTAO.m_Radius = 2.0f;
+			const std::array overrides
+			{
+				LabParameterValue{ LabParameterId("view.taa.max_history_feedback"), 0.6f },
+				LabParameterValue{ LabParameterId("view.gtao.radius"), 2.0f },
+			};
+			const auto find = [](std::span<const HostViewProjectionEntry> projection, std::string_view id)
+				{
+					const auto found = std::ranges::find(projection, LabParameterId(id), &HostViewProjectionEntry::m_Id);
+					return found != projection.end() ? &*found : nullptr;
+				};
+			ViewRenderSettingsPatch sequence;
+			sequence.m_TemporalAA.m_MaxHistoryFeedback = 0.3f;
+			sequence.m_Lighting.m_GTAO.m_StepCount = 3u;
+			const auto projection = DescribeHostViewProjection(view, { .m_TemporalAA = true }, overrides,
+				{ .m_Sequence = &sequence });
+			const auto* feedback = find(projection, "view.taa.max_history_feedback");
+			const auto* taaEnabled = find(projection, "view.taa.enabled");
+			const auto* radius = find(projection, "view.gtao.radius");
+			const auto* steps = find(projection, "view.gtao.step_count");
+			const auto* ev100 = find(projection, "view.exposure.ev100");
+			context.Check(projection.size() == 25 && feedback && taaEnabled && radius && steps && ev100,
+				"The projection covers every Host view binding");
+			if (!feedback || !taaEnabled || !radius || !steps || !ev100)
+			{
+				return;
+			}
+			context.Check(taaEnabled->m_Source == HostViewValueSource::Tooling &&
+				steps->m_InheritedSource == HostViewValueSource::Content &&
+				ev100->m_Source == HostViewValueSource::Camera && !ev100->m_Override,
+				"Inherited values come from the active tooling block, content or the display camera");
+			context.Check(radius->m_Source == HostViewValueSource::Host && radius->m_Override &&
+				std::get<float>(*radius->m_Override) == 2.0f && std::get<float>(radius->m_Value) == 2.0f,
+				"A present Host override is attributed to host and reports its stored value");
+			context.Check(feedback->m_Source == HostViewValueSource::Sequence &&
+				feedback->m_InheritedSource == HostViewValueSource::Tooling && feedback->m_Override &&
+				steps->m_Source == HostViewValueSource::Sequence && !steps->m_Override,
+				"A legacy sequence patch is attributed after Host overrides, whatever the stored values");
+
+			ViewRenderSettingsPatch reference;
+			reference.m_TemporalAA.m_Enabled = false;
+			reference.m_Lighting.m_GTAO.m_TemporalAccumulation = false;
+			const auto masked = DescribeHostViewProjection(view, {}, overrides, { .m_ForcedReference = &reference });
+			const auto* maskedEnabled = find(masked, "view.taa.enabled");
+			const auto* maskedAccumulation = find(masked, "view.gtao.temporal_accumulation");
+			const auto* maskedFeedback = find(masked, "view.taa.max_history_feedback");
+			context.Check(maskedEnabled && maskedEnabled->m_Source == HostViewValueSource::ForcedReference &&
+				maskedEnabled->m_InheritedSource == HostViewValueSource::Content &&
+				maskedAccumulation && maskedAccumulation->m_Source == HostViewValueSource::ForcedReference &&
+				maskedFeedback && maskedFeedback->m_Source == HostViewValueSource::Host,
+				"Reference sampling attributes only its forced fields");
+
+			context.Check(GetHostViewValueSourceName(HostViewValueSource::Content) == "content" &&
+				GetHostViewValueSourceName(HostViewValueSource::Tooling) == "tooling" &&
+				GetHostViewValueSourceName(HostViewValueSource::Camera) == "camera" &&
+				GetHostViewValueSourceName(HostViewValueSource::Host) == "host" &&
+				GetHostViewValueSourceName(HostViewValueSource::Sequence) == "sequence" &&
+				GetHostViewValueSourceName(HostViewValueSource::ForcedReference) == "forced-reference",
+				"Value sources keep their transport names");
+		}
+
 		ParameterEffectReceipt BeginReceipt(ParameterEffectClass effectClass) noexcept
 		{
 			return *ParameterEffectReceipt::Begin(LabParameterId("test.parameter"), effectClass, 7, 10);
@@ -370,6 +440,7 @@ namespace gglab
 		RunBatchTests(context);
 		RunInheritedParameterTests(context);
 		RunHostViewProjectionTests(context);
+		RunHostViewAttributionTests(context);
 		RunReceiptTests(context);
 	}
 }

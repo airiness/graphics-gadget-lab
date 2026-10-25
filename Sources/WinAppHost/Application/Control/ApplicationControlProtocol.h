@@ -4,6 +4,7 @@
 #include "Capture/CapturePlan.h"
 #include "Capture/FrameSequenceCoordinator.h"
 #include "Capture/NonFiniteWatchCoordinator.h"
+#include "Parameters/HostViewParameters.h"
 
 #include <cstdint>
 #include <memory>
@@ -91,6 +92,8 @@ namespace gglab
 		const ParameterBatchStatus* m_ParameterBatch = nullptr;
 		const LightingProfilePublication* m_LightingProfiles = nullptr;
 		std::string m_LightingProfileError;
+		// Live control state; the frame carries the stamp it was planned with.
+		HostViewControlStamp m_HostViewControl;
 	};
 
 	// Response serializers. Every response carries the protocol version, the

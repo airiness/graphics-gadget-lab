@@ -10,6 +10,7 @@
 #include "Demo/DemoLoadingShell.h"
 #include "Demo/DemoManager.h"
 #include "GGLabAppRuntime.h"
+#include "Parameters/HostViewParameters.h"
 #include "Parameters/SessionParameterControl.h"
 #include "Parameters/ParameterSourceAdapters.h"
 #include "Lab/LabRuntime.h"
@@ -73,6 +74,7 @@
 #include <thread>
 #include <type_traits>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #define NOMINMAX
@@ -2984,6 +2986,112 @@ namespace gglab
 			runtime.Shutdown();
 		}
 
+		void RunHostViewControlScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = true;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			ParameterTestTooling tooling;
+			tooling.m_Settings.m_TemporalAA = TemporalAASettings{};
+			const auto tick = [&]()
+				{
+					return runtime.Tick({ .m_ApplicationTooling = &tooling });
+				};
+			const auto find = [](std::span<const HostViewProjectionEntry> projection, std::string_view id)
+				{
+					const auto found = std::ranges::find(projection, LabParameterId(id), &HostViewProjectionEntry::m_Id);
+					GGLAB_ASSERT_MSG(found != projection.end(), "Every Host view binding is projected.");
+					return *found;
+				};
+			GGLAB_UNUSED(tick());
+			const auto& control = *runtime.GetParameterControl();
+			const auto& capture = *runtime.GetFrameCaptureCoordinator();
+			const auto environment = nlohmann::json::parse(capture.GetEnvironmentJson(), nullptr, false);
+			checks.Check(runtime.GetRunIdentity().size() == 32 && environment.is_object() &&
+				environment["process"]["runIdentity"] == runtime.GetRunIdentity(),
+				"Capture artifacts and session control share the runtime-composed run identity");
+			const uint64_t initial = control.GetHostViewRevision();
+			const auto* frame = capture.GetLastFrameState();
+			checks.Check(!control.IsEnabled() && frame && frame->m_Outcome == FrameCaptureFrameOutcome::Submitted &&
+				frame->m_HostViewControl.m_RunIdentity == runtime.GetRunIdentity() &&
+				frame->m_HostViewControl.m_ContentIdentity == control.GetContentIdentity() &&
+				frame->m_HostViewControl.m_HostViewRevision == initial && frame->m_HostViewProjection.size() == 25 &&
+				find(frame->m_HostViewProjection, "view.taa.enabled").m_Source == HostViewValueSource::Tooling &&
+				find(frame->m_HostViewProjection, "view.gtao.radius").m_Source == HostViewValueSource::Content &&
+				find(frame->m_HostViewProjection, "view.exposure.ev100").m_Source == HostViewValueSource::Camera,
+				"Frames record the Host view stamp and layer attribution while parameter tracking stays lazy");
+
+			runtime.EnableParameterControl();
+			const auto discovered = control.DescribeHostView();
+			checks.Check(control.GetHostViewRevision() == initial && discovered.size() == 25 &&
+				find(discovered, "view.taa.enabled").m_InheritedSource == HostViewValueSource::Tooling &&
+				!find(discovered, "view.gtao.radius").m_Override,
+				"Discovery describes the next frame without advancing the Host view revision");
+			std::string error;
+			const auto request = [&](float radius)
+				{
+					const std::array values{ LabParameterValue{ LabParameterId("view.gtao.radius"), radius } };
+					const auto id = runtime.RequestParameterBatch(values, error);
+					GGLAB_UNUSED(tick());
+					return runtime.TakeParameterBatchResult(id);
+				};
+			const float inherited = std::get<float>(find(discovered, "view.gtao.radius").m_Value);
+			const auto unchanged = request(inherited);
+			checks.Check(unchanged && unchanged->m_Items[0].m_State == ParameterEffectState::NoChange &&
+				control.GetHostViewRevision() == initial && control.GetHostViewOverrides().empty(),
+				"A retained semantic NoChange batch leaves Host overrides and their revision unchanged");
+			const auto pinned = request(inherited + 1.0f);
+			frame = capture.GetLastFrameState();
+			checks.Check(pinned && pinned->m_Items[0].m_State == ParameterEffectState::Consumed &&
+				control.GetHostViewRevision() == initial + 1 &&
+				frame->m_HostViewControl.m_HostViewRevision == initial + 1 &&
+				find(frame->m_HostViewProjection, "view.gtao.radius").m_Source == HostViewValueSource::Host,
+				"A committed Host override advances the revision once and is attributed to host");
+			const auto repeated = request(inherited + 1.0f);
+			checks.Check(repeated && repeated->m_Items[0].m_State == ParameterEffectState::NoChange &&
+				control.GetHostViewRevision() == initial + 1,
+				"Repeating a present override value keeps the revision");
+
+			tooling.m_Settings.m_GTAO = GTAOSettings{ .m_Radius = 3.0f };
+			GGLAB_UNUSED(tick());
+			GGLAB_UNUSED(tick());
+			frame = capture.GetLastFrameState();
+			checks.Check(control.GetHostViewRevision() == initial + 1 &&
+				find(frame->m_HostViewProjection, "view.gtao.radius").m_Source == HostViewValueSource::Host &&
+				find(frame->m_HostViewProjection, "view.gtao.radius").m_InheritedSource == HostViewValueSource::Tooling &&
+				find(frame->m_HostViewProjection, "view.gtao.enabled").m_Source == HostViewValueSource::Tooling,
+				"Inherited tooling changes masked by a Host override do not advance the revision");
+
+			probe.m_SkipParameterFrame = true;
+			GGLAB_UNUSED(tick());
+			checks.Check(capture.GetLastFrameState()->m_Outcome == FrameCaptureFrameOutcome::Aborted,
+				"A frame that ends before submission reports an aborted outcome");
+
+			const auto restart = [&]()
+				{
+					probe.m_ParameterRuntime->OnExit();
+					probe.m_ParameterRuntime->RequestRestartSession();
+					probe.m_ParameterRuntime->ProcessPendingCommands();
+					probe.m_ParameterRuntime->OnEnter();
+					GGLAB_UNUSED(tick());
+				};
+			const uint64_t content = control.GetContentIdentity();
+			restart();
+			checks.Check(control.GetContentIdentity() != content && control.GetHostViewOverrides().empty() &&
+				control.GetHostViewRevision() == initial + 2,
+				"A content activation that discards Host overrides advances the revision once");
+			restart();
+			checks.Check(control.GetHostViewRevision() == initial + 2,
+				"A content activation without Host overrides keeps the revision");
+			runtime.Shutdown();
+		}
+
 		void RunSequenceParameterEventScenario(SelfTestContext& checks, const std::filesystem::path& root)
 		{
 			LifetimeProbe probe;
@@ -5512,6 +5620,7 @@ namespace gglab
 		RunHostParameterScenario(context, root / "host-lab", true);
 		RunEffectiveParameterSettingsScenario(context, root / "tooling-host", false);
 		RunEffectiveParameterSettingsScenario(context, root / "tooling-lab", true);
+		RunHostViewControlScenario(context, root / "host-view-control");
 		RunLightingParameterScenario(context, root / "lighting-parameters");
 		RunBatchPreparationScenario(context, root / "batch-preparation");
 		RunContentBindingScenario(context, root / "content-binding-shutdown", false);

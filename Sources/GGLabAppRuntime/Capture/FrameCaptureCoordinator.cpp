@@ -182,7 +182,7 @@ namespace gglab
 		m_ShutdownWriteTimeout(createInfo.m_ShutdownWriteTimeout),
 		m_Writer(std::make_unique<CaptureWriter>(createInfo.m_ImageEncoder,
 			createInfo.m_WriteOnCallingThread, createInfo.m_PublicationFileSystem)),
-		m_RunIdentity(CreateCaptureRunIdentity()),
+		m_RunIdentity(createInfo.m_RunIdentity ? *createInfo.m_RunIdentity : CreateCaptureRunIdentity()),
 		m_EnvironmentJson(SerializeCaptureEnvironment(createInfo.m_Environment, m_RunIdentity)),
 		m_JobLimits(createInfo.m_JobLimits),
 		m_JobReceipts(m_JobLimits.m_MaxReceipts)
@@ -997,6 +997,18 @@ namespace gglab
 			++m_SettledFrames;
 		}
 		m_HasOpenFrame = false;
+		if (m_LastFrameState)
+		{
+			m_LastFrameState->m_Outcome = FrameCaptureFrameOutcome::Submitted;
+		}
+	}
+
+	void FrameCaptureCoordinator::OnFrameAborted() noexcept
+	{
+		if (m_LastFrameState && m_LastFrameState->m_Outcome == FrameCaptureFrameOutcome::Planned)
+		{
+			m_LastFrameState->m_Outcome = FrameCaptureFrameOutcome::Aborted;
+		}
 	}
 
 	void FrameCaptureCoordinator::Update() noexcept

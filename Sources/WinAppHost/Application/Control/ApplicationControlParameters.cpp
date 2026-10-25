@@ -2,6 +2,7 @@
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabRuntime/Graphics/LightingProfile.h"
 #include "Application/Control/ApplicationControlProtocol.h"
+#include "Parameters/HostViewParameters.h"
 #include "Parameters/SessionParameterControl.h"
 #include "GGLabAppRuntime.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
@@ -57,6 +58,13 @@ namespace gglab
 					return item;
 				}
 			}, value);
+		}
+
+		[[nodiscard]] Json HostOverride(const HostViewProjectionEntry& entry)
+		{
+			return entry.m_Override ?
+				Json{ { "present", true }, { "value", Value(*entry.m_Override) } } :
+				Json{ { "present", false } };
 		}
 
 		[[nodiscard]] const char* EffectClass(ParameterEffectClass value)
@@ -327,6 +335,30 @@ namespace gglab
 			Json();
 	}
 
+	Json SerializeApplicationControlHostViewStamp(const HostViewControlStamp& stamp)
+	{
+		return {
+			{ "runIdentity", stamp.m_RunIdentity.empty() ? Json() : Json(stamp.m_RunIdentity) },
+			{ "contentIdentity", stamp.m_ContentIdentity },
+			{ "hostViewRevision", stamp.m_HostViewRevision } };
+	}
+
+	Json SerializeApplicationControlHostViewProjection(std::span<const HostViewProjectionEntry> projection)
+	{
+		Json result = Json::array();
+		for (const auto& entry : projection)
+		{
+			result.push_back({
+				{ "id", entry.m_Id.GetName() },
+				{ "type", ParameterTypes[static_cast<size_t>(entry.m_Type)] },
+				{ "value", Value(entry.m_Value) },
+				{ "source", GetHostViewValueSourceName(entry.m_Source) },
+				{ "inheritedSource", GetHostViewValueSourceName(entry.m_InheritedSource) },
+				{ "hostOverride", HostOverride(entry) } });
+		}
+		return result;
+	}
+
 	std::string SerializeApplicationControlParameters(uint64_t id, GGLabAppRuntime* runtime) noexcept
 	{
 		const auto* parameterControl = runtime ? runtime->GetParameterControl() : nullptr;
@@ -338,6 +370,8 @@ namespace gglab
 		Json response = Response(id, true);
 		response["contentId"] = parameterControl->GetContentId();
 		response["revision"] = parameterControl->GetParameterRevision();
+		response["controlState"] = SerializeApplicationControlHostViewStamp(runtime->GetHostViewControlStamp());
+		const auto hostView = parameterControl->DescribeHostView();
 		response["parameters"] = Json::array();
 		response["lighting"] = SerializeApplicationControlLightingProfiles(&parameterControl->GetLightingProfilePublication());
 		response["lightingProfileError"] = parameterControl->GetLightingProfileError();
@@ -375,6 +409,18 @@ namespace gglab
 						{ "min", desc.m_MinValue ? Value(*desc.m_MinValue) : Json() },
 						{ "max", desc.m_MaxValue ? Value(*desc.m_MaxValue) : Json() },
 						{ "enumItems", std::move(enums) } });
+					const auto entry = std::ranges::find(hostView, desc.m_Id, &HostViewProjectionEntry::m_Id);
+					if (entry != hostView.end())
+					{
+						auto& item = response["parameters"].back();
+						item["hostOverride"] = HostOverride(*entry);
+						// The next frame's value before sequence or reference patches.
+						item["resolved"] = {
+							{ "value", Value(entry->m_Value) },
+							{ "source", GetHostViewValueSourceName(entry->m_Source) },
+							{ "scope", "display-view" } };
+						item["inheritedSource"] = GetHostViewValueSourceName(entry->m_InheritedSource);
+					}
 				}
 			};
 		append(parameterControl->GetHostParameters(), "host");

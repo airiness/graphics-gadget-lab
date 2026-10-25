@@ -4,6 +4,7 @@
 #include "AppRuntimeLog.h"
 #include "ApplicationInput.h"
 #include "ApplicationToolingIntegration.h"
+#include "Capture/CaptureBundle.h"
 #include "Capture/FrameCaptureCoordinator.h"
 #include "Capture/NonFiniteWatchCoordinator.h"
 #include "Capture/FrameSequenceCoordinator.h"
@@ -253,6 +254,7 @@ namespace gglab
 				AppRuntimeServiceInitializeResult::RendererInitializationFailed);
 		}
 		m_NonFiniteWatch = std::make_unique<NonFiniteWatchCoordinator>(m_RenderHost->GetFrameCaptureControl());
+		m_RunIdentity = CreateCaptureRunIdentity();
 		m_FrameCapture = std::make_unique<FrameCaptureCoordinator>(
 			FrameCaptureCoordinator::CreateInfo{
 				.m_Capture = m_RenderHost->GetFrameCaptureControl(),
@@ -265,6 +267,7 @@ namespace gglab
 					.m_Device = m_RenderHost->GetRHIContext()->GetDeviceIdentity(),
 					.m_StartedAt = m_StartedAt,
 				},
+				.m_RunIdentity = m_RunIdentity,
 			});
 		m_FrameCapture->SetAppRuntimeJobResultOwner();
 		m_FrameSequence = std::make_unique<FrameSequenceCoordinator>(*m_FrameCapture);

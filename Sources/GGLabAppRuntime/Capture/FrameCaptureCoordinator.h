@@ -6,6 +6,7 @@
 #include "Capture/FrameCaptureImageEncoder.h"
 #include "Capture/FrameCaptureMetadata.h"
 #include "Capture/FrameCaptureReadiness.h"
+#include "Parameters/HostViewParameters.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalHistoryTypes.h"
@@ -48,6 +49,13 @@ namespace gglab
 		}
 	};
 
+	enum class FrameCaptureFrameOutcome : uint8_t
+	{
+		Planned,
+		Submitted,
+		Aborted,
+	};
+
 	// Runtime state of the frame about to be built, supplied by the application
 	// runtime once per rendered frame.
 	struct FrameCaptureFrameState
@@ -71,6 +79,11 @@ namespace gglab
 		double m_TotalTime = 0.0;
 		bool m_DevelopmentTools = false;
 		FrameCaptureTemporalState m_Temporal{};
+		HostViewControlStamp m_HostViewControl{};
+		// Final display-view values, attributed through this frame's sequence/reference patches.
+		std::vector<HostViewProjectionEntry> m_HostViewProjection;
+		// Planned until the coordinator records submission or an abort.
+		FrameCaptureFrameOutcome m_Outcome = FrameCaptureFrameOutcome::Planned;
 	};
 
 	// A camera reference view the runtime restores for a waiting job.
@@ -108,6 +121,9 @@ namespace gglab
 			CaptureJobLimits m_JobLimits;
 			// Recorded in every bundle manifest; unknown values stay null.
 			CaptureEnvironment m_Environment;
+			// The composed process run identity, shared with session control. Empty means
+			// creation failed; standalone coordinators omit it and create their own.
+			std::optional<std::string> m_RunIdentity;
 		};
 
 		explicit FrameCaptureCoordinator(const CreateInfo& createInfo) noexcept;
@@ -180,6 +196,8 @@ namespace gglab
 			ResourceExportFrameContext context) noexcept;
 		// Called after the frame passed to BeginFrame was submitted.
 		void OnFrameSubmitted() noexcept;
+		// Called when the frame passed to BeginFrame ends before submission.
+		void OnFrameAborted() noexcept;
 		// Collects Runtime capture results, starts encoding and publishes
 		// finished requests.
 		void Update() noexcept;

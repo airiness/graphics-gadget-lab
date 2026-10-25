@@ -116,6 +116,16 @@ namespace gglab
 		return ResolveInherited().has_value();
 	}
 
+	std::optional<ApplicationViewSettingsResolution> HostViewParameterSource::Resolve() const noexcept
+	{
+		auto resolution = ResolveInherited();
+		if (resolution)
+		{
+			ApplyViewSettings(resolution->m_View, resolution->m_Profile.m_EnableScenePreExposure);
+		}
+		return resolution;
+	}
+
 	void HostViewParameterSource::Refresh() noexcept
 	{
 		const auto inherited = ResolveInherited();

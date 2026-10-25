@@ -59,10 +59,19 @@ namespace gglab
 		[[nodiscard]] ViewRenderProfile ResolveProfile(const ViewRenderProfile& authored) const noexcept;
 	};
 
+	// Whole tooling blocks that replaced the authored profile's settings.
+	struct ApplicationToolingBlocks
+	{
+		bool m_TemporalAA = false;
+		bool m_GTAO = false;
+		bool m_Bloom = false;
+	};
+
 	struct ApplicationViewSettingsResolution
 	{
 		ViewRenderProfile m_Profile;
 		ResolvedViewRenderSettings m_View;
+		ApplicationToolingBlocks m_ToolingBlocks;
 	};
 
 	[[nodiscard]] ApplicationViewSettingsResolution ResolveApplicationViewSettings(

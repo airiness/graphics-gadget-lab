@@ -142,6 +142,26 @@ temporary and do not replace Host values. Reference sampling forces temporal AA
 and temporal GTAO inactive. Preview tap, camera input/FOV and other Immediate
 fields without frozen projections remain unavailable through `set`.
 
+### Host view control state
+
+Check `status.capabilities.hostViewControlState` before relying on these fields.
+Discovery and `status.parameterControl` report `controlState`: the process
+`runIdentity` (the same value as `environment.process.runIdentity`), the active
+`contentIdentity` and `hostViewRevision`. The revision advances once for each
+committed or discarded change to Host view override presence or value. NoChange,
+inherited content/tooling/camera changes and queries leave it unchanged.
+
+Each Host view descriptor in discovery adds `hostOverride` (`present`, plus `value`
+when present), `resolved` (`value`, `source`, `scope: display-view`) and
+`inheritedSource`. `resolved` is the next frame's value before sequence or
+reference patches. Sources are `content`, `tooling`, `camera` and `host`; a whole
+active tooling block attributes all of its fields to `tooling`.
+
+`status.frame` describes the last planned frame and may lag live control state. It
+carries that frame's own `controlState`, a `hostView` array whose `source` can also
+be `sequence` or `forced-reference`, the temporal consumer plan, and `outcome`
+(`planned`, `submitted` or `aborted`). Capture sidecars do not record these fields.
+
 ## Content-registered lighting profiles
 
 Discover enum integers through `parameters`. `-1` is a read-only indication of no

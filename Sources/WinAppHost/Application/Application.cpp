@@ -588,6 +588,7 @@ namespace gglab
 				.m_ParameterBatch = parameters ? parameters->GetParameterBatchStatus() : nullptr,
 				.m_LightingProfiles = parameters ? &parameters->GetLightingProfilePublication() : nullptr,
 				.m_LightingProfileError = parameters ? parameters->GetLightingProfileError() : std::string{},
+				.m_HostViewControl = m_AppRuntime ? m_AppRuntime->GetHostViewControlStamp() : HostViewControlStamp{},
 				}));
 			return;
 		case ApplicationControlCommand::Parameters:

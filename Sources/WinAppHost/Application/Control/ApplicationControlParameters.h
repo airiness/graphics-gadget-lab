@@ -13,6 +13,8 @@
 namespace gglab
 {
 	class GGLabAppRuntime;
+	struct HostViewControlStamp;
+	struct HostViewProjectionEntry;
 	struct LightingProfilePublication;
 
 	inline constexpr size_t ApplicationControlMaxParameterItems = 128;
@@ -31,6 +33,11 @@ namespace gglab
 		const ParameterBatchStatus& batch);
 	[[nodiscard]] nlohmann::json SerializeApplicationControlLightingProfiles(
 		const LightingProfilePublication* profiles);
+	[[nodiscard]] nlohmann::json SerializeApplicationControlHostViewStamp(
+		const HostViewControlStamp& stamp);
+	// One object per Host view binding: final value, its source and override presence.
+	[[nodiscard]] nlohmann::json SerializeApplicationControlHostViewProjection(
+		std::span<const HostViewProjectionEntry> projection);
 	[[nodiscard]] std::string SerializeApplicationControlParameters(
 		uint64_t id, GGLabAppRuntime* runtime) noexcept;
 	[[nodiscard]] std::string SubmitApplicationControlParameters(uint64_t id,

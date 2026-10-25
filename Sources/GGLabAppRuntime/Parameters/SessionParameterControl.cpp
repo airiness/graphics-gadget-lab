@@ -11,6 +11,19 @@
 
 namespace gglab
 {
+	namespace
+	{
+		[[nodiscard]] bool SameOverrides(std::span<const LabParameterValue> a,
+			std::span<const LabParameterValue> b) noexcept
+		{
+			return a.size() == b.size() && std::ranges::all_of(a, [&](const LabParameterValue& value)
+				{
+					const auto found = std::ranges::find(b, value.m_Id, &LabParameterValue::m_Id);
+					return found != b.end() && LabValuesEqual(found->m_Value, value.m_Value);
+				});
+		}
+	}
+
 	SessionParameterControl::SessionParameterControl(RenderEnvironmentAccess& environment,
 		WorldLightingControlBase* worldLighting,
 		std::function<std::optional<ApplicationViewSettingsResolution>(DemoBase&)> viewResolver) noexcept :
@@ -47,7 +60,12 @@ namespace gglab
 					EndParameterBatch(*batch, true, "The content changed before the parameter frame.");
 				}
 			}
+			const bool discardsHostView = !continuing && !GetHostViewOverrides().empty();
 			m_Sources->Bind(demo, demo ? demo->GetParameterLabRuntime() : nullptr, serial, continuing);
+			if (discardsHostView)
+			{
+				AdvanceHostViewRevision();
+			}
 			if (!continuing && m_Enabled && m_Demo &&
 				m_ParameterRevision != std::numeric_limits<uint64_t>::max())
 			{
@@ -115,6 +133,30 @@ namespace gglab
 		}
 		const auto progress = m_Demo->GetActiveLoadingProgress();
 		return !progress || progress->IsReady();
+	}
+
+	std::span<const LabParameterValue> SessionParameterControl::GetHostViewOverrides() const noexcept
+	{
+		return m_Sources->m_View.GetOverrides();
+	}
+
+	std::vector<HostViewProjectionEntry> SessionParameterControl::DescribeHostView() const
+	{
+		const auto resolution = m_Sources->m_View.Resolve();
+		return resolution ?
+			DescribeHostViewProjection(resolution->m_View, resolution->m_ToolingBlocks, GetHostViewOverrides()) :
+			std::vector<HostViewProjectionEntry>{};
+	}
+
+	void SessionParameterControl::AdvanceHostViewRevision() noexcept
+	{
+		// Admission and application stop at the last value, so no revision is reused.
+		GGLAB_ASSERT_MSG(m_HostViewRevision != std::numeric_limits<uint64_t>::max(),
+			"Host view revision capacity is exhausted.");
+		if (m_HostViewRevision != std::numeric_limits<uint64_t>::max())
+		{
+			++m_HostViewRevision;
+		}
 	}
 
 	const LabParameterSet& SessionParameterControl::GetHostParameters() const noexcept
@@ -363,7 +405,8 @@ namespace gglab
 			error = "A parameter batch requires ready active content and 1-128 items.";
 			return 0;
 		}
-		if (m_NextParameterBatchId == 0 || m_ParameterRevision == std::numeric_limits<uint64_t>::max())
+		if (m_NextParameterBatchId == 0 || m_ParameterRevision == std::numeric_limits<uint64_t>::max() ||
+			m_HostViewRevision == std::numeric_limits<uint64_t>::max())
 		{
 			error = "Parameter transaction identity capacity is exhausted.";
 			return 0;
@@ -612,7 +655,12 @@ namespace gglab
 			EndParameterBatch(*batch, false, "The runtime shut down before parameter consumption.");
 		}
 		m_ParameterIntakeFailed = true;
+		const bool discardsHostView = !GetHostViewOverrides().empty();
 		m_Sources->Bind(nullptr, nullptr, 0);
+		if (discardsHostView)
+		{
+			AdvanceHostViewRevision();
+		}
 		m_Demo = nullptr;
 		m_Lab = nullptr;
 	}
@@ -657,7 +705,8 @@ namespace gglab
 	void SessionParameterControl::ApplyParameterBatch(ParameterBatch& batch, uint64_t serial) noexcept
 	{
 		m_Sources->m_Domain.BeginApplication(batch.m_Domain);
-		if (!IsAvailable() || m_ParameterRevision == std::numeric_limits<uint64_t>::max())
+		if (!IsAvailable() || m_ParameterRevision == std::numeric_limits<uint64_t>::max() ||
+			m_HostViewRevision == std::numeric_limits<uint64_t>::max())
 		{
 			EndParameterBatch(batch, false, "The content is unavailable at the safe parameter boundary.");
 			return;
@@ -734,6 +783,8 @@ namespace gglab
 			receipts.push_back(std::move(*receipt));
 		}
 
+		const std::vector<LabParameterValue> hostViewBefore(
+			GetHostViewOverrides().begin(), GetHostViewOverrides().end());
 		// No callbacks or rejection in this region. Install every source and the
 		// unique receipt owner before allowing any content handler to observe state.
 		for (auto& plan : plans)
@@ -760,6 +811,12 @@ namespace gglab
 			plan.m_Prepared->FinalizeEffects();
 			GGLAB_ASSERT_MSG(changed || !plan.m_Prepared->HasChanges(),
 				"Inherited values cannot change during an all-NoChange batch without an owning source effect.");
+		}
+		// Finalization has removed newly introduced equal overrides, so this compares
+		// the committed override set rather than the requested values.
+		if (!SameOverrides(hostViewBefore, GetHostViewOverrides()))
+		{
+			AdvanceHostViewRevision();
 		}
 		RefreshSources();
 		m_ParameterRevision = revision;

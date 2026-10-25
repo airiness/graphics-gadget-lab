@@ -1341,6 +1341,40 @@ namespace gglab
 			return gates;
 		}
 
+		[[nodiscard]] const char* FrameOutcomeName(FrameCaptureFrameOutcome outcome)
+		{
+			switch (outcome)
+			{
+			case FrameCaptureFrameOutcome::Planned:
+				return "planned";
+			case FrameCaptureFrameOutcome::Submitted:
+				return "submitted";
+			case FrameCaptureFrameOutcome::Aborted:
+				return "aborted";
+			}
+			return "unknown";
+		}
+
+		[[nodiscard]] Json SerializeTemporalPlan(const FrameCaptureTemporalState& temporal)
+		{
+			Json consumers = Json::array();
+			for (const FrameCaptureTemporalConsumer& consumer : temporal.m_Consumers)
+			{
+				consumers.push_back({
+					{ "name", consumer.m_Name },
+					{ "requested", consumer.m_Requested },
+					{ "status", consumer.m_Status },
+					{ "disableReason", consumer.m_DisableReason },
+					});
+			}
+			return {
+				{ "requested", temporal.m_Requested },
+				{ "status", temporal.m_Status },
+				{ "disableReason", temporal.m_DisableReason },
+				{ "consumers", std::move(consumers) },
+			};
+		}
+
 		[[nodiscard]] Json SerializeTimingSummary(std::span<const double> milliseconds)
 		{
 			const FrameSequenceTimingSummary summary = SummarizeFrameSequenceTiming(milliseconds);
@@ -1615,7 +1649,12 @@ namespace gglab
 			{ "sequenceTimingProducts", true },
 			{ "sequenceCancelVerdicts", true },
 			{ "gpuTimingSchema", "gglab.gpu-timing" },
-			{ "gpuTimingSchemaVersion", 1 } };
+			{ "gpuTimingSchemaVersion", 1 },
+			{ "hostViewControlState", {
+				{ "version", 1 },
+				{ "stamp", { "runIdentity", "contentIdentity", "hostViewRevision" } },
+				{ "valueSources", { "content", "tooling", "camera", "host", "sequence", "forced-reference" } },
+				{ "frameOutcomes", { "planned", "submitted", "aborted" } } } } };
 		response["capture"] = {
 			{ "limits", {
 				{ "activeJobs", intake.m_Limits.m_MaxActiveJobs },
@@ -1695,7 +1734,8 @@ namespace gglab
 			{ "revision", status.m_ParametersAvailable ? Json(status.m_ParameterRevision) : Json() },
 			{ "batch", status.m_ParameterBatch ? SerializeApplicationControlParameterBatch(*status.m_ParameterBatch) : Json() },
 			{ "lighting", SerializeApplicationControlLightingProfiles(status.m_LightingProfiles) },
-			{ "lightingProfileError", status.m_LightingProfileError } };
+			{ "lightingProfileError", status.m_LightingProfileError },
+			{ "controlState", SerializeApplicationControlHostViewStamp(status.m_HostViewControl) } };
 		response["sequence"] = status.m_Sequence ? SerializeSequence(*status.m_Sequence) : Json();
 		if (!status.m_Frame)
 		{
@@ -1722,6 +1762,10 @@ namespace gglab
 			} },
 			{ "referenceViews", frame.m_ReferenceViewIds },
 			{ "fixedDeltaTime", frame.m_FixedDeltaTime ? Json(*frame.m_FixedDeltaTime) : Json() },
+			{ "outcome", FrameOutcomeName(frame.m_Outcome) },
+			{ "controlState", SerializeApplicationControlHostViewStamp(frame.m_HostViewControl) },
+			{ "hostView", SerializeApplicationControlHostViewProjection(frame.m_HostViewProjection) },
+			{ "temporal", SerializeTemporalPlan(frame.m_Temporal) },
 		};
 		return Dump(response);
 	}

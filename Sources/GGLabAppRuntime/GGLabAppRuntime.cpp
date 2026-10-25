@@ -159,6 +159,15 @@ namespace gglab
 		return m_ParameterControl ? m_ParameterControl->GetParameterBatchStatus() : nullptr;
 	}
 
+	HostViewControlStamp GGLabAppRuntime::GetHostViewControlStamp() const
+	{
+		return {
+			.m_RunIdentity = m_RunIdentity,
+			.m_ContentIdentity = m_ParameterControl ? m_ParameterControl->GetContentIdentity() : 0,
+			.m_HostViewRevision = m_ParameterControl ? m_ParameterControl->GetHostViewRevision() : 0,
+		};
+	}
+
 	void GGLabAppRuntime::UpdateSequenceParameterEvents() noexcept
 	{
 		const auto* sequence = m_FrameSequence ? m_FrameSequence->GetStatus() : nullptr;

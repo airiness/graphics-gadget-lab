@@ -1,6 +1,8 @@
 #include "GGLabAppRuntime.h"
+#include "Parameters/HostViewParameters.h"
 #include "Parameters/SessionParameterControl.h"
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettingsPatch.h"
 
 #include "AppRuntimeLog.h"
 #include "ApplicationInput.h"
@@ -604,12 +606,16 @@ namespace gglab
 		ResolvedViewRenderSettings displayViewSettings = inheritedView.m_View;
 		m_ParameterControl->ApplyViewSettings(displayViewSettings,
 			effectiveViewRenderProfile.m_EnableScenePreExposure);
+		// Records which fields the frame-local layer below writes, for value attribution.
+		ViewRenderSettingsPatch framePatch;
 		if (referenceSample)
 		{
 			// The reference owns jitter and accumulation; Temporal AA and temporal GTAO
 			// stay inactive while it averages its own sample sequence.
 			displayViewSettings.m_TemporalAA.m_Enabled = false;
 			displayViewSettings.m_Lighting.m_GTAO.m_TemporalAccumulation = false;
+			framePatch.m_TemporalAA.m_Enabled = false;
+			framePatch.m_Lighting.m_GTAO.m_TemporalAccumulation = false;
 		}
 		else
 		{
@@ -617,11 +623,13 @@ namespace gglab
 			{
 				displayViewSettings.m_TemporalAA = ApplyFrameSequenceTemporalAAOverrides(
 					*sequenceTemporalAAOverrides, displayViewSettings.m_TemporalAA);
+				framePatch.m_TemporalAA = *sequenceTemporalAAOverrides;
 			}
 			if (sequenceGTAOOverrides)
 			{
 				displayViewSettings.m_Lighting.m_GTAO = ApplyFrameSequenceGTAOOverrides(
 					*sequenceGTAOOverrides, displayViewSettings.m_Lighting.m_GTAO);
+				framePatch.m_Lighting.m_GTAO = ToGTAOSettingsPatch(*sequenceGTAOOverrides);
 			}
 		}
 		const uint64_t temporalSessionIdentity = m_ActiveContentIdentity;
@@ -688,6 +696,12 @@ namespace gglab
 			.m_DevelopmentTools = applicationTooling != nullptr,
 		});
 		captureFrameState.m_ParameterRevision = m_ParameterControl->GetParameterRevision();
+		captureFrameState.m_HostViewControl = GetHostViewControlStamp();
+		captureFrameState.m_HostViewProjection = DescribeHostViewProjection(displayViewSettings,
+			inheritedView.m_ToolingBlocks, m_ParameterControl->GetHostViewOverrides(), {
+				.m_Sequence = referenceSample ? nullptr : &framePatch,
+				.m_ForcedReference = referenceSample ? &framePatch : nullptr,
+			});
 		if (!m_FrameSequence->BeginFrame(captureFrameState, [this](const FrameCaptureGate& gate)
 			{
 				return m_ParameterControl->CoversReadinessGate(
@@ -733,6 +747,7 @@ namespace gglab
 			// Nothing has been recorded. The temporal transaction is aborted and the
 			// RenderFrame handle retires the begun frame on return.
 			m_RenderHost->InvalidateTemporalFrameAfterLateContractFailure(rendererFrame);
+			m_FrameCapture->OnFrameAborted();
 			if (validation.m_Status == RenderFrameValidationStatus::Skipped)
 			{
 				toolingFrame.Complete();
@@ -764,6 +779,7 @@ namespace gglab
 		GGLAB_ASSERT_MSG(renderGraphCompiled, "RenderGraph compilation failed.");
 		if (!renderGraphCompiled)
 		{
+			m_FrameCapture->OnFrameAborted();
 			return FailRuntime("RenderGraph compilation failed.");
 		}
 		const auto defaults = m_NonFiniteWatch->UsesDefaultTargets() ?
@@ -777,6 +793,7 @@ namespace gglab
 		{
 			// The RenderFrame aborts before submission. Sequence pose/sample and
 			// capture metadata are retried together when the complete group fits.
+			m_FrameCapture->OnFrameAborted();
 			toolingFrame.Complete();
 			return AppRuntimeTickResult::Continue;
 		}
@@ -865,6 +882,7 @@ namespace gglab
 		}
 		if (!frameEndResult.IsCompleted())
 		{
+			m_FrameCapture->OnFrameAborted();
 			toolingFrame.Abort();
 			return FailRuntime("The render host failed to complete frame submission.");
 		}

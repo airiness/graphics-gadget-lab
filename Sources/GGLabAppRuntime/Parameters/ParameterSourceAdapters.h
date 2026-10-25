@@ -32,6 +32,9 @@ namespace gglab
 		[[nodiscard]] bool MatchesFrame(const LabParameterValue& value,
 			const ParameterSourceFrame& frame) const noexcept override;
 		void ApplyViewSettings(ResolvedViewRenderSettings& settings, bool enablePreExposure) const noexcept;
+		[[nodiscard]] std::span<const LabParameterValue> GetOverrides() const noexcept { return m_Overrides; }
+		// The display view as the next frame resolves it before frame-local patches.
+		[[nodiscard]] std::optional<ApplicationViewSettingsResolution> Resolve() const noexcept;
 
 	private:
 		class Prepared;
