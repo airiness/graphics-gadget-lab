@@ -41,7 +41,7 @@ jobs:
         shell: pwsh
         run: |
           $pchCreatorSource =
-            (Resolve-Path -LiteralPath "Sources\WinApp\Application\ApplicationPch.cpp").Path
+            (Resolve-Path -LiteralPath "Sources\WinAppHost\Application\ApplicationPch.cpp").Path
           $sourceExtensions = @(".cpp", ".h", ".hpp", ".inl")
           $unexpectedIncludes = @(
             Get-ChildItem -LiteralPath Sources -Recurse -File |
@@ -546,13 +546,13 @@ jobs:
             exit $LASTEXITCODE
           }
 
-      - name: Run headless self-tests from unrelated CWD (WinApp)
+      - name: Run headless self-tests from unrelated CWD (WinAppTests)
         shell: pwsh
         working-directory: ${{ runner.temp }}
         run: |
-          $application = Join-Path "${{ github.workspace }}" `
-            "Build\Output\x64\${{ matrix.configuration }}\GraphicsGadgetLab.exe"
-          & $application --self-test all
+          $winAppTests = Join-Path "${{ github.workspace }}" `
+            "Build\Output\x64\${{ matrix.configuration }}\WinAppTests.exe"
+          & $winAppTests --suite all
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
@@ -575,7 +575,9 @@ jobs:
         run: |
           $application = Join-Path "${{ github.workspace }}" `
             "Build\Output\x64\${{ matrix.configuration }}\GraphicsGadgetLab.exe"
-          & $application --self-test app-path-composition
+          $winAppTests = Join-Path "${{ github.workspace }}" `
+            "Build\Output\x64\${{ matrix.configuration }}\WinAppTests.exe"
+          & $winAppTests --suite app-path-composition --application $application
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }

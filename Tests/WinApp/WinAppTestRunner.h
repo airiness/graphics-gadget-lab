@@ -17,6 +17,6 @@ namespace gglab
 	[[nodiscard]] bool IsApplicationSelfTestSelectionValid(std::string_view selection) noexcept;
 	[[nodiscard]] bool RunApplicationSelfTests(std::string_view selection, const RuntimePaths& runtimePaths) noexcept;
 	[[nodiscard]] const std::filesystem::path& GetApplicationSelfTestAssetRoot() noexcept;
-	[[nodiscard]] bool RunApplicationPathCompositionSelfTest(const RuntimePaths& runtimePaths, RHIBackendType backend) noexcept;
-	[[nodiscard]] bool RunApplicationArtifactPackageClosureSelfTest(const RuntimePaths& runtimePaths, RHIBackendType backend) noexcept;
+	[[nodiscard]] bool RunApplicationPathCompositionSelfTest(const std::filesystem::path& application) noexcept;
+	[[nodiscard]] bool RunApplicationArtifactPackageClosureSelfTest(const std::filesystem::path& application) noexcept;
 }

@@ -48,7 +48,7 @@ namespace gglab
 		std::optional<std::string> m_StartupLabId;
 		// Development startup assignments for the startup Lab, in command-line order.
 		std::vector<LabParameterAssignment> m_StartupLabParameters;
-		std::optional<std::string> m_SelfTestSelection;
+		bool m_InspectRuntime = false;
 		std::filesystem::path m_StateRoot;
 		bool m_StartWithRelativeMouse = false;
 		bool m_DisableDevelopmentTools = false;

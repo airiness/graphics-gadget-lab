@@ -1,13 +1,12 @@
 #pragma once
-#include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 #include "GGLabTestCore/SelfTest.h"
+
+#include <filesystem>
 
 namespace gglab
 {
-	struct RuntimePaths;
-
 	void RunApplicationPathCompositionSelfTests(SelfTestContext& context,
-		const RuntimePaths& runtimePaths, RHIBackendType backend) noexcept;
+		const std::filesystem::path& application) noexcept;
 	void RunApplicationArtifactPackageClosureSelfTests(SelfTestContext& context,
-		const RuntimePaths& runtimePaths, RHIBackendType backend) noexcept;
+		const std::filesystem::path& application) noexcept;
 }

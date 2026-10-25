@@ -13,7 +13,7 @@ Atlas ID: atlas.application.frame-orchestration
 
 - **Source owner:** `GGLabAppRuntime`, under `Sources/GGLabAppRuntime`.
 - **Responsibility:** begin, build, validate, execute and end each frame, then send
-  host-level feedback. WinApp calls in through `GGLabAppRuntime::Tick`.
+  host-level feedback. WinAppHost calls in through `GGLabAppRuntime::Tick`.
 - **Public interface:** [GGLabAppRuntime.h](../../../Sources/GGLabAppRuntime/GGLabAppRuntime.h).
 - **Implementation:** [TickFrame](../../../Sources/GGLabAppRuntime/GGLabAppRuntimeFrame.cpp)
   and [InitializeServices / Shutdown](../../../Sources/GGLabAppRuntime/GGLabAppRuntimeServices.cpp).
@@ -32,7 +32,7 @@ Anchors:
   - Sources/GGLabAppRuntime/GGLabAppRuntimeFrame.cpp::TickFrame
   - Sources/GGLabAppRuntime/GGLabAppRuntimeServices.cpp::Shutdown
 ReviewPaths:
-  - Sources/WinApp/Application/Application.cpp
+  - Sources/WinAppHost/Application/Application.cpp
   - Projects/GGLabAppRuntime/GGLabAppRuntime.vcxproj
 ```
 
@@ -40,7 +40,7 @@ ReviewPaths:
 Atlas ID: atlas.application.content-hosting
 
 - **Source owner:** `GGLabAppRuntime`, under `Sources/GGLabAppRuntime/Demo`.
-  WinApp supplies the Demo factories through its content registration.
+  WinAppHost supplies the Demo factories through its content registration.
 - **Responsibility:** switch Demos at a frame-safe point and keep each replaced Demo
   until its retire fence completes.
 - **Interface:** [DemoBase.h](../../../Sources/GGLabAppRuntime/Demo/DemoBase.h)
@@ -67,7 +67,7 @@ ReviewPaths:
 Atlas ID: atlas.application.lab-runtime
 
 - **Source owner:** `GGLabAppRuntime`, under `Sources/GGLabAppRuntime/Lab`. Concrete
-  Labs are WinApp sessions under `Sources/WinApp/Application/Lab`, hosted by the
+  Labs are WinAppHost sessions under `Sources/WinAppHost/Application/Lab`, hosted by the
   `DemoLabHost` Demo.
 - **Responsibility:** register Labs, consume Lab commands at the safe point, prepare
   and activate sessions, retire replaced ones and route parameter impacts.
@@ -84,17 +84,17 @@ Atlas ID: atlas.application.lab-runtime
 - **Boundary:** Lab IDs are persisted ([AGENTS.md](../../../AGENTS.md#gpu-shader-and-lab-invariants));
   [Content retirement](../Frame_Execution_Map.md#content-retirement).
 - **Verification:** `GGLabAppRuntimeTests` suite `gpu-fault-lifecycle`, including
-  `RunLabSessionRetirementScenario` and `RunRebuildParameterScenario`; WinApp
+  `RunLabSessionRetirementScenario` and `RunRebuildParameterScenario`; WinAppTests
   `napa-voxel` and `app-content-registration`; `--lab` GPU runs.
 
 ```text
 Anchors:
   - Sources/GGLabAppRuntime/Lab/LabRuntime.h::LabRuntime
   - Sources/GGLabAppRuntime/Lab/LabSessionBase.h::LabSessionBase
-  - Sources/WinApp/Application/Demo/DemoLabHost.h::DemoLabHost
+  - Sources/WinAppHost/Application/Demo/DemoLabHost.h::DemoLabHost
 ReviewPaths:
   - Sources/GGLabAppRuntime/Lab/LabRuntime.cpp
   - Sources/GGLabAppRuntime/Lab/LabRuntimeParameters.cpp
   - Sources/GGLabAppRuntime/Lab/LabCommandQueue.cpp
-  - Sources/WinApp/Application/Content/DesktopApplicationContent.cpp
+  - Sources/WinAppHost/Application/Content/DesktopApplicationContent.cpp
 ```

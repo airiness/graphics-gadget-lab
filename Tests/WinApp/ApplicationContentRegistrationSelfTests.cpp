@@ -1,5 +1,5 @@
 #include "ApplicationContentRegistrationSelfTests.h"
-#include "Application/SelfTest/SelfTestRunner.h"
+#include "WinAppTestRunner.h"
 #include "Application/Content/DesktopApplicationContent.h"
 #include "Application/Content/RuntimeAssetBundle.h"
 #include "Application/Demo/CoastalSceneCameraPaths.h"

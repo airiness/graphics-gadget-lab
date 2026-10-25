@@ -22,7 +22,7 @@ Arrows mean **calls or supplies work to**.
 
 ```mermaid
 flowchart TD
-    Host[WinApp: platform and content composition] --> App[AppRuntime: frame orchestration]
+    Host[WinAppHost: platform and content composition] --> App[AppRuntime: frame orchestration]
     App --> Renderer[Runtime: RenderHost and Renderer]
     App --> Graph[Runtime: pipeline and RenderGraph]
     Renderer --> Graph
@@ -33,7 +33,7 @@ flowchart TD
 
 ## A short tour from startup to one frame
 
-1. [WinApp Application](../../Sources/WinApp/Application/Application.cpp) creates
+1. [WinAppHost Application](../../Sources/WinAppHost/Application/Application.cpp) creates
    the shared application and provides host inputs and the selected RHI factory.
    Before composing services it prepares development shader artifacts, or reads
    the packaged active registry in an artifact-only build.
@@ -60,7 +60,7 @@ flowchart TD
 
 ## Projects
 
-The [repository map](Repository_Module_Map.md) lists all sixteen first-party
+The [repository map](Repository_Module_Map.md) lists all eighteen first-party
 projects, their source owners, declared references and include visibility.
 
 ## Coverage and related guidance
@@ -78,7 +78,7 @@ Anchors:
   - Projects/WinApp/WinApp.vcxproj
   - Projects/GGLabAppRuntime/GGLabAppRuntime.vcxproj
   - Projects/GGLabRuntime/GGLabRuntime.vcxproj
-  - Sources/WinApp/Application/Application.cpp::Initialize
+  - Sources/WinAppHost/Application/Application.cpp::Initialize
   - Sources/GGLabAppRuntime/GGLabAppRuntimeServices.cpp::InitializeServices
 ReviewPaths:
   - GraphicsGadgetLab.sln

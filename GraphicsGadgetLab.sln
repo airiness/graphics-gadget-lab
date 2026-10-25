@@ -41,6 +41,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Dependencies", "Dependencie
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DirectXTex", "Externals\Vender\DirectXTex\DirectXTex\DirectXTex_Desktop_2026.vcxproj", "{371B9FA9-4C90-4AC6-A123-ACED756D6C77}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WinAppHost", "Projects\WinAppHost\WinAppHost.vcxproj", "{865A4DA4-3104-4023-90D1-E765F2B0D52F}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "WinAppTests", "Projects\WinAppTests\WinAppTests.vcxproj", "{236130B0-49CA-474F-8840-09FFE97B2428}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -48,6 +52,18 @@ Global
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{865A4DA4-3104-4023-90D1-E765F2B0D52F}.Debug|x64.ActiveCfg = Debug|x64
+		{865A4DA4-3104-4023-90D1-E765F2B0D52F}.Debug|x64.Build.0 = Debug|x64
+		{865A4DA4-3104-4023-90D1-E765F2B0D52F}.Develop|x64.ActiveCfg = Develop|x64
+		{865A4DA4-3104-4023-90D1-E765F2B0D52F}.Develop|x64.Build.0 = Develop|x64
+		{865A4DA4-3104-4023-90D1-E765F2B0D52F}.Release|x64.ActiveCfg = Release|x64
+		{865A4DA4-3104-4023-90D1-E765F2B0D52F}.Release|x64.Build.0 = Release|x64
+		{236130B0-49CA-474F-8840-09FFE97B2428}.Debug|x64.ActiveCfg = Debug|x64
+		{236130B0-49CA-474F-8840-09FFE97B2428}.Debug|x64.Build.0 = Debug|x64
+		{236130B0-49CA-474F-8840-09FFE97B2428}.Develop|x64.ActiveCfg = Develop|x64
+		{236130B0-49CA-474F-8840-09FFE97B2428}.Develop|x64.Build.0 = Develop|x64
+		{236130B0-49CA-474F-8840-09FFE97B2428}.Release|x64.ActiveCfg = Release|x64
+		{236130B0-49CA-474F-8840-09FFE97B2428}.Release|x64.Build.0 = Release|x64
 		{805C79E6-A919-4D77-9A57-A4B66CDCF3C2}.Debug|x64.ActiveCfg = Debug|x64
 		{805C79E6-A919-4D77-9A57-A4B66CDCF3C2}.Develop|x64.ActiveCfg = Develop|x64
 		{805C79E6-A919-4D77-9A57-A4B66CDCF3C2}.Debug|x64.Build.0 = Debug|x64
@@ -155,6 +171,7 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
+		{236130B0-49CA-474F-8840-09FFE97B2428} = {6217F100-D96D-45C6-AA08-A1D7266C505E}
 		{B276486A-987A-424E-9878-91057B05DAAD} = {6217F100-D96D-45C6-AA08-A1D7266C505E}
 		{8E4C1A7B-5B2D-4F6A-9C3E-1D7A4B8F2E60} = {6217F100-D96D-45C6-AA08-A1D7266C505E}
 		{D6F3A2C1-8B47-4E95-A0D6-2C7F9B1E5A83} = {6217F100-D96D-45C6-AA08-A1D7266C505E}

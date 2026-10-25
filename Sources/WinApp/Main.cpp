@@ -8,12 +8,10 @@
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 #include "Application/RenderingStartup.h"
 #endif
-#include "Application/SelfTest/SelfTestRunner.h"
 #include "GGLabFoundation/Platform/Win/Win32PathUtils.h"
 #include "GGLabFoundation/Platform/Win/Win32TaskWorkerLifecycle.h"
-#if defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
+#include <Windows.h>
 #include <nlohmann/json.hpp>
-#endif
 
 #include <cstddef>
 #include <cstdio>
@@ -96,16 +94,12 @@ int main(int argc, char* argv[])
 			launchResult.m_Options.m_OutputLog.c_str());
 		return EXIT_FAILURE;
 	}
-	if (launchResult.m_Options.m_Hidden || launchResult.m_Options.m_CaptureOnReady ||
+	if (launchResult.m_Options.m_InspectRuntime || launchResult.m_Options.m_Hidden ||
+		launchResult.m_Options.m_CaptureOnReady ||
 		launchResult.m_Options.m_SessionId)
 	{
 		gglab::win32::ConfigureUnattendedFailureReporting();
 	}
-	const bool isPathSensitiveSelfTest = launchResult.m_Options.m_SelfTestSelection &&
-		(*launchResult.m_Options.m_SelfTestSelection ==
-			gglab::ApplicationPathCompositionSelfTestSelection ||
-			*launchResult.m_Options.m_SelfTestSelection ==
-			gglab::ApplicationArtifactPackageClosureSelfTestSelection);
 	const gglab::RuntimePaths runtimePaths =
 		gglab::BuildRuntimePaths(gglab::win32::GetExecutableDirectory(),
 			launchResult.m_Options.m_StateRoot);
@@ -114,14 +108,6 @@ int main(int argc, char* argv[])
 		std::fputs("Error: Runtime inputs and explicit writable state must be absolute and disjoint.\n", stderr);
 		return EXIT_FAILURE;
 	}
-	if (launchResult.m_Options.m_SelfTestSelection && !isPathSensitiveSelfTest)
-	{
-		return gglab::RunApplicationSelfTests(
-			*launchResult.m_Options.m_SelfTestSelection, runtimePaths) ?
-			EXIT_SUCCESS :
-			EXIT_FAILURE;
-	}
-
 	HINSTANCE hInstance = GetModuleHandle(nullptr);
 #if defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 	const std::optional<gglab::RHIBackendType> packagedBackend =
@@ -143,15 +129,42 @@ int main(int argc, char* argv[])
 	}
 	launchResult.m_Options.m_RhiBackend = *packagedBackend;
 #endif
-	if (isPathSensitiveSelfTest)
+	if (launchResult.m_Options.m_InspectRuntime)
 	{
-		const bool succeeded = *launchResult.m_Options.m_SelfTestSelection ==
-			gglab::ApplicationPathCompositionSelfTestSelection ?
-				gglab::RunApplicationPathCompositionSelfTest(
-					runtimePaths, launchResult.m_Options.m_RhiBackend) :
-				gglab::RunApplicationArtifactPackageClosureSelfTest(
-					runtimePaths, launchResult.m_Options.m_RhiBackend);
-		return succeeded ? EXIT_SUCCESS : EXIT_FAILURE;
+		try
+		{
+			const auto pathText = [](const std::filesystem::path& path)
+				{
+					const auto utf8 = path.generic_u8string();
+					return std::string(utf8.begin(), utf8.end());
+				};
+			const nlohmann::json snapshot{
+				{ "schemaVersion", 1 },
+				{ "kind", "gglab.runtime-inspection" },
+				{ "backend", launchResult.m_Options.m_RhiBackend == gglab::RHIBackendType::Vulkan ? "vulkan" : "dx12" },
+#if defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
+				{ "artifactOnly", true },
+#else
+				{ "artifactOnly", false },
+#endif
+				{ "paths", {
+					{ "runtimeRoot", pathText(runtimePaths.m_RuntimeRoot) },
+					{ "assetRoot", pathText(runtimePaths.m_AssetRoot) },
+					{ "shaderArtifactRoot", pathText(runtimePaths.m_ShaderArtifactRoot) },
+					{ "iblDerivedDataRoot", pathText(runtimePaths.m_IblDerivedDataRoot) },
+					{ "textureDerivedDataRoot", pathText(runtimePaths.m_TextureDerivedDataRoot) },
+					{ "environmentAssetRoot", pathText(runtimePaths.m_EnvironmentAssetRoot) },
+					{ "settingsRoot", pathText(runtimePaths.m_SettingsRoot) },
+					{ "captureRoot", pathText(runtimePaths.m_CaptureRoot) },
+				} },
+			};
+			return std::puts(snapshot.dump().c_str()) >= 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+		}
+		catch (...)
+		{
+			std::fputs("Error: Could not serialize runtime inspection.\n", stderr);
+			return EXIT_FAILURE;
+		}
 	}
 	const gglab::AppRuntimeExtent initialExtent{
 		launchResult.m_Options.m_WindowWidth,

@@ -1,6 +1,5 @@
 #include "Application/ApplicationLaunchOptions.h"
 #include "Application/Content/DesktopApplicationContent.h"
-#include "Application/SelfTest/SelfTestRunner.h"
 #include "GGLabFoundation/String/StringUtils.h"
 
 #include <algorithm>
@@ -313,24 +312,14 @@ namespace gglab
 				return result;
 #endif
 			}
-			if (argument == "--self-test")
+			if (argument == "--inspect-runtime")
 			{
-				if (result.m_Options.m_SelfTestSelection)
+				if (result.m_Options.m_InspectRuntime)
 				{
-					result.m_Error = "Option '--self-test' may only be specified once.";
+					result.m_Error = "Option '--inspect-runtime' may only be specified once.";
 					return result;
 				}
-				if (++index >= arguments.size() || arguments[index].empty())
-				{
-					result.m_Error = "Option '--self-test' requires a non-empty suite ID.";
-					return result;
-				}
-				if (!IsApplicationSelfTestSelectionValid(arguments[index]))
-				{
-					result.m_Error = std::format("Unknown self-test selection '{}'.", arguments[index]);
-					return result;
-				}
-				result.m_Options.m_SelfTestSelection = std::string(arguments[index]);
+				result.m_Options.m_InspectRuntime = true;
 				continue;
 			}
 
@@ -601,19 +590,19 @@ namespace gglab
 			}
 			result.m_Options.m_StartupDemo = ApplicationStartupDemo::LabHost;
 		}
-		if (result.m_Options.m_SelfTestSelection &&
+		if (result.m_Options.m_InspectRuntime &&
 			(demoSpecified || result.m_Options.m_StartupLabId ||
 				!result.m_Options.m_StartupLabParameters.empty() ||
 				result.m_Options.m_StartWithRelativeMouse || result.m_Options.m_ValidationMode ||
-				result.m_Options.m_DisableDevelopmentTools ||
-				result.m_Options.m_RhiBackendSpecified || result.m_Options.m_ListAdapters ||
+				result.m_Options.m_DisableDevelopmentTools || result.m_Options.m_WatchNonFinite ||
+				result.m_Options.m_ListAdapters ||
 				result.m_Options.m_AdapterSelector || result.m_Options.m_Hidden ||
 				result.m_Options.m_WindowSizeSpecified ||
 				result.m_Options.m_FixedDeltaTimeSeconds || result.m_Options.m_CaptureOnReady ||
 				result.m_Options.m_SessionId))
 		{
 			result.m_Error =
-				"Option '--self-test' cannot be combined with interactive startup options.";
+				"Option '--inspect-runtime' cannot be combined with interactive startup options.";
 			return result;
 		}
 		if (result.m_Options.m_AdapterSelector && result.m_Options.m_ListAdapters)
@@ -677,10 +666,7 @@ namespace gglab
 			"  --idle-timeout <seconds>        Exit a session after this long without a\n"
 			"                                  control request (default: 900).\n"
 			"  --output-log <absolute-file>    Write stdout and stderr to this file.\n"
-			"  --self-test <suite-id|all>      Run one or all headless self-test suites.\n"
-			"                                  Available: artifact-cache, asset-data,\n"
-			"                                  publication-accounting, rendering-contracts,\n"
-			"                                  napa-voxel, vulkan-contracts, all.\n"
+			"  --inspect-runtime             Print effective runtime paths/backend as JSON and exit.\n"
 			"  --help, -h                      Show this help text.\n"
 			"Requires the Vulkan SDK 1.3.296 for Vulkan backend builds\n"
 			"(GGLAB_ENABLE_VULKAN=1, the default).\n";

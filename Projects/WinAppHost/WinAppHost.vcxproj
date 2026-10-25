@@ -1,0 +1,471 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.props" Condition="Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.props')" />
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Develop|x64">
+      <Configuration>Develop</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>18.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{865A4DA4-3104-4023-90D1-E765F2B0D52F}</ProjectGuid>
+    <RootNamespace>WinAppHost</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <GGLAB_ARTIFACT_ONLY_RUNTIME Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'==''">0</GGLAB_ARTIFACT_ONLY_RUNTIME>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Develop|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
+    <LinkIncremental>true</LinkIncremental>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings"></ImportGroup>
+  <ImportGroup Label="Shared"></ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\..\PropertySheets\Common.props" />
+    <Import Project="..\..\PropertySheets\JsonImport.props" />
+    <Import Project="..\..\PropertySheets\D3D12MemAllocImport.props" />
+    <Import Project="..\..\PropertySheets\AssimpImport.props" />
+    <Import Project="..\..\PropertySheets\EnttImport.props" />
+    <Import Project="..\..\PropertySheets\ImGuiImport.props" />
+    <Import Project="..\..\PropertySheets\VulkanImport.props" />
+    <Import Project="..\..\PropertySheets\VulkanMemAllocImport.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Develop|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\..\PropertySheets\Common.props" />
+    <Import Project="..\..\PropertySheets\JsonImport.props" />
+    <Import Project="..\..\PropertySheets\D3D12MemAllocImport.props" />
+    <Import Project="..\..\PropertySheets\AssimpImport.props" />
+    <Import Project="..\..\PropertySheets\EnttImport.props" />
+    <Import Project="..\..\PropertySheets\ImGuiImport.props" />
+    <Import Project="..\..\PropertySheets\VulkanImport.props" />
+    <Import Project="..\..\PropertySheets\VulkanMemAllocImport.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="..\..\PropertySheets\Common.props" />
+    <Import Project="..\..\PropertySheets\JsonImport.props" />
+    <Import Project="..\..\PropertySheets\D3D12MemAllocImport.props" />
+    <Import Project="..\..\PropertySheets\AssimpImport.props" />
+    <Import Project="..\..\PropertySheets\EnttImport.props" />
+    <Import Project="..\..\PropertySheets\ImGuiImport.props" />
+    <Import Project="..\..\PropertySheets\VulkanImport.props" />
+    <Import Project="..\..\PropertySheets\VulkanMemAllocImport.props" />
+  </ImportGroup>
+  <Import Project="..\..\PropertySheets\WinAppBuildProfile.props" />
+  <PropertyGroup Label="UserMacros">
+    <GGLAB_USE_PCH Condition="'$(GGLAB_USE_PCH)'==''">1</GGLAB_USE_PCH>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <TargetName>WinAppHost</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Develop|x64'">
+    <TargetName>WinAppHost</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <TargetName>WinAppHost</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;$(GGLabArtifactOnlyDefine)%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(GGLabRepositoryRoot)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\WinAppHost;$(GGLabRepositoryRoot)Sources\GGLabAppRuntime;$(GGLabRepositoryRoot)Sources\GGLabRuntime\Public;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\NapaVoxelCore\Public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>shlwapi.lib;gameinput.lib;d3d12.lib;dxgi.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Develop|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions>_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;$(GGLabArtifactOnlyDefine)%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(GGLabRepositoryRoot)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\WinAppHost;$(GGLabRepositoryRoot)Sources\GGLabAppRuntime;$(GGLabRepositoryRoot)Sources\GGLabRuntime\Public;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\NapaVoxelCore\Public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>shlwapi.lib;gameinput.lib;d3d12.lib;dxgi.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;$(GGLabArtifactOnlyDefine)%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(GGLabRepositoryRoot)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\WinAppHost;$(GGLabRepositoryRoot)Sources\GGLabAppRuntime;$(GGLabRepositoryRoot)Sources\GGLabRuntime\Public;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\NapaVoxelCore\Public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>shlwapi.lib;gameinput.lib;d3d12.lib;dxgi.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <PrecompiledHeader Condition="'$(GGLAB_USE_PCH)'!='0'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(GGLAB_USE_PCH)'=='0'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>Application/ApplicationPch.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles Condition="'$(GGLAB_USE_PCH)'!='0'">Application/ApplicationPch.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Content\RuntimeAssetBundle.cpp" />
+    <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_dx12.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Develop|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles />
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_vulkan.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Develop|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles />
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_win32.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Develop|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles />
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\imgui.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Develop|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles />
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\imgui_demo.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Develop|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles />
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\imgui_draw.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Develop|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles />
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\imgui_tables.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Develop|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles />
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\imgui_widgets.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Develop|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <ForcedIncludeFiles />
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Application.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Content\DesktopApplicationContent.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32RHIContextFactory.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\ApplicationHostConfiguration.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Capture\ApplicationFrameCapture.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Capture\CaptureOnReady.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\ApplicationEnvironment.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\ApplicationLaunchOptions.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\RenderingStartup.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Shader\DevelopmentShaderBuildBridge.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Shader\DevelopmentShaderBuildProcessClient.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32PlatformHost.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32Window.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32UnattendedProcess.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32NamedPipeServer.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32FrameCaptureImageEncoder.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32Shell.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Control\ApplicationControlCaptureJobs.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Control\ApplicationControlProtocol.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Control\ApplicationControlParameters.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\AssetSnapshotText.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\AssetManagerPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\DX12BackendSummaryPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ProfilingPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\TaskSystemPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\VulkanBackendSummaryPanel.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\IBLViewerPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\PostProcessInspectorPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\RenderingSettingsPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\SceneDepthPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\WorldLightingPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ShadowTemporalLabWidgets.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ForwardPlusInspectorPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\GTAOInspectorPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\TemporalAAInspectorPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ResourceManagementPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ShadowInspectorPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\TransientResourcePoolPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\CameraInspectorPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\DebugDrawPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\EntityPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\DemoPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\FrameCapturePanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ImGuiToolsPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\RenderViewPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiPanelCatalog.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\CameraReferenceViewWidgets.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiMathWidgets.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiProjectionUtils.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiTextureUtils.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiBackendFactory.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiApplicationTooling.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiSystem.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiRegistry.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevToolsRuntime.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12RenderBackend.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Backends\Vulkan\DevelopGuiVulkanRenderBackend.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Demo\DemoLabHost.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Demo\DemoLabRuntimeLocator.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Demo\DemoPlayground.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Demo\StartDemo.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelCommands.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelMeshAdapter.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelRaycast.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelRenderExtension.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelRenderPass.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelRenderState.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\AlphaTestLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CullingLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\MathFoundationLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\MiniPBRGridLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\NapaVoxelLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\PostProcessLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\RenderGraphComputeLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CoordinateConformanceLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\SampleableDepthLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\SurfaceProbeLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\GTAOLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\ForwardPlusLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\TemporalAALabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\TemporalAALabDiagnostics.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\TemporalAALabGpuTiming.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\LightingContractLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\AtmosphereRangeLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\TextureContractLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\LoadingOverlay.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\LabPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Input\InputBase.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Input\InputManager.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Input\Keyboard.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Input\Mouse.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Input\WindowsInputMapping.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\ApplicationPch.cpp">
+      <MultiProcessorCompilation Condition="'$(GGLAB_USE_PCH)'!='0'">false</MultiProcessorCompilation>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64' and '$(GGLAB_USE_PCH)'!='0'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Develop|x64' and '$(GGLAB_USE_PCH)'!='0'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64' and '$(GGLAB_USE_PCH)'!='0'">Create</PrecompiledHeader>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Content\RuntimeAssetBundle.h" />
+    <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_dx12.h" />
+    <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_vulkan.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_win32.h" />
+    <ClInclude Include="..\..\Externals\Vender\imgui\imconfig.h" />
+    <ClInclude Include="..\..\Externals\Vender\imgui\imgui.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Application.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Content\DesktopApplicationContent.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Tooling\ApplicationToolingComposition.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32RHIContextFactory.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\ApplicationHostConfiguration.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Capture\ApplicationFrameCapture.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Capture\CaptureOnReady.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\ApplicationEnvironment.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\ApplicationLaunchOptions.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\RenderingStartup.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Shader\DevelopmentShaderBuildBridge.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Shader\DevelopmentShaderBuildProcessClient.h" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\PlatformHost.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\PlatformWindow.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32MessageHandler.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32PlatformHost.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32Window.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32UnattendedProcess.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32NamedPipeServer.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32FrameCaptureImageEncoder.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32Shell.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Control\ApplicationControlCaptureJobs.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Control\ApplicationControlProtocol.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Control\ApplicationControlParameters.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\EnumText\EnumText.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\EnumText\EnumTextGraphics.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\EnumText\EnumTextLab.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\EnumText\EnumTextRHI.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\EnumText\EnumTextRenderGraph.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\EnumText\EnumTextRenderPass.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\AssetSnapshotText.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\RHIText.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\AssetManagerPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\DX12BackendSummaryPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ProfilingPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\TaskSystemPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\VulkanBackendSummaryPanel.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\IBLViewerPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\PostProcessInspectorPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\RenderingSettingsPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\SceneDepthPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\WorldLightingPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ShadowTemporalLabWidgets.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ForwardPlusInspectorPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\GTAOInspectorPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\TemporalAAInspectorPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ResourceManagementPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ShadowInspectorPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\TransientResourcePoolPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\EntityPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\DemoPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\FrameCapturePanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ImGuiToolsPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\RenderViewPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiPanelCatalog.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiProjectionUtils.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiFormatting.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiStateStore.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\CameraInspectorPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\DebugDrawPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiContext.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\CameraReferenceViewWidgets.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiMathWidgets.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiStyle.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiTextureUtils.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiRegistry.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevToolsRuntime.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiBackendFactory.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiPlatformBackend.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiRenderBackend.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiSystem.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12RenderBackend.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Backends\Vulkan\DevelopGuiVulkanRenderBackend.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.h" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\PersistentSceneBuffersPanel.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\PipelineSystemPanel.cpp" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\PersistentSceneBuffersPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\PipelineSystemPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Demo\DemoLabHost.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Demo\DemoPlayground.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Demo\CoastalSceneCameraPaths.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Demo\CoastalSceneReferenceViews.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Demo\CoastalSceneLightingProfiles.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Demo\StartDemo.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelCommands.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelMeshAdapter.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelRaycast.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelRenderExtension.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelRenderPass.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelRenderState.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\AlphaTestLabSession.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CullingLabSession.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\MathFoundationLabSession.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\MiniPBRGridLabSession.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\NapaVoxelLabSession.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\PostProcessLabSession.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\RenderGraphComputeLabSession.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CoordinateConformanceLabSession.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\SampleableDepthLabSession.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\SurfaceProbeLabSession.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\GTAOLabSession.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\ForwardPlusLabSession.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\TemporalAALabSession.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\TemporalAALabDiagnostics.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\TemporalAALabGpuTiming.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\LightingContractReferenceViews.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\AtmosphereRangeReferenceViews.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\AtmosphereRangeLabSession.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\LightingContractLabSession.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\TextureContractLabSession.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Demo\DemoLabRuntimeLocator.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\LoadingOverlay.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\LabPanel.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Input\InputBase.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Input\InputManager.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Input\Keyboard.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Input\Mouse.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Input\WindowsInputMapping.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\ApplicationPch.h" />
+  </ItemGroup>
+  <ItemGroup></ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\GGLabAppRuntime\GGLabAppRuntime.vcxproj">
+      <Project>{A7F6C8E1-2D3B-4A59-91C7-6E8D4B2F0A35}</Project>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+    <ProjectReference Include="..\GGLabFoundation\GGLabFoundation.vcxproj">
+      <Project>{5C275408-928E-43C7-A2B5-7099FEA072D4}</Project>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+    <ProjectReference Include="..\GGLabRuntime\GGLabRuntime.vcxproj">
+      <Project>{f382cfe9-9912-487d-b999-e649c340125d}</Project>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+    <ProjectReference Include="..\NapaVoxelCore\NapaVoxelCore.vcxproj">
+      <Project>{37c8824e-aaab-46f3-86b1-b03c02fe468b}</Project>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+    <ProjectReference Include="..\ShaderArtifactRuntime\ShaderArtifactRuntime.vcxproj">
+      <Project>{922A26B8-7CC4-4344-AC03-7A40845F09FE}</Project>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'"></ItemGroup>
+  <ItemGroup Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'"></ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="..\..\PropertySheets\GGLabBuildStamp.targets" />
+    <Import Project="..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets" Condition="Exists('..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets')" />
+    <Import Project="..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.targets" Condition="Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.targets')" />
+  </ImportGroup>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets'))" />
+    <Error Condition="!Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.props')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.props'))" />
+    <Error Condition="!Exists('..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Direct3D.D3D12.1.619.5\build\native\Microsoft.Direct3D.D3D12.targets'))" />
+  </Target>
+</Project>

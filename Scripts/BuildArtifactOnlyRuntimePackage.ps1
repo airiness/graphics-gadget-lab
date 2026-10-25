@@ -34,6 +34,29 @@ function Remove-ContainedDirectory {
         throw "Refusing to remove path outside '$fullAllowedRoot': '$fullPath'."
     }
     if (Test-Path -LiteralPath $fullPath) {
+        # Unlink reparse points before recursive cleanup so linked assets are preserved.
+        if ((Get-Item -LiteralPath $fullPath -Force).Attributes -band
+            [System.IO.FileAttributes]::ReparsePoint) {
+            [System.IO.Directory]::Delete($fullPath)
+            return
+        }
+        $pending = [System.Collections.Generic.Stack[string]]::new()
+        $pending.Push($fullPath)
+        while ($pending.Count -gt 0) {
+            $directory = $pending.Pop()
+            $item = Get-Item -LiteralPath $directory -Force
+            if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+                [System.IO.Directory]::Delete($directory)
+                continue
+            }
+            foreach ($child in Get-ChildItem -LiteralPath $directory -Force) {
+                if ($child.PSIsContainer) {
+                    $pending.Push($child.FullName)
+                } elseif ($child.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+                    [System.IO.File]::Delete($child.FullName)
+                }
+            }
+        }
         Remove-Item -LiteralPath $fullPath -Recurse -Force
     }
 }
@@ -81,6 +104,8 @@ function Assert-ArtifactOnlyPackage {
     $forbiddenFileNames = @(
         "dxcompiler.dll",
         "dxil.dll",
+        "WinAppTests.exe",
+        "GGLabTestCore.lib",
         "gglab-shaderc.exe",
         "ShaderToolchainCore.lib"
     )
@@ -100,10 +125,14 @@ function Assert-ArtifactOnlyPackage {
     }
 
     $tlogRoot = Join-Path $IntermediateRoot "WinApp.tlog"
-    $compileCommand = Get-Content -LiteralPath (Join-Path $tlogRoot "CL.command.1.tlog") -Raw
-    if ($compileCommand -match "Sources\\ShaderToolchain" -or
-        $compileCommand -match "Microsoft\.Direct3D\.DXC") {
-        throw "Artifact-only compile command still exposes ShaderToolchain or DXC include paths."
+    foreach ($owner in @("WinApp", "WinAppHost")) {
+        $ownerRoot = Join-Path $artifactOnlyRoot "Intermediate\$owner\x64\$Configuration\$owner.tlog"
+        $compileCommand = Get-Content -LiteralPath (Join-Path $ownerRoot "CL.command.1.tlog") -Raw
+        if ($compileCommand -match "Sources\\ShaderToolchain" -or
+            $compileCommand -match "Microsoft\.Direct3D\.DXC" -or
+            $compileCommand -match "(?:RenderingStartup|DevelopmentShaderBuildBridge|DevelopmentShaderBuildProcessClient)\.cpp") {
+            throw "Artifact-only $owner compile command still consumes development shader compilation."
+        }
     }
     $linkCommand = Get-Content -LiteralPath (Join-Path $tlogRoot "link.command.1.tlog") -Raw
     if ($linkCommand -match "ShaderToolchainCore\.lib" -or
@@ -184,7 +213,8 @@ function Invoke-PackageSmoke {
 function Assert-PackageRuntimeStructure {
     param(
         [Parameter(Mandatory)] [string]$PackageRoot,
-        [Parameter(Mandatory)] [string]$WorkingDirectory
+        [Parameter(Mandatory)] [string]$WorkingDirectory,
+        [Parameter(Mandatory)] [string]$TestExecutable
     )
 
     $executable = Join-Path $PackageRoot "GraphicsGadgetLab.exe"
@@ -192,8 +222,8 @@ function Assert-PackageRuntimeStructure {
         $stdoutPath = Join-Path $PackageRoot "$selection.stdout.log"
         $stderrPath = Join-Path $PackageRoot "$selection.stderr.log"
         try {
-            $process = Start-Process -FilePath $executable -WorkingDirectory $WorkingDirectory `
-                -ArgumentList @("--self-test", $selection) `
+            $process = Start-Process -FilePath $TestExecutable -WorkingDirectory $WorkingDirectory `
+                -ArgumentList @("--suite", $selection, "--application", ('"' + $executable + '"')) `
                 -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath `
                 -WindowStyle Hidden -Wait -PassThru
             if ($process.ExitCode -ne 0) {
@@ -253,8 +283,17 @@ $artifactIntermediateRoot =
     Join-Path $artifactOnlyRoot "Intermediate\WinApp\x64\$Configuration"
 $msbuild = Get-MSBuildPath
 
+& $msbuild (Join-Path $repositoryRoot "Projects\WinAppTests\WinAppTests.vcxproj") /m `
+    /p:Configuration=$Configuration /p:Platform=x64 /p:PreferredToolArchitecture=x64 `
+    "/p:SolutionDir=$($repositoryRoot.TrimEnd('\'))\" /p:GGLAB_ARTIFACT_ONLY_RUNTIME=0
+Assert-Succeeded "Independent Windows host tests build"
+$winAppTests = Join-Path $repositoryRoot "Build\Output\x64\$Configuration\WinAppTests.exe"
+
 Remove-ContainedDirectory -Path $artifactOutputRoot -AllowedRoot $artifactOnlyRoot
-Remove-ContainedDirectory -Path $artifactIntermediateRoot -AllowedRoot $artifactOnlyRoot
+foreach ($owner in @("WinApp", "WinAppHost", "WinAppTests")) {
+    $ownerIntermediate = Join-Path $artifactOnlyRoot "Intermediate\$owner\x64\$Configuration"
+    Remove-ContainedDirectory -Path $ownerIntermediate -AllowedRoot $artifactOnlyRoot
+}
 
 & $msbuild (Join-Path $repositoryRoot "Projects\ShaderCompiler\ShaderCompiler.vcxproj") /m `
     /p:Configuration=$Configuration /p:Platform=x64 /p:PreferredToolArchitecture=x64 `
@@ -311,7 +350,7 @@ foreach ($selectedBackend in $Backend) {
 
     Assert-ArtifactOnlyPackage -PackageRoot $packageRoot `
         -IntermediateRoot $artifactIntermediateRoot -TargetProfile $shaderTarget
-    Assert-PackageRuntimeStructure -PackageRoot $packageRoot `
+    Assert-PackageRuntimeStructure -PackageRoot $packageRoot -TestExecutable $winAppTests `
         -WorkingDirectory $repositoryRoot
     Assert-PackageBackendContract -PackageRoot $packageRoot -SelectedBackend $selectedBackend
     if ($RunSmoke) {

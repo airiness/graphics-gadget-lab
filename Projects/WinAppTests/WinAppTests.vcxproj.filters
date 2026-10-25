@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="..\..\Tests\WinApp\ApplicationContentRegistrationSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\ApplicationControlSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\ApplicationFrameCaptureSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\ApplicationHostConfigurationSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\ApplicationInputSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\ApplicationLifecycleSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\DevelopGuiVulkanPresentationContractSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\DevelopmentShaderBuildProcessClientSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\DevelopmentShaderHotReloadSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\DevToolsViewProfileSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\FrameCaptureImageEncoderSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\LaunchOptionsSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\NapaVoxelCommandSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\NapaVoxelGGLabAdapterSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\NapaVoxelPublicationSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\NapaVoxelRaycastEditSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\NapaVoxelSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\ProductRuntimeInspection.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\RuntimePathSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\TemporalAALabDiagnosticsSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\TemporalAALabGpuTimingSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\WinAppTestRunner.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\WinAppTestsMain.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Tests\WinApp\ApplicationContentRegistrationSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\ApplicationControlSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\ApplicationFrameCaptureSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\ApplicationHostConfigurationSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\ApplicationInputSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\ApplicationLifecycleSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\DevelopGuiVulkanPresentationContractSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\DevelopmentShaderBuildProcessClientSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\DevelopmentShaderHotReloadSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\DevToolsViewProfileSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\FrameCaptureImageEncoderSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\LaunchOptionsSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\NapaVoxelSelfTestCases.h" />
+    <ClInclude Include="..\..\Tests\WinApp\NapaVoxelSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\ProductRuntimeInspection.h" />
+    <ClInclude Include="..\..\Tests\WinApp\RuntimePathSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\TemporalAALabDiagnosticsSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\TemporalAALabGpuTimingSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\WinAppTestRunner.h" />
+  </ItemGroup>
+</Project>

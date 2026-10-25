@@ -26,15 +26,19 @@ first-party C++ source and header has exactly one owning project; never compile
 the same first-party `.cpp` in multiple projects. Keep physical paths, include
 visibility and project membership consistent.
 
-- `WinApp` owns Windows startup, platform hosts/adapters, concrete Labs and
-  DevTools. `GGLabAppRuntime` owns host-neutral Application lifecycle, services
+- `WinApp` owns native startup and runtime inspection. `WinAppHost` owns Windows
+  platform hosts/adapters, concrete Labs and DevTools. `WinAppTests` owns their
+  regression cases and links the host implementation; product targets do not
+  depend on test targets or include roots.
+  `GGLabAppRuntime` owns host-neutral Application lifecycle, services
   and frame orchestration, without depending on WinApp content.
 - `GGLabRuntime` owns reusable scene, graphics, RHI, rendering and runtime
-  diagnostics. It must not depend on WinApp, AppRuntime or DevTools content.
+  diagnostics. It must not depend on WinApp, WinAppHost, WinAppTests, AppRuntime
+  or DevTools content.
   Ordinary consumers use `Sources/GGLabRuntime/Public` with the
   `GGLabRuntime/...` include prefix. Public headers must not expose Private or
   legacy implementation paths; do not restore Runtime Private include access to
-  WinApp or AppRuntime. Keep privileged access confined to explicitly declared
+  WinApp, WinAppHost or AppRuntime. Keep privileged access confined to explicitly declared
   qualification/test targets and their documented dependency closure.
 - `GGLabFoundation` is Tier-0: no dependencies on Application, Runtime, Graphics,
   RHI, RenderGraph or Shader Toolchain. Its public contracts use

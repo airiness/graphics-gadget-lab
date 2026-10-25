@@ -1,4 +1,4 @@
-#include "Application/SelfTest/SelfTestRunner.h"
+#include "WinAppTestRunner.h"
 #include "ApplicationHostConfigurationSelfTests.h"
 #include "ApplicationContentRegistrationSelfTests.h"
 #include "ApplicationControlSelfTests.h"
@@ -103,24 +103,24 @@ namespace gglab
 		return RunSelfTestSuite(*suite, reporter);
 	}
 
-	bool RunApplicationPathCompositionSelfTest(const RuntimePaths& runtimePaths, RHIBackendType backend) noexcept
+	bool RunApplicationPathCompositionSelfTest(const std::filesystem::path& application) noexcept
 	{
 		InitializeLogging();
 		ConsoleSelfTestReporter reporter;
 		reporter.OnSuiteStarted(ApplicationPathCompositionSelfTestSelection);
 		SelfTestContext context(reporter);
-		RunApplicationPathCompositionSelfTests(context, runtimePaths, backend);
+		RunApplicationPathCompositionSelfTests(context, application);
 		reporter.OnSuiteFinished(ApplicationPathCompositionSelfTestSelection, context.GetSummary());
 		return context.GetSummary().Succeeded();
 	}
 
-	bool RunApplicationArtifactPackageClosureSelfTest(const RuntimePaths& runtimePaths, RHIBackendType backend) noexcept
+	bool RunApplicationArtifactPackageClosureSelfTest(const std::filesystem::path& application) noexcept
 	{
 		InitializeLogging();
 		ConsoleSelfTestReporter reporter;
 		reporter.OnSuiteStarted(ApplicationArtifactPackageClosureSelfTestSelection);
 		SelfTestContext context(reporter);
-		RunApplicationArtifactPackageClosureSelfTests(context, runtimePaths, backend);
+		RunApplicationArtifactPackageClosureSelfTests(context, application);
 		reporter.OnSuiteFinished(ApplicationArtifactPackageClosureSelfTestSelection, context.GetSummary());
 		return context.GetSummary().Succeeded();
 	}

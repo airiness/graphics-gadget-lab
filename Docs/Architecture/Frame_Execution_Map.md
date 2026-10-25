@@ -177,11 +177,11 @@ Anchors:
   - Sources/GGLabAppRuntime/Demo/DemoManager.cpp::DemoManager::CommitPendingDemo
   - Sources/GGLabAppRuntime/Lab/LabRuntime.cpp::LabRuntime::ProcessPendingCommands
   - Sources/GGLabAppRuntime/Lab/LabRuntime.cpp::LabRuntime::CommitPendingSession
-  - Sources/WinApp/Application/Demo/DemoLabHost.cpp::DemoLabHost::Update
+  - Sources/WinAppHost/Application/Demo/DemoLabHost.cpp::DemoLabHost::Update
 ReviewPaths:
   - Sources/GGLabAppRuntime/Lab/LabRuntimeParameters.cpp
   - Sources/GGLabAppRuntime/GGLabAppRuntimeFrame.cpp
-  - Sources/WinApp/Application/Lab/Sessions/NapaVoxelLabSession.cpp
+  - Sources/WinAppHost/Application/Lab/Sessions/NapaVoxelLabSession.cpp
 ```
 
 ## Contracts
@@ -301,7 +301,7 @@ Anchors:
   - Sources/GGLabAppRuntime/Lab/LabSessionBase.h::BeginPrepare
 ReviewPaths:
   - Sources/GGLabAppRuntime/Demo/DemoBase.h
-  - Sources/WinApp/Application/Lab/Sessions/NapaVoxelLabSession.cpp
-  - Sources/WinApp/Application/Lab/NapaVoxel/NapaVoxelRenderState.cpp
+  - Sources/WinAppHost/Application/Lab/Sessions/NapaVoxelLabSession.cpp
+  - Sources/WinAppHost/Application/Lab/NapaVoxel/NapaVoxelRenderState.cpp
   - Tests/GGLabAppRuntime/GpuFaultLifecycleSelfTests.cpp
 ```

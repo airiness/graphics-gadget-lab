@@ -123,23 +123,16 @@ namespace gglab
 			}
 
 			{
-				const auto result = parse({ "--self-test", "app-path-composition" });
-				context.Check(result.IsValid() && result.m_Options.m_SelfTestSelection ==
-					"app-path-composition",
-					"Path-composition proof is an explicit self-test exit mode");
-			}
-			{
-				const auto unknownSuite = parse({ "--self-test", "unknown-suite" });
-				const auto interactiveConflict = parse({ "--self-test", "all", "--lab", "gglab.lab.culling" });
-				const auto relativeMouseConflict = parse({ "--self-test", "all", "--relative-mouse" });
-				context.Check(!unknownSuite.IsValid() &&
-					unknownSuite.m_Error.find("Unknown self-test selection") != std::string::npos,
-					"Self-test selection rejects unknown suites");
-				context.Check(!interactiveConflict.IsValid() &&
-					interactiveConflict.m_Error.find("cannot be combined") != std::string::npos &&
-					!relativeMouseConflict.IsValid() &&
-					relativeMouseConflict.m_Error.find("cannot be combined") != std::string::npos,
-					"Self-test selection rejects interactive startup options");
+				const auto inspection = parse({ "--inspect-runtime", "--rhi", "vulkan", "--state-root", "C:/gglab-state" });
+				context.Check(inspection.IsValid() && inspection.m_Options.m_InspectRuntime &&
+					inspection.m_Options.m_RhiBackend == RHIBackendType::Vulkan,
+					"Runtime inspection accepts explicit backend and writable state selection");
+				context.Check(!parse({ "--inspect-runtime", "--inspect-runtime" }).IsValid() &&
+					!parse({ "--self-test", "all" }).IsValid(),
+					"Runtime inspection rejects duplication and the retired product test entry");
+				context.Check(!parse({ "--inspect-runtime", "--lab", "gglab.lab.culling" }).IsValid() &&
+					!parse({ "--inspect-runtime", "--relative-mouse" }).IsValid(),
+					"Runtime inspection rejects interactive startup options");
 			}
 			{
 				const auto defaults = parse({});
@@ -193,8 +186,8 @@ namespace gglab
 					!parse({ "--capture-on-ready", "C:/c", "--capture-source", "hud" }).IsValid() &&
 					!parse({ "--capture-on-ready", "C:/c", "--capture-settle-frames", "-1" }).IsValid() &&
 					!parse({ "--capture-on-ready", "C:/c", "--capture-timeout", "0" }).IsValid() &&
-					!parse({ "--self-test", "all", "--capture-on-ready", "C:/c" }).IsValid() &&
-					!parse({ "--self-test", "all", "--hidden" }).IsValid(),
+					!parse({ "--inspect-runtime", "--capture-on-ready", "C:/c" }).IsValid() &&
+					!parse({ "--inspect-runtime", "--hidden" }).IsValid(),
 					"Capture options require an absolute capture-on-ready directory and valid values");
 			}
 			{
@@ -208,7 +201,7 @@ namespace gglab
 					!parse({ "--session", std::string(65, 'a') }).IsValid() &&
 					!parse({ "--idle-timeout", "60" }).IsValid() &&
 					!parse({ "--session", "a", "--idle-timeout", "0" }).IsValid() &&
-					!parse({ "--self-test", "all", "--session", "a" }).IsValid(),
+					!parse({ "--inspect-runtime", "--session", "a" }).IsValid(),
 					"Session options reject unsafe ids, orphan or invalid idle timeouts");
 				context.Check(parse({ "--output-log", "C:/logs/out.log" }).m_Options.m_OutputLog == std::filesystem::path("C:/logs/out.log") &&
 					!parse({ "--output-log", "out.log" }).IsValid() &&
@@ -256,7 +249,7 @@ namespace gglab
 					!parse({ "--lab-parameter", "speed=" }).IsValid() &&
 					!parse({ "--lab-parameter", "a=1", "--lab-parameter", "a=2" }).IsValid() &&
 					!parse({ "--demo", "atrium", "--lab-parameter", "a=1" }).IsValid() &&
-					!parse({ "--self-test", "all", "--lab-parameter", "a=1" }).IsValid(),
+					!parse({ "--inspect-runtime", "--lab-parameter", "a=1" }).IsValid(),
 					"Debug startup Lab parameters reject malformed, duplicate or non-Lab assignments");
 #else
 				context.Check(!assignments.IsValid() &&
@@ -286,7 +279,7 @@ namespace gglab
 			!parseValidation({ "--validation", "off", "--validation", "gpu" }).IsValid() &&
 			!parseValidation({ "--validation", "gpu", "--rhi", "vulkan" }).IsValid() &&
 			!parseValidation({ "--list-adapters", "--validation", "gpu" }).IsValid() &&
-			!parseValidation({ "--self-test", "all", "--validation", "standard" }).IsValid(),
+			!parseValidation({ "--inspect-runtime", "--validation", "standard" }).IsValid(),
 			"Validation modes reject missing, duplicate, incompatible and unsupported requests");
 		RunPlaygroundContentCliContractTests(context);
 		RunTextureContractLabCliTests(context);
