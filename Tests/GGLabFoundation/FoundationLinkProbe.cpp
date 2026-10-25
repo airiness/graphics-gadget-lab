@@ -18,6 +18,7 @@
 #include "GGLabFoundation/Platform/Win/Win32TaskWorkerLifecycle.h"
 #include "GGLabFoundation/String/StringUtils.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
+#include "TaskSystemLifetimeTests.h"
 
 #include <array>
 #include <atomic>
@@ -895,14 +896,19 @@ namespace gglab::foundation::tests
 	}
 }
 
-int main()
+int main(int argc, char** argv)
 {
+	if (argc == 3 && std::string_view(argv[1]) == "--task-lifetime-child")
+	{
+		return gglab::foundation::tests::RunTaskSystemLifetimeChild(argv[2]);
+	}
 	const bool linked = gglab::foundation::detail::FoundationLinkAnchor();
 	return linked && gglab::foundation::tests::RunPrimitiveTests() &&
 		gglab::foundation::tests::RunSha256Tests() &&
 		gglab::foundation::tests::RunStringTests() &&
 		gglab::foundation::tests::RunProgressTests() &&
 		gglab::foundation::tests::RunTaskTests() &&
+		gglab::foundation::tests::RunTaskSystemLifetimeTests() &&
 		gglab::foundation::tests::RunPathTests() &&
 		gglab::foundation::tests::RunLoggingTests() &&
 		gglab::foundation::tests::RunWindowsLeafTests() ?
