@@ -14,6 +14,7 @@
 #include "Application/SelfTest/NapaVoxelSelfTests.h"
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 #include "Application/SelfTest/DevelopmentShaderBuildProcessClientSelfTests.h"
+#include "Application/SelfTest/DevelopmentShaderHotReloadSelfTests.h"
 #endif
 #if GGLAB_ENABLE_VULKAN
 #include "Application/SelfTest/DevelopGuiVulkanPresentationContractSelfTests.h"
@@ -52,6 +53,7 @@ namespace gglab
 			SelfTestSuiteDesc{ .m_Id = "app-launch-options", .m_Run = &RunLaunchOptionsSelfTests, },
 #if !defined(GGLAB_ARTIFACT_ONLY_RUNTIME)
 			SelfTestSuiteDesc{ .m_Id = "app-development-shader-process-client", .m_Run = &RunDevelopmentShaderBuildProcessClientSelfTests, },
+			SelfTestSuiteDesc{ .m_Id = "app-development-shader-hot-reload", .m_Run = &RunDevelopmentShaderHotReloadSelfTests, },
 #endif
 			SelfTestSuiteDesc{ .m_Id = "napa-voxel", .m_Run = &RunNapaVoxelSelfTests, },
 #if GGLAB_ENABLE_VULKAN

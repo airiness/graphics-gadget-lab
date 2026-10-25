@@ -3,6 +3,7 @@
 #include "GGLabRuntime/Graphics/IBLPreviewControlBase.h"
 #include "RenderingContractSelfTests.h"
 #include "RGObjectArenaSelfTests.h"
+#include "RenderServicesViewSelfTests.h"
 #include "AssetTestServices.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/Asset/ModelTypes.h"
@@ -4336,14 +4337,14 @@ namespace gglab
 
 			const RenderHostInstance missingFactory = CreateRenderHost({});
 			context.Check(!missingFactory.m_Host &&
-				!missingFactory.m_Services.m_PipelineResolver &&
-				!missingFactory.m_Services.m_Presentation,
+				!missingFactory.m_CompositionBindings.m_PipelineResolver &&
+				!missingFactory.m_CompositionBindings.m_Presentation,
 				"render host factory rejects a missing host context factory");
 			RenderHostCreateInfo missingPaths{};
 			missingPaths.m_RHIContextFactory = reinterpret_cast<const RHIContextFactoryBase*>(1);
 			const RenderHostInstance missingPathsInstance = CreateRenderHost(missingPaths);
 			context.Check(!missingPathsInstance.m_Host &&
-				!missingPathsInstance.m_Services.m_PipelineResolver,
+				!missingPathsInstance.m_CompositionBindings.m_PipelineResolver,
 				"render host factory rejects missing runtime paths");
 
 			RenderHostCreateInfo missingShaderManager{};
@@ -4351,7 +4352,7 @@ namespace gglab
 			missingShaderManager.m_IblDerivedDataCacheDirectory = "cache";
 			const RenderHostInstance missingShaderManagerInstance = CreateRenderHost(missingShaderManager);
 			context.Check(!missingShaderManagerInstance.m_Host &&
-				!missingShaderManagerInstance.m_Services.m_PipelineResolver,
+				!missingShaderManagerInstance.m_CompositionBindings.m_PipelineResolver,
 				"render host factory rejects a missing host shader manager");
 
 			RenderHostInstance defaultHostInstance{};
@@ -13608,6 +13609,7 @@ namespace gglab
 
 	void RunRenderingContractSelfTests(SelfTestContext& context) noexcept
 	{
+		RunRenderServicesViewSelfTests(context);
 		RunRGObjectArenaSelfTests(context);
 		RunGraphObjectLifetimeTests(context);
 		RunMaterialDiagnosticPrewarmTests(context);

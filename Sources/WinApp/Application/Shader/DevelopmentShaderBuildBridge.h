@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Task/TaskTypes.h"
 #include "GGLabRuntime/Graphics/GraphicsHandles.h"
+#include "GGLabRuntime/Graphics/RenderServicesView.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 #include "ShaderArtifactRuntime/ShaderProgramRegistryArtifact.h"
 
@@ -14,7 +15,6 @@
 
 namespace gglab
 {
-	class RenderTemporalAccess;
 	class ShaderManager;
 	class TaskSystem;
 
@@ -68,7 +68,7 @@ namespace gglab
 			DevelopmentShaderBuildRequest m_BuildRequest{};
 			TaskSystem* m_TaskSystem = nullptr;
 			ShaderManager* m_ShaderManager = nullptr;
-			RenderTemporalAccess* m_RenderTemporal = nullptr;
+			RenderServicesView m_RenderServices;
 		};
 
 		explicit DevelopmentShaderHotReloadSystem(CreateInfo createInfo) noexcept;
@@ -83,16 +83,19 @@ namespace gglab
 		void Shutdown() noexcept;
 
 	private:
+		friend struct DevelopmentShaderHotReloadTestAccess;
 		struct BuildJob;
 
 		[[nodiscard]] std::optional<uint64_t> ComputeSourceFingerprint() const noexcept;
 		void StartBuild() noexcept;
+		void OnBuildCompleted(const TaskCompletionInfo& completion,
+			const DevelopmentShaderBuildResult& result) noexcept;
 		void TryActivatePendingRegistry() noexcept;
 
 		DevelopmentShaderBuildRequest m_BuildRequest{};
 		TaskSystem* m_TaskSystem = nullptr;
 		ShaderManager* m_ShaderManager = nullptr;
-		RenderTemporalAccess* m_RenderTemporal = nullptr;
+		RenderServicesView m_RenderServices;
 		ShaderID m_TemporalAAResolveShader{};
 		std::shared_ptr<BuildJob> m_BuildJob{};
 		TaskHandle m_BuildTask{};

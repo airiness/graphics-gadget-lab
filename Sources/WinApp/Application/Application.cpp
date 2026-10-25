@@ -267,7 +267,7 @@ namespace gglab
 					.m_BuildRequest = shaderBuildRequest,
 					.m_TaskSystem = taskSystem,
 					.m_ShaderManager = shaderManager,
-					.m_RenderTemporal = m_AppRuntime->GetRenderServices().m_Temporal,
+					.m_RenderServices = m_AppRuntime->GetRenderServices(),
 				});
 			if (!m_ShaderHotReload->Initialize())
 			{

@@ -146,6 +146,11 @@ namespace gglab
 	AppRuntimeServiceInitializeResult GGLabAppRuntime::InitializeServices(
 		AppRuntimeServiceCreateInfo createInfo) noexcept
 	{
+		CheckOwnerThread();
+		if (m_RenderHost)
+		{
+			m_RenderHost->CheckServiceLifecycleAccess();
+		}
 		if (m_ServicesInitialized)
 		{
 			return AppRuntimeServiceInitializeResult::AlreadyInitialized;
@@ -238,7 +243,8 @@ namespace gglab
 				AppRuntimeServiceInitializeResult::RendererInitializationFailed);
 		}
 		m_RenderHost = std::move(renderHostInstance.m_Host);
-		m_RenderServices = renderHostInstance.m_Services;
+		m_RenderServiceBindings = renderHostInstance.m_CompositionBindings;
+		m_RenderServicesView = renderHostInstance.m_ServiceView;
 		m_RenderComposition = renderHostInstance.m_Composition;
 		if (!m_RenderComposition)
 		{
@@ -263,7 +269,7 @@ namespace gglab
 		m_FrameCapture->SetAppRuntimeJobResultOwner();
 		m_FrameSequence = std::make_unique<FrameSequenceCoordinator>(*m_FrameCapture);
 		m_ParameterControl = std::make_unique<SessionParameterControl>(
-			*m_RenderServices.m_Environment, m_RenderComposition->GetWorldLightingControl(),
+			*m_RenderServiceBindings.m_Environment, m_RenderComposition->GetWorldLightingControl(),
 			[this](DemoBase& demo) -> std::optional<ApplicationViewSettingsResolution>
 			{
 				const auto view = demo.GetCameraRig().ResolveEffectiveDisplayView();
@@ -306,7 +312,7 @@ namespace gglab
 		const DemoCreateInfo demoCreateInfo{
 			.m_Services =
 				{
-					.m_RenderServices = m_RenderServices,
+					.m_RenderServices = m_RenderServiceBindings,
 					.m_EnvironmentLighting = m_RenderHost->GetEnvironmentLightingView(),
 					.m_EnvironmentLightingControl = m_RenderHost->GetEnvironmentLightingControl(),
 					.m_IBLCacheControl = m_RenderHost->GetIBLCacheControl(),
@@ -387,6 +393,10 @@ namespace gglab
 	AppRuntimeServiceInitializeResult GGLabAppRuntime::FailServiceInitialization(
 		AppRuntimeServiceInitializeResult result) noexcept
 	{
+		if (m_RenderHost)
+		{
+			m_RenderHost->RevokeRenderServices();
+		}
 		m_LifecycleState = AppRuntimeLifecycleState::Failed;
 		Shutdown();
 		return result;
@@ -454,11 +464,18 @@ namespace gglab
 
 	void GGLabAppRuntime::Shutdown(AppRuntimeShutdownInfo shutdownInfo) noexcept
 	{
+		CheckOwnerThread();
+		if (m_RenderHost)
+		{
+			m_RenderHost->RevokeRenderServices();
+		}
 		if (m_ShutdownComplete || m_LifecycleState == AppRuntimeLifecycleState::ShuttingDown)
 		{
 			return;
 		}
 
+		const bool preserveFailure = m_LifecycleState == AppRuntimeLifecycleState::Failed;
+		m_LifecycleState = AppRuntimeLifecycleState::ShuttingDown;
 		if (m_ParameterControl)
 		{
 			m_ParameterControl->Finish();
@@ -468,8 +485,6 @@ namespace gglab
 		{
 			m_DemoManager->SetBeforeActiveDemoReleaseCallback({});
 		}
-		const bool preserveFailure = m_LifecycleState == AppRuntimeLifecycleState::Failed;
-		m_LifecycleState = AppRuntimeLifecycleState::ShuttingDown;
 		if (m_FrameCapture)
 		{
 			m_FrameCapture->Update();
@@ -560,6 +575,8 @@ namespace gglab
 		m_Diagnostics.reset();
 		m_DemoManager.reset();
 		m_DebugDrawService.reset();
+		m_RenderServiceBindings = {};
+		m_RenderServicesView = {};
 		if (m_RenderHost)
 		{
 			m_RenderHost->Finalize();
@@ -569,6 +586,10 @@ namespace gglab
 			{
 				m_FrameCapture->FinalizeAfterRenderHost();
 				CollectFrameCaptureResults();
+			}
+			if (m_NonFiniteWatch)
+			{
+				m_NonFiniteWatch->DetachCapture();
 			}
 			m_RenderHost.reset();
 		}

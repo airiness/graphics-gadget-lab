@@ -15,11 +15,14 @@ Atlas ID: atlas.runtime.render-host
 - **Responsibility:** the active frame, Runtime participants, the commit list and
   GPU services.
 - **Public interface:** [RenderHost.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderHost.h),
-  including `CreateRenderHost` and the move-only `RenderFrame` abort handle.
+  including `CreateRenderHost` and the move-only `RenderFrame` abort handle;
+  [RenderServicesView.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderServicesView.h)
+  provides retained service access.
 - **Implementation:** [Renderer](../../../Sources/GGLabRuntime/Private/Graphics/Renderer.cpp)
   and [outcome derivation](../../../Sources/GGLabRuntime/Private/Graphics/RenderFrameOutcome.h).
 - **Lifetime:** AppRuntime owns the host. Renderer owns the RHI context and pools,
   borrows the active graph and clears its active-frame state after settlement.
+  Service views revoke before teardown callbacks; contained borrows end before Finalize.
 - **Boundary:** [frame settlement](../Frame_Execution_Map.md#frame-settlement) keeps
   the four outcomes and their retention fences apart.
 - **Verification:** the production Renderer in `GpuFaultLifecycleSelfTests.cpp`;
@@ -31,6 +34,7 @@ Anchors:
   - Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderHost.h::RenderFrame::Reset
 ReviewPaths:
   - Sources/GGLabRuntime/Private/Graphics/RenderHostFactory.cpp
+  - Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderServicesView.h
   - Sources/GGLabRuntime/Private/Graphics/RenderFrameOutcome.h
 ```
 

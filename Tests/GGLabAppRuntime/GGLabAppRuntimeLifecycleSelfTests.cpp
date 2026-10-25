@@ -772,6 +772,10 @@ int main(int argumentCount, char* arguments[])
 	// Headless test failures must terminate instead of opening a CRT/OS error dialog.
 	_set_error_mode(_OUT_TO_STDERR);
 	_set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+	if (argumentCount == 3 && std::string_view(arguments[1]) == "--service-publication-child")
+	{
+		return gglab::RunServicePublicationChild(arguments[2]);
+	}
 	if (argumentCount == 4 && std::string_view(arguments[1]) == "--gpu-fault-child")
 	{
 		if (std::string_view(arguments[2]) != "timeout" && std::string_view(arguments[2]) != "failed")

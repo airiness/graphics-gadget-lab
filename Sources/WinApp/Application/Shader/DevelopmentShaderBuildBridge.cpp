@@ -102,7 +102,7 @@ namespace gglab
 		m_BuildRequest(std::move(createInfo.m_BuildRequest)),
 		m_TaskSystem(createInfo.m_TaskSystem),
 		m_ShaderManager(createInfo.m_ShaderManager),
-		m_RenderTemporal(createInfo.m_RenderTemporal)
+		m_RenderServices(std::move(createInfo.m_RenderServices))
 	{
 	}
 
@@ -115,14 +115,20 @@ namespace gglab
 	{
 		if (m_Initialized)
 		{
-			return true;
+			return m_RenderServices.IsValid();
 		}
-		if (!m_BuildRequest.IsValid() || !m_TaskSystem || !m_ShaderManager || !m_RenderTemporal)
+		if (m_ShuttingDown || !m_BuildRequest.IsValid() || !m_TaskSystem || !m_ShaderManager)
 		{
 			return false;
 		}
-		m_TemporalAAResolveShader =
-			m_ShaderManager->LoadProgram(shader_programs::TemporalAAReprojectionCompute);
+		if (!m_RenderServices.TryUse([&](const RenderServices&) noexcept
+			{
+				m_TemporalAAResolveShader =
+					m_ShaderManager->LoadProgram(shader_programs::TemporalAAReprojectionCompute);
+			}))
+		{
+			return false;
+		}
 		if (!m_TemporalAAResolveShader.IsValid())
 		{
 			return false;
@@ -142,6 +148,11 @@ namespace gglab
 	{
 		if (!m_Initialized || m_ShuttingDown)
 		{
+			return;
+		}
+		if (!m_RenderServices.IsValid())
+		{
+			Shutdown();
 			return;
 		}
 		TryActivatePendingRegistry();
@@ -172,11 +183,18 @@ namespace gglab
 			return;
 		}
 		m_ShuttingDown = true;
+		m_Initialized = false;
+		m_RebuildRequested = false;
+		m_PendingRegistry.reset();
+		m_RenderServices = {};
 		if (m_TaskSystem && m_BuildTask.IsValid())
 		{
 			m_TaskSystem->Cancel(m_BuildTask);
 		}
-		m_PendingRegistry.reset();
+		m_BuildTask = {};
+		m_BuildJob.reset();
+		m_TaskSystem = nullptr;
+		m_ShaderManager = nullptr;
 	}
 
 	std::optional<uint64_t>
@@ -253,23 +271,7 @@ namespace gglab
 			},
 			[this, job](const TaskCompletionInfo& completion) noexcept
 			{
-				m_BuildTask = {};
-				if (m_ShuttingDown)
-				{
-					return;
-				}
-				if (completion.m_Status == TaskStatus::Succeeded && job->m_Result.IsSuccess())
-				{
-					m_PendingRegistry = job->m_Result.m_RegistryRef;
-					GGLAB_LOG_INFO("Development shader build published a new registry snapshot.");
-					TryActivatePendingRegistry();
-				}
-				else
-				{
-					GGLAB_LOG_WARN(
-						"Development shader build failed; keeping last-known-good shaders: {}",
-						job->m_Result.m_Diagnostics);
-				}
+				OnBuildCompleted(completion, job->m_Result);
 			});
 		if (!m_BuildTask.IsValid())
 		{
@@ -277,29 +279,60 @@ namespace gglab
 		}
 	}
 
-	void DevelopmentShaderHotReloadSystem::TryActivatePendingRegistry() noexcept
+	void DevelopmentShaderHotReloadSystem::OnBuildCompleted(
+		const TaskCompletionInfo& completion, const DevelopmentShaderBuildResult& result) noexcept
 	{
-		if (!m_PendingRegistry)
+		m_BuildTask = {};
+		if (m_ShuttingDown)
 		{
 			return;
 		}
-		const uint64_t temporalAAGenerationBefore =
-			m_ShaderManager->GetGeneration(m_TemporalAAResolveShader);
-		const ShaderRegistryActivationResult activation =
-			m_ShaderManager->ActivateRegistry(*m_PendingRegistry);
+		if (!m_RenderServices.IsValid())
+		{
+			Shutdown();
+			return;
+		}
+		if (completion.m_Status == TaskStatus::Succeeded && result.IsSuccess())
+		{
+			m_PendingRegistry = result.m_RegistryRef;
+			GGLAB_LOG_INFO("Development shader build published a new registry snapshot.");
+			TryActivatePendingRegistry();
+		}
+		else
+		{
+			GGLAB_LOG_WARN("Development shader build failed; keeping last-known-good shaders: {}",
+				result.m_Diagnostics);
+		}
+	}
+
+	void DevelopmentShaderHotReloadSystem::TryActivatePendingRegistry() noexcept
+	{
+		if (m_ShuttingDown || !m_PendingRegistry)
+		{
+			return;
+		}
+		ShaderRegistryActivationResult activation;
+		if (!m_RenderServices.TryUse([&](const RenderServices& services) noexcept
+			{
+				const uint64_t generationBefore =
+					m_ShaderManager->GetGeneration(m_TemporalAAResolveShader);
+				activation = m_ShaderManager->ActivateRegistry(*m_PendingRegistry);
+				if (activation.m_Status == ShaderRegistryActivationStatus::Activated &&
+					m_ShaderManager->GetGeneration(m_TemporalAAResolveShader) != generationBefore)
+				{
+					services.m_Temporal->InvalidateTemporalHistoryAfterResolveProgramChange();
+				}
+			}))
+		{
+			Shutdown();
+			return;
+		}
 		if (activation.m_Status == ShaderRegistryActivationStatus::Busy)
 		{
 			return;
 		}
 		if (activation.IsSuccess())
 		{
-			const uint64_t temporalAAGenerationAfter =
-				m_ShaderManager->GetGeneration(m_TemporalAAResolveShader);
-			if (activation.m_Status == ShaderRegistryActivationStatus::Activated &&
-				temporalAAGenerationAfter != temporalAAGenerationBefore)
-			{
-				m_RenderTemporal->InvalidateTemporalHistoryAfterResolveProgramChange();
-			}
 			GGLAB_LOG_INFO("Activated development shader registry (changedShaders={}).",
 				activation.m_ChangedShaderCount);
 		}

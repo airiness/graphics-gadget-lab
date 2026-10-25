@@ -723,6 +723,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderSceneBuilder.cpp">
       <Filter>Private\Graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderServicesView.cpp">
+      <Filter>Private\Graphics</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderView.cpp">
       <Filter>Private\Graphics</Filter>
     </ClCompile>
@@ -2241,6 +2244,9 @@
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderServices.h">
+      <Filter>Public\GGLabRuntime\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderServicesView.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderTextureAssetAccess.h">

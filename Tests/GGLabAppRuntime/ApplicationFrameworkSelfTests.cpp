@@ -21,6 +21,8 @@ namespace gglab
 		class StubRenderHost final : public RenderHost
 		{
 		public:
+			void CheckServiceLifecycleAccess() const noexcept override {}
+			void RevokeRenderServices() noexcept override {}
 			[[nodiscard]] bool IsInitialized() const noexcept override { return false; }
 			void Finalize() noexcept override {}
 			void OnResize(uint32_t, uint32_t) noexcept override {}

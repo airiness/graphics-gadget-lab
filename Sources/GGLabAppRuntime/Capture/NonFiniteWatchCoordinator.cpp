@@ -188,7 +188,7 @@ namespace gglab
 	void NonFiniteWatchCoordinator::PrepareFrame(uint64_t frameSerial, bool yieldBoundaryCapacity,
 		std::span<const NonFiniteWatchDefault> defaults) noexcept
 	{
-		if (frameSerial <= m_LastPreparedFrame)
+		if (!m_Capture || frameSerial <= m_LastPreparedFrame)
 		{
 			return;
 		}

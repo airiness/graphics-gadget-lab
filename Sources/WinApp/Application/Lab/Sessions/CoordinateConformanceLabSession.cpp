@@ -133,7 +133,7 @@ namespace gglab
 			{
 				rg.GetBlackboard().GetOrCreate<NonFiniteWatchDefaultRegistry>().Declare({});
 				GGLAB_ASSERT_MSG(context.IsValid(), "RenderFrameContext invalid.");
-				GGLAB_ASSERT_MSG(services.IsValid(), "RenderServices invalid.");
+				GGLAB_ASSERT_MSG(services.HasRequiredServices(), "RenderServices invalid.");
 				EnsureInitialized(services);
 
 				auto* swapChain = services.m_Presentation->GetSwapChain();

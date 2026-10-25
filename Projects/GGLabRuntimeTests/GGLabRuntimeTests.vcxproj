@@ -132,6 +132,7 @@
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <ClCompile Include="..\..\Tests\GGLabRuntime\RGObjectArenaSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\RenderServicesViewSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\ShaderArtifactRuntimeSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\VulkanContractSelfTests.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
   </ItemGroup>
@@ -151,6 +152,7 @@
     <ClInclude Include="..\..\Tests\GGLabRuntime\PublicationAccountingSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\RenderingContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\RGObjectArenaSelfTests.h" />
+    <ClInclude Include="..\..\Tests\GGLabRuntime\RenderServicesViewSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\ShaderArtifactRuntimeSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\VulkanContractSelfTests.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
   </ItemGroup>

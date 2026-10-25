@@ -114,7 +114,7 @@ namespace gglab
 			const DemoBase& m_Demo;
 			const EnvironmentAssetController& m_EnvironmentAssetController;
 			const AssetManager& m_AssetManager;
-			const RenderServices& m_RenderServices;
+			const RenderServices& m_RenderServiceBindings;
 			const Time& m_Time;
 			const ShaderPreloadStatus& m_ShaderPreload;
 			const CameraRig::CameraSlot& m_DisplayCameraSlot;
@@ -172,7 +172,7 @@ namespace gglab
 			// requested environment lighting is fully baked or cache-restored. The
 			// request is read live: an environment committed this frame requests its
 			// bake before the bake status observes it.
-			const RenderEnvironmentAccess& environment = *inputs.m_RenderServices.m_Environment;
+			const RenderEnvironmentAccess& environment = *inputs.m_RenderServiceBindings.m_Environment;
 			const IBLBakeStatus& bake = environment.GetBakingStatus();
 			const bool iblPending = environment.GetBakeRequestGeneration() != bake.m_ActiveGeneration;
 			readiness.Add("ibl",
@@ -192,7 +192,7 @@ namespace gglab
 					std::string{});
 
 			const AssetUploadStatistics uploads =
-				inputs.m_RenderServices.m_AssetUpload->GetStatistics();
+				inputs.m_RenderServiceBindings.m_AssetUpload->GetStatistics();
 			const uint32_t pendingUploads = uploads.m_PendingCount +
 				uploads.m_CpuPayloadQueue.m_PendingCount +
 				uploads.m_ResourcePublicationQueue.m_PendingCount +
@@ -329,7 +329,7 @@ namespace gglab
 					.m_Temporal = inputs.m_TemporalFrameTransaction.GetContinuity(),
 					.m_DemoIndex = demoIndex,
 				},
-				.m_DisplayFormat = inputs.m_RenderServices.m_Presentation->GetSwapChain()->GetFormat(),
+				.m_DisplayFormat = inputs.m_RenderServiceBindings.m_Presentation->GetSwapChain()->GetFormat(),
 				.m_FrameSerial = inputs.m_FrameSerial,
 				.m_FrameIndex = inputs.m_Time.GetFrameCount(),
 				.m_Camera = {
@@ -352,6 +352,7 @@ namespace gglab
 
 	AppRuntimeTickResult GGLabAppRuntime::FailRuntime(std::string_view failure) noexcept
 	{
+		m_RenderHost->RevokeRenderServices();
 		GGLAB_LOG_CRITICAL_ALWAYS("Fatal runtime failure: {}", failure);
 		m_LifecycleState = AppRuntimeLifecycleState::Failed;
 		if (m_ParameterControl)
@@ -377,6 +378,11 @@ namespace gglab
 
 	AppRuntimeTickResult GGLabAppRuntime::Tick(AppRuntimeTickInfo tickInfo) noexcept
 	{
+		CheckOwnerThread();
+		if (m_RenderHost)
+		{
+			m_RenderHost->CheckServiceLifecycleAccess();
+		}
 		switch (m_LifecycleState)
 		{
 		case AppRuntimeLifecycleState::Suspended:
@@ -449,6 +455,7 @@ namespace gglab
 
 		if (m_Input->IsKeyPressed(AppInputKey::Escape))
 		{
+			m_RenderHost->RevokeRenderServices();
 			GGLAB_LOG_INFO_ALWAYS("Exit requested by the Escape key.");
 			m_LifecycleState = AppRuntimeLifecycleState::ExitRequested;
 			return AppRuntimeTickResult::Exit;
@@ -539,7 +546,7 @@ namespace gglab
 		}
 		demo->OnFrameReady(rendererFrame.GetSerial());
 		ApplicationToolingFrame toolingFrame(applicationTooling);
-		RenderServices services = m_RenderServices;
+		RenderServices services = m_RenderServiceBindings;
 		services.m_TextureAssets = m_AssetManager.get();
 		services.m_OverlayExtension = toolingFrame.GetOverlayExtension();
 		// The RAII frame handle may retire RenderGraph resources from its abort
@@ -666,7 +673,7 @@ namespace gglab
 			.m_Demo = *demo,
 			.m_EnvironmentAssetController = *m_EnvironmentAssetController,
 			.m_AssetManager = *m_AssetManager,
-			.m_RenderServices = m_RenderServices,
+			.m_RenderServiceBindings = m_RenderServiceBindings,
 			.m_Time = *m_Time,
 			.m_ShaderPreload = shaderPreload,
 			.m_DisplayCameraSlot = *displayCameraSlot,
@@ -702,7 +709,7 @@ namespace gglab
 			&frame.m_RenderViews[utils::ToIndex(frame.m_DisplayViewId)]);
 		auto parameterFrame = m_ParameterControl->IsEnabled() ?
 			std::make_shared<ParameterFrameState>(m_ParameterControl->CaptureFrameState(
-				frame.m_FrameSerial, m_RenderServices.m_Environment->GetBakeRequestGeneration(),
+				frame.m_FrameSerial, m_RenderServiceBindings.m_Environment->GetBakeRequestGeneration(),
 				frame.m_RenderScene.m_WorldLightingGeneration)) : nullptr;
 		UpdateSequenceParameterEvents();
 		demo->OnFrameBuilt(frame.m_FrameSerial, frame.m_RenderScene.m_WorldLightingGeneration);
@@ -712,7 +719,7 @@ namespace gglab
 			.m_Exposure = capturedView.m_Exposure,
 			.m_PostProcess = capturedView.m_PostProcess,
 			.m_Shadows = frame.m_DirectionalShadowSettings,
-			.m_Environment = m_RenderServices.m_Environment->GetEnvironmentLightingSettings(),
+			.m_Environment = m_RenderServiceBindings.m_Environment->GetEnvironmentLightingSettings(),
 			.m_ActiveIBLGeneration = frame.m_RenderScene.m_WorldLightingGeneration,
 			.m_Atmosphere = frame.m_RenderScene.m_Atmosphere,
 			.m_Sun = frame.m_RenderScene.m_WorldSun,

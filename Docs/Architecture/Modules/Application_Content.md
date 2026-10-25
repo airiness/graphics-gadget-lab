@@ -18,8 +18,8 @@ Atlas ID: atlas.application.frame-orchestration
 - **Implementation:** [TickFrame](../../../Sources/GGLabAppRuntime/GGLabAppRuntimeFrame.cpp)
   and [InitializeServices / Shutdown](../../../Sources/GGLabAppRuntime/GGLabAppRuntimeServices.cpp).
 - **Lifetime:** owns the RenderHost and shared services; the RenderGraph lives for one
-  `TickFrame`. Composition and service pointers, and the ready frame's abort
-  cleanup, borrow the host.
+  `TickFrame`. Retained service views revoke on exit, failure and shutdown;
+  contained composition borrows end before host Finalize.
 - **Boundary:** [success feedback](../Frame_Execution_Map.md#settlement-contract-failures)
   waits for Runtime settlement; [teardown](../Frame_Execution_Map.md#teardown-ownership)
   releases consumers while their borrowed services are alive.
