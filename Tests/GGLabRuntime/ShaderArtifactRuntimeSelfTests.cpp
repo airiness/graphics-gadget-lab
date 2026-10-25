@@ -762,11 +762,17 @@ namespace gglab
 				}
 				const bool workerFinished = cancelled.GetStatus().m_CompletedCount == 1;
 				cancelled.Cancel(tasks);
-				const bool cancellationDrained = waitFor([&]() noexcept
-					{
-						const auto status = tasks.GetStatistics();
-						return status.m_ActiveTasks.empty() && status.m_PendingCompletionCount == 0;
-					});
+				// Startup's callback was consumed above; this isolated request is the only
+				// outstanding completion. Terminal/empty-queue statistics can look idle
+				// while FinishTask is still releasing its work captures.
+				uint32_t consumedCompletions = 0;
+				const auto completionDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+				while (consumedCompletions == 0 && std::chrono::steady_clock::now() < completionDeadline)
+				{
+					consumedCompletions += tasks.PumpCompletions();
+					std::this_thread::yield();
+				}
+				const bool cancellationDrained = consumedCompletions == 1;
 				context.Check(activationBlocked && workerFinished && cancellationDrained &&
 					cancelled.GetStatus().m_Status == TaskStatus::Cancelled &&
 					!preloadManager.GetBytecode(ShaderID{ 1 }).IsValid() &&

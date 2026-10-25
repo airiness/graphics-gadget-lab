@@ -27,9 +27,8 @@ namespace gglab
 
 	struct DemoServices
 	{
-		// Stable explicit pass/content service bundle for content that no longer
-		// needs the concrete renderer. IsValid() validates the required
-		// capabilities; the optional capabilities are explicitly nullable.
+		// Contained composition borrow, released before RenderHost Finalize.
+		// IsValid checks required capabilities, not provider lifetime.
 		RenderServices m_RenderServices{};
 		EnvironmentLightingViewBase* m_EnvironmentLighting = nullptr;
 		EnvironmentLightingControlBase* m_EnvironmentLightingControl = nullptr;
@@ -52,7 +51,7 @@ namespace gglab
 			// service below. The renderer always provides the RHI context,
 			// environment lighting and IBL cache when composition succeeds.
 			// Optional: GPU profiling depends on backend profiler availability.
-			return m_RenderServices.IsValid() && m_RHIContext && m_EnvironmentLighting &&
+			return m_RenderServices.HasRequiredServices() && m_RHIContext && m_EnvironmentLighting &&
 				m_EnvironmentLightingControl && m_IBLCacheControl && m_AssetManager &&
 				m_ShaderManager && m_TaskSystem && m_Input && m_Time && m_DebugDraw &&
 				m_EnvironmentAssetController;

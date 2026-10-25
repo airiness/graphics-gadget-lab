@@ -141,7 +141,7 @@ namespace gglab
 		RenderGraph& rg, const RenderFrameContext& context, const RenderServices& services) noexcept
 	{
 		GGLAB_ASSERT_MSG(context.IsValid(), "RenderFrameContext invalid.");
-		GGLAB_ASSERT_MSG(services.IsValid(), "RenderServices invalid.");
+		GGLAB_ASSERT_MSG(services.HasRequiredServices(), "RenderServices invalid.");
 
 		GGLAB_ASSERT_MSG(m_FramePlan && m_FramePlan->m_FrameSerial == context.m_FrameSerial,
 			"Forward+ graph construction requires a Ready validation of the same frame.");

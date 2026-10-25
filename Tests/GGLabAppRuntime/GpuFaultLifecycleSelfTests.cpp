@@ -6,6 +6,7 @@
 #include "Capture/FrameCaptureCoordinator.h"
 #include "Capture/FrameCaptureImageEncoder.h"
 #include "Capture/FrameSequenceCoordinator.h"
+#include "Capture/NonFiniteWatchCoordinator.h"
 #include "Demo/DemoLoadingShell.h"
 #include "Demo/DemoManager.h"
 #include "GGLabAppRuntime.h"
@@ -58,11 +59,14 @@
 #include <fstream>
 #include <functional>
 #include <iterator>
+#include <initializer_list>
+#include <latch>
 #include <map>
 #include <memory>
 #include <optional>
 #include <set>
 #include <span>
+#include <stop_token>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -77,6 +81,18 @@
 
 namespace gglab
 {
+	struct AppRuntimeServicePublicationTestAccess
+	{
+		static bool RollBackPartialInitialization(GGLabAppRuntime& runtime) noexcept
+		{
+			runtime.m_ServicesInitialized = false;
+			const bool unpublished = !runtime.GetRenderServices().IsValid();
+			GGLAB_UNUSED(runtime.FailServiceInitialization(
+				AppRuntimeServiceInitializeResult::StartupContentUnavailable));
+			return unpublished;
+		}
+	};
+
 	namespace
 	{
 		enum class TeardownOutcome
@@ -152,7 +168,11 @@ namespace gglab
 			bool m_RequestLightingTwice = false;
 			uint32_t m_LightingParameterApplications = 0;
 			bool m_HoldLightingPreparation = false;
+			// Contained fault-harness bindings; external retained capabilities use the view below.
 			DemoServices m_ContentServices{};
+			RenderServicesView m_SavedServiceView;
+			bool m_CheckServiceCleanup = false;
+			bool m_ContainedCleanupAfterRevocation = false;
 			bool m_FrameBeginUnavailable = false;
 			uint32_t m_ContentSerialOffset = 0;
 			uint64_t m_PlannedContentIdentity = 0;
@@ -1325,6 +1345,13 @@ namespace gglab
 			}
 			~FaultDemo() override
 			{
+				if (m_Probe.m_CheckServiceCleanup)
+				{
+					GGLAB_UNUSED(m_Probe.m_ContentServices.m_RenderServices.m_Environment->GetBakeRequestGeneration());
+					m_Probe.m_ContainedCleanupAfterRevocation =
+						!m_Probe.m_SavedServiceView.IsValid() &&
+						m_Probe.m_ContentServices.m_RenderServices.HasRequiredServices();
+				}
 				++m_Probe.m_DemoDestructions;
 			}
 			std::span<const WorldLightingProfile> GetLightingProfiles() const noexcept override
@@ -1582,7 +1609,7 @@ namespace gglab
 				std::this_thread::yield();
 			}
 			probe.m_CaptureControl = runtime.GetRenderHost()->GetFrameCaptureControl();
-			probe.m_Presentation = runtime.GetRenderServices().m_Presentation;
+			probe.m_Presentation = probe.m_ContentServices.m_RenderServices.m_Presentation;
 			probe.m_EnableDeferredCommits = true;
 			checks.Check(probe.m_GraphExecutions > 0 && probe.m_SubmittedCallbacks > 0,
 				"The outcome harness reaches its production content and submission hook before injection");
@@ -1614,7 +1641,7 @@ namespace gglab
 			auto settings = ResolveViewRenderSettings(demo.GetViewRenderProfile(), demo.GetCamera());
 			settings.m_TemporalAA.m_Enabled = false;
 			settings.m_Lighting.m_GTAO.m_Enabled = false;
-			const auto compatibility = runtime.GetRenderServices().m_Temporal->GetTemporalHistoryDiagnostics().m_Compatibility;
+			const auto compatibility = probe.m_ContentServices.m_RenderServices.m_Temporal->GetTemporalHistoryDiagnostics().m_Compatibility;
 			const ResolvedTemporalFramePlan plan{ .m_DisplayViewId = RenderViewID::Main,
 				.m_Services = TemporalService::ColorDepthHistory | TemporalService::FrameContinuity,
 				.m_ResetIdentity = compatibility.m_ResetIdentity,
@@ -1629,7 +1656,7 @@ namespace gglab
 				.m_FrameSlotIndex = frame.GetFrameSlotIndex(), .m_BackBufferIndex = frame.GetBackBufferIndex(),
 				.m_FrameSerial = frame.GetSerial() });
 			auto context = built.MakeRenderFrameContext();
-			demo.GetRenderPipeline().BuildRenderGraph(graph, context, runtime.GetRenderServices());
+			demo.GetRenderPipeline().BuildRenderGraph(graph, context, probe.m_ContentServices.m_RenderServices);
 			const bool compiled = graph.Compile();
 			checks.Check(compiled, "The outcome test compiles the production content graph");
 			if (!compiled || action == HostFrameAction::DiscardAfterBuild)
@@ -1677,16 +1704,16 @@ namespace gglab
 		{
 			probe.m_EnablePreviewCommits = true;
 			runtime.GetRenderHost()->GetShadowPreviewControl()->RequestShadowPreview();
-			auto* resources = runtime.GetRenderServices().m_Resources;
+			auto* resources = probe.m_ContentServices.m_RenderServices.m_Resources;
 			resources->EnsurePostProcessPreviewResources(32, 32);
 			resources->RequestPostProcessPreview();
 			resources->MarkIBLPreviewDirty(IBLPreviewType::Environment);
 			resources->RequestIBLPreview(IBLPreviewType::Environment);
 		}
 
-		void CheckOutcomePreviews(SelfTestContext& checks, GGLabAppRuntime& runtime, bool submitted)
+		void CheckOutcomePreviews(SelfTestContext& checks, const LifetimeProbe& probe, bool submitted)
 		{
-			auto* resources = runtime.GetRenderServices().m_Resources;
+			auto* resources = probe.m_ContentServices.m_RenderServices.m_Resources;
 			checks.Check(resources->IsPostProcessPreviewRequested() != submitted &&
 				resources->IsDirty(RenderTextureIndex::Preview_PostProcess) != submitted &&
 				resources->HasPublishedPostProcessPreview() == submitted &&
@@ -1708,7 +1735,7 @@ namespace gglab
 				return;
 			}
 			RequestOutcomePreviews(runtime, probe);
-			const auto previousFence = runtime.GetRenderServices().m_Presentation->GetLastSubmittedFencePoint();
+			const auto previousFence = probe.m_ContentServices.m_RenderServices.m_Presentation->GetLastSubmittedFencePoint();
 			const uint32_t callbacks = probe.m_SubmittedCallbacks;
 			const uint32_t ends = probe.m_FrameEnds;
 			const uint32_t aborts = probe.m_FrameAborts;
@@ -1724,7 +1751,7 @@ namespace gglab
 			const RHIFencePoint frameFence = injection == FrameEndInjection::RecordingFailure ?
 				probe.m_LastAbortFence : probe.m_LastEndFence;
 			const auto expectedFence = frameFence.IsValid() ? frameFence : previousFence;
-			checks.Check(runtime.GetRenderServices().m_Presentation->GetLastSubmittedFencePoint() == expectedFence &&
+			checks.Check(probe.m_ContentServices.m_RenderServices.m_Presentation->GetLastSubmittedFencePoint() == expectedFence &&
 				HasOutcomeTextureState(runtime, TransientPoolSlotState::PendingRetirement, expectedFence),
 				"Submitted and Failed retire the recorded graph on the returned fence or the previous retention fence");
 			std::vector<FrameCaptureResult> results;
@@ -1733,7 +1760,7 @@ namespace gglab
 				results[0].m_Status == (submitted ? FrameCaptureStatus::Completed : FrameCaptureStatus::Failed) &&
 				bool(results[0].m_Image) == submitted,
 				"EndFrame Fatal fails the capture once, including fenceless and RHI-internal abort failures");
-			const auto temporal = runtime.GetRenderServices().m_Temporal->GetTemporalHistoryDiagnostics();
+			const auto temporal = probe.m_ContentServices.m_RenderServices.m_Temporal->GetTemporalHistoryDiagnostics();
 			checks.Check(submitted ?
 				temporal.m_HistoryValid && temporal.m_LastCommitted.m_GraphicsFence == frameFence :
 				!temporal.m_HasActiveHistory &&
@@ -1745,7 +1772,7 @@ namespace gglab
 					probe.m_CommitObservations[1].m_Order == 2 &&
 					probe.m_CommitObservations[1].m_Fence == frameFence)),
 				"Production settlement commits once in order with its fence only on Submitted and drops Failed captures");
-			CheckOutcomePreviews(checks, runtime, submitted);
+			CheckOutcomePreviews(checks, probe, submitted);
 			if (!submitted)
 			{
 				const uint32_t begins = probe.m_FrameBegins;
@@ -1779,11 +1806,11 @@ namespace gglab
 				registry.emplace<components::LightComponent>(light);
 			}
 			RequestOutcomePreviews(runtime, probe);
-			const auto previousFence = runtime.GetRenderServices().m_Presentation->GetLastSubmittedFencePoint();
+			const auto previousFence = probe.m_ContentServices.m_RenderServices.m_Presentation->GetLastSubmittedFencePoint();
 			const uint32_t ends = probe.m_FrameEnds;
 			const uint32_t aborts = probe.m_FrameAborts;
 			const uint32_t executions = probe.m_GraphExecutions;
-			const auto previousTemporal = runtime.GetRenderServices().m_Temporal->GetTemporalHistoryDiagnostics();
+			const auto previousTemporal = probe.m_ContentServices.m_RenderServices.m_Temporal->GetTemporalHistoryDiagnostics();
 			const uint64_t capture = probe.m_CaptureControl->RequestCapture(FrameCaptureSource::Scene);
 			probe.m_AbortInjection = abort;
 			GGLAB_UNUSED(RunOutcomeHostFrame(checks, runtime, probe, action));
@@ -1795,7 +1822,7 @@ namespace gglab
 				"Build deferral, upload-order failure and recorded RAII abort each settle through RHI AbortFrame once");
 			const bool unknown = abort == AbortInjection::CompletionUnknown;
 			const auto expectedFence = probe.m_LastAbortFence.IsValid() ? probe.m_LastAbortFence : previousFence;
-			checks.Check(runtime.GetRenderServices().m_Presentation->GetLastSubmittedFencePoint() == expectedFence &&
+			checks.Check(probe.m_ContentServices.m_RenderServices.m_Presentation->GetLastSubmittedFencePoint() == expectedFence &&
 				(unknown ? !recorded || HasOutcomeTextureState(runtime, TransientPoolSlotState::Leased, {}) :
 					!recorded || HasOutcomeTextureState(runtime, TransientPoolSlotState::PendingRetirement, expectedFence)),
 				"Renderer abort preserves the previous fence, adopts a retirement fence, or retains unknown work");
@@ -1803,7 +1830,7 @@ namespace gglab
 			probe.m_CaptureControl->ConsumeResults(results);
 			checks.Check(probe.m_CommitsRun == 0 && probe.m_CommitPayloadsDestroyed == (recorded ? 2u : 0u),
 				"Discarded and unknown-completion frames destroy recorded CPU commits without running them");
-			CheckOutcomePreviews(checks, runtime, false);
+			CheckOutcomePreviews(checks, probe, false);
 			if (unknown)
 			{
 				checks.Check(results.size() == 1 && results[0].m_RequestId == capture &&
@@ -1814,7 +1841,7 @@ namespace gglab
 			}
 			else
 			{
-				const auto temporal = runtime.GetRenderServices().m_Temporal->GetTemporalHistoryDiagnostics();
+				const auto temporal = probe.m_ContentServices.m_RenderServices.m_Temporal->GetTemporalHistoryDiagnostics();
 				checks.Check(results.empty() && probe.m_CaptureControl->GetUnfinishedRequestCount() == 1 &&
 					temporal.m_ResetCount == previousTemporal.m_ResetCount && temporal.m_HistoryValid &&
 					temporal.m_ReadIndex == previousTemporal.m_ReadIndex &&
@@ -1822,7 +1849,7 @@ namespace gglab
 					"Discarded requeues flexible captures and preserves the previously committed temporal history");
 				probe.m_AbortInjection = AbortInjection::Unfenced;
 				const auto next = RunOutcomeHostFrame(checks, runtime, probe, HostFrameAction::Submit);
-				CheckOutcomePreviews(checks, runtime, true);
+				CheckOutcomePreviews(checks, probe, true);
 				probe.m_CaptureControl->ConsumeResults(results);
 				checks.Check(next.IsCompleted() && results.size() == 1 && results[0].m_RequestId == capture &&
 					results[0].m_Status == FrameCaptureStatus::Completed && results[0].m_Image,
@@ -1874,12 +1901,12 @@ namespace gglab
 				"Production AppRuntime export deferral aborts after graph build without recording or submitting");
 			checks.Check(probe.m_CommitsRun == commits && probe.m_CommitPayloadsDestroyed == commits,
 				"The export-deferral abort carries no CPU commits from graph setup");
-			CheckOutcomePreviews(checks, runtime, false);
+			CheckOutcomePreviews(checks, probe, false);
 			held.clear();
 			checks.Check(runtime.Tick() == AppRuntimeTickResult::Continue && probe.m_FrameEnds == ends + 1 &&
 				probe.m_SubmittedCallbacks == callbacks + 1,
 				"Production AppRuntime continues with one successful frame after export pressure clears");
-			CheckOutcomePreviews(checks, runtime, true);
+			CheckOutcomePreviews(checks, probe, true);
 			std::vector<FrameCaptureResult> results;
 			probe.m_CaptureControl->ConsumeResults(results);
 			checks.Check(results.size() == 1 && results[0].m_RequestId == probe.m_ExportRequest &&
@@ -2446,7 +2473,7 @@ namespace gglab
 			probe.m_ChangePreviewAfterBuild = true;
 			const auto first = RunOutcomeHostFrame(checks, runtime, probe, HostFrameAction::Submit);
 			const auto stale = runtime.GetRenderHost()->GetIBLPreviewView()->GetIBLPreviewResourcesDiagnostics().m_EnvironmentPreview;
-			auto* resources = runtime.GetRenderServices().m_Resources;
+			auto* resources = probe.m_ContentServices.m_RenderServices.m_Resources;
 			checks.Check(first.IsCompleted() && stale.m_Dirty && stale.m_Requested &&
 				stale.m_PublishedLayout == before.m_Layout && stale.m_PublishedMip == before.m_SelectedMip &&
 				stale.m_UpdateCount == before.m_UpdateCount + 1 &&
@@ -2459,7 +2486,7 @@ namespace gglab
 				current.m_PublishedLayout == static_cast<uint32_t>(IBLPreviewLayout::Grid2x3) &&
 				current.m_PublishedMip == 1 && current.m_UpdateCount == stale.m_UpdateCount + 1,
 				"The next requesting frame publishes the newer IBL layout and mip exactly once");
-			CheckOutcomePreviews(checks, runtime, true);
+			CheckOutcomePreviews(checks, probe, true);
 			runtime.Shutdown();
 		}
 
@@ -2475,7 +2502,7 @@ namespace gglab
 				return;
 			}
 			const auto previousFence = probe.m_Presentation->GetLastSubmittedFencePoint();
-			const auto previousTemporal = runtime.GetRenderServices().m_Temporal->GetTemporalHistoryDiagnostics();
+			const auto previousTemporal = probe.m_ContentServices.m_RenderServices.m_Temporal->GetTemporalHistoryDiagnostics();
 			const uint32_t ends = probe.m_FrameEnds;
 			const uint32_t aborts = probe.m_FrameAborts;
 			const uint32_t callbacks = probe.m_SubmittedCallbacks;
@@ -2509,7 +2536,7 @@ namespace gglab
 			checks.Check(probe.m_Presentation->GetLastSubmittedFencePoint() == expectedFence &&
 				HasOutcomeTextureState(runtime, TransientPoolSlotState::PendingRetirement, expectedFence),
 				"Late enqueue preserves the actual submission or abort retirement fence");
-			const auto temporal = runtime.GetRenderServices().m_Temporal->GetTemporalHistoryDiagnostics();
+			const auto temporal = probe.m_ContentServices.m_RenderServices.m_Temporal->GetTemporalHistoryDiagnostics();
 			checks.Check(temporal.m_HistoryValid && (submitted ?
 				temporal.m_LastCommitted.m_GraphicsFence == expectedFence && (!committed ||
 					probe.m_CommitObservations[0].m_Order == 1 && probe.m_CommitObservations[1].m_Order == 2 &&
@@ -2827,9 +2854,16 @@ namespace gglab
 		class ParameterTestTooling final : public ApplicationToolingIntegrationBase
 		{
 		public:
+			std::function<void()> m_OnShutdown;
 			ApplicationToolingFrameSettings m_Settings;
 			mutable uint32_t m_Captures = 0;
-			void PrepareForShutdown() noexcept override {}
+			void PrepareForShutdown() noexcept override
+			{
+				if (m_OnShutdown)
+				{
+					m_OnShutdown();
+				}
+			}
 			ApplicationToolingInputCapture GetPreviousFrameInputCapture() const noexcept override { return {}; }
 			ApplicationToolingFrameSettings CaptureFrameSettings() const noexcept override
 			{
@@ -3139,7 +3173,7 @@ namespace gglab
 			probe.m_EnableTemporalHistory = false;
 			const auto& parameters = *runtime.GetParameterControl();
 			const auto& sequence = *runtime.GetFrameSequenceCoordinator();
-			const auto& environment = *runtime.GetRenderServices().m_Environment;
+			const auto& environment = *probe.m_ContentServices.m_RenderServices.m_Environment;
 			probe.m_ParameterControl = &parameters;
 			const auto tick = [&]()
 				{
@@ -3522,8 +3556,8 @@ namespace gglab
 			}
 			// Standalone source tests may inject frame evidence. The AppRuntime-owned
 			// source is exposed read-only and receives evidence only from its frame owner.
-			const auto& environment = *runtime.GetRenderServices().m_Environment;
-			SessionParameterControl source(*runtime.GetRenderServices().m_Environment);
+			const auto& environment = *probe.m_ContentServices.m_RenderServices.m_Environment;
+			SessionParameterControl source(*probe.m_ContentServices.m_RenderServices.m_Environment);
 			source.SynchronizeContent(runtime.GetDemoManager()->GetActiveDemo(),
 				runtime.GetDemoManager()->GetActiveContentIdentity(), "FaultLifecycle.Demo", false);
 			const std::array values{ LabParameterValue{ LabParameterId("lighting"), uint32_t(2) } };
@@ -3582,7 +3616,7 @@ namespace gglab
 			}
 			probe.m_EnableTemporalHistory = false;
 			GGLAB_UNUSED(runtime.Tick());
-			auto& environment = *runtime.GetRenderServices().m_Environment;
+			auto& environment = *probe.m_ContentServices.m_RenderServices.m_Environment;
 			auto* demo = runtime.GetDemoManager()->GetActiveDemo();
 			const auto content = runtime.GetDemoManager()->GetActiveContentIdentity();
 			const ParameterBatchOwner owner{ 1 };
@@ -3854,7 +3888,7 @@ namespace gglab
 				};
 			const auto generation = [&]()
 				{
-					return runtime.GetRenderServices().m_Environment->GetBakeRequestGeneration();
+					return probe.m_ContentServices.m_RenderServices.m_Environment->GetBakeRequestGeneration();
 				};
 			const auto baseline = settings().m_BakeConfig.m_PrefilteredSpecularSampleCount;
 			lab.RequestSetParameter(samples, uint32_t(64));
@@ -4320,7 +4354,7 @@ namespace gglab
 					}
 					return condition();
 				};
-			const auto& environment = *runtime.GetRenderServices().m_Environment;
+			const auto& environment = *probe.m_ContentServices.m_RenderServices.m_Environment;
 			checks.Check(tickUntil([&]() { return environment.GetBakingStatus().m_ActiveGeneration != 0; }),
 				"Deferred fixture establishes an actual published production bake before its experiment");
 			const std::array tooMany{ LabParameterValue{ LabParameterId("lighting"), uint32_t(2) },
@@ -4620,7 +4654,7 @@ namespace gglab
 			auto& lab = *probe.m_ParameterRuntime;
 			auto& world = runtime.GetDemoManager()->GetActiveDemo()->GetWorld();
 			auto& lighting = *runtime.GetRenderComposition()->GetWorldLightingControl();
-			const auto& environment = *runtime.GetRenderServices().m_Environment;
+			const auto& environment = *probe.m_ContentServices.m_RenderServices.m_Environment;
 			const auto source = lighting.GetWorldLightingPublication().m_Requested;
 			std::optional<entt::entity> sun;
 			for (const auto entity : world.GetRegistry().view<components::LightComponent>())
@@ -4824,7 +4858,7 @@ namespace gglab
 			probe.m_ParameterControl = &parameters;
 			auto& lab = *probe.m_ParameterRuntime;
 			auto& lighting = *runtime.GetRenderComposition()->GetWorldLightingControl();
-			const auto& environment = *runtime.GetRenderServices().m_Environment;
+			const auto& environment = *probe.m_ContentServices.m_RenderServices.m_Environment;
 			const auto tickUntil = [&](auto condition)
 				{
 					const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
@@ -4955,7 +4989,7 @@ namespace gglab
 			auto& parameters = *runtime.GetParameterControl();
 			probe.m_ParameterControl = &parameters;
 			runtime.EnableParameterControl();
-			const auto& environment = *runtime.GetRenderServices().m_Environment;
+			const auto& environment = *probe.m_ContentServices.m_RenderServices.m_Environment;
 			const auto tickUntil = [&](auto condition)
 				{
 					const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
@@ -5104,6 +5138,146 @@ namespace gglab
 				"Shutdown releases content bindings, profile registrations and both publication identities");
 		}
 
+		void RunServicePublicationScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			RenderServicesView retained;
+			{
+				LifetimeProbe probe;
+				FaultFactory factory(probe);
+				ApplicationInput input;
+				GGLabAppRuntime runtime;
+				checks.Check(!runtime.GetRenderServices().IsValid(),
+					"Uninitialized AppRuntime publishes no render services");
+				if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root / "shutdown"))
+				{
+					return;
+				}
+				retained = runtime.GetRenderServices();
+				probe.m_SavedServiceView = retained;
+				probe.m_CheckServiceCleanup = true;
+				bool frameInjectionsAbsent = false;
+				checks.Check(retained.TryUse([&](const RenderServices& services) noexcept
+					{
+						frameInjectionsAbsent = !services.m_TextureAssets && !services.m_OverlayExtension;
+					}) && frameInjectionsAbsent,
+					"Running AppRuntime publishes stable services without per-frame injections");
+				runtime.HandleHostEvent({ .m_Type = AppHostEventType::Suspended });
+				checks.Check(retained.IsValid() && runtime.GetRenderServices().IsValid(),
+					"Suspension preserves published services");
+				runtime.HandleHostEvent({ .m_Type = AppHostEventType::Resumed });
+				std::latch registered(1);
+				bool cancellationRejected = false;
+				const auto task = runtime.GetTaskSystem()->Submit({}, [&](std::stop_token token) noexcept
+					{
+						std::stop_callback callback(token, [&]() noexcept
+							{
+								cancellationRejected = !runtime.GetRenderServices().IsValid() &&
+									!retained.IsValid() && runtime.GetLifecycleState() ==
+									AppRuntimeLifecycleState::ShuttingDown;
+							});
+						registered.count_down();
+						while (!token.stop_requested())
+						{
+							std::this_thread::yield();
+						}
+						return TaskResult::Success();
+					});
+				checks.Check(task.IsValid(), "Service shutdown regression registers a cancellable task");
+				const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+				while (task.IsValid() && !registered.try_wait() &&
+					std::chrono::steady_clock::now() < deadline)
+				{
+					std::this_thread::yield();
+				}
+				if (!registered.try_wait())
+				{
+					checks.Check(false, "The service cancellation fixture starts within its deadline");
+					runtime.Shutdown();
+					return;
+				}
+				bool toolingRejected = false;
+				ParameterTestTooling tooling;
+				tooling.m_OnShutdown = [&]() noexcept
+					{
+						toolingRejected = !runtime.GetRenderServices().IsValid() && !retained.IsValid() &&
+							runtime.GetRenderHost()->IsInitialized();
+					};
+				runtime.Shutdown({ .m_ApplicationTooling = &tooling });
+				checks.Check(cancellationRejected && toolingRejected && probe.m_ContainedCleanupAfterRevocation,
+					"Shutdown revokes before callbacks while contained cleanup retains live providers");
+				bool invoked = false;
+				checks.Check(!runtime.GetRenderServices().IsValid() && !retained.TryUse(
+					[&](const RenderServices&) noexcept { invoked = true; }) && !invoked,
+					"Stopped AppRuntime rejects both new and previously retained service views");
+				std::string error;
+				checks.Check(!runtime.GetFrameCaptureCoordinator()->HasNonFiniteInstrumentation() &&
+					!runtime.GetNonFiniteWatchCoordinator()->Configure({}, error),
+					"Post-shutdown capture/watch queries cannot reach destroyed render services");
+				runtime.GetNonFiniteWatchCoordinator()->PrepareFrame(99999);
+				GGLAB_UNUSED(runtime.GetParameterControl()->GetParameterBatchStatuses({}));
+				runtime.Shutdown();
+			}
+			checks.Check(!retained.IsValid(), "A saved view safely outlives AppRuntime destruction");
+			for (const auto terminal : { "exit", "failure", "rollback" })
+			{
+				LifetimeProbe probe;
+				FaultFactory factory(probe);
+				ApplicationInput input;
+				GGLabAppRuntime runtime;
+				if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root / terminal))
+				{
+					continue;
+				}
+				const auto saved = runtime.GetRenderServices();
+				if (std::string_view(terminal) == "exit")
+				{
+					runtime.HandleHostEvent({ .m_Type = AppHostEventType::ExitRequested });
+				}
+				else if (std::string_view(terminal) == "failure")
+				{
+					probe.m_FrameEndInjection = FrameEndInjection::FatalFenced;
+					GGLAB_UNUSED(runtime.Tick());
+				}
+				else
+				{
+					checks.Check(AppRuntimeServicePublicationTestAccess::RollBackPartialInitialization(runtime),
+						"Lifecycle-only Running state does not publish a partially initialized service bundle");
+				}
+				checks.Check(!saved.IsValid() && !runtime.GetRenderServices().IsValid(),
+					"Exit, failure and partial-initialization rollback revoke saved service views");
+				runtime.Shutdown();
+			}
+			{
+				LifetimeProbe probe;
+				FaultFactory factory(probe);
+				const auto artifactRoot = root / "direct-finalize";
+				TaskSystem tasks;
+				ShaderManager manager({ .m_ActiveBackend = RHIBackendType::DX12,
+					.m_ArtifactRoot = artifactRoot, .m_ActiveRegistry = WriteShaderFixtures(artifactRoot) });
+				auto instance = CreateRenderHost({ .m_RHIContextFactory = &factory,
+					.m_ShaderManager = &manager, .m_TaskSystem = &tasks,
+					.m_IblDerivedDataCacheDirectory = root / "direct-ibl",
+					.m_Width = 32, .m_Height = 32 });
+				checks.Check(instance.m_Host && instance.m_ServiceView.IsValid(),
+					"The production host factory publishes a retained service view");
+				if (instance.m_Host)
+				{
+					instance.m_Host->Finalize();
+					checks.Check(!instance.m_ServiceView.IsValid() && !instance.m_Host->IsInitialized(),
+						"Direct Finalize revokes views while the host object remains allocated");
+				}
+				tasks.Shutdown();
+				tasks.PumpCompletions();
+			}
+			for (const auto scenario : { "shutdown", "tick", "finalize" })
+			{
+				const auto child = RunSelfTestChild("--service-publication-child", scenario);
+				checks.Check(child.m_Completed && child.m_ExitCode != 0 && child.m_Output.find(
+					"lifecycle operation during a service borrow") != std::string::npos,
+					"Production AppRuntime and RenderHost reject lifecycle reentry before releasing services");
+			}
+		}
+
 		void RunFrameOutcomeScenarios(SelfTestContext& checks, const std::filesystem::path& root)
 		{
 			for (const auto injection : { FrameEndInjection::Completed, FrameEndInjection::FatalFenced,
@@ -5211,7 +5385,7 @@ namespace gglab
 				});
 			const auto capture = runtime.TrySubmitCaptureJob({
 				.m_RequiredProducts = { ImageCaptureProduct{} } }).m_JobId;
-			probe.m_Presentation = runtime.GetRenderServices().m_Presentation;
+			probe.m_Presentation = probe.m_ContentServices.m_RenderServices.m_Presentation;
 			probe.m_EnableDeferredCommits = true;
 			probe.m_Inject = true;
 			checks.Check(runtime.Tick() == AppRuntimeTickResult::Fatal && probe.m_Faulted && probe.m_QuarantinedPages > 0,
@@ -5292,11 +5466,48 @@ namespace gglab
 		return 2;
 	}
 
+	int RunServicePublicationChild(std::string_view scenario) noexcept
+	{
+		if (scenario != "shutdown" && scenario != "tick" && scenario != "finalize")
+		{
+			return 2;
+		}
+		ConsoleSelfTestReporter reporter;
+		SelfTestContext checks(reporter);
+		LifetimeProbe probe;
+		FaultFactory factory(probe);
+		ApplicationInput input;
+		GGLabAppRuntime runtime;
+		const auto root = std::filesystem::temp_directory_path() /
+			("gglab-service-child-" + std::to_string(GetCurrentProcessId()));
+		if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+		{
+			return 90;
+		}
+		runtime.GetRenderServices().TryUse([&](const RenderServices&) noexcept
+			{
+				if (scenario == "shutdown")
+				{
+					runtime.Shutdown();
+				}
+				else if (scenario == "tick")
+				{
+					GGLAB_UNUSED(runtime.Tick());
+				}
+				else
+				{
+					runtime.GetRenderHost()->Finalize();
+				}
+			});
+		return 91;
+	}
+
 	void RunGpuFaultLifecycleSelfTests(SelfTestContext& context) noexcept
 	{
 		const auto root = std::filesystem::temp_directory_path() /
 			("gglab-fault-lifecycle-" + std::to_string(GetCurrentProcessId()) + "-" +
 				std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+		RunServicePublicationScenario(context, root / "service-publication");
 		RunHostParameterScenario(context, root / "host-demo", false);
 		RunHostParameterScenario(context, root / "host-lab", true);
 		RunEffectiveParameterSettingsScenario(context, root / "tooling-host", false);

@@ -89,6 +89,10 @@ namespace gglab
 		~Renderer() override;
 
 		[[nodiscard]] bool Initialize(const CreateInfo& createInfo) noexcept;
+		[[nodiscard]] RenderServicesView PublishRenderServices(
+			const RenderServices& bindings) noexcept;
+		void CheckServiceLifecycleAccess() const noexcept override;
+		void RevokeRenderServices() noexcept override;
 		void Finalize() noexcept override;
 		bool IsInitialized() const noexcept override { return m_IsInitialized; }
 
@@ -367,5 +371,6 @@ namespace gglab
 		bool m_HasActiveFrame = false;
 		// Set once a frame's GPU completion became unknown; no further frame begins.
 		bool m_Poisoned = false;
+		std::unique_ptr<RenderServicesPublication> m_ServicePublication;
 	};
 }

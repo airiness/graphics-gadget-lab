@@ -128,6 +128,7 @@ namespace gglab
 	{
 	public:
 		explicit NonFiniteWatchCoordinator(FrameCaptureControlBase* capture) noexcept : m_Capture(capture) {}
+		void DetachCapture() noexcept { m_Capture = nullptr; }
 		[[nodiscard]] bool Configure(NonFiniteWatchConfiguration configuration, std::string& error) noexcept;
 		void PrepareFrame(uint64_t frameSerial, bool yieldBoundaryCapacity = false,
 			std::span<const NonFiniteWatchDefault> defaults = {}) noexcept;

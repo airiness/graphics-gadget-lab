@@ -22,6 +22,7 @@
 #include "GGLabRuntime/Graphics/RenderContexts.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
+#include "GGLabRuntime/Graphics/RenderServicesView.h"
 #include "GGLabRuntime/Graphics/ShadowPreviewViewBase.h"
 
 #include <array>
@@ -187,6 +188,8 @@ namespace gglab
 		virtual ~RenderHost() = default;
 
 		[[nodiscard]] virtual bool IsInitialized() const noexcept = 0;
+		virtual void CheckServiceLifecycleAccess() const noexcept = 0;
+		virtual void RevokeRenderServices() noexcept = 0;
 		virtual void Finalize() noexcept = 0;
 		virtual void OnResize(uint32_t width, uint32_t height) noexcept = 0;
 		virtual void OnSuspend() noexcept = 0;
@@ -261,12 +264,13 @@ namespace gglab
 		}
 	};
 
-	// Runtime render host plus the stable explicit service bundle. The host is
-	// null when the host inputs are missing or initialization fails.
+	// Public callers retain m_ServiceView. The composition owner wires contained
+	// borrowers with m_CompositionBindings and releases them before host Finalize.
 	struct RenderHostInstance
 	{
 		std::unique_ptr<RenderHost> m_Host;
-		RenderServices m_Services;
+		RenderServicesView m_ServiceView;
+		RenderServices m_CompositionBindings;
 		RenderCompositionAccess* m_Composition = nullptr;
 	};
 

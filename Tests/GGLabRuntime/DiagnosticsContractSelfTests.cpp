@@ -9,6 +9,7 @@
 #include "GGLabRuntime/Graphics/RenderHost.h"
 #include "GGLabRuntime/Scene/Components.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderViewSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/RenderGraphSnapshot.h"
 #include "Diagnostics/Builders/RenderQueueSnapshotBuilder.h"
 #include "GGLabRuntime/Graphics/RenderQueue.h"
 #include <limits>
@@ -47,6 +48,7 @@
 #include <concepts>
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -556,6 +558,79 @@ namespace gglab
 
 	void RunDiagnosticsContractSelfTests(SelfTestContext& context) noexcept
 	{
+		{
+			DiagnosticsRuntime diagnostics;
+			RegisterBuiltinSnapshotProviders(diagnostics, nullptr);
+			RGSnapshot retained;
+			context.Check(diagnostics.GetSnapshot<RGSnapshot>() == nullptr,
+				"Arena diagnostics have no publication before an open frame");
+			{
+				RenderGraph graph({ .m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+					.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }),
+					.m_ObjectArena = { .m_RegularBlockPayloadBytes = 64 } });
+				struct Data
+				{
+					std::string m_Value = "Non-trivial large arena diagnostic payload";
+					std::array<std::byte, 256> m_Padding{};
+				};
+				graph.AddPass<Data>("Arena.Diagnostics", [](auto& builder, Data&)
+					{
+						builder.SideEffect();
+					});
+				context.Check(graph.Compile(), "Arena diagnostic fixture compiles");
+				graph.GetBlackboard().Create<std::string>() = "Late blackboard allocation";
+				const auto live = graph.GetObjectArenaStatistics();
+				diagnostics.BeginFrame({ .m_RenderGraph = &graph, .m_FrameSerial = 21 });
+				const auto* captured = diagnostics.GetSnapshot<RGSnapshot>();
+				context.Check(captured && captured->m_ObjectArena &&
+					captured->m_ObjectArena->m_ObjectBytes == live.m_ObjectBytes &&
+					captured->m_ObjectArena->m_ObjectCount == live.m_ObjectCount &&
+					captured->m_ObjectArena->m_DestructorRecordBytes == live.m_DestructorRecordBytes &&
+					captured->m_ObjectArena->m_DestructorRecordCount == live.m_DestructorRecordCount &&
+					captured->m_ObjectArena->m_UsedPayloadBytes == live.m_UsedPayloadBytes &&
+					captured->m_ObjectArena->m_ReservedPayloadBytes == live.m_ReservedPayloadBytes &&
+					captured->m_ObjectArena->m_BlockOverheadBytes == live.m_BlockOverheadBytes &&
+					captured->m_ObjectArena->m_RegularBlockCount == live.m_RegularBlockCount &&
+					captured->m_ObjectArena->m_DedicatedBlockCount == live.m_DedicatedBlockCount &&
+					live.m_DedicatedBlockCount > 0 && live.m_RegularBlockCount > 0,
+					"Arena snapshot copies every counter, including allocations added after Compile");
+				if (captured)
+				{
+					retained = *captured;
+					const auto exported = SerializeRenderGraphSnapshot(retained);
+					auto withoutArena = retained;
+					withoutArena.m_ObjectArena.reset();
+					context.Check(exported == SerializeRenderGraphSnapshot(withoutArena),
+						"Live arena diagnostics do not change the versioned graph export");
+				}
+				graph.GetBlackboard().Create<std::array<std::byte, 1024>>("AfterCapture");
+				const auto* cached = diagnostics.GetSnapshot<RGSnapshot>();
+				context.Check(cached && cached == captured && cached->m_ObjectArena &&
+					cached->m_ObjectArena->m_ObjectBytes == live.m_ObjectBytes &&
+					graph.GetObjectArenaStatistics().m_ObjectBytes > live.m_ObjectBytes,
+					"Arena snapshot remains frozen when the source graph grows later in the frame");
+				diagnostics.EndFrame();
+			}
+			const auto* closed = diagnostics.GetSnapshot<RGSnapshot>();
+			context.Check(closed && closed->m_ObjectArena && retained.m_ObjectArena &&
+				closed->m_ObjectArena->m_ObjectBytes == retained.m_ObjectArena->m_ObjectBytes &&
+				retained.m_ObjectArena->m_ObjectCount > 0,
+				"Published arena counters own their values after graph destruction");
+			diagnostics.BeginFrame({ .m_FrameSerial = 22 });
+			const auto* missing = diagnostics.GetSnapshot<RGSnapshot>();
+			context.Check(missing && !missing->m_ObjectArena,
+				"A frame without a graph clears previous arena statistics to unavailable");
+			diagnostics.EndFrame();
+			RenderGraph empty({ .m_Device = reinterpret_cast<RHIDevice*>(uintptr_t{ 1 }),
+				.m_TransientResourcePool = reinterpret_cast<TransientResourcePool*>(uintptr_t{ 1 }) });
+			diagnostics.BeginFrame({ .m_RenderGraph = &empty, .m_FrameSerial = 23 });
+			const auto* emptySnapshot = diagnostics.GetSnapshot<RGSnapshot>();
+			context.Check(emptySnapshot && emptySnapshot->m_ObjectArena &&
+				emptySnapshot->m_ObjectArena->m_ReservedPayloadBytes == 0 &&
+				emptySnapshot->m_ObjectArena->m_ObjectCount == 0,
+				"An available empty arena is distinct from missing graph statistics");
+			diagnostics.EndFrame();
+		}
 		{
 			World world;
 			WorldTooling tooling(world);

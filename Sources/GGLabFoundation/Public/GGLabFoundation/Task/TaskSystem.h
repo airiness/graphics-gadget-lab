@@ -5,6 +5,7 @@
 
 #include <array>
 #include <condition_variable>
+#include <cstdint>
 #include <deque>
 #include <memory>
 #include <mutex>
@@ -14,6 +15,8 @@
 
 namespace gglab
 {
+	// Concurrent callers may submit/cancel/update/query. The owner controls object lifetime
+	// and must relinquish external callers before destruction; callbacks cannot delete it.
 	class TaskSystem
 	{
 	public:
@@ -34,12 +37,22 @@ namespace gglab
 
 		[[nodiscard]] TaskHandle Submit(
 			TaskDesc desc, TaskWork work, TaskCompletion completion = {}) noexcept;
+		// True accepts the first cancellation decision before terminal publication.
+		// Stop callbacks run synchronously outside the state lock; work may already run.
 		bool Cancel(TaskHandle handle) noexcept;
+		// Returns false once shutdown takes queue ownership, including unchanged priority.
 		bool UpdatePriority(TaskHandle handle, TaskPriority priority) noexcept;
+		// Owner-thread operation. Work captures are released before a completion can be
+		// pumped. Callbacks may submit/cancel/query, but cannot pump or start shutdown.
 		uint32_t PumpCompletions(const TaskCompletionPumpBudget& budget = {}) noexcept;
 
+		// Owner-thread control flow only; also required for implicit destructor shutdown.
+		// Stopping reentry and deletion from a reentrant operation fail in all builds.
+		// Normal return joins workers and completes finish publication, retaining queued
+		// completions for an explicit pump. Repetition after Stopped is harmless.
 		void Shutdown() noexcept;
 		[[nodiscard]] bool IsAcceptingTasks() const noexcept;
+		// Terminal/running/pending counts are snapshots, not a work-release or drain barrier.
 		[[nodiscard]] TaskSystemStatistics GetStatistics() const;
 
 	private:
@@ -47,7 +60,13 @@ namespace gglab
 		struct CompletionRecord
 		{
 			TaskCompletionInfo m_Info;
-			TaskCompletion m_Callback;
+			std::unique_ptr<TaskCompletion> m_Callback;
+		};
+		enum class LifecycleState : uint8_t
+		{
+			Accepting,
+			Stopping,
+			Stopped,
 		};
 
 		[[nodiscard]] static uint32_t ResolveWorkerCount(uint32_t requested) noexcept;
@@ -77,8 +96,9 @@ namespace gglab
 		uint64_t m_CompletionCallbackCount = 0;
 		uint64_t m_CompletionCallbackFailureCount = 0;
 		uint32_t m_RunningCount = 0;
+		uint32_t m_WorkerCount = 0;
+		uint64_t m_PendingFinishPublicationCount = 0;
 		uint32_t m_RecentTaskCapacity = 64;
-		bool m_AcceptingTasks = true;
-		bool m_Shutdown = false;
+		LifecycleState m_LifecycleState = LifecycleState::Accepting;
 	};
 }

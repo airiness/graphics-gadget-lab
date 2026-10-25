@@ -1,0 +1,774 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Application">
+      <UniqueIdentifier>{51D6A829-5122-A73B-BC38-D8363F1B2482}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Application\Capture">
+      <UniqueIdentifier>{E4B252A1-DC11-2CBC-DE83-F2976FC4F647}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Application\Content">
+      <UniqueIdentifier>{90FAD950-6502-2EC0-0BC0-9919ACD2ADA7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Application\Control">
+      <UniqueIdentifier>{841993F5-6550-AE14-6FC0-39D8ACB2239A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Application\Demo">
+      <UniqueIdentifier>{C4FF5092-8893-D220-7965-DAEFF052A64A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Application\Lab">
+      <UniqueIdentifier>{BD4563B6-E93B-531E-4D88-E74F22A77428}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Application\Lab\NapaVoxel">
+      <UniqueIdentifier>{754BAED8-1955-DA7F-B2AA-6A7F3FEC72EC}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Application\Lab\Sessions">
+      <UniqueIdentifier>{CE948C73-7329-E59F-1B1F-65941625DB0B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Application\Platform">
+      <UniqueIdentifier>{8C4118A3-A03C-D41F-2AAA-9F5304BB7DBF}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Application\Platform\Windows">
+      <UniqueIdentifier>{7050D9C3-C78B-F43F-7B86-AC781B6E1144}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Application\Platform\Windows\Input">
+      <UniqueIdentifier>{07C76A95-3513-1C08-5435-B5B326889E2C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Application\Shader">
+      <UniqueIdentifier>{9D0B80E6-0277-8868-8EAE-CF393B2B6036}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Application\Tooling">
+      <UniqueIdentifier>{C739C2A3-0EA2-9BC3-8378-301D412229F8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DevTools">
+      <UniqueIdentifier>{9625F77E-4CA0-CD60-86BA-20FC8038B0AD}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DevTools\DevelopGui">
+      <UniqueIdentifier>{7F4DD322-1BC4-008C-84CB-3322770BEABB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DevTools\DevelopGui\Backends">
+      <UniqueIdentifier>{810F9C08-4808-920B-59C7-78D7ECC97F52}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DevTools\DevelopGui\Backends\DX12">
+      <UniqueIdentifier>{FB8D3748-19DF-FC1A-F437-C00A45B6A86E}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DevTools\DevelopGui\Backends\Vulkan">
+      <UniqueIdentifier>{1A73BC7C-EC27-C722-A852-C5FD8E8958DF}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DevTools\DevelopGui\Backends\Windows">
+      <UniqueIdentifier>{A391AA80-EC2E-C57D-350B-3ADEBF8BE0F5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DevTools\DevelopGui\Panels">
+      <UniqueIdentifier>{528692BE-B1E8-33C9-B5D1-8A6FB5DFCDDB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="DevTools\EnumText">
+      <UniqueIdentifier>{5CC851E9-C8F0-E203-FBB1-41C995C19353}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ThirdParty">
+      <UniqueIdentifier>{6A8F12C3-D4D3-C968-0534-4156FE54BBAE}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ThirdParty\ImGui">
+      <UniqueIdentifier>{1B0F2251-47BC-5F37-CBE5-BED5477CEFDF}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ThirdParty\ImGui\backends">
+      <UniqueIdentifier>{E7D1B6CA-E777-5F5B-15C0-F16997F7E758}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_dx12.cpp">
+      <Filter>ThirdParty\ImGui\backends</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_vulkan.cpp">
+      <Filter>ThirdParty\ImGui\backends</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\backends\imgui_impl_win32.cpp">
+      <Filter>ThirdParty\ImGui\backends</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\imgui.cpp">
+      <Filter>ThirdParty\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\imgui_demo.cpp">
+      <Filter>ThirdParty\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\imgui_draw.cpp">
+      <Filter>ThirdParty\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\imgui_tables.cpp">
+      <Filter>ThirdParty\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Externals\Vender\imgui\imgui_widgets.cpp">
+      <Filter>ThirdParty\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Application.cpp">
+      <Filter>Application</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\ApplicationEnvironment.cpp">
+      <Filter>Application</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\ApplicationHostConfiguration.cpp">
+      <Filter>Application</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\ApplicationLaunchOptions.cpp">
+      <Filter>Application</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\ApplicationPch.cpp">
+      <Filter>Application</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Capture\ApplicationFrameCapture.cpp">
+      <Filter>Application\Capture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Capture\CaptureOnReady.cpp">
+      <Filter>Application\Capture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Content\DesktopApplicationContent.cpp">
+      <Filter>Application\Content</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Content\RuntimeAssetBundle.cpp">
+      <Filter>Application\Content</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Control\ApplicationControlCaptureJobs.cpp">
+      <Filter>Application\Control</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Control\ApplicationControlParameters.cpp">
+      <Filter>Application\Control</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Control\ApplicationControlProtocol.cpp">
+      <Filter>Application\Control</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Demo\DemoLabHost.cpp">
+      <Filter>Application\Demo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Demo\DemoLabRuntimeLocator.cpp">
+      <Filter>Application\Demo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Demo\DemoPlayground.cpp">
+      <Filter>Application\Demo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Demo\StartDemo.cpp">
+      <Filter>Application\Demo</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelCommands.cpp">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelMeshAdapter.cpp">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelRaycast.cpp">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelRenderExtension.cpp">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelRenderPass.cpp">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelRenderState.cpp">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\AlphaTestLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\AtmosphereRangeLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CoordinateConformanceLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CullingLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\ForwardPlusLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\GTAOLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\LightingContractLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\MathFoundationLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\MiniPBRGridLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\NapaVoxelLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\PostProcessLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\RenderGraphComputeLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\SampleableDepthLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\SurfaceProbeLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\TemporalAALabDiagnostics.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\TemporalAALabGpuTiming.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\TemporalAALabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\TextureContractLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Input\InputBase.cpp">
+      <Filter>Application\Platform\Windows\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Input\InputManager.cpp">
+      <Filter>Application\Platform\Windows\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Input\Keyboard.cpp">
+      <Filter>Application\Platform\Windows\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Input\Mouse.cpp">
+      <Filter>Application\Platform\Windows\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Input\WindowsInputMapping.cpp">
+      <Filter>Application\Platform\Windows\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32FrameCaptureImageEncoder.cpp">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32NamedPipeServer.cpp">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32PlatformHost.cpp">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32RHIContextFactory.cpp">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32Shell.cpp">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32UnattendedProcess.cpp">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32Window.cpp">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\RenderingStartup.cpp">
+      <Filter>Application</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Shader\DevelopmentShaderBuildBridge.cpp">
+      <Filter>Application\Shader</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Shader\DevelopmentShaderBuildProcessClient.cpp">
+      <Filter>Application\Shader</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\AssetSnapshotText.cpp">
+      <Filter>DevTools</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12RenderBackend.cpp">
+      <Filter>DevTools\DevelopGui\Backends\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Backends\Vulkan\DevelopGuiVulkanRenderBackend.cpp">
+      <Filter>DevTools\DevelopGui\Backends\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.cpp">
+      <Filter>DevTools\DevelopGui\Backends\Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\CameraReferenceViewWidgets.cpp">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiApplicationTooling.cpp">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiBackendFactory.cpp">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiMathWidgets.cpp">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiPanelCatalog.cpp">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiProjectionUtils.cpp">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiRegistry.cpp">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiSystem.cpp">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiTextureUtils.cpp">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\LoadingOverlay.cpp">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\AssetManagerPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\CameraInspectorPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\DebugDrawPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\DemoPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\DX12BackendSummaryPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\EntityPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ForwardPlusInspectorPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\FrameCapturePanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\GTAOInspectorPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\IBLViewerPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ImGuiToolsPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\LabPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\PersistentSceneBuffersPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\PipelineSystemPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\PostProcessInspectorPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ProfilingPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\RenderingSettingsPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\RenderViewPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ResourceManagementPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\SceneDepthPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ShadowInspectorPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ShadowTemporalLabWidgets.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\TaskSystemPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\TemporalAAInspectorPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\TransientResourcePoolPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\VulkanBackendSummaryPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\WorldLightingPanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevToolsRuntime.cpp">
+      <Filter>DevTools</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_dx12.h">
+      <Filter>ThirdParty\ImGui\backends</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_vulkan.h">
+      <Filter>ThirdParty\ImGui\backends</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Externals\Vender\imgui\backends\imgui_impl_win32.h">
+      <Filter>ThirdParty\ImGui\backends</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Externals\Vender\imgui\imconfig.h">
+      <Filter>ThirdParty\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Externals\Vender\imgui\imgui.h">
+      <Filter>ThirdParty\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Application.h">
+      <Filter>Application</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\ApplicationEnvironment.h">
+      <Filter>Application</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\ApplicationHostConfiguration.h">
+      <Filter>Application</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\ApplicationLaunchOptions.h">
+      <Filter>Application</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\ApplicationPch.h">
+      <Filter>Application</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Capture\ApplicationFrameCapture.h">
+      <Filter>Application\Capture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Capture\CaptureOnReady.h">
+      <Filter>Application\Capture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Content\DesktopApplicationContent.h">
+      <Filter>Application\Content</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Content\RuntimeAssetBundle.h">
+      <Filter>Application\Content</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Control\ApplicationControlCaptureJobs.h">
+      <Filter>Application\Control</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Control\ApplicationControlParameters.h">
+      <Filter>Application\Control</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Control\ApplicationControlProtocol.h">
+      <Filter>Application\Control</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Demo\CoastalSceneCameraPaths.h">
+      <Filter>Application\Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Demo\CoastalSceneLightingProfiles.h">
+      <Filter>Application\Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Demo\CoastalSceneReferenceViews.h">
+      <Filter>Application\Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Demo\DemoLabHost.h">
+      <Filter>Application\Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Demo\DemoLabRuntimeLocator.h">
+      <Filter>Application\Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Demo\DemoPlayground.h">
+      <Filter>Application\Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Demo\StartDemo.h">
+      <Filter>Application\Demo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\AtmosphereRangeReferenceViews.h">
+      <Filter>Application\Lab</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\LightingContractReferenceViews.h">
+      <Filter>Application\Lab</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelCommands.h">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelMeshAdapter.h">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelRaycast.h">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelRenderExtension.h">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelRenderPass.h">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelRenderState.h">
+      <Filter>Application\Lab\NapaVoxel</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\AlphaTestLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\AtmosphereRangeLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CoordinateConformanceLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CullingLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\ForwardPlusLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\GTAOLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\LightingContractLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\MathFoundationLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\MiniPBRGridLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\NapaVoxelLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\PostProcessLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\RenderGraphComputeLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\SampleableDepthLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\SurfaceProbeLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\TemporalAALabDiagnostics.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\TemporalAALabGpuTiming.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\TemporalAALabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\TextureContractLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\PlatformHost.h">
+      <Filter>Application\Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\PlatformWindow.h">
+      <Filter>Application\Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Input\InputBase.h">
+      <Filter>Application\Platform\Windows\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Input\InputManager.h">
+      <Filter>Application\Platform\Windows\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Input\Keyboard.h">
+      <Filter>Application\Platform\Windows\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Input\Mouse.h">
+      <Filter>Application\Platform\Windows\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Input\WindowsInputMapping.h">
+      <Filter>Application\Platform\Windows\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32FrameCaptureImageEncoder.h">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32MessageHandler.h">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32NamedPipeServer.h">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32PlatformHost.h">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32RHIContextFactory.h">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32Shell.h">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32UnattendedProcess.h">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32Window.h">
+      <Filter>Application\Platform\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\RenderingStartup.h">
+      <Filter>Application</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Shader\DevelopmentShaderBuildBridge.h">
+      <Filter>Application\Shader</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Shader\DevelopmentShaderBuildProcessClient.h">
+      <Filter>Application\Shader</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Tooling\ApplicationToolingComposition.h">
+      <Filter>Application\Tooling</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\AssetSnapshotText.h">
+      <Filter>DevTools</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Backends\DX12\DevelopGuiDX12RenderBackend.h">
+      <Filter>DevTools\DevelopGui\Backends\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Backends\Vulkan\DevelopGuiVulkanRenderBackend.h">
+      <Filter>DevTools\DevelopGui\Backends\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Backends\Windows\DevelopGuiWin32PlatformBackend.h">
+      <Filter>DevTools\DevelopGui\Backends\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\CameraReferenceViewWidgets.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiBackendFactory.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiContext.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiFormatting.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiMathWidgets.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiPanel.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiPanelCatalog.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiPlatformBackend.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiProjectionUtils.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiRegistry.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiRenderBackend.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiStateStore.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiStyle.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiSystem.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiTextureUtils.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\LoadingOverlay.h">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\AssetManagerPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\CameraInspectorPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\DebugDrawPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\DemoPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\DX12BackendSummaryPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\EntityPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ForwardPlusInspectorPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\FrameCapturePanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\GTAOInspectorPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\IBLViewerPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ImGuiToolsPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\LabPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\PersistentSceneBuffersPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\PipelineSystemPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\PostProcessInspectorPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ProfilingPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\RenderGraphInspectorPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\RenderingSettingsPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\RenderViewPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ResourceManagementPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\SceneDepthPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ShadowInspectorPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\ShadowTemporalLabWidgets.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\TaskSystemPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\TemporalAAInspectorPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\TransientResourcePoolPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\VulkanBackendSummaryPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\WorldLightingPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevToolsRuntime.h">
+      <Filter>DevTools</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\EnumText\EnumText.h">
+      <Filter>DevTools\EnumText</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\EnumText\EnumTextGraphics.h">
+      <Filter>DevTools\EnumText</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\EnumText\EnumTextLab.h">
+      <Filter>DevTools\EnumText</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\EnumText\EnumTextRenderGraph.h">
+      <Filter>DevTools\EnumText</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\EnumText\EnumTextRenderPass.h">
+      <Filter>DevTools\EnumText</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\EnumText\EnumTextRHI.h">
+      <Filter>DevTools\EnumText</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\RHIText.h">
+      <Filter>DevTools</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

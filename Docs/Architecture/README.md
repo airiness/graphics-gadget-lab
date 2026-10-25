@@ -22,7 +22,7 @@ Arrows mean **calls or supplies work to**.
 
 ```mermaid
 flowchart TD
-    Host[WinApp: platform and content composition] --> App[AppRuntime: frame orchestration]
+    Host[WinAppHost: platform and content composition] --> App[AppRuntime: frame orchestration]
     App --> Renderer[Runtime: RenderHost and Renderer]
     App --> Graph[Runtime: pipeline and RenderGraph]
     Renderer --> Graph
@@ -33,15 +33,15 @@ flowchart TD
 
 ## A short tour from startup to one frame
 
-1. [WinApp Application](../../Sources/WinApp/Application/Application.cpp) creates
+1. [WinAppHost Application](../../Sources/WinAppHost/Application/Application.cpp) creates
    the shared application and provides host inputs and the selected RHI factory.
    Before composing services it prepares development shader artifacts, or reads
    the packaged active registry in an artifact-only build.
 2. [AppRuntime services](../../Sources/GGLabAppRuntime/GGLabAppRuntimeServices.cpp)
    create the Runtime RenderHost and shared services, register content and queue
    the startup Demo for [preparation](Frame_Execution_Map.md#content-transitions).
-   AppRuntime owns the host; composition and service pointers taken from it stay
-   valid while the host lives.
+   AppRuntime owns the host. Contained composition borrows end before host Finalize;
+   retained service views are revoked when the session closes.
 3. [TickFrame](../../Sources/GGLabAppRuntime/GGLabAppRuntimeFrame.cpp) updates
    content, begins a frame, resolves immutable frame inputs and validates the
    pipeline. If it returns early after the frame began, the scoped `RenderFrame`
@@ -60,7 +60,7 @@ flowchart TD
 
 ## Projects
 
-The [repository map](Repository_Module_Map.md) lists all sixteen first-party
+The [repository map](Repository_Module_Map.md) lists all eighteen first-party
 projects, their source owners, declared references and include visibility.
 
 ## Coverage and related guidance
@@ -78,7 +78,7 @@ Anchors:
   - Projects/WinApp/WinApp.vcxproj
   - Projects/GGLabAppRuntime/GGLabAppRuntime.vcxproj
   - Projects/GGLabRuntime/GGLabRuntime.vcxproj
-  - Sources/WinApp/Application/Application.cpp::Initialize
+  - Sources/WinAppHost/Application/Application.cpp::Initialize
   - Sources/GGLabAppRuntime/GGLabAppRuntimeServices.cpp::InitializeServices
 ReviewPaths:
   - GraphicsGadgetLab.sln

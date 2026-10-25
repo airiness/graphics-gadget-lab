@@ -3,7 +3,7 @@
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Core/StringId.h"
 #include "GGLabRuntime/Graphics/GraphicsHandles.h"
-#include "GGLabRuntime/Graphics/RenderGraph/RGArenaAllocator.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGObjectArena.h"
 #include "GGLabRuntime/Graphics/Resource/TransientResourcePool.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGResourceUtils.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGPass.h"
@@ -182,6 +182,7 @@ namespace gglab
 		{
 			RHIDevice* m_Device = nullptr;
 			TransientResourcePool* m_TransientResourcePool = nullptr;
+			RGObjectArena::CreateInfo m_ObjectArena;
 		};
 
 		class RGBuilder
@@ -407,6 +408,10 @@ namespace gglab
 		};
 
 	public:
+		// CPU payloads and compiled-plan borrows live until this graph is destroyed.
+		// Keep the graph through execution and frame abort/commit/discard settlement.
+		// Payload destructors must not query or mutate the graph. GPU/asynchronous
+		// consumers require separate owners; stable CPU addresses do not extend their lifetimes.
 		explicit RenderGraph(const CreateInfo& createInfo) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(RenderGraph);
 		~RenderGraph() noexcept;
@@ -489,6 +494,10 @@ namespace gglab
 
 		RGBlackboard& GetBlackboard() noexcept { return m_Blackboard; }
 		const RGBlackboard& GetBlackboard() const noexcept { return m_Blackboard; }
+		[[nodiscard]] RGObjectArena::Statistics GetObjectArenaStatistics() const noexcept
+		{
+			return m_ObjectArena.GetStatistics();
+		}
 		[[nodiscard]] const RHITextureDesc& GetTextureDesc(RGTextureId textureId) const noexcept;
 
 	private:
@@ -558,7 +567,8 @@ namespace gglab
 		RHIDevice* m_Device = nullptr;
 		TransientResourcePool* m_TransientResourcePool = nullptr;
 
-		RGArenaAllocator m_ArenaAllocator;
+		// Declared before all payload borrowers so their containers/plans end first.
+		RGObjectArena m_ObjectArena;
 		RGBlackboard m_Blackboard;
 
 		std::vector<RGResourceNode> m_ResourceNodes;
@@ -604,7 +614,7 @@ namespace gglab
 
 		GGLAB_ASSERT_MSG(passName && *passName, "Pass name must not be null.");
 
-		auto* pass = m_ArenaAllocator.MakeTracked<PassType>(std::forward<ExecuteFunc>(executeFunc));
+		auto* pass = m_ObjectArena.Make<PassType>(std::forward<ExecuteFunc>(executeFunc));
 
 		RGPassNode passNode = {};
 		passNode.m_NameId = StringID(passName);
@@ -730,7 +740,7 @@ namespace gglab
 		m_ResourceSlots.push_back(slot);
 
 		RGVirtualResource<RESOURCE>* virtualResource =
-			m_ArenaAllocator.MakeTracked<RGVirtualResource<RESOURCE>>();
+			m_ObjectArena.Make<RGVirtualResource<RESOURCE>>();
 		virtualResource->m_NameId = StringID(name);
 		virtualResource->m_Devirtualized = false;
 		virtualResource->m_Desc = desc;
@@ -797,7 +807,7 @@ namespace gglab
 		m_ResourceSlots.push_back(slot);
 
 		RGVirtualResource<RESOURCE>* virtualResource =
-			m_ArenaAllocator.MakeTracked<RGVirtualResource<RESOURCE>>();
+			m_ObjectArena.Make<RGVirtualResource<RESOURCE>>();
 		virtualResource->m_NameId = StringID(name);
 		virtualResource->m_Imported = true;
 		virtualResource->m_Devirtualized = true; // import resource alreay devirtualized.

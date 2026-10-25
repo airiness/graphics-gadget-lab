@@ -104,6 +104,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Tests\GGLabFoundation\FoundationLinkProbe.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabFoundation\TaskSystemLifetimeTests.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Tests\GGLabFoundation\TaskSystemLifetimeTests.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\GGLabFoundation\GGLabFoundation.vcxproj">

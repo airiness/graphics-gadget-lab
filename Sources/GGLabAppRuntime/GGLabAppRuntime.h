@@ -10,6 +10,7 @@
 #include "Parameters/ParameterBatch.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
+#include "GGLabRuntime/Graphics/RenderServicesView.h"
 #include "RuntimePaths.h"
 #include "ShaderArtifactRuntime/ShaderProgramRegistryArtifact.h"
 
@@ -20,6 +21,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 namespace gglab
@@ -170,6 +172,7 @@ namespace gglab
 
 	class GGLabAppRuntime final
 	{
+		friend struct AppRuntimeServicePublicationTestAccess;
 	public:
 		GGLabAppRuntime() noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(GGLabAppRuntime);
@@ -197,9 +200,11 @@ namespace gglab
 		{
 			return m_RenderComposition;
 		}
-		[[nodiscard]] const RenderServices& GetRenderServices() const noexcept
+		// Retained owner-thread capability; usable only inside a synchronous TryUse callback.
+		[[nodiscard]] RenderServicesView GetRenderServices() const noexcept
 		{
-			return m_RenderServices;
+			CheckOwnerThread();
+			return CanAcceptSessionCommands() ? m_RenderServicesView : RenderServicesView{};
 		}
 		[[nodiscard]] AssetManager* GetAssetManager() const noexcept
 		{
@@ -296,6 +301,7 @@ namespace gglab
 		void SyncSequenceGpuProfiling() noexcept;
 		void CollectSequenceGpuTiming() noexcept;
 		void UpdateSequenceParameterEvents() noexcept;
+		void CheckOwnerThread() const noexcept;
 
 		ApplicationToolingFrameSettings m_ToolingFrameSettings;
 		AppRuntimeConfig m_Config{};
@@ -306,7 +312,9 @@ namespace gglab
 		std::chrono::system_clock::time_point m_StartedAt{};
 		ApplicationContentRegistration m_ContentRegistration{};
 		std::unique_ptr<RenderHost> m_RenderHost;
-		RenderServices m_RenderServices{};
+		const std::thread::id m_OwnerThread = std::this_thread::get_id();
+		RenderServices m_RenderServiceBindings{};
+		RenderServicesView m_RenderServicesView;
 		RenderCompositionAccess* m_RenderComposition = nullptr;
 		std::unique_ptr<Time> m_Time;
 		std::unique_ptr<TaskSystem> m_TaskSystem;

@@ -6,13 +6,14 @@ param(
 
 # Project ownership and first-party boundary validation.
 # Enforces the first-party source ownership and dependency direction contracts:
-#   Project graph - WinApp must reference GGLabRuntime and NapaVoxelCore;
+#   Project graph - WinApp and WinAppTests link WinAppHost; product targets
+#                   exclude test dependencies, and host code consumes Runtime/Napa;
 #                   Foundation must remain Tier-0; its tests may reference only
 #                   Foundation; NapaVoxelCore remains an independent sibling;
 #                   Vulkan qualification owns the explicit privileged Runtime /
 #                   Shader Toolchain dependency closure.
 #   Source ownership - every first-party source item must live below its owning
-#                      project's source root, and every physical source file must
+#                      project's source roots, and every physical source file must
 #                      belong to exactly one owning project.
 #   Include visibility - Foundation and NapaVoxelCore see only their owned
 #                        Public/Private roots, while ordinary consumers receive
@@ -59,6 +60,8 @@ $root = Get-RepoRoot $RootDir
 $repositorySourcesDir = Join-Path $root "Sources"
 $repositoryTestsDir = Join-Path $root "Tests"
 $winAppSourcesDir = Join-Path $root "Sources/WinApp"
+$winAppHostSourcesDir = Join-Path $root "Sources/WinAppHost"
+$winAppTestsDir = Join-Path $root "Tests/WinApp"
 $vulkanQualificationSourcesDir = Join-Path $root "Sources/GGLabVulkanQualification"
 $appRuntimeSourcesDir = Join-Path $root "Sources/GGLabAppRuntime"
 $appRuntimeTestsDir = Join-Path $root "Tests/GGLabAppRuntime"
@@ -282,7 +285,8 @@ function Test-IsUnexpectedFirstPartyIncludeRoot {
 
     $resolved = Resolve-ProjectPathEntry -Entry $Entry -ProjectDirectory $ProjectDirectory
     if ([string]::IsNullOrWhiteSpace($resolved) -or
-        -not (Test-IsPathUnderRoot $resolved $repositorySourcesDir)) {
+        -not ((Test-IsPathUnderRoot $resolved $repositorySourcesDir) -or
+            (Test-IsPathUnderRoot $resolved $repositoryTestsDir))) {
         return $false
     }
     return $ResolvedAllowedRoots -notcontains $resolved
@@ -445,6 +449,20 @@ function Invoke-BoundaryRuleSelfTests {
             Project  = $root
             Allowed  = @($allowedPublicRoot)
             Expected = $false
+        },
+        @{
+            Name     = "test roots require explicit include visibility"
+            Entry    = '$(GGLabRepositoryRoot)Tests\WinApp'
+            Project  = $root
+            Allowed  = @($allowedPublicRoot)
+            Expected = $true
+        },
+        @{
+            Name     = "the declared test root stays allowed"
+            Entry    = '$(GGLabRepositoryRoot)Tests\WinApp'
+            Project  = $root
+            Allowed  = @((Join-Path $root 'Tests/WinApp'))
+            Expected = $false
         }
     )
     foreach ($case in $includeRootCases) {
@@ -579,6 +597,16 @@ $winAppProject = [xml](Get-Content -LiteralPath $winAppProjectPath -Raw -ErrorAc
 $winAppNamespace = New-Object System.Xml.XmlNamespaceManager($winAppProject.NameTable)
 $winAppNamespace.AddNamespace("msb", "http://schemas.microsoft.com/developer/msbuild/2003")
 $winAppProjectDir = Split-Path -Parent $winAppProjectPath
+$winAppHostProjectPath = Join-Path $root "Projects/WinAppHost/WinAppHost.vcxproj"
+$winAppHostProject = [xml](Get-Content -LiteralPath $winAppHostProjectPath -Raw -ErrorAction Stop)
+$winAppHostNamespace = New-Object System.Xml.XmlNamespaceManager($winAppHostProject.NameTable)
+$winAppHostNamespace.AddNamespace("msb", "http://schemas.microsoft.com/developer/msbuild/2003")
+$winAppHostProjectDir = Split-Path -Parent $winAppHostProjectPath
+$winAppTestsProjectPath = Join-Path $root "Projects/WinAppTests/WinAppTests.vcxproj"
+$winAppTestsProject = [xml](Get-Content -LiteralPath $winAppTestsProjectPath -Raw -ErrorAction Stop)
+$winAppTestsNamespace = New-Object System.Xml.XmlNamespaceManager($winAppTestsProject.NameTable)
+$winAppTestsNamespace.AddNamespace("msb", "http://schemas.microsoft.com/developer/msbuild/2003")
+$winAppTestsProjectDir = Split-Path -Parent $winAppTestsProjectPath
 
 $vulkanQualificationProjectPath = Join-Path $root `
     "Projects/GGLabVulkanQualification/GGLabVulkanQualification.vcxproj"
@@ -974,6 +1002,32 @@ foreach ($path in $shaderCompilerProjectReferences) {
     [void]$shaderCompilerProjectReferenceSet.Add($path)
 }
 
+$winAppEntrySourceItems = $winAppSourceItems
+$winAppEntryCompileFiles = $winAppCompileFiles
+$winAppHostSourceItems = Get-ProjectItemPaths $winAppHostProject $winAppHostNamespace `
+    $winAppHostProjectDir "//msb:ClCompile | //msb:ClInclude" "WinAppHost source item"
+$winAppTestsSourceItems = Get-ProjectItemPaths $winAppTestsProject $winAppTestsNamespace `
+    $winAppTestsProjectDir "//msb:ClCompile | //msb:ClInclude" "WinAppTests source item"
+$winAppHostCompileFiles = Get-ProjectItemPaths $winAppHostProject $winAppHostNamespace `
+    $winAppHostProjectDir "//msb:ClCompile" "WinAppHost compile item"
+$winAppTestsCompileFiles = Get-ProjectItemPaths $winAppTestsProject $winAppTestsNamespace `
+    $winAppTestsProjectDir "//msb:ClCompile" "WinAppTests compile item"
+# Existing host-domain contract scans cover all three independently owned targets.
+$winAppSourceItems = @($winAppEntrySourceItems) + @($winAppHostSourceItems) + @($winAppTestsSourceItems)
+$winAppCompileFiles = @($winAppEntryCompileFiles) + @($winAppHostCompileFiles) + @($winAppTestsCompileFiles)
+$winAppHostProjectReferenceSet = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::OrdinalIgnoreCase)
+$winAppTestsProjectReferenceSet = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::OrdinalIgnoreCase)
+foreach ($reference in Get-ProjectItemPaths $winAppHostProject $winAppHostNamespace `
+        $winAppHostProjectDir "//msb:ProjectReference" "WinAppHost project reference") {
+    [void]$winAppHostProjectReferenceSet.Add($reference)
+}
+foreach ($reference in Get-ProjectItemPaths $winAppTestsProject $winAppTestsNamespace `
+        $winAppTestsProjectDir "//msb:ProjectReference" "WinAppTests project reference") {
+    [void]$winAppTestsProjectReferenceSet.Add($reference)
+}
+
 $projectContractFindings = New-Object System.Collections.Generic.List[object]
 
 function Test-ProjectIncludeVisibility {
@@ -1092,7 +1146,7 @@ $runtimePrivateIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabRuntime\Private
 # AppRuntime lifecycle tests simulate a backend with the real neutral upload/submission
 # owners. This grants only the neutral RHI directory, not Runtime Private generally.
 $runtimeRhiTestIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabRuntime\Private\Graphics\RHI'
-$winAppIncludeRoot = '$(GGLabRepositoryRoot)Sources\WinApp'
+$winAppHostIncludeRoot = '$(GGLabRepositoryRoot)Sources\WinAppHost'
 $vulkanQualificationIncludeRoot = `
     '$(GGLabRepositoryRoot)Sources\GGLabVulkanQualification'
 $appRuntimeIncludeRoot = '$(GGLabRepositoryRoot)Sources\GGLabAppRuntime'
@@ -1121,18 +1175,22 @@ Test-ProjectIncludeVisibility $runtimeProject $namespace `
     @($runtimePrivateIncludeRoot, $runtimePublicIncludeRoot,
         $shaderArtifactRuntimePublicIncludeRoot,
         $foundationPublicIncludeRoot)
-# Native host/GUI adapters use Public contracts. WinApp must not receive Runtime
-# Private visibility, and Phase 3B removed the legacy Runtime include root.
+# Windows host implementations and their tests consume Runtime Public contracts.
+$hostProductionRoots = @($winAppHostIncludeRoot, $appRuntimeIncludeRoot,
+    $runtimePublicIncludeRoot, $shaderArtifactRuntimePublicIncludeRoot,
+    $foundationPublicIncludeRoot, $napaConsumerPublicIncludeRoot)
+$winAppEntryIncludeRoot = '$(GGLabRepositoryRoot)Sources\WinApp'
+$winAppTestsIncludeRoot = '$(GGLabRepositoryRoot)Tests\WinApp'
 Test-ProjectIncludeVisibility $winAppProject $winAppNamespace `
     "Projects/WinApp/WinApp.vcxproj" `
-    @($winAppIncludeRoot, $appRuntimeIncludeRoot,
-        $runtimePublicIncludeRoot,
-        $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot,
-        $testCorePublicIncludeRoot, $napaConsumerPublicIncludeRoot) `
-    @($winAppIncludeRoot, $appRuntimeIncludeRoot,
-        $runtimePublicIncludeRoot,
-        $shaderArtifactRuntimePublicIncludeRoot, $foundationPublicIncludeRoot,
-        $testCorePublicIncludeRoot, $napaConsumerPublicIncludeRoot)
+    (@($winAppEntryIncludeRoot) + $hostProductionRoots) `
+    (@($winAppEntryIncludeRoot) + $hostProductionRoots)
+Test-ProjectIncludeVisibility $winAppHostProject $winAppHostNamespace `
+    "Projects/WinAppHost/WinAppHost.vcxproj" $hostProductionRoots $hostProductionRoots
+Test-ProjectIncludeVisibility $winAppTestsProject $winAppTestsNamespace `
+    "Projects/WinAppTests/WinAppTests.vcxproj" `
+    (@($winAppTestsIncludeRoot, $testCorePublicIncludeRoot) + $hostProductionRoots) `
+    (@($winAppTestsIncludeRoot, $testCorePublicIncludeRoot) + $hostProductionRoots)
 Test-ProjectIncludeVisibility $vulkanQualificationProject `
     $vulkanQualificationNamespace `
     "Projects/GGLabVulkanQualification/GGLabVulkanQualification.vcxproj" `
@@ -1228,7 +1286,7 @@ Test-ProjectIncludeVisibility $napaTestsProject $napaTestsNamespace `
     @($napaTestsIncludeRoot, $napaConsumerPublicIncludeRoot) `
     @($napaTestsIncludeRoot, $napaConsumerPublicIncludeRoot)
 
-$legacyWinAppInputDir = Join-Path $winAppSourcesDir "Core/Input"
+$legacyWinAppInputDir = Join-Path $winAppHostSourcesDir "Core/Input"
 if (Test-Path -LiteralPath $legacyWinAppInputDir) {
     $projectContractFindings.Add([pscustomobject]@{
         Rule   = "winapp-input-ownership"
@@ -1237,7 +1295,7 @@ if (Test-Path -LiteralPath $legacyWinAppInputDir) {
     })
 }
 $legacyWinAppInputIncludeRegex = '#include\s*[<"]Core[\\/]Input[\\/]'
-foreach ($winAppSourceFile in Get-ChildItem -LiteralPath $winAppSourcesDir -Recurse -File |
+foreach ($winAppSourceFile in Get-ChildItem -LiteralPath $winAppHostSourcesDir -Recurse -File |
         Where-Object { $_.Extension.ToLowerInvariant() -in @(".cpp", ".h", ".hpp", ".inl") }) {
     $content = Get-Content -LiteralPath $winAppSourceFile.FullName -Raw -ErrorAction Stop
     if ($content -match $legacyWinAppInputIncludeRegex) {
@@ -1575,9 +1633,9 @@ foreach ($itemPath in @($winAppSourceItems) + @($appRuntimeSourceItems) +
 # narrow Renderer capabilities instead of the concrete service getters.
 $rendererCapabilityConsumerPaths = @(
     (Join-Path $root "Sources/GGLabAppRuntime/GGLabAppRuntimeFrame.cpp"),
-    (Join-Path $winAppSourcesDir "Application/Demo/StartDemo.cpp"),
-    (Join-Path $winAppSourcesDir "Application/Lab/Sessions/ForwardPlusLabSession.cpp"),
-    (Join-Path $winAppSourcesDir "Application/Lab/Sessions/TemporalAALabSession.cpp")
+    (Join-Path $winAppHostSourcesDir "Application/Demo/StartDemo.cpp"),
+    (Join-Path $winAppHostSourcesDir "Application/Lab/Sessions/ForwardPlusLabSession.cpp"),
+    (Join-Path $winAppHostSourcesDir "Application/Lab/Sessions/TemporalAALabSession.cpp")
 )
 $rendererConcreteCapabilityGetterRegex =
     '\bGetEnvironmentLightingSystem\b|\bGetIBLBakeScheduler\b|\bGetGpuProfiler\b'
@@ -1679,14 +1737,14 @@ foreach ($relativePath in $legacyRuntimeDiagnosticsEnginePaths) {
 }
 
 $developGuiDiagnosticsConsumerFiles = @()
-$developGuiPanelsDir = Join-Path $winAppSourcesDir "DevTools/DevelopGui/Panels"
+$developGuiPanelsDir = Join-Path $winAppHostSourcesDir "DevTools/DevelopGui/Panels"
 if (Test-Path -LiteralPath $developGuiPanelsDir -PathType Container) {
     $developGuiDiagnosticsConsumerFiles += @(
         Get-ChildItem -LiteralPath $developGuiPanelsDir -Recurse -File |
             Where-Object { $_.Extension.ToLowerInvariant() -in @(".cpp", ".h", ".hpp", ".inl") }
     )
 }
-$developGuiContextPath = Join-Path $winAppSourcesDir "DevTools/DevelopGui/DevelopGuiContext.h"
+$developGuiContextPath = Join-Path $winAppHostSourcesDir "DevTools/DevelopGui/DevelopGuiContext.h"
 if (Test-Path -LiteralPath $developGuiContextPath -PathType Leaf) {
     $developGuiDiagnosticsConsumerFiles += Get-Item -LiteralPath $developGuiContextPath
 }
@@ -2088,91 +2146,103 @@ $firstPartySourceExtensions = @(".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp"
 $publicHeaderExtensions = @(".h", ".hh", ".hpp", ".hxx", ".inl", ".ixx")
 $ownershipSpecifications = @(
     [pscustomobject]@{
-        Name       = "WinApp"
-        SourceRoot = $winAppSourcesDir
-        ItemPaths  = $winAppSourceItems
+        Name        = "WinApp"
+        SourceRoots = $winAppSourcesDir
+        ItemPaths   = $winAppEntrySourceItems
     }
     [pscustomobject]@{
-        Name       = "GGLabVulkanQualification"
-        SourceRoot = $vulkanQualificationSourcesDir
-        ItemPaths  = $vulkanQualificationSourceItems
+        Name        = "WinAppHost"
+        SourceRoots = $winAppHostSourcesDir
+        ItemPaths   = $winAppHostSourceItems
     }
     [pscustomobject]@{
-        Name       = "GGLabAppRuntime"
-        SourceRoot = $appRuntimeSourcesDir
-        ItemPaths  = $appRuntimeSourceItems
+        Name        = "WinAppTests"
+        SourceRoots = $winAppTestsDir
+        ItemPaths   = $winAppTestsSourceItems
     }
     [pscustomobject]@{
-        Name       = "GGLabAppRuntimeTests"
-        SourceRoot = $appRuntimeTestsDir
-        ItemPaths  = $appRuntimeTestsSourceItems
+        Name        = "GGLabVulkanQualification"
+        SourceRoots = $vulkanQualificationSourcesDir
+        ItemPaths   = $vulkanQualificationSourceItems
     }
     [pscustomobject]@{
-        Name       = "GGLabFoundation"
-        SourceRoot = $foundationSourcesDir
-        ItemPaths  = $foundationSourceItems
+        Name        = "GGLabAppRuntime"
+        SourceRoots = $appRuntimeSourcesDir
+        ItemPaths   = $appRuntimeSourceItems
     }
     [pscustomobject]@{
-        Name       = "GGLabFoundationTests"
-        SourceRoot = $foundationTestsDir
-        ItemPaths  = $foundationTestsSourceItems
+        Name        = "GGLabAppRuntimeTests"
+        SourceRoots = $appRuntimeTestsDir
+        ItemPaths   = $appRuntimeTestsSourceItems
     }
     [pscustomobject]@{
-        Name       = "GGLabRuntime"
-        SourceRoot = $runtimeSourcesDir
-        ItemPaths  = $runtimeSourceItems
+        Name        = "GGLabFoundation"
+        SourceRoots = $foundationSourcesDir
+        ItemPaths   = $foundationSourceItems
     }
     [pscustomobject]@{
-        Name       = "ShaderArtifactRuntime"
-        SourceRoot = $shaderArtifactRuntimeSourcesDir
-        ItemPaths  = $shaderArtifactRuntimeSourceItems
+        Name        = "GGLabFoundationTests"
+        SourceRoots = $foundationTestsDir
+        ItemPaths   = $foundationTestsSourceItems
     }
     [pscustomobject]@{
-        Name       = "ShaderToolchainCore"
-        SourceRoot = $shaderToolchainSourcesDir
-        ItemPaths  = $shaderToolchainSourceItems
+        Name        = "GGLabRuntime"
+        SourceRoots = $runtimeSourcesDir
+        ItemPaths   = $runtimeSourceItems
     }
     [pscustomobject]@{
-        Name       = "ShaderCompiler"
-        SourceRoot = $shaderCompilerSourcesDir
-        ItemPaths  = $shaderCompilerSourceItems
+        Name        = "ShaderArtifactRuntime"
+        SourceRoots = $shaderArtifactRuntimeSourcesDir
+        ItemPaths   = $shaderArtifactRuntimeSourceItems
     }
     [pscustomobject]@{
-        Name       = "NapaVoxelCore"
-        SourceRoot = $napaSourcesDir
-        ItemPaths  = $napaSourceItems
+        Name        = "ShaderToolchainCore"
+        SourceRoots = $shaderToolchainSourcesDir
+        ItemPaths   = $shaderToolchainSourceItems
     }
     [pscustomobject]@{
-        Name       = "GGLabTestCore"
-        SourceRoot = $testCoreSourcesDir
-        ItemPaths  = $testCoreSourceItems
+        Name        = "ShaderCompiler"
+        SourceRoots = $shaderCompilerSourcesDir
+        ItemPaths   = $shaderCompilerSourceItems
     }
     [pscustomobject]@{
-        Name       = "GGLabRuntimeTests"
-        SourceRoot = $runtimeTestsDir
-        ItemPaths  = $runtimeTestsSourceItems
+        Name        = "NapaVoxelCore"
+        SourceRoots = $napaSourcesDir
+        ItemPaths   = $napaSourceItems
     }
     [pscustomobject]@{
-        Name       = "ShaderToolchainTests"
-        SourceRoot = $shaderToolchainTestsDir
-        ItemPaths  = $shaderToolchainTestsSourceItems
+        Name        = "GGLabTestCore"
+        SourceRoots = $testCoreSourcesDir
+        ItemPaths   = $testCoreSourceItems
     }
     [pscustomobject]@{
-        Name       = "ShaderRuntimeIntegrationTests"
-        SourceRoot = $shaderRuntimeIntegrationTestsDir
-        ItemPaths  = $shaderRuntimeIntegrationTestsSourceItems
+        Name        = "GGLabRuntimeTests"
+        SourceRoots = $runtimeTestsDir
+        ItemPaths   = $runtimeTestsSourceItems
     }
     [pscustomobject]@{
-        Name       = "NapaVoxelCoreTests"
-        SourceRoot = $napaTestsDir
-        ItemPaths  = $napaTestsSourceItems
+        Name        = "ShaderToolchainTests"
+        SourceRoots = $shaderToolchainTestsDir
+        ItemPaths   = $shaderToolchainTestsSourceItems
+    }
+    [pscustomobject]@{
+        Name        = "ShaderRuntimeIntegrationTests"
+        SourceRoots = $shaderRuntimeIntegrationTestsDir
+        ItemPaths   = $shaderRuntimeIntegrationTestsSourceItems
+    }
+    [pscustomobject]@{
+        Name        = "NapaVoxelCoreTests"
+        SourceRoots = $napaTestsDir
+        ItemPaths   = $napaTestsSourceItems
     }
 )
 
 $firstPartyMemberships = @{}
 foreach ($specification in $ownershipSpecifications) {
-    if (-not (Test-Path -LiteralPath $specification.SourceRoot -PathType Container)) {
-        throw "$($specification.Name) source root not found: $($specification.SourceRoot)"
+    foreach ($sourceRoot in $specification.SourceRoots) {
+        if (-not (Test-Path -LiteralPath $sourceRoot -PathType Container)) {
+            throw "$($specification.Name) source root not found: $sourceRoot"
+        }
     }
 
     $projectItemPathSet = New-Object 'System.Collections.Generic.HashSet[string]' `
@@ -2186,13 +2256,17 @@ foreach ($specification in $ownershipSpecifications) {
             continue
         }
 
-        $itemUnderOwnerRoot = Test-IsPathUnderRoot $itemPath $specification.SourceRoot
+        $itemUnderOwnerRoot = @($specification.SourceRoots | Where-Object {
+                Test-IsPathUnderRoot $itemPath $_
+            }).Count -gt 0
         if (-not $itemUnderOwnerRoot) {
             $projectContractFindings.Add([pscustomobject]@{
                 Rule   = "source-ownership"
                 Target = ConvertTo-RepoRelativePath $itemPath
                 Reason = "$($specification.Name) project item is outside " +
-                    (ConvertTo-RepoRelativePath $specification.SourceRoot)
+                    (($specification.SourceRoots | ForEach-Object {
+                            ConvertTo-RepoRelativePath $_
+                        }) -join ", ")
             })
         }
 
@@ -2203,7 +2277,7 @@ foreach ($specification in $ownershipSpecifications) {
     }
 
     $physicalOwnerFiles = @(
-        Get-ChildItem -LiteralPath $specification.SourceRoot -Recurse -File |
+        Get-ChildItem -LiteralPath $specification.SourceRoots -Recurse -File |
             Where-Object { $_.Extension.ToLowerInvariant() -in $firstPartySourceExtensions }
     )
     foreach ($file in $physicalOwnerFiles) {
@@ -2226,7 +2300,11 @@ $firstPartySourceFiles = @(
 foreach ($file in $firstPartySourceFiles) {
     $matchingOwners = @(
         $ownershipSpecifications |
-            Where-Object { Test-IsPathUnderRoot $file.FullName $_.SourceRoot }
+            Where-Object {
+                @($_.SourceRoots | Where-Object {
+                        Test-IsPathUnderRoot $file.FullName $_
+                    }).Count -gt 0
+            }
     )
     if ($matchingOwners.Count -eq 0) {
         $projectContractFindings.Add([pscustomobject]@{
@@ -2292,11 +2370,11 @@ if ($winAppProjectContent -match 'DxcImport\.(?:props|targets)' -or
     })
 }
 $winAppQualificationDispatchPaths = @(
-    (Join-Path $winAppSourcesDir "Application/Main.cpp"),
-    (Join-Path $winAppSourcesDir "Application/ApplicationLaunchOptions.h"),
-    (Join-Path $winAppSourcesDir "Application/ApplicationLaunchOptions.cpp"),
-    (Join-Path $winAppSourcesDir "Application/RenderingStartup.h"),
-    (Join-Path $winAppSourcesDir "Application/RenderingStartup.cpp")
+    (Join-Path $winAppSourcesDir "Main.cpp"),
+    (Join-Path $winAppHostSourcesDir "Application/ApplicationLaunchOptions.h"),
+    (Join-Path $winAppHostSourcesDir "Application/ApplicationLaunchOptions.cpp"),
+    (Join-Path $winAppHostSourcesDir "Application/RenderingStartup.h"),
+    (Join-Path $winAppHostSourcesDir "Application/RenderingStartup.cpp")
 )
 $winAppQualificationDispatchRegex = `
     '\bm_RunVulkanQualification\b|\bRunVulkanQualification\b|' +
@@ -2457,13 +2535,51 @@ if (-not $winAppProjectReferenceSet.Contains($foundationProjectPath)) {
         Reason = "missing direct ProjectReference to GGLabFoundation"
     })
 }
-if (-not $winAppProjectReferenceSet.Contains($testCoreProjectPath)) {
-    $projectContractFindings.Add([pscustomobject]@{
-        Rule   = "project-graph"
-        Target = "Projects/WinApp/WinApp.vcxproj"
-        Reason = "missing ProjectReference to GGLabTestCore"
-    })
+$hostProductionReferences = @($appRuntimeProjectPath, $runtimeProjectPath,
+    $foundationProjectPath, $shaderArtifactRuntimeProjectPath, $napaProjectPath)
+foreach ($target in @(
+        @{ Name = "WinApp"; Set = $winAppProjectReferenceSet; Required = @($winAppHostProjectPath) + $hostProductionReferences },
+        @{ Name = "WinAppHost"; Set = $winAppHostProjectReferenceSet; Required = $hostProductionReferences },
+        @{ Name = "WinAppTests"; Set = $winAppTestsProjectReferenceSet; Required = @($winAppHostProjectPath, $testCoreProjectPath) + $hostProductionReferences })) {
+    foreach ($reference in $target.Required) {
+        if (-not $target.Set.Contains($reference)) {
+            $projectContractFindings.Add([pscustomobject]@{
+                Rule = "winapp-test-isolation"; Target = "Projects/$($target.Name)/$($target.Name).vcxproj"
+                Reason = "missing required ProjectReference to " + (Split-Path -Leaf $reference)
+            })
+        }
+    }
+    foreach ($reference in $target.Set) {
+        if ($reference -notin $target.Required) {
+            $projectContractFindings.Add([pscustomobject]@{
+                Rule = "winapp-test-isolation"; Target = "Projects/$($target.Name)/$($target.Name).vcxproj"
+                Reason = "unexpected host/test dependency: " + (Split-Path -Leaf $reference)
+            })
+        }
+    }
 }
+foreach ($reference in $winAppHostProject.SelectNodes("//msb:ProjectReference", $winAppHostNamespace)) {
+    if ([string]$reference.LinkLibraryDependencies -ne "false") {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule = "winapp-test-isolation"; Target = "Projects/WinAppHost/WinAppHost.vcxproj"
+            Reason = "the host library must not merge its dependent libraries"
+        })
+    }
+}
+Test-ProjectPrivateAccessDefinition $winAppHostProject $winAppHostNamespace `
+    "Projects/WinAppHost/WinAppHost.vcxproj" $false
+Test-ProjectPrivateAccessDefinition $winAppTestsProject $winAppTestsNamespace `
+    "Projects/WinAppTests/WinAppTests.vcxproj" $false
+foreach ($lowerSet in @($runtimeProjectReferenceSet, $appRuntimeProjectReferenceSet,
+        $foundationProjectReferenceSet, $shaderArtifactRuntimeProjectReferenceSet)) {
+    if ($lowerSet.Contains($winAppHostProjectPath) -or $lowerSet.Contains($winAppTestsProjectPath)) {
+        $projectContractFindings.Add([pscustomobject]@{
+            Rule = "winapp-test-isolation"; Target = "Windows host dependency direction"
+            Reason = "lower domains must not reference WinAppHost or WinAppTests"
+        })
+    }
+}
+
 if ($testCoreProjectReferenceSet.Count -ne 0) {
     $projectContractFindings.Add([pscustomobject]@{
         Rule   = "project-graph"
@@ -2755,8 +2871,8 @@ foreach ($itemPath in $appRuntimeSourceItems) {
 }
 
 $applicationCoreContractPaths = @(
-    (Join-Path $winAppSourcesDir "Application/Application.cpp"),
-    (Join-Path $winAppSourcesDir "Application/Application.h")
+    (Join-Path $winAppHostSourcesDir "Application/Application.cpp"),
+    (Join-Path $winAppHostSourcesDir "Application/Application.h")
 )
 $applicationCoreHostControlRegex = `
     '\bApplicationLaunchOptions\b|\bm_ListAdapters\b|' +
@@ -2773,8 +2889,8 @@ foreach ($itemPath in $applicationCoreContractPaths) {
 }
 
 $applicationContentFrameworkPaths = @(
-	(Join-Path $winAppSourcesDir "Application/Application.cpp"),
-	(Join-Path $winAppSourcesDir "Application/Demo/DemoLabHost.cpp")
+	(Join-Path $winAppHostSourcesDir "Application/Application.cpp"),
+	(Join-Path $winAppHostSourcesDir "Application/Demo/DemoLabHost.cpp")
 )
 $applicationConcreteContentRegex =
 	'#include\s*[<"]Application[\\/]Lab[\\/]Sessions[\\/]'
@@ -2814,7 +2930,7 @@ foreach ($itemPath in $applicationCoreContractPaths) {
 
 $toolingFrameContextPaths = @(
     (Join-Path $appRuntimeSourcesDir "ApplicationToolingIntegration.h"),
-    (Join-Path $winAppSourcesDir "DevTools/DevelopGui/DevelopGuiContext.h")
+    (Join-Path $winAppHostSourcesDir "DevTools/DevelopGui/DevelopGuiContext.h")
 )
 $redundantToolingFrameMemberRegex =
     '\bm_(?:Camera|CameraController|AuthoringViewRenderProfile|' +
@@ -2878,8 +2994,8 @@ foreach ($itemPath in $iblViewerPaths) {
 
 $environmentSelectionToolingPaths = @($iblViewerPaths) + @(
     (Join-Path $root "Sources/GGLabAppRuntime/ApplicationToolingIntegration.h"),
-    (Join-Path $root "Sources/WinApp/DevTools/DevelopGui/DevelopGuiContext.h"),
-    (Join-Path $root "Sources/WinApp/DevTools/DevelopGui/DevelopGuiApplicationTooling.cpp")
+    (Join-Path $root "Sources/WinAppHost/DevTools/DevelopGui/DevelopGuiContext.h"),
+    (Join-Path $root "Sources/WinAppHost/DevTools/DevelopGui/DevelopGuiApplicationTooling.cpp")
 )
 foreach ($itemPath in $environmentSelectionToolingPaths) {
     $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
@@ -2896,8 +3012,8 @@ $rendererIndependentToolingPanelPaths = @(
     (Join-Path $developGuiPanelsDir "ResourceManagementPanel.cpp"),
     (Join-Path $developGuiPanelsDir "ResourceManagementPanel.h"),
     (Join-Path $root "Sources/GGLabAppRuntime/ApplicationToolingIntegration.h"),
-    (Join-Path $root "Sources/WinApp/DevTools/DevelopGui/DevelopGuiContext.h"),
-    (Join-Path $root "Sources/WinApp/DevTools/DevelopGui/DevelopGuiApplicationTooling.cpp"),
+    (Join-Path $root "Sources/WinAppHost/DevTools/DevelopGui/DevelopGuiContext.h"),
+    (Join-Path $root "Sources/WinAppHost/DevTools/DevelopGui/DevelopGuiApplicationTooling.cpp"),
     (Join-Path $developGuiPanelsDir "IBLViewerPanel.cpp"),
     (Join-Path $developGuiPanelsDir "IBLViewerPanel.h"),
     (Join-Path $developGuiPanelsDir "ShadowInspectorPanel.cpp"),
@@ -3074,12 +3190,12 @@ foreach ($itemPath in @($winAppSourceItems) + @($appRuntimeSourceItems) + @($app
 }
 
 foreach ($itemPath in @(
-    (Join-Path $winAppSourcesDir "Application/Platform/Windows/Win32RHIContextFactory.cpp"),
-    (Join-Path $winAppSourcesDir "Application/Platform/Windows/Win32RHIContextFactory.h"),
-    (Join-Path $winAppSourcesDir "DevTools/DevelopGui/DevelopGuiBackendFactory.cpp"),
-    (Join-Path $winAppSourcesDir "DevTools/DevelopGui/DevelopGuiBackendFactory.h"),
-    (Join-Path $winAppSourcesDir "DevTools/DevelopGui/DevelopGuiPanelCatalog.cpp"),
-    (Join-Path $winAppSourcesDir "DevTools/DevelopGui/DevelopGuiPanelCatalog.h")
+    (Join-Path $winAppHostSourcesDir "Application/Platform/Windows/Win32RHIContextFactory.cpp"),
+    (Join-Path $winAppHostSourcesDir "Application/Platform/Windows/Win32RHIContextFactory.h"),
+    (Join-Path $winAppHostSourcesDir "DevTools/DevelopGui/DevelopGuiBackendFactory.cpp"),
+    (Join-Path $winAppHostSourcesDir "DevTools/DevelopGui/DevelopGuiBackendFactory.h"),
+    (Join-Path $winAppHostSourcesDir "DevTools/DevelopGui/DevelopGuiPanelCatalog.cpp"),
+    (Join-Path $winAppHostSourcesDir "DevTools/DevelopGui/DevelopGuiPanelCatalog.h")
 )) {
     $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
     if ($content -match '#include\s*[<"]Graphics[\\/]RHI[\\/](DX12|Vulkan)[\\/]|\b(DX12Context|VulkanContext|VulkanWin32SurfaceFactory)\b') {
@@ -3094,7 +3210,7 @@ foreach ($itemPath in @(
 # Native API objects are intentional here; Runtime implementation types are not.
 foreach ($backend in @("DX12", "Vulkan")) {
     foreach ($extension in @("h", "cpp")) {
-        $itemPath = Join-Path $winAppSourcesDir "DevTools/DevelopGui/Backends/$backend/DevelopGui${backend}RenderBackend.$extension"
+        $itemPath = Join-Path $winAppHostSourcesDir "DevTools/DevelopGui/Backends/$backend/DevelopGui${backend}RenderBackend.$extension"
         $content = Get-Content -LiteralPath $itemPath -Raw -ErrorAction Stop
         if ($content -match '#include\s*[<"](?:Graphics|Diagnostics)[\\/]|\b(?:DX12|Vulkan)(?:Context|Device|DescriptorManager|DescriptorBacking|GraphicsCommandContext|SwapChain)\b') {
             $projectContractFindings.Add([pscustomobject]@{
@@ -3297,9 +3413,8 @@ foreach ($check in $presentationContractChecks) {
 $pathDiscoveryAllowed = [System.Collections.Generic.HashSet[string]]::new(
     [System.StringComparer]::OrdinalIgnoreCase)
 foreach ($allowedPath in @(
-        (Join-Path $winAppSourcesDir "Application/Main.cpp"),
-        (Join-Path $winAppSourcesDir "Application/Platform/Windows/Win32PathUtils.cpp"),
-        (Join-Path $winAppSourcesDir "Application/Platform/Windows/Win32PathUtils.h"))) {
+        (Join-Path $winAppSourcesDir "Main.cpp"),
+        (Join-Path $winAppTestsDir "WinAppTestsMain.cpp"))) {
     [void]$pathDiscoveryAllowed.Add([System.IO.Path]::GetFullPath($allowedPath))
 }
 foreach ($itemPath in $winAppSourceItems) {
@@ -3445,8 +3560,8 @@ foreach ($boundaryPath in $shaderRuntimeIdentityBoundaryPaths) {
 # process and consume Artifact Runtime records, but it must not reintroduce the
 # in-process Toolchain APIs removed by the extraction.
 $developmentShaderBridgePaths = @(
-    (Join-Path $winAppSourcesDir "Application/Shader/DevelopmentShaderBuildBridge.h"),
-    (Join-Path $winAppSourcesDir "Application/Shader/DevelopmentShaderBuildBridge.cpp")
+    (Join-Path $winAppHostSourcesDir "Application/Shader/DevelopmentShaderBuildBridge.h"),
+    (Join-Path $winAppHostSourcesDir "Application/Shader/DevelopmentShaderBuildBridge.cpp")
 )
 $developmentShaderBridgeToolchainRegex =
     '#include\s*[<"](?:Artifact|Compiler|Targets)[\/]|' +
@@ -3471,6 +3586,16 @@ $logicalIncludeSpecifications = @(
         Name        = "WinApp"
         ScanRoot    = $winAppSourcesDir
         LogicalRoot = $winAppSourcesDir
+    }
+    [pscustomobject]@{
+        Name        = "WinAppHost"
+        ScanRoot    = $winAppHostSourcesDir
+        LogicalRoot = $winAppHostSourcesDir
+    }
+    [pscustomobject]@{
+        Name        = "WinAppTests"
+        ScanRoot    = $winAppTestsDir
+        LogicalRoot = $winAppTestsDir
     }
     [pscustomobject]@{
         Name        = "GGLabFoundation"
@@ -3798,10 +3923,11 @@ foreach ($debt in $transitionalDebt) {
 }
 
 # Report.
+Write-Host "Windows source ownership: $($winAppEntrySourceItems.Count) WinApp, $($winAppHostSourceItems.Count) WinAppHost, $($winAppTestsSourceItems.Count) WinAppTests"
 Write-Host "=== Project Ownership and Runtime Boundary Validation ==="
 Write-Host "Root: $root"
 Write-Host "Physical ownership: $($firstPartySourceFiles.Count) first-party source files"
-Write-Host (("Project items: {0} WinApp, {1} VulkanQualification, " +
+Write-Host (("Project items: {0} Windows host domain, {1} VulkanQualification, " +
     "{2} AppRuntime, {3} AppRuntimeTests, {4} Foundation, " +
     "{5} FoundationTests, {6} GGLabRuntime, {7} ShaderArtifactRuntime, " +
     "{8} NapaVoxelCore, {9} TestCore, {10} RuntimeTests, " +
@@ -3815,7 +3941,7 @@ Write-Host (("Project items: {0} WinApp, {1} VulkanQualification, " +
         $runtimeTestsSourceItems.Count, $shaderToolchainTestsSourceItems.Count,
         $shaderRuntimeIntegrationTestsSourceItems.Count, $napaTestsSourceItems.Count)
 Write-Host "Platform: $($candidateFiles.Count) candidate files (Private Core, Graphics and Diagnostics portable leaves)"
-Write-Host (("Compile items: {0} WinApp, {1} VulkanQualification, " +
+Write-Host (("Compile items: {0} Windows host domain, {1} VulkanQualification, " +
     "{2} AppRuntime, {3} AppRuntimeTests, {4} Foundation, " +
     "{5} FoundationTests, {6} GGLabRuntime, {7} ShaderArtifactRuntime, " +
     "{8} NapaVoxelCore, {9} TestCore, {10} RuntimeTests, " +

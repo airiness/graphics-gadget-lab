@@ -177,11 +177,11 @@ Anchors:
   - Sources/GGLabAppRuntime/Demo/DemoManager.cpp::DemoManager::CommitPendingDemo
   - Sources/GGLabAppRuntime/Lab/LabRuntime.cpp::LabRuntime::ProcessPendingCommands
   - Sources/GGLabAppRuntime/Lab/LabRuntime.cpp::LabRuntime::CommitPendingSession
-  - Sources/WinApp/Application/Demo/DemoLabHost.cpp::DemoLabHost::Update
+  - Sources/WinAppHost/Application/Demo/DemoLabHost.cpp::DemoLabHost::Update
 ReviewPaths:
   - Sources/GGLabAppRuntime/Lab/LabRuntimeParameters.cpp
   - Sources/GGLabAppRuntime/GGLabAppRuntimeFrame.cpp
-  - Sources/WinApp/Application/Lab/Sessions/NapaVoxelLabSession.cpp
+  - Sources/WinAppHost/Application/Lab/Sessions/NapaVoxelLabSession.cpp
 ```
 
 ## Contracts
@@ -244,13 +244,13 @@ retained beyond execution.
 
 Shut down in this order:
 
-1. Stop new producer work and drain or cancel the application work that depends on
-   Runtime services.
+1. Revoke published service views before shutdown callbacks. Stop new producer work
+   and drain or cancel application work that depends on Runtime services.
 2. Establish verified idle or natively confirmed device loss
    (`QuiesceRHIForTeardown`) before destroying GPU-visible owners, or tooling,
    content and assets that borrow GPU services.
 3. Release those consumers while the Runtime services they borrow are still alive.
-4. Finalize and release the RenderHost.
+4. Clear contained service bindings, then Finalize and release the RenderHost.
 
 Unknown completion and timed-out waits do not count as device loss. When teardown
 ends in `RHITeardownState::Unverified` on a live device, GPU-visible memory is
@@ -301,7 +301,7 @@ Anchors:
   - Sources/GGLabAppRuntime/Lab/LabSessionBase.h::BeginPrepare
 ReviewPaths:
   - Sources/GGLabAppRuntime/Demo/DemoBase.h
-  - Sources/WinApp/Application/Lab/Sessions/NapaVoxelLabSession.cpp
-  - Sources/WinApp/Application/Lab/NapaVoxel/NapaVoxelRenderState.cpp
+  - Sources/WinAppHost/Application/Lab/Sessions/NapaVoxelLabSession.cpp
+  - Sources/WinAppHost/Application/Lab/NapaVoxel/NapaVoxelRenderState.cpp
   - Tests/GGLabAppRuntime/GpuFaultLifecycleSelfTests.cpp
 ```

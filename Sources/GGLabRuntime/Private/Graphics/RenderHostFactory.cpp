@@ -37,20 +37,21 @@ namespace gglab
 			return instance;
 		}
 
-		instance.m_Services.m_PipelineResolver = renderer->GetPipelineCache();
-		instance.m_Services.m_ShaderPrograms = createInfo.m_ShaderManager;
-		instance.m_Services.m_Samplers = renderer->GetSamplerRegistry();
-		instance.m_Services.m_Resources = renderer->GetRenderResourceRegistry();
-		instance.m_Services.m_FrameBuffers = renderer.get();
-		instance.m_Services.m_Environment = renderer.get();
-		instance.m_Services.m_Presentation = renderer.get();
-		instance.m_Services.m_BindingLayout = renderer.get();
-		instance.m_Services.m_Temporal = renderer.get();
-		instance.m_Services.m_Atmosphere = renderer->GetAtmosphereSystem();
-		instance.m_Services.m_BakeAtmosphere = renderer->GetBakeAtmosphereSystem();
-		instance.m_Services.m_AssetUpload = renderer->GetAssetUploadScheduler();
-		instance.m_Services.m_FrameCapture = renderer->GetFrameCaptureAccess();
+		instance.m_CompositionBindings.m_PipelineResolver = renderer->GetPipelineCache();
+		instance.m_CompositionBindings.m_ShaderPrograms = createInfo.m_ShaderManager;
+		instance.m_CompositionBindings.m_Samplers = renderer->GetSamplerRegistry();
+		instance.m_CompositionBindings.m_Resources = renderer->GetRenderResourceRegistry();
+		instance.m_CompositionBindings.m_FrameBuffers = renderer.get();
+		instance.m_CompositionBindings.m_Environment = renderer.get();
+		instance.m_CompositionBindings.m_Presentation = renderer.get();
+		instance.m_CompositionBindings.m_BindingLayout = renderer.get();
+		instance.m_CompositionBindings.m_Temporal = renderer.get();
+		instance.m_CompositionBindings.m_Atmosphere = renderer->GetAtmosphereSystem();
+		instance.m_CompositionBindings.m_BakeAtmosphere = renderer->GetBakeAtmosphereSystem();
+		instance.m_CompositionBindings.m_AssetUpload = renderer->GetAssetUploadScheduler();
+		instance.m_CompositionBindings.m_FrameCapture = renderer->GetFrameCaptureAccess();
 		instance.m_Composition = renderer.get();
+		instance.m_ServiceView = renderer->PublishRenderServices(instance.m_CompositionBindings);
 		instance.m_Host = std::move(renderer);
 		return instance;
 	}

@@ -146,7 +146,7 @@ cancellation does not produce a completed parameter/timing range. Metadata recor
 
 `-TemporalAA 'name=value,...'` and `-GTAO 'name=value,...'` set overrides from frame 0.
 Omitted values inherit content settings. Use the
-[control parser](../../../../Sources/WinApp/Application/Control/ApplicationControlProtocol.cpp)
+[control parser](../../../../Sources/WinAppHost/Application/Control/ApplicationControlProtocol.cpp)
 for names/ranges and saved metadata for effective values:
 
 ```powershell

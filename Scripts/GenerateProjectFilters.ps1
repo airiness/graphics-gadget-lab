@@ -321,8 +321,28 @@ $projectSpecifications = @(
         Mappings = @(
             [pscustomobject]@{ Root = "Sources\WinApp"; FilterPrefix = "" }
             [pscustomobject]@{ Root = "Shaders"; FilterPrefix = "Shaders" }
-            [pscustomobject]@{ Root = "Externals\Vender\imgui"; FilterPrefix = "ThirdParty\ImGui" }
             [pscustomobject]@{ Root = "Projects\WinApp\packages.config"; FilterPrefix = "" }
+        )
+    }
+    [pscustomobject]@{
+        Name = "WinAppHost"
+        ProjectPath = "Projects\WinAppHost\WinAppHost.vcxproj"
+        FiltersPath = "Projects\WinAppHost\WinAppHost.vcxproj.filters"
+        ItemTypes = @("ClCompile", "ClInclude")
+        IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
+        Mappings = @(
+            [pscustomobject]@{ Root = "Sources\WinAppHost"; FilterPrefix = "" }
+            [pscustomobject]@{ Root = "Externals\Vender\imgui"; FilterPrefix = "ThirdParty\ImGui" }
+        )
+    }
+    [pscustomobject]@{
+        Name = "WinAppTests"
+        ProjectPath = "Projects\WinAppTests\WinAppTests.vcxproj"
+        FiltersPath = "Projects\WinAppTests\WinAppTests.vcxproj.filters"
+        ItemTypes = @("ClCompile", "ClInclude")
+        IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
+        Mappings = @(
+            [pscustomobject]@{ Root = "Tests\WinApp"; FilterPrefix = "" }
         )
     }
     [pscustomobject]@{

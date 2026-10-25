@@ -138,6 +138,6 @@ Anchors:
   - Sources/GGLabRuntime/Private/Graphics/RenderPipeline/RenderPipelineForwardPlus.cpp::ResolveTemporalFramePlan
 ReviewPaths:
   - Sources/GGLabRuntime/Private/Graphics/RenderGraph/RenderGraph.cpp
-  - Sources/WinApp/Application/Lab/NapaVoxel/NapaVoxelRenderPass.cpp
-  - Sources/WinApp/Application/Lab/Sessions/NapaVoxelLabSession.cpp
+  - Sources/WinAppHost/Application/Lab/NapaVoxel/NapaVoxelRenderPass.cpp
+  - Sources/WinAppHost/Application/Lab/Sessions/NapaVoxelLabSession.cpp
 ```

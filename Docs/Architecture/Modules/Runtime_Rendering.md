@@ -15,11 +15,14 @@ Atlas ID: atlas.runtime.render-host
 - **Responsibility:** the active frame, Runtime participants, the commit list and
   GPU services.
 - **Public interface:** [RenderHost.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderHost.h),
-  including `CreateRenderHost` and the move-only `RenderFrame` abort handle.
+  including `CreateRenderHost` and the move-only `RenderFrame` abort handle;
+  [RenderServicesView.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderServicesView.h)
+  provides retained service access.
 - **Implementation:** [Renderer](../../../Sources/GGLabRuntime/Private/Graphics/Renderer.cpp)
   and [outcome derivation](../../../Sources/GGLabRuntime/Private/Graphics/RenderFrameOutcome.h).
 - **Lifetime:** AppRuntime owns the host. Renderer owns the RHI context and pools,
   borrows the active graph and clears its active-frame state after settlement.
+  Service views revoke before teardown callbacks; contained borrows end before Finalize.
 - **Boundary:** [frame settlement](../Frame_Execution_Map.md#frame-settlement) keeps
   the four outcomes and their retention fences apart.
 - **Verification:** the production Renderer in `GpuFaultLifecycleSelfTests.cpp`;
@@ -31,6 +34,7 @@ Anchors:
   - Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderHost.h::RenderFrame::Reset
 ReviewPaths:
   - Sources/GGLabRuntime/Private/Graphics/RenderHostFactory.cpp
+  - Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderServicesView.h
   - Sources/GGLabRuntime/Private/Graphics/RenderFrameOutcome.h
 ```
 
@@ -78,7 +82,7 @@ Atlas ID: atlas.runtime.render-pass-authoring
   [SceneDepthGraphResources.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h).
 - **Implementation:** Runtime examples [RenderPassForwardPlusCull](../../../Sources/GGLabRuntime/Private/Graphics/RenderPass/RenderPassForwardPlusCull.cpp)
   and [RenderPassGTAO](../../../Sources/GGLabRuntime/Private/Graphics/RenderPass/RenderPassGTAO.cpp);
-  the Lab example [NapaVoxelRenderPass](../../../Sources/WinApp/Application/Lab/NapaVoxel/NapaVoxelRenderPass.cpp).
+  the Lab example [NapaVoxelRenderPass](../../../Sources/WinAppHost/Application/Lab/NapaVoxel/NapaVoxelRenderPass.cpp).
 - **Lifetime:** a pass lives as long as its pipeline or extension; graph transients
   live for one frame; persistent resources belong to an owner outside the graph.
 - **Boundary:** [pass ownership](../Runtime_Boundaries_Map.md#pass-ownership) and
@@ -87,14 +91,14 @@ Atlas ID: atlas.runtime.render-pass-authoring
   Private.
 - **Verification:** `GGLabRuntimeTests` suite `rendering-contracts`, including the
   render graph access, Forward+ and GTAO history tests and the Napa voxel graph
-  fixture; WinApp `--self-test napa-voxel`; GPU runs with the
+  fixture; `WinAppTests --suite napa-voxel`; GPU runs with the
   [frame-capture skill](../../../.agents/skills/gglab-frame-capture/SKILL.md).
 
 ```text
 Anchors:
   - Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderPass/RenderPassBase.h::RenderPassBase
   - Sources/GGLabRuntime/Private/Graphics/RenderPass/RenderPassForwardPlusCull.cpp::RenderPassForwardPlusCull::AddPass
-  - Sources/WinApp/Application/Lab/NapaVoxel/NapaVoxelRenderPass.cpp::NapaVoxelRenderPass::AddPass
+  - Sources/WinAppHost/Application/Lab/NapaVoxel/NapaVoxelRenderPass.cpp::NapaVoxelRenderPass::AddPass
 ReviewPaths:
   - Sources/GGLabRuntime/Private/Graphics/RenderPass/RenderPassGTAO.cpp
   - Tests/GGLabRuntime/RenderingContractSelfTests.cpp
@@ -153,7 +157,7 @@ Atlas ID: atlas.runtime.shader-consumption
 - **Boundary:** shader production, artifact publication and activation are outside
   this card.
 - **Verification:** `GGLabRuntimeTests` suite `shader-artifact-runtime`; WinApp
-  `--self-test app-content-registration` for Lab demand; `GGLabShaderToolchainTests`
+  `WinAppTests --suite app-content-registration` for Lab demand; `GGLabShaderToolchainTests`
   checks the build-record catalog count when records change.
 
 ```text

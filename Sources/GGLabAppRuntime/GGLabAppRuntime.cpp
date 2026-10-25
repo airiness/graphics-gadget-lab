@@ -7,13 +7,30 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
+#include <cstdlib>
 #include <utility>
 
 namespace gglab
 {
+	void GGLabAppRuntime::CheckOwnerThread() const noexcept
+	{
+		if (m_OwnerThread != std::this_thread::get_id())
+		{
+			std::fputs("AppRuntime lifecycle requires the owner thread.\n", stderr);
+			std::fflush(stderr);
+			std::abort();
+		}
+	}
+
 	AppRuntimeInitializeResult GGLabAppRuntime::Initialize(
 		const GGLabAppRuntimeCreateInfo& createInfo) noexcept
 	{
+		CheckOwnerThread();
+		if (m_RenderHost)
+		{
+			m_RenderHost->CheckServiceLifecycleAccess();
+		}
 		if (m_LifecycleState == AppRuntimeLifecycleState::Running ||
 			m_LifecycleState == AppRuntimeLifecycleState::Suspended ||
 			m_LifecycleState == AppRuntimeLifecycleState::ExitRequested)
@@ -224,6 +241,11 @@ namespace gglab
 
 	void GGLabAppRuntime::HandleHostEvent(const AppHostEvent& event) noexcept
 	{
+		CheckOwnerThread();
+		if (m_RenderHost)
+		{
+			m_RenderHost->CheckServiceLifecycleAccess();
+		}
 		switch (event.m_Type)
 		{
 		case AppHostEventType::None:
@@ -265,6 +287,10 @@ namespace gglab
 			if (m_LifecycleState == AppRuntimeLifecycleState::Running ||
 				m_LifecycleState == AppRuntimeLifecycleState::Suspended)
 			{
+				if (m_RenderHost)
+				{
+					m_RenderHost->RevokeRenderServices();
+				}
 				m_LifecycleState = AppRuntimeLifecycleState::ExitRequested;
 			}
 			break;

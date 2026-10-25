@@ -49,8 +49,31 @@ namespace gglab
 
 	Renderer::~Renderer()
 	{
+		RevokeRenderServices();
 		GGLAB_ASSERT_MSG(
 			!m_HasActiveFrame, "Renderer destroyed while a render frame is still active.");
+	}
+
+	RenderServicesView Renderer::PublishRenderServices(const RenderServices& bindings) noexcept
+	{
+		m_ServicePublication = std::make_unique<RenderServicesPublication>(bindings);
+		return m_ServicePublication->GetView();
+	}
+
+	void Renderer::CheckServiceLifecycleAccess() const noexcept
+	{
+		if (m_ServicePublication)
+		{
+			m_ServicePublication->CheckLifecycleAccess();
+		}
+	}
+
+	void Renderer::RevokeRenderServices() noexcept
+	{
+		if (m_ServicePublication)
+		{
+			m_ServicePublication->Revoke();
+		}
 	}
 
 	RenderSamplerAccess* Renderer::GetSamplerRegistry() const noexcept
@@ -208,6 +231,7 @@ namespace gglab
 
 	void Renderer::Finalize() noexcept
 	{
+		RevokeRenderServices();
 		if (!m_IsInitialized)
 		{
 			return;
@@ -293,6 +317,7 @@ namespace gglab
 
 	RenderFrame Renderer::BeginFrame() noexcept
 	{
+		CheckServiceLifecycleAccess();
 		GGLAB_ASSERT_MSG(m_IsInitialized, "Renderer::BeginFrame called before initialization.");
 		GGLAB_ASSERT_MSG(
 			!m_HasActiveFrame, "Renderer::BeginFrame called without ending the previous frame.");
@@ -829,6 +854,7 @@ namespace gglab
 
 	void Renderer::OnResize(uint32_t width, uint32_t height) noexcept
 	{
+		CheckServiceLifecycleAccess();
 		if (!m_IsInitialized)
 		{
 			GGLAB_LOG_GRAPHICS_WARN("Renderer::OnResize. Renderer is not initialized.");
@@ -860,11 +886,13 @@ namespace gglab
 
 	void Renderer::OnSuspend() noexcept
 	{
+		CheckServiceLifecycleAccess();
 		m_IsSuspended.store(true, std::memory_order_relaxed);
 	}
 
 	void Renderer::OnResume() noexcept
 	{
+		CheckServiceLifecycleAccess();
 		if (m_TemporalHistoryManager)
 		{
 			m_TemporalHistoryManager->Invalidate(

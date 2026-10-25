@@ -7,10 +7,10 @@ Atlas ID: atlas.repository.projects
 - Refresh triggers: solution/project membership, references, imports, include
   visibility or build-profile conditions change.
 
-The [Atlas overview](README.md) follows a frame. This map follows the sixteen
+The [Atlas overview](README.md) follows a frame. This map follows the eighteen
 first-party projects in [the solution](../../GraphicsGadgetLab.sln). RenderGraph,
 RHI and the native backends are subsystems of `GGLabRuntime`; concrete Labs and
-DevTools belong to `WinApp`. Instance ownership is described separately in the
+DevTools belong to `WinAppHost`. Instance ownership is described separately in the
 [frame and content map](Frame_Execution_Map.md).
 
 ## Projects and source ownership
@@ -20,7 +20,9 @@ The source roots below locate those items.
 
 | Project | Source roots | Role |
 | --- | --- | --- |
-| [WinApp](../../Projects/WinApp/WinApp.vcxproj) | [Sources/WinApp](../../Sources/WinApp) | Windows startup and hosts, concrete Labs, DevTools and their self-tests |
+| [WinApp](../../Projects/WinApp/WinApp.vcxproj) | [Sources/WinApp](../../Sources/WinApp) | Native startup, deployment inspection and application bootstrap |
+| [WinAppHost](../../Projects/WinAppHost/WinAppHost.vcxproj) | [Sources/WinAppHost](../../Sources/WinAppHost) | Linkable Windows hosts/adapters, concrete Labs and DevTools |
+| [WinAppTests](../../Projects/WinAppTests/WinAppTests.vcxproj) | [Tests/WinApp](../../Tests/WinApp) | Host regression cases, runner and real-product integration checks |
 | [GGLabAppRuntime](../../Projects/GGLabAppRuntime/GGLabAppRuntime.vcxproj) | [Sources/GGLabAppRuntime](../../Sources/GGLabAppRuntime) | Host-neutral lifecycle, services, frames and content coordination |
 | [GGLabRuntime](../../Projects/GGLabRuntime/GGLabRuntime.vcxproj) | [Sources/GGLabRuntime](../../Sources/GGLabRuntime) | Reusable scene, rendering, RenderGraph, RHI and diagnostics library |
 | [GGLabFoundation](../../Projects/GGLabFoundation/GGLabFoundation.vcxproj) | [Sources/GGLabFoundation](../../Sources/GGLabFoundation) | Tier-0 facilities |
@@ -41,6 +43,10 @@ The source roots below locate those items.
 inside that test project's intermediate directory. Vendored DirectXTex is a
 separate solution project under `Externals/Vender`, outside this first-party set.
 
+`WinAppTests` owns its runner and cases. It links the host library and selects
+suites with `--suite`; structural checks launch the actual product's
+`--inspect-runtime` entry. Product targets have no test-framework dependency.
+
 ## Declared project references
 
 `A → B` means A declares a `ProjectReference` to B. This selected diagram shows
@@ -49,6 +55,9 @@ dashed arrow. The table below contains the complete declared reference set.
 
 ```mermaid
 flowchart TD
+    WinApp --> WinAppHost
+    WinAppTests --> WinAppHost
+    WinAppTests --> GGLabTestCore
     WinApp --> GGLabAppRuntime
     WinApp --> GGLabRuntime
     GGLabAppRuntime --> GGLabRuntime
@@ -66,7 +75,9 @@ table; this is a declared graph, not an MSBuild-evaluated dependency closure.
 
 | Declaring project | Library references | Tool/build-order references |
 | --- | --- | --- |
-| `WinApp` | `GGLabAppRuntime`, `GGLabFoundation`, `GGLabRuntime`, `GGLabTestCore`, `NapaVoxelCore`, `ShaderArtifactRuntime` | — |
+| `WinApp` | `WinAppHost`, `GGLabAppRuntime`, `GGLabFoundation`, `GGLabRuntime`, `NapaVoxelCore`, `ShaderArtifactRuntime` | — |
+| `WinAppHost` | `GGLabAppRuntime`, `GGLabFoundation`, `GGLabRuntime`, `NapaVoxelCore`, `ShaderArtifactRuntime` | — |
+| `WinAppTests` | `WinAppHost`, `GGLabAppRuntime`, `GGLabFoundation`, `GGLabRuntime`, `GGLabTestCore`, `NapaVoxelCore`, `ShaderArtifactRuntime` | — |
 | `GGLabAppRuntime` | `GGLabFoundation`, `GGLabRuntime`, `ShaderArtifactRuntime` | — |
 | `GGLabRuntime` | `GGLabFoundation`, `ShaderArtifactRuntime`, `DirectXTex_Desktop_2026` | — |
 | `GGLabFoundation` | — | — |
@@ -84,9 +95,11 @@ table; this is a declared graph, not an MSBuild-evaluated dependency closure.
 | `GGLabVulkanQualification` | `GGLabFoundation`, `GGLabRuntime`, `GGLabTestCore`; `ShaderArtifactRuntime` [V], `ShaderToolchainCore` [V] | — |
 
 - **[V]:** the reference has condition `'$(GGLAB_ENABLE_VULKAN)'!='0'`.
-- **Explicit link metadata:** `LinkLibraryDependencies=true` on WinApp → Runtime,
+- **Explicit link metadata:** `LinkLibraryDependencies=true` on WinApp/WinAppTests → Runtime,
   Runtime → DirectXTex, ShaderCompiler → ToolchainCore, and qualification → Runtime
   and ToolchainCore. The last edge retains [V].
+- **Host library:** every WinAppHost reference has `LinkLibraryDependencies=false`.
+  Its archive contains owned objects; the executables link its library dependencies.
 - **Compiler tool:** ToolchainTests → ShaderCompiler has
   `LinkLibraryDependencies=false` and `ReferenceOutputAssembly=false`. The tests
   build the process executable without linking it as a library.
@@ -101,9 +114,10 @@ changes are:
 
 | Input | Declared effect and evidence |
 | --- | --- |
-| Debug / Develop / Release, x64 | All sixteen first-party projects declare these configurations. [GGLabBuildBaseline.props](../../PropertySheets/GGLabBuildBaseline.props), directly or through [Common.props](../../PropertySheets/Common.props), supplies the shared build policy. `NapaVoxelCore` keeps its own C++20 build identity |
-| `GGLAB_ENABLE_VULKAN` | Defaults to 1 in [VulkanImport.props](../../PropertySheets/VulkanImport.props). `!=0` enables its SDK includes/link inputs, Runtime and WinApp Vulkan source items and the two [V] references. Qualification's Shader-directory/DXC imports and Shader-directory target also require `!=0` |
-| `GGLAB_ARTIFACT_ONLY_RUNTIME` | Defaults to 0 in the WinApp project. `!=1` includes development Shader startup/process sources, [ShaderDirectory.props](../../PropertySheets/ShaderDirectory.props) and the asset/Shader directory targets. Those extension-target imports also retain `Exists(...)`. WinApp's project-reference set stays the same |
+| Debug / Develop / Release, x64 | All eighteen first-party projects declare these configurations. [GGLabBuildBaseline.props](../../PropertySheets/GGLabBuildBaseline.props), directly or through [Common.props](../../PropertySheets/Common.props), supplies the shared build policy. `NapaVoxelCore` keeps its own C++20 build identity |
+| `GGLAB_ENABLE_VULKAN` | Defaults to 1 in [VulkanImport.props](../../PropertySheets/VulkanImport.props). `!=0` enables SDK inputs, Runtime/WinAppHost Vulkan sources, the host presentation test and the two [V] references. Qualification's Shader-directory/DXC imports and target also require `!=0` |
+| `GGLAB_ARTIFACT_ONLY_RUNTIME` | [WinAppBuildProfile.props](../../PropertySheets/WinAppBuildProfile.props) isolates normal/artifact-only outputs and intermediates for all three Windows host targets. `!=1` includes development Shader startup/process sources and tests; WinApp also retains its conditional Shader/asset deployment imports |
+| `GGLAB_USE_PCH` | WinAppHost owns the PCH and disables it for `=0`; both executables use no PCH. The shared host profile separates no-PCH intermediates within each normal/artifact-only profile |
 | DXC integration | [DxcImport.props](../../PropertySheets/DxcImport.props) and [DxcImport.targets](../../PropertySheets/DxcImport.targets) are paired early/late imports in ToolchainCore, ShaderCompiler, ToolchainTests, integration tests, AppRuntime tests and qualification; qualification retains [V]. Their package imports preserve `Exists(...)` and package checks. WinApp has no DXC import |
 
 The [asset](../../PropertySheets/LinkAssetDirectory.targets) and
@@ -121,13 +135,13 @@ the permitted direction. Ordinary consumers use the `Public` include roots of
 [ShaderArtifactRuntime](../../Sources/ShaderArtifactRuntime/Public),
 [NapaVoxelCore](../../Sources/NapaVoxelCore/Public) and
 [TestCore](../../Sources/GGLabTestCore/Public). AppRuntime exposes its own source
-root to WinApp; the Shader tools/tests use `Sources/ShaderToolchain`.
+root to the Windows host targets; the Shader tools/tests use `Sources/ShaderToolchain`.
 
 The project include-directory declarations distinguish these cases:
 
 | Consumer | Additional implementation access and purpose |
 | --- | --- |
-| `WinApp`, `GGLabAppRuntime` | Runtime Public consumption; no Runtime Private include root |
+| `WinApp`, `WinAppHost`, `WinAppTests`, `GGLabAppRuntime` | Runtime Public consumption; no Runtime Private include root |
 | `GGLabRuntimeTests` | Runtime Private for owning implementation tests |
 | `GGLabAppRuntimeTests` | Only Runtime `Private/Graphics/RHI` for the fault harness |
 | `ShaderRuntimeIntegrationTests` | Runtime Private and ShaderToolchain for cross-domain numeric/compile tests |
@@ -156,6 +170,8 @@ scripted suites are listed by
 Anchors:
   - GraphicsGadgetLab.sln
   - Projects/WinApp/WinApp.vcxproj
+  - Projects/WinAppHost/WinAppHost.vcxproj
+  - Projects/WinAppTests/WinAppTests.vcxproj
   - Projects/GGLabRuntime/GGLabRuntime.vcxproj
   - Projects/ShaderToolchainTests/ShaderToolchainTests.vcxproj
   - Projects/ShaderRuntimeIntegrationTests/ShaderRuntimeIntegrationTests.vcxproj

@@ -264,8 +264,8 @@ namespace gglab
 			const = 0;
 	};
 
-	// Explicit services borrowed for one frame or pipeline invocation. The
-	// interface fields are stable for the renderer lifetime.
+	// Non-owning bindings for contained composition and synchronous frame/pass work.
+	// External callers retain a RenderServicesView instead.
 	struct RenderServices
 	{
 		RenderPipelineResolver* m_PipelineResolver = nullptr;
@@ -274,7 +274,7 @@ namespace gglab
 		RenderResourceRegistryAccess* m_Resources = nullptr;
 		// Injected by the application content host from its asset manager before
 		// pipeline execution. Passes that consume texture assets require a
-		// non-null value; IsValid() validates only the stable owner-provided
+		// non-null value; HasRequiredServices() validates only the stable owner-provided
 		// bundle below.
 		RenderTextureAssetAccess* m_TextureAssets = nullptr;
 		RenderFrameBufferAccess* m_FrameBuffers = nullptr;
@@ -294,7 +294,7 @@ namespace gglab
 		// Validates the stable owner-provided services. The application-injected
 		// m_TextureAssets is required for pass execution but is not part of this
 		// owner-provided validation.
-		[[nodiscard]] bool IsValid() const noexcept
+		[[nodiscard]] bool HasRequiredServices() const noexcept
 		{
 			return m_PipelineResolver && m_ShaderPrograms && m_Samplers && m_Resources &&
 				m_FrameBuffers && m_Environment && m_Presentation && m_BindingLayout &&

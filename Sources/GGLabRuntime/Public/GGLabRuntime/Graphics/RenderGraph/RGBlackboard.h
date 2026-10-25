@@ -1,7 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Core/Hash/KeyHash.h"
 #include "GGLabRuntime/Core/StringId.h"
-#include "GGLabRuntime/Graphics/RenderGraph/RGArenaAllocator.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGObjectArena.h"
 
 namespace gglab
 {
@@ -31,9 +31,10 @@ namespace gglab
 	class RGBlackboard
 	{
 	public:
-		explicit RGBlackboard(RGArenaAllocator& arenaAllocator) noexcept;
+		explicit RGBlackboard(RGObjectArena& objectArena) noexcept;
 
-		void Reset() noexcept;
+		// Clears lookup entries only; existing payloads live until arena destruction.
+		void ClearIndex() noexcept;
 
 		template <typename T> bool Contains() const noexcept { return Contains<T>(StringID{}); }
 
@@ -139,7 +140,7 @@ namespace gglab
 			GGLAB_ASSERT_MSG(
 				!m_Container.contains(key), "RGBlackboard::Create() duplicated entry.");
 
-			T* object = m_ArenaAllocator.MakeTracked<T>(std::forward<ARGS>(args)...);
+			T* object = m_ObjectArena.Make<T>(std::forward<ARGS>(args)...);
 			m_Container.emplace(key, object);
 
 			return *object;
@@ -162,7 +163,7 @@ namespace gglab
 		}
 
 	private:
-		RGArenaAllocator& m_ArenaAllocator;
+		RGObjectArena& m_ObjectArena;
 		std::unordered_map<BlackboardKey, void*, BlackboardKeyHash> m_Container;
 	};
 }
