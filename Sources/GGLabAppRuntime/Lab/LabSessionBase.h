@@ -110,6 +110,9 @@ namespace gglab
 		void ApplyParameterChanges(LabChangeImpact impact) noexcept;
 		void ApplyRestoredParametersForPrepare(LabChangeImpact impact) noexcept;
 
+		// A pending session is destroyed as soon as its preparation is cancelled or fails.
+		// GPU work it starts belongs to a service that retains it until completion, such
+		// as the asset upload scheduler.
 		virtual void BeginPrepare() noexcept {}
 		virtual void TickPrepare() noexcept {}
 		virtual LoadingProgress GetPreparationProgress() const noexcept

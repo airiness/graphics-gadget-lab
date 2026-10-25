@@ -502,6 +502,8 @@ namespace gglab
 
 	enum class SceneExtensionTemporalParticipation : uint8_t
 	{
+		// Reserved and not yet enabled. Forward+ resolves it to TemporalUnsupported until the
+		// extension API supplies matching color, depth, motion and history participation.
 		TemporalIntegrated,
 		PostTAA,
 		TemporalUnsupported,
