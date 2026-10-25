@@ -11,6 +11,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <string>
 #include <string_view>
 #include <system_error>
 
@@ -69,12 +70,16 @@ namespace gglab
 			paths.m_IblDerivedDataRoot == paths.m_RuntimeRoot / "DerivedDataCache/IBL" &&
 			paths.m_SettingsRoot == paths.m_RuntimeRoot,
 			"Default writable paths are derived by production bootstrap");
-		const auto state = std::filesystem::temp_directory_path() /
-			("gglab-inspection-state-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
-		const auto relocated = InspectProductRuntime(application, L"--state-root \"" + state.wstring() + L"\"");
+		// Exercise canonicalization even when TEMP already has its canonical spelling.
+		const auto requestedState = std::filesystem::temp_directory_path() / "." /
+			("gglab-inspection-state-" +
+				std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+		const auto expectedState = std::filesystem::weakly_canonical(requestedState);
+		const auto relocated = InspectProductRuntime(
+			application, L"--state-root \"" + requestedState.wstring() + L"\"");
 		context.Check(relocated.m_Valid && relocated.m_Paths.m_AssetRoot == paths.m_AssetRoot &&
-			relocated.m_Paths.m_ShaderArtifactRoot == state / "ShaderArtifacts" &&
-			relocated.m_Paths.m_SettingsRoot == state / "Settings",
+			relocated.m_Paths.m_ShaderArtifactRoot == expectedState / "ShaderArtifacts" &&
+			relocated.m_Paths.m_SettingsRoot == expectedState / "Settings",
 			"Explicit state roots relocate writable paths while preserving deployed inputs");
 		const auto conflict = InspectProductRuntime(application, L"--lab gglab.lab.culling");
 		context.Check(conflict.m_Completed && conflict.m_ExitCode != 0 &&
