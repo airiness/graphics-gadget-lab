@@ -502,6 +502,34 @@ jobs:
             exit $LASTEXITCODE
           }
 
+      - name: Build WinAppTests standalone
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force Build\Logs | Out-Null
+
+          $winAppTestsBuildArguments = @(
+            "Projects\WinAppTests\WinAppTests.vcxproj"
+            "/p:SolutionDir=${{ github.workspace }}\"
+            "/m"
+            "/t:Build"
+            "/p:Configuration=${{ matrix.configuration }}"
+            "/p:Platform=x64"
+            "/p:PreferredToolArchitecture=x64"
+            "/verbosity:minimal"
+            "/nologo"
+            "/bl:Build\Logs\winapp-tests-standalone-${{ matrix.log_name }}.binlog"
+          )
+
+          if ("${{ matrix.pch }}" -eq "disabled") {
+            $winAppTestsBuildArguments += "/p:GGLAB_USE_PCH=0"
+          }
+
+          msbuild @winAppTestsBuildArguments
+
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
       - name: Build solution
         if: matrix.pch == 'enabled'
         shell: pwsh
