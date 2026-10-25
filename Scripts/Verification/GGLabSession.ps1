@@ -11,6 +11,12 @@ Every command prints one JSON object on stdout and exits 0 when the command
 succeeded, or 1 with an "error" field otherwise. A capture that ran but failed
 still exits 0; inspect its "status".
 
+-ExpectedRunIdentity <id> names the process run that protected commands (set,
+parameter-result, capture, graph, export, watch, result, capture-cancel, sequence,
+sequence-cancel and stop) must reach. start reports it as "runIdentity"; status reports
+environment.process.runIdentity. A session restarted under the same name rejects them
+with errorCode ExpectedRunChanged and changes nothing.
+
 Commands:
   start    Launch a session (hidden by default) and wait until it accepts requests.
            -LabParameters "id=value",... sets startup Lab parameters (Debug and Develop builds).
@@ -75,6 +81,9 @@ param(
 
     [ValidatePattern('^[A-Za-z0-9_-]{1,64}$')]
     [string]$Session,
+    # Process run the session must still be; status reports environment.process.runIdentity.
+    [ValidatePattern('^[0-9a-f]{32}$')]
+    [string]$ExpectedRunIdentity,
 
     # start
     [ValidateSet('dx12', 'vulkan')]
@@ -166,6 +175,9 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 
 $ProtocolVersion = 4
+# Commands the session checks against expectedRunIdentity; status and parameters report the run.
+$RunCheckedCommands = @('set', 'parameter-result', 'capture', 'graph', 'export', 'watch', 'result',
+    'capture-cancel', 'sequence', 'sequence-cancel', 'stop')
 $RepositoryRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 if (-not $SessionRoot) {
     $SessionRoot = Join-Path $RepositoryRoot 'Build\Sessions'
@@ -209,10 +221,19 @@ function Test-SessionPipe([string]$Id) {
     return [bool]($pipes | Where-Object { $_ -ieq "\\.\pipe\$(Get-PipeName $Id)" })
 }
 
+# With -ExpectedRunIdentity, a restarted session rejects protected requests instead of
+# applying them to another process run.
+function Add-ExpectedRunIdentity([hashtable]$Request) {
+    if ($ExpectedRunIdentity -and $RunCheckedCommands -contains $Request['command']) {
+        $Request['expectedRunIdentity'] = $ExpectedRunIdentity
+    }
+}
+
 # Sends one request and returns the parsed response object. Transport failures
 # throw so a waiting client can retain an accepted jobId; commands report them
 # through Invoke-SessionCommand.
 function Invoke-SessionRequest([string]$Id, [hashtable]$Request, [int]$ResponseTimeoutSeconds) {
+    Add-ExpectedRunIdentity $Request
     $Request['protocol'] = $ProtocolVersion
     $Request['id'] = Get-Random -Minimum 1 -Maximum 2147483647
     $client = New-Object System.IO.Pipes.NamedPipeClientStream('.', (Get-PipeName $Id),
@@ -478,10 +499,19 @@ switch ($Command) {
                 exitCode = $(if ($process.HasExited) { $process.ExitCode } else { $null })
             }
         }
+        # The run identity lets later commands reject a restarted session with this name.
+        $runIdentity = $null
+        try {
+            $environment = Get-Field (Invoke-SessionRequest $Session @{ command = 'status' } 30) 'environment'
+            $runIdentity = Get-Field (Get-Field $environment 'process') 'runIdentity'
+        }
+        catch {
+            $runIdentity = $null
+        }
         $record = @{
             session = $Session; pid = $process.Id; rhi = $Rhi; arguments = $arguments
             startedAt = (Get-Date).ToString('o'); outputLog = $outputLog
-            directory = $sessionDirectory
+            directory = $sessionDirectory; runIdentity = $runIdentity
         }
         ($record | ConvertTo-Json -Depth 5) | Set-Content -Encoding UTF8 -Path (Join-Path $sessionDirectory 'session.json')
         $record['ok'] = $true
@@ -696,7 +726,8 @@ switch ($Command) {
         }
         $response = Invoke-SessionCommand $Session @{ command = 'stop' } 30
         $exitCode = $null
-        if ($process) {
+        # A rejected stop, such as a different run, leaves the session running.
+        if ($process -and $response.ok) {
             if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
                 Fail "Session '$Session' acknowledged stop but did not exit within $TimeoutSeconds seconds." @{ session = $Session; pid = $process.Id }
             }

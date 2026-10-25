@@ -110,6 +110,29 @@ try {
         $taken = Wait-ParameterBatch $admission ([DateTime]::UtcNow.AddSeconds(90))
         Check ($taken.ok -and $taken.consumed -and $state.calls -eq 6) 'parameter-terminal-wait-explicitly-releases-slot'
     }
+    # The client adds an expected run only to commands the session checks.
+    & {
+        $tokens = $null; $parseErrors = $null
+        $ast = [Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $root 'Scripts/Verification/GGLabSession.ps1'), [ref]$tokens, [ref]$parseErrors)
+        $definition = $ast.Find({ param($node)
+            $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Add-ExpectedRunIdentity'
+        }, $true)
+        . ([scriptblock]::Create($definition.Extent.Text))
+        $commands = $ast.Find({ param($node)
+            $node -is [Management.Automation.Language.AssignmentStatementAst] -and
+                $node.Left.Extent.Text -eq '$RunCheckedCommands'
+        }, $true)
+        . ([scriptblock]::Create($commands.Extent.Text))
+        $ExpectedRunIdentity = '0123456789abcdef0123456789abcdef'
+        $set = @{ command='set' }; Add-ExpectedRunIdentity $set
+        $status = @{ command='status' }; Add-ExpectedRunIdentity $status
+        $ExpectedRunIdentity = ''
+        $unchecked = @{ command='stop' }; Add-ExpectedRunIdentity $unchecked
+        Check ($set.expectedRunIdentity -eq '0123456789abcdef0123456789abcdef' -and
+            -not $status.ContainsKey('expectedRunIdentity') -and -not $unchecked.ContainsKey('expectedRunIdentity') -and
+            $RunCheckedCommands.Count -eq 11) 'client-expected-run-identity-only-on-protected-commands'
+    }
     $invalidParameter = Invoke-VerificationScript (Join-Path $root 'Scripts/Verification/GGLabSession.ps1') @{
         Command='set';Session='parameter-invalid';Changes='[]';NoWait=$true;WaitConsumed=$true }
     $invalidResult = $invalidParameter.output | ConvertFrom-Json

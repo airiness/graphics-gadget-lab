@@ -55,6 +55,8 @@ namespace gglab
 		std::vector<ApplicationControlParameterChange> m_ParameterChanges;
 		// Separate namespace from capture job ids; only terminal results can be consumed.
 		uint64_t m_ParameterBatchId = 0;
+		// Protected commands only: the process run this request was prepared against.
+		std::optional<std::string> m_ExpectedRunIdentity;
 	};
 
 	struct ApplicationControlParseResult
@@ -67,6 +69,12 @@ namespace gglab
 
 	[[nodiscard]] ApplicationControlParseResult ParseApplicationControlRequest(
 		std::string_view line) noexcept;
+	// Every command except status and parameters can name its expected process run.
+	[[nodiscard]] bool AcceptsApplicationControlExpectedRun(ApplicationControlCommand command) noexcept;
+	// An error response when a run-checked request names another process run, or when
+	// this run has no identity; empty when the request may touch process-local state.
+	[[nodiscard]] std::optional<std::string> CheckApplicationControlRunIdentity(
+		const ApplicationControlRequest& request, std::string_view runIdentity) noexcept;
 
 	struct ApplicationControlStatus
 	{

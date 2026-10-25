@@ -558,6 +558,13 @@ namespace gglab
 		const std::shared_ptr<win32::NamedPipeRequest>& pipeRequest,
 		ApplicationControlRequest&& request) noexcept
 	{
+		// Checked before any handle lookup or admission, so a stale client changes nothing.
+		if (auto rejected = CheckApplicationControlRunIdentity(request,
+			m_AppRuntime ? std::string_view(m_AppRuntime->GetRunIdentity()) : std::string_view{}))
+		{
+			pipeRequest->Respond(std::move(*rejected));
+			return;
+		}
 		const FrameSequenceCoordinator* frameSequence =
 			m_AppRuntime ? m_AppRuntime->GetFrameSequenceCoordinator() : nullptr;
 		const FrameCaptureCoordinator* frameCapture =

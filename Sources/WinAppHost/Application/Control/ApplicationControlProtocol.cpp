@@ -1355,6 +1355,20 @@ namespace gglab
 			return "unknown";
 		}
 
+		// The capture run identity format: 32 lowercase hexadecimal digits.
+		[[nodiscard]] bool IsRunIdentity(const Json& value)
+		{
+			if (!value.is_string())
+			{
+				return false;
+			}
+			const auto& text = value.get_ref<const std::string&>();
+			return text.size() == 32 && std::ranges::all_of(text, [](char digit)
+				{
+					return (digit >= '0' && digit <= '9') || (digit >= 'a' && digit <= 'f');
+				});
+		}
+
 		[[nodiscard]] Json SerializeTemporalPlan(const FrameCaptureTemporalState& temporal)
 		{
 			Json consumers = Json::array();
@@ -1515,65 +1529,85 @@ namespace gglab
 		}
 
 		ApplicationControlRequest request{ .m_Id = result.m_Id, .m_Command = *command };
+		// The shared run check is removed before each command's exact field validation.
+		std::optional<Json> withoutRun;
+		if (const auto expected = document.find("expectedRunIdentity"); expected != document.end())
+		{
+			if (!AcceptsApplicationControlExpectedRun(*command))
+			{
+				result.m_Error = std::format("Command '{}' does not accept 'expectedRunIdentity'.",
+					commandField->get<std::string>());
+				return result;
+			}
+			if (!IsRunIdentity(*expected))
+			{
+				result.m_Error = "Field 'expectedRunIdentity' must be a 32-digit lowercase hexadecimal run identity.";
+				return result;
+			}
+			request.m_ExpectedRunIdentity = expected->get<std::string>();
+			withoutRun = document;
+			withoutRun->erase("expectedRunIdentity");
+		}
+		const Json& fields = withoutRun ? *withoutRun : document;
 		std::string error;
 		switch (*command)
 		{
 		case ApplicationControlCommand::Capture:
 		case ApplicationControlCommand::Graph:
 		case ApplicationControlCommand::Export:
-			error = ParseCaptureFields(document, request);
+			error = ParseCaptureFields(fields, request);
 			break;
 		case ApplicationControlCommand::Watch:
-			error = ParseWatchFields(document, request.m_Watch);
+			error = ParseWatchFields(fields, request.m_Watch);
 			break;
 		case ApplicationControlCommand::Result:
 		case ApplicationControlCommand::CaptureCancel:
 		{
-			const auto jobId = document.find("jobId");
-			const bool consume = document.contains("consume");
-			if (jobId == document.end() || !jobId->is_number_unsigned() ||
-				jobId->get<uint64_t>() == 0 || document.size() != (consume ? 5u : 4u) ||
-				(consume && (*command != ApplicationControlCommand::Result || !document["consume"].is_boolean())))
+			const auto jobId = fields.find("jobId");
+			const bool consume = fields.contains("consume");
+			if (jobId == fields.end() || !jobId->is_number_unsigned() ||
+				jobId->get<uint64_t>() == 0 || fields.size() != (consume ? 5u : 4u) ||
+				(consume && (*command != ApplicationControlCommand::Result || !fields["consume"].is_boolean())))
 			{
 				error = "A job command takes a non-zero unsigned 'jobId'; only 'result' accepts boolean 'consume'.";
 				break;
 			}
 			request.m_JobId = jobId->get<uint64_t>();
-			request.m_Consume = document.value("consume", false);
+			request.m_Consume = fields.value("consume", false);
 			break;
 		}
 		case ApplicationControlCommand::Set:
-			if (document.size() != 4 || !document.contains("changes"))
+			if (fields.size() != 4 || !fields.contains("changes"))
 			{
 				error = "Command 'set' takes only a 'changes' array.";
 			}
 			else
 			{
-				error = ParseApplicationControlParameterChanges(document["changes"], request.m_ParameterChanges);
+				error = ParseApplicationControlParameterChanges(fields["changes"], request.m_ParameterChanges);
 			}
 			break;
 		case ApplicationControlCommand::ParameterResult:
 		{
-			const auto batch = document.find("batchId");
-			const bool consume = document.contains("consume");
-			if (batch == document.end() || !batch->is_number_unsigned() || batch->get<uint64_t>() == 0 ||
-				document.size() != (consume ? 5u : 4u) || (consume && !document["consume"].is_boolean()))
+			const auto batch = fields.find("batchId");
+			const bool consume = fields.contains("consume");
+			if (batch == fields.end() || !batch->is_number_unsigned() || batch->get<uint64_t>() == 0 ||
+				fields.size() != (consume ? 5u : 4u) || (consume && !fields["consume"].is_boolean()))
 			{
 				error = "Command 'parameter-result' takes a non-zero unsigned 'batchId' and optional boolean 'consume'.";
 				break;
 			}
 			request.m_ParameterBatchId = batch->get<uint64_t>();
-			request.m_Consume = document.value("consume", false);
+			request.m_Consume = fields.value("consume", false);
 			break;
 		}
 		case ApplicationControlCommand::Sequence:
-			error = ParseSequenceFields(document, request);
+			error = ParseSequenceFields(fields, request);
 			break;
 		case ApplicationControlCommand::Parameters:
 		case ApplicationControlCommand::Status:
 		case ApplicationControlCommand::Stop:
 		case ApplicationControlCommand::SequenceCancel:
-			if (document.size() != 3)
+			if (fields.size() != 3)
 			{
 				error = std::format("Command '{}' takes no fields.",
 					commandField->get<std::string>());
@@ -1587,6 +1621,39 @@ namespace gglab
 		}
 		result.m_Request = std::move(request);
 		return result;
+	}
+
+	bool AcceptsApplicationControlExpectedRun(ApplicationControlCommand command) noexcept
+	{
+		return command != ApplicationControlCommand::Status &&
+			command != ApplicationControlCommand::Parameters;
+	}
+
+	std::optional<std::string> CheckApplicationControlRunIdentity(
+		const ApplicationControlRequest& request, std::string_view runIdentity) noexcept
+	{
+		if (!request.m_ExpectedRunIdentity)
+		{
+			return std::nullopt;
+		}
+		if (runIdentity.empty())
+		{
+			Json response = MakeResponse(request.m_Id, false);
+			response["errorCode"] = "RunIdentityUnavailable";
+			response["error"] = "RunIdentityUnavailable: this session has no run identity, so it rejects "
+				"run-checked requests.";
+			return Dump(response);
+		}
+		if (*request.m_ExpectedRunIdentity != runIdentity)
+		{
+			Json response = MakeResponse(request.m_Id, false);
+			response["errorCode"] = "ExpectedRunChanged";
+			response["error"] = "ExpectedRunChanged: the session runs a different process than "
+				"'expectedRunIdentity'; the request changed nothing.";
+			response["runIdentity"] = std::string(runIdentity);
+			return Dump(response);
+		}
+		return std::nullopt;
 	}
 
 	std::string SerializeApplicationControlError(uint64_t id, std::string_view error) noexcept
@@ -1654,7 +1721,13 @@ namespace gglab
 				{ "version", 1 },
 				{ "stamp", { "runIdentity", "contentIdentity", "hostViewRevision" } },
 				{ "valueSources", { "content", "tooling", "camera", "host", "sequence", "forced-reference" } },
-				{ "frameOutcomes", { "planned", "submitted", "aborted" } } } } };
+				{ "frameOutcomes", { "planned", "submitted", "aborted" } } } },
+			{ "runIdentityChecks", {
+				{ "version", 1 },
+				{ "field", "expectedRunIdentity" },
+				{ "commands", { "set", "parameter-result", "capture", "graph", "export", "watch", "result",
+					"capture-cancel", "sequence", "sequence-cancel", "stop" } },
+				{ "errorCodes", { "ExpectedRunChanged", "RunIdentityUnavailable" } } } } };
 		response["capture"] = {
 			{ "limits", {
 				{ "activeJobs", intake.m_Limits.m_MaxActiveJobs },

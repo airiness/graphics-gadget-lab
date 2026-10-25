@@ -161,9 +161,10 @@ try {
             $session = "params-$runId-$config-$backend"
             $start = $null; $caseFailure = $null
             try {
-                $start = Invoke-VerificationSession start $session @{ Configuration=$config; Rhi=$backend;
+                $startOptions = @{ Configuration=$config; Rhi=$backend;
                     Lab='gglab.lab.gtao'; WindowSize='640x360'; NoDevTools=$true; Validation='standard';
                     StateRoot="$directory/state"; StartTimeoutSeconds=$TimeoutSeconds }
+                $start = Invoke-VerificationSession start $session $startOptions
                 Write-VerificationJson "$directory/start.json" $start
                 $status = Wait-VerificationCondition -Poll { Invoke-VerificationSession status $session } `
                     -Until { param($r) $r.frame -and $r.frame.ready } -TimeoutSeconds $TimeoutSeconds
@@ -276,6 +277,41 @@ try {
                 Check (-not $during.ok -and $during.error -match 'sequence') "$backend-sequence-blocks-external-set"
                 $null = Invoke-VerificationSession sequence-cancel $session
                 Write-VerificationJson "$directory/final-status.json" (Invoke-VerificationSession status $session)
+
+                # The run identity keeps a stale client from acting on a restarted session.
+                $run = $start.runIdentity
+                Check ($run -match '^[0-9a-f]{32}$' -and $status.environment.process.runIdentity -eq $run -and
+                    $status.capabilities.runIdentityChecks.version -eq 1) "$backend-start-records-run-identity"
+                $null = Wait-VerificationCondition -Poll { Invoke-VerificationSession status $session } `
+                    -Until { param($r) $r.sequence.state -in @('completed','failed','cancelled') } -TimeoutSeconds $TimeoutSeconds
+                $other = if ($run.StartsWith('0')) { '1' + $run.Substring(1) } else { '0' + $run.Substring(1) }
+                $before = Invoke-VerificationSession status $session
+                $stale = Set-Values @(@{id='gtao.radius';type='float';value=1.25}) @{ExpectedRunIdentity=$other} -AllowFailure
+                $after = Invoke-VerificationSession status $session
+                Check (-not $stale.ok -and $stale.errorCode -eq 'ExpectedRunChanged' -and $stale.runIdentity -eq $run -and
+                    $null -eq $after.parameterControl.batch -and
+                    $after.parameterControl.revision -eq $before.parameterControl.revision) "$backend-other-run-set-changes-nothing"
+                $guarded = Set-Values @(@{id='gtao.radius';type='float';value=1.25}) @{ExpectedRunIdentity=$run}
+                Check ($guarded.consumed -and $guarded.batch.succeeded) "$backend-matching-run-set-applies"
+                $staleStop = Invoke-VerificationSession stop $session @{ExpectedRunIdentity=$other} -AllowFailure
+                Check (-not $staleStop.ok -and $staleStop.errorCode -eq 'ExpectedRunChanged' -and
+                    (Invoke-VerificationSession status $session).environment.process.runIdentity -eq $run) "$backend-other-run-stop-keeps-session"
+
+                $firstStart = $start; $start = $null
+                $null = Stop-VerificationSession $session -StartedSession $firstStart -ReceiptPath "$directory/stop-first-run.json" -RequireCleanExit
+                $firstLog = Get-Content -LiteralPath $firstStart.outputLog -Raw
+                if ($firstLog -match '\[(error|critical)\]|VUID-|GPU_BASED_VALIDATION_|assertion failed') { throw "Native validation errors: $($firstStart.outputLog)" }
+                $start = Invoke-VerificationSession start $session $startOptions
+                $null = Wait-VerificationCondition -Poll { Invoke-VerificationSession status $session } `
+                    -Until { param($r) $r.frame -and $r.frame.ready } -TimeoutSeconds $TimeoutSeconds
+                $oldResult = Invoke-VerificationSession parameter-result $session @{BatchId=$guarded.batchId;ExpectedRunIdentity=$run} -AllowFailure
+                $oldSet = Set-Values @(@{id='gtao.radius';type='float';value=1.5}) @{ExpectedRunIdentity=$run} -AllowFailure
+                $oldStop = Invoke-VerificationSession stop $session @{ExpectedRunIdentity=$run} -AllowFailure
+                $restarted = Invoke-VerificationSession status $session
+                Check ($start.runIdentity -match '^[0-9a-f]{32}$' -and $start.runIdentity -ne $run -and
+                    @(@($oldResult, $oldSet, $oldStop) | Where-Object { -not $_.ok -and $_.errorCode -eq 'ExpectedRunChanged' }).Count -eq 3 -and
+                    $null -eq $restarted.parameterControl.batch -and
+                    $restarted.environment.process.runIdentity -eq $start.runIdentity) "$backend-restart-rejects-previous-run"
             } catch { $caseFailure=$_; throw }
             finally {
                 if ($start) {

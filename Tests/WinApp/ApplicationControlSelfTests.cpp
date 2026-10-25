@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <format>
+#include <initializer_list>
 #include <memory>
 #include <optional>
 #include <string>
@@ -884,6 +885,59 @@ namespace gglab
 			context.Check(received && pendingResponse == "stopped", "Stopping answers outstanding requests with the fallback response");
 			context.Check(silentAnswered && stopTime < std::chrono::seconds(3), "A client that never reads its response cannot hold server shutdown");
 		}
+
+		void RunRunIdentityCheckTests(SelfTestContext& context) noexcept
+		{
+			constexpr std::string_view run = "0123456789abcdef0123456789abcdef";
+			const auto set = ParseApplicationControlRequest(
+				R"({"protocol":4,"id":30,"command":"set","expectedRunIdentity":"0123456789abcdef0123456789abcdef",)"
+				R"("changes":[{"id":"view.taa.enabled","type":"bool","value":false}]})");
+			const auto result = ParseApplicationControlRequest(
+				R"({"protocol":4,"id":31,"command":"result","jobId":4,"consume":true,)"
+				R"("expectedRunIdentity":"0123456789abcdef0123456789abcdef"})");
+			const auto stop = ParseApplicationControlRequest(
+				R"({"protocol":4,"id":32,"command":"stop","expectedRunIdentity":"0123456789abcdef0123456789abcdef"})");
+			context.Check(set.m_Request && set.m_Request->m_ExpectedRunIdentity == run &&
+				set.m_Request->m_ParameterChanges.size() == 1 &&
+				result.m_Request && result.m_Request->m_JobId == 4 && result.m_Request->m_Consume &&
+				result.m_Request->m_ExpectedRunIdentity == run &&
+				stop.m_Request && stop.m_Request->m_ExpectedRunIdentity == run,
+				"Protected commands accept an expected run beside their exact fields");
+			const auto legacy = ParseApplicationControlRequest(R"({"protocol":4,"id":33,"command":"stop"})");
+			context.Check(legacy.m_Request && !legacy.m_Request->m_ExpectedRunIdentity,
+				"Requests without an expected run keep their existing meaning");
+			for (const auto* invalid : {
+				R"({"protocol":4,"id":34,"command":"status","expectedRunIdentity":"0123456789abcdef0123456789abcdef"})",
+				R"({"protocol":4,"id":35,"command":"parameters","expectedRunIdentity":"0123456789abcdef0123456789abcdef"})",
+				R"({"protocol":4,"id":36,"command":"stop","expectedRunIdentity":"0123456789ABCDEF0123456789ABCDEF"})",
+				R"({"protocol":4,"id":37,"command":"stop","expectedRunIdentity":"0123456789abcdef0123456789abcde"})",
+				R"({"protocol":4,"id":38,"command":"stop","expectedRunIdentity":7})",
+				R"({"protocol":4,"id":39,"command":"stop","expectedRunIdentity":"0123456789abcdef0123456789abcdef","x":1})" })
+			{
+				context.Check(!ParseApplicationControlRequest(invalid).m_Request,
+					"Queries, malformed run identities and unknown fields reject the request");
+			}
+
+			context.Check(!CheckApplicationControlRunIdentity(*legacy.m_Request, "") &&
+				!CheckApplicationControlRunIdentity(*stop.m_Request, run),
+				"Unchecked requests and the matching run proceed");
+			const auto changed = Json::parse(*CheckApplicationControlRunIdentity(*stop.m_Request,
+				"ffffffffffffffffffffffffffffffff"));
+			context.Check(!changed["ok"] && changed["id"] == 32 && changed["errorCode"] == "ExpectedRunChanged" &&
+				changed["runIdentity"] == "ffffffffffffffffffffffffffffffff",
+				"A different run is rejected with a machine-readable code and the current run");
+			const auto unavailable = Json::parse(*CheckApplicationControlRunIdentity(*set.m_Request, ""));
+			context.Check(!unavailable["ok"] && unavailable["errorCode"] == "RunIdentityUnavailable",
+				"A session without a run identity rejects run-checked requests");
+
+			const auto status = Json::parse(SerializeApplicationControlStatus(40, {}));
+			const auto& commands = status["capabilities"]["runIdentityChecks"]["commands"];
+			context.Check(status["capabilities"]["runIdentityChecks"]["version"] == 1 && commands.size() == 11 &&
+				!AcceptsApplicationControlExpectedRun(ApplicationControlCommand::Status) &&
+				!AcceptsApplicationControlExpectedRun(ApplicationControlCommand::Parameters) &&
+				AcceptsApplicationControlExpectedRun(ApplicationControlCommand::Sequence),
+				"Run checks are advertised for every protected command");
+		}
 	}
 
 	void RunApplicationControlSelfTests(SelfTestContext& context) noexcept
@@ -891,6 +945,7 @@ namespace gglab
 		RunParameterControlTests(context);
 		RunDeferredParameterSerializationTests(context);
 		RunParseTests(context);
+		RunRunIdentityCheckTests(context);
 		RunSerializeTests(context);
 		RunCaptureJobOwnershipTests(context);
 		RunPipeServerTests(context);

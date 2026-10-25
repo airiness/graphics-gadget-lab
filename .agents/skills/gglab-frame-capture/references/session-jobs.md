@@ -70,6 +70,18 @@ already-consumed work. Polling counts as activity; stored receipts do not.
 Termination drains/cancels work and ends retention, leaving artifacts on disk.
 Transport failures still print one JSON error result and exit 1.
 
+### Run-checked requests
+
+A session name can be reused by a restarted process, whose job and batch ids may
+repeat. `start` reports the new process's `runIdentity`, and `status` reports it as
+`environment.process.runIdentity`. Pass `-ExpectedRunIdentity <id>` to make `set`,
+`parameter-result`, `capture`, `graph`, `export`, `watch`, `result`,
+`capture-cancel`, `sequence`, `sequence-cancel` and `stop` reach only that run. A
+different run answers `ok: false` with `errorCode: ExpectedRunChanged` and its own
+`runIdentity` before looking up any handle, so nothing is submitted, consumed,
+cancelled or stopped. Treat that as a lost session rather than retrying without the
+check. `status.capabilities.runIdentityChecks` lists the checked commands.
+
 ## Interpret results and artifacts
 
 Require `status: completed` and `publication: Published`, then validate the final
