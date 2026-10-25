@@ -17,8 +17,9 @@ namespace gglab
 {
 	RenderGraph::RenderGraph(const CreateInfo& createInfo) noexcept :
 		m_Device(createInfo.m_Device),
-		m_TransientResourcePool(createInfo.m_TransientResourcePool), m_ArenaAllocator(1u << 20),
-		m_Blackboard(m_ArenaAllocator)
+		m_TransientResourcePool(createInfo.m_TransientResourcePool),
+		m_ObjectArena(createInfo.m_ObjectArena),
+		m_Blackboard(m_ObjectArena)
 	{
 		GGLAB_ASSERT_MSG(m_Device != nullptr, "RHIDevice can not be null.");
 		GGLAB_ASSERT_MSG(

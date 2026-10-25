@@ -374,9 +374,9 @@ namespace gglab
 			finished = m_WorkerCount == 0 && m_RunningCount == 0 &&
 				m_PendingFinishPublicationCount == 0 &&
 				std::ranges::all_of(m_Tasks | std::views::values, [](const auto& task) noexcept
-				{
-					return task->m_FinishPhase == TaskRecord::FinishPhase::CompletionAvailable;
-				});
+					{
+						return task->m_FinishPhase == TaskRecord::FinishPhase::CompletionAvailable;
+					});
 			if (finished)
 			{
 				m_LifecycleState = LifecycleState::Stopped;

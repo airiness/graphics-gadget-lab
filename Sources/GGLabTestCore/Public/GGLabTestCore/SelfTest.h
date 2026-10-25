@@ -1,10 +1,24 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
+#include <string>
 #include <string_view>
 
 namespace gglab
 {
+	struct SelfTestChildResult
+	{
+		bool m_Completed = false;
+		uint32_t m_ExitCode = 0;
+		std::string m_Output;
+	};
+
+	// Runs this test executable only, with two restricted ASCII argument tokens.
+	// Owns/reaps the child with a 15-second watchdog; never invokes an external tool.
+	[[nodiscard]] SelfTestChildResult RunSelfTestChild(
+		std::string_view mode, std::string_view scenario) noexcept;
+
 	struct SelfTestSummary
 	{
 		size_t m_CheckCount = 0;

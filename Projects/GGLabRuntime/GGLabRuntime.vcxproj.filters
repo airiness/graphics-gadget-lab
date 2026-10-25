@@ -588,9 +588,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RenderGraph.cpp">
       <Filter>Private\Graphics\RenderGraph</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGArenaAllocator.cpp">
-      <Filter>Private\Graphics\RenderGraph</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGBarrierPlanner.cpp">
       <Filter>Private\Graphics\RenderGraph</Filter>
     </ClCompile>
@@ -604,6 +601,9 @@
       <Filter>Private\Graphics\RenderGraph</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGExecutor.cpp">
+      <Filter>Private\Graphics\RenderGraph</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGObjectArena.cpp">
       <Filter>Private\Graphics\RenderGraph</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderGraph\RGObservation.cpp">
@@ -2159,9 +2159,6 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RenderGraphTypes.h">
       <Filter>Public\GGLabRuntime\Graphics\RenderGraph</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RGArenaAllocator.h">
-      <Filter>Public\GGLabRuntime\Graphics\RenderGraph</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RGBlackboard.h">
       <Filter>Public\GGLabRuntime\Graphics\RenderGraph</Filter>
     </ClInclude>
@@ -2169,6 +2166,9 @@
       <Filter>Public\GGLabRuntime\Graphics\RenderGraph</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RGDeferredCommit.h">
+      <Filter>Public\GGLabRuntime\Graphics\RenderGraph</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RGObjectArena.h">
       <Filter>Public\GGLabRuntime\Graphics\RenderGraph</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderGraph\RGObservation.h">

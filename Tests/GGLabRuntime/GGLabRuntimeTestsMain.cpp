@@ -13,6 +13,7 @@
 #include "GGLabTestCore/SelfTest.h"
 #include "PublicationAccountingSelfTests.h"
 #include "RenderingContractSelfTests.h"
+#include "RGObjectArenaSelfTests.h"
 #include "ShaderArtifactRuntimeSelfTests.h"
 #if GGLAB_ENABLE_VULKAN
 #include "VulkanContractSelfTests.h"
@@ -123,6 +124,15 @@ namespace
 
 int main(int argumentCount, char* arguments[])
 {
+	if (argumentCount == 2 && std::string_view(arguments[1]) == "--rg-object-storage-benchmark")
+	{
+		gglab::RunRenderGraphObjectStorageBenchmark();
+		return 0;
+	}
+	if (argumentCount == 3 && std::string_view(arguments[1]) == "--rg-object-arena-child")
+	{
+		return gglab::RunRGObjectArenaChild(arguments[2]);
+	}
 	std::string_view selection = "all";
 	for (int index = 1; index < argumentCount; ++index)
 	{

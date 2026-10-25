@@ -2,6 +2,7 @@
 #include "GGLabRuntime/Graphics/IBLPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/IBLPreviewControlBase.h"
 #include "RenderingContractSelfTests.h"
+#include "RGObjectArenaSelfTests.h"
 #include "AssetTestServices.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/Asset/ModelTypes.h"
@@ -131,9 +132,11 @@
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <chrono>
 #include <concepts>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <filesystem>
 #include <exception>
 #include <initializer_list>
@@ -141,6 +144,7 @@
 #include <memory>
 #include <numbers>
 #include <ranges>
+#include <string>
 #include <thread>
 #include <type_traits>
 #include <utility>
@@ -13392,8 +13396,220 @@ namespace gglab
 		batch->Cancel();
 	}
 
+	void RunGraphObjectLifetimeTests(SelfTestContext& context) noexcept
+	{
+		struct Data
+		{
+			Data() = default;
+			GGLAB_DELETE_COPYABLE_MOVABLE(Data);
+			~Data() noexcept
+			{
+				if (m_Destroyed)
+				{
+					++*m_Destroyed;
+				}
+			}
+			Data* m_Self = this;
+			uint32_t* m_Destroyed = nullptr;
+			uint32_t m_Index = 0;
+			std::string m_Text = "Stable graph pass payload";
+			std::unique_ptr<uint32_t> m_Owner = std::make_unique<uint32_t>(42);
+			std::array<std::byte, 20u << 10> m_Padding{};
+		};
+		// No compile, failed compile, recorded/discarded and recorded/submitted scopes.
+		for (uint32_t mode = 0; mode < 4; ++mode)
+		{
+			RecordingDevice device;
+			device.m_PassConstantsEnabled = true;
+			TransientResourcePool pool(&device);
+			RecordingGraphicsCommandContext graphics;
+			RecordingComputeCommandContext commands;
+			uint32_t destroyed = 0;
+			uint32_t executed = 0;
+			uint32_t committed = 0;
+			bool stable = true;
+			{
+				RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool,
+					.m_ObjectArena = { .m_RegularBlockPayloadBytes = 512 } });
+				// These borrowers/commits must settle before the graph's payloads end.
+				RGDeferredCommitList commits;
+				RGExecuteContext execution(commits, { &graphics, &commands, nullptr });
+				RGBufferId buffer;
+				std::vector<Data*> addresses;
+				for (uint32_t index = 0; index < 64; ++index)
+				{
+					auto* pass = graph.AddPass<Data>("Arena.Live", RGPassEncoderType::Compute,
+						[&](RenderGraph::RGBuilder& builder, Data& data)
+						{
+							data.m_Index = index;
+							data.m_Destroyed = &destroyed;
+							if (index == 0)
+							{
+								buffer = builder.CreateBuffer("Arena.Buffer", { .m_SizeInBytes = 64 });
+								if (mode == 1)
+								{
+									builder.Read(buffer, RGBufferAccess::StorageRead);
+								}
+								else
+								{
+									builder.WriteInPlace(buffer, RGBufferAccess::StorageWrite);
+								}
+							}
+							else
+							{
+								builder.ReadWriteInPlace(buffer, RGBufferAccess::StorageReadWrite);
+							}
+							builder.SideEffect();
+						},
+						[&, owner = std::make_unique<uint32_t>(17)](RGExecuteContext& execute, Data& data)
+						{
+							stable = stable && data.m_Self == &data && data.m_Index == executed &&
+								data.m_Text == "Stable graph pass payload" && *data.m_Owner == 42 && *owner == 17;
+							++executed;
+							execute.DeferCommit([&committed](const RGCommitContext&) noexcept { ++committed; });
+						});
+					addresses.push_back(&pass->GetData());
+				}
+				graph.AddPass<Data>("Arena.Culled", RGPassEncoderType::Compute,
+					[&](RenderGraph::RGBuilder& builder, Data& data)
+					{
+						data.m_Destroyed = &destroyed;
+						GGLAB_UNUSED(builder.Write(builder.CreateBuffer("Arena.Dead", { .m_SizeInBytes = 64 }),
+							RGBufferAccess::StorageWrite));
+					},
+					[&](RGExecuteContext&, Data&) { stable = false; });
+				auto& blackboard = graph.GetBlackboard().Create<std::string>();
+				blackboard = "Stable blackboard payload";
+				const auto* blackboardAddress = &blackboard;
+				context.Check(graph.GetObjectArenaStatistics().m_ObjectBytes > (1u << 20),
+					"Real graph fixture exceeds the previous arena growth threshold");
+				if (mode != 0)
+				{
+					const bool compiled = graph.Compile();
+					context.Check(compiled == (mode != 1), "Arena lifetime fixture preserves compile success/failure");
+					if (compiled)
+					{
+						const auto originalPasses = graph.GetExecutionPlan()->GetPasses();
+						const auto* originalResource = graph.GetExecutionPlan()->GetResources()[0].m_Resource;
+						for (uint32_t index = 0; index < 128; ++index)
+						{
+							const std::string name = "Arena.Late." + std::to_string(index);
+							graph.GetBlackboard().Create<std::array<std::byte, 1024>>(name.c_str());
+						}
+						const auto target = graph.ResolveObservation({ .m_Resource = "Arena.Buffer" });
+						const auto dead = graph.ResolveObservation({ .m_Resource = "Arena.Dead" });
+						const auto readback = device.CreateBuffer({ .m_SizeInBytes = 64,
+							.m_Usage = RHIBufferUsage::CopyDest, .m_MemoryUsage = RHIMemoryUsage::GpuToCpu }, {});
+						const std::array copies{ RGObservationCopy{ .m_Target = target,
+							.m_Readback = readback, .m_ReadbackBytes = 64 } };
+						const bool attached = graph.AttachObservationCopies(copies);
+						bool originalPlanStable = attached && dead.m_Failure == RGObservationFailure::Culled &&
+							graph.GetExecutionPlan()->GetResources()[0].m_Resource == originalResource;
+						for (size_t index = 0; index < originalPasses.size(); ++index)
+						{
+							const auto& before = originalPasses[index];
+							const auto& after = graph.GetExecutionPlan()->GetPasses()[index];
+							originalPlanStable = originalPlanStable && before.m_Executor == after.m_Executor &&
+								before.m_Culled == after.m_Culled && before.m_ExecutionOrder == after.m_ExecutionOrder &&
+								before.m_PreBarriers.size() == after.m_PreBarriers.size();
+							for (size_t barrier = 0; barrier < before.m_PreBarriers.size(); ++barrier)
+							{
+								if (barrier >= after.m_PreBarriers.size())
+								{
+									break;
+								}
+								const auto& original = before.m_PreBarriers[barrier];
+								const auto& retained = after.m_PreBarriers[barrier];
+								originalPlanStable = originalPlanStable && original.m_Resource == retained.m_Resource &&
+									original.m_Kind == retained.m_Kind && original.m_Reason == retained.m_Reason &&
+									original.m_Before == retained.m_Before && original.m_After == retained.m_After &&
+									original.m_Subresources == retained.m_Subresources;
+							}
+						}
+						context.Check(originalPlanStable,
+							"Late allocations and observation attachment preserve original compiled borrows and liveness");
+						graph.Execute(execution);
+						commits.Seal();
+						if (mode == 3)
+						{
+							const RHIFencePoint fence{ RHIFenceHandle{ 1, 1 }, 1 };
+							commits.CommitAll({ .m_FrameSerial = 1, .m_Fence = fence });
+							graph.Retire(fence);
+						}
+						else
+						{
+							commits.Discard();
+							graph.Retire({});
+						}
+						context.Check(executed == 64 && committed == (mode == 3 ? 64u : 0u) && destroyed == 0,
+							"Execution, culling, transient release and commit/discard settlement keep CPU payloads alive");
+						device.DestroyBuffer(readback);
+					}
+				}
+				for (uint32_t index = 0; index < addresses.size(); ++index)
+				{
+					stable = stable && addresses[index]->m_Self == addresses[index] &&
+						addresses[index]->m_Index == index;
+				}
+				context.Check(stable && &graph.GetBlackboard().Get<std::string>() == blackboardAddress &&
+					blackboard == "Stable blackboard payload" && destroyed == 0,
+					"Pass and blackboard addresses survive graph processing until graph destruction");
+			}
+			context.Check(destroyed == 65, "Early exit and settlement destroy live and culled pass data exactly once");
+			pool.Tick();
+		}
+	}
+
+	void RunRenderGraphObjectStorageBenchmark() noexcept
+	{
+		struct Data
+		{
+			std::array<std::byte, 128> m_Bytes{};
+			std::string m_Text = "Graph-owned non-trivial benchmark payload";
+			std::vector<uint32_t> m_Values{ 1, 2, 3, 4 };
+		};
+		RecordingDevice device;
+		TransientResourcePool pool(&device);
+		for (const uint32_t passCount : { 32u, 2048u })
+		{
+			const uint32_t iterations = passCount == 32 ? 1000 : 100;
+			double buildMicroseconds = 0;
+			double destroyMicroseconds = 0;
+			RGObjectArena::Statistics statistics;
+			for (uint32_t iteration = 0; iteration < iterations; ++iteration)
+			{
+				const auto begin = std::chrono::steady_clock::now();
+				auto graph = std::make_unique<RenderGraph>(RenderGraph::CreateInfo{
+					.m_Device = &device, .m_TransientResourcePool = &pool });
+				graph->GetBlackboard().Create<std::string>() = "benchmark";
+				for (uint32_t index = 0; index < passCount; ++index)
+				{
+					auto execute = [](RGExecuteContext&, Data&) noexcept {};
+					graph->AddPass<Data>("ArenaBenchmark.Pass", RGPassEncoderType::Compute,
+						[](RenderGraph::RGBuilder& builder, Data&) { builder.SideEffect(); },
+						decltype(execute){});
+				}
+				const auto built = std::chrono::steady_clock::now();
+				statistics = graph->GetObjectArenaStatistics();
+				graph.reset();
+				const auto destroyed = std::chrono::steady_clock::now();
+				buildMicroseconds += std::chrono::duration<double, std::micro>(built - begin).count();
+				destroyMicroseconds += std::chrono::duration<double, std::micro>(destroyed - built).count();
+			}
+			std::printf("rg-object-storage passes=%u iterations=%u build-us=%.3f destroy-us=%.3f "
+				"object-bytes=%zu record-bytes=%zu payload-used=%zu payload-reserved=%zu "
+				"block-overhead=%zu regular-blocks=%zu dedicated-blocks=%zu\n",
+				passCount, iterations, buildMicroseconds / iterations, destroyMicroseconds / iterations,
+				statistics.m_ObjectBytes, statistics.m_DestructorRecordBytes, statistics.m_UsedPayloadBytes,
+				statistics.m_ReservedPayloadBytes, statistics.m_BlockOverheadBytes,
+				statistics.m_RegularBlockCount, statistics.m_DedicatedBlockCount);
+		}
+	}
+
 	void RunRenderingContractSelfTests(SelfTestContext& context) noexcept
 	{
+		RunRGObjectArenaSelfTests(context);
+		RunGraphObjectLifetimeTests(context);
 		RunMaterialDiagnosticPrewarmTests(context);
 		RunMaterialBaselineContractTests(context);
 		RunMaterialFrameCacheContractTests(context);

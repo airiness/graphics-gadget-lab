@@ -2,12 +2,12 @@
 
 namespace gglab
 {
-	RGBlackboard::RGBlackboard(RGArenaAllocator& arenaAllocator) noexcept :
-		m_ArenaAllocator(arenaAllocator)
+	RGBlackboard::RGBlackboard(RGObjectArena& objectArena) noexcept :
+		m_ObjectArena(objectArena)
 	{
 	}
 
-	void RGBlackboard::Reset() noexcept
+	void RGBlackboard::ClearIndex() noexcept
 	{
 		m_Container.clear();
 	}

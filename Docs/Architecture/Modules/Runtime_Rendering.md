@@ -109,13 +109,21 @@ Atlas ID: atlas.runtime.graph-execution
   Imported resources take part in ordering and barriers from their declared initial
   access, and an export sets their final access.
 - **Public interface:** [RenderGraph.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderGraph/RenderGraph.h)
+  with [RGObjectArena.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderGraph/RGObjectArena.h)
   and [RGDeferredCommit.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderGraph/RGDeferredCommit.h).
 - **Implementation:** [RenderGraph](../../../Sources/GGLabRuntime/Private/Graphics/RenderGraph/RenderGraph.cpp),
   [RGExecutor](../../../Sources/GGLabRuntime/Private/Graphics/RenderGraph/RGExecutor.cpp)
+  with [object storage](../../../Sources/GGLabRuntime/Private/Graphics/RenderGraph/RGObjectArena.cpp)
   and the [commit list](../../../Sources/GGLabRuntime/Private/Graphics/RenderGraph/RGDeferredCommit.cpp).
 - **Lifetime:** execution borrows the command contexts, the transient pool and the
   caller-owned commit list. Culled passes enqueue nothing. Renderer settles the list
   it supplies for the active frame.
+  Graph-owned CPU objects retain their addresses until graph destruction, including
+  after compilation, culling, observation attachment, execution and retirement.
+  Declaration containers, plans and the blackboard index end before the arena runs
+  payload destructors in reverse completed-construction order. Payload destructors
+  cannot reenter the graph. Keep the graph alive through frame abort and settlement;
+  asynchronous consumers and GPU owners require their own completion-based lifetime.
 - **Boundary:** graph ownership rules are in
   [AGENTS.md](../../../AGENTS.md#gpu-shader-and-lab-invariants);
   [frame settlement](../Frame_Execution_Map.md#frame-settlement) decides when CPU
@@ -132,6 +140,9 @@ Anchors:
 ReviewPaths:
   - Sources/GGLabRuntime/Private/Graphics/RenderGraph/RGExecutor.cpp
   - Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderGraph/RenderGraph.h
+  - Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderGraph/RGObjectArena.h
+  - Sources/GGLabRuntime/Private/Graphics/RenderGraph/RGObjectArena.cpp
+  - Tests/GGLabRuntime/RGObjectArenaSelfTests.cpp
   - Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderGraph/RGDeferredCommit.h
 ```
 
