@@ -88,6 +88,9 @@
     <Filter Include="Shaders\Tests">
       <UniqueIdentifier>{EEA089C0-E071-EA3C-EFDF-59DAECA485F6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Tests">
+      <UniqueIdentifier>{D2C3FB13-E9DD-07ED-C49C-AAA852E23C78}</UniqueIdentifier>
+    </Filter>
     <Filter Include="ThirdParty">
       <UniqueIdentifier>{171B5147-9F2B-A638-FB02-84BF202F994B}</UniqueIdentifier>
     </Filter>
@@ -285,64 +288,7 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\RenderingStartup.cpp">
       <Filter>Application</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationContentRegistrationSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationControlSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationFrameCaptureSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationHostConfigurationSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationInputSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationLifecycleSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\DevelopGuiVulkanPresentationContractSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\DevelopmentShaderBuildProcessClientSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\DevelopmentShaderHotReloadSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\DevToolsViewProfileSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\FrameCaptureImageEncoderSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\LaunchOptionsSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelCommandSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelGGLabAdapterSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelPublicationSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelRaycastEditSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\SelfTestRunner.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\TemporalAALabDiagnosticsSelfTests.cpp">
-      <Filter>Application\SelfTest</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\TemporalAALabGpuTimingSelfTests.cpp">
       <Filter>Application\SelfTest</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.cpp">
@@ -479,6 +425,66 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinApp\DevTools\DevToolsRuntime.cpp">
       <Filter>DevTools</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\WinApp\ApplicationContentRegistrationSelfTests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\WinApp\ApplicationControlSelfTests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\WinApp\ApplicationFrameCaptureSelfTests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\WinApp\ApplicationHostConfigurationSelfTests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\WinApp\ApplicationInputSelfTests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\WinApp\ApplicationLifecycleSelfTests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\WinApp\DevelopGuiVulkanPresentationContractSelfTests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\WinApp\DevelopmentShaderBuildProcessClientSelfTests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\WinApp\DevelopmentShaderHotReloadSelfTests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\WinApp\DevToolsViewProfileSelfTests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\WinApp\FrameCaptureImageEncoderSelfTests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\WinApp\LaunchOptionsSelfTests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\WinApp\NapaVoxelCommandSelfTests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\WinApp\NapaVoxelGGLabAdapterSelfTests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\WinApp\NapaVoxelPublicationSelfTests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\WinApp\NapaVoxelRaycastEditSelfTests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\WinApp\NapaVoxelSelfTests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\WinApp\RuntimePathSelfTests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\WinApp\TemporalAALabDiagnosticsSelfTests.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Tests\WinApp\TemporalAALabGpuTimingSelfTests.cpp">
+      <Filter>Tests</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -680,55 +686,7 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\RenderingStartup.h">
       <Filter>Application</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationContentRegistrationSelfTests.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationControlSelfTests.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationFrameCaptureSelfTests.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationHostConfigurationSelfTests.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationInputSelfTests.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationLifecycleSelfTests.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\DevelopGuiVulkanPresentationContractSelfTests.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\DevelopmentShaderBuildProcessClientSelfTests.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\DevelopmentShaderHotReloadSelfTests.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\DevToolsViewProfileSelfTests.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\FrameCaptureImageEncoderSelfTests.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\LaunchOptionsSelfTests.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelSelfTestCases.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelSelfTests.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\SelfTestRunner.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\TemporalAALabDiagnosticsSelfTests.h">
-      <Filter>Application\SelfTest</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\TemporalAALabGpuTimingSelfTests.h">
       <Filter>Application\SelfTest</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.h">
@@ -907,6 +865,57 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinApp\DevTools\RHIText.h">
       <Filter>DevTools</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Tests\WinApp\ApplicationContentRegistrationSelfTests.h">
+      <Filter>Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Tests\WinApp\ApplicationControlSelfTests.h">
+      <Filter>Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Tests\WinApp\ApplicationFrameCaptureSelfTests.h">
+      <Filter>Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Tests\WinApp\ApplicationHostConfigurationSelfTests.h">
+      <Filter>Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Tests\WinApp\ApplicationInputSelfTests.h">
+      <Filter>Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Tests\WinApp\ApplicationLifecycleSelfTests.h">
+      <Filter>Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Tests\WinApp\DevelopGuiVulkanPresentationContractSelfTests.h">
+      <Filter>Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Tests\WinApp\DevelopmentShaderBuildProcessClientSelfTests.h">
+      <Filter>Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Tests\WinApp\DevelopmentShaderHotReloadSelfTests.h">
+      <Filter>Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Tests\WinApp\DevToolsViewProfileSelfTests.h">
+      <Filter>Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Tests\WinApp\FrameCaptureImageEncoderSelfTests.h">
+      <Filter>Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Tests\WinApp\LaunchOptionsSelfTests.h">
+      <Filter>Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Tests\WinApp\NapaVoxelSelfTestCases.h">
+      <Filter>Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Tests\WinApp\NapaVoxelSelfTests.h">
+      <Filter>Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Tests\WinApp\RuntimePathSelfTests.h">
+      <Filter>Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Tests\WinApp\TemporalAALabDiagnosticsSelfTests.h">
+      <Filter>Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Tests\WinApp\TemporalAALabGpuTimingSelfTests.h">
+      <Filter>Tests</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

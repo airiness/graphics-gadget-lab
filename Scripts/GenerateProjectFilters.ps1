@@ -320,6 +320,7 @@ $projectSpecifications = @(
         IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
         Mappings = @(
             [pscustomobject]@{ Root = "Sources\WinApp"; FilterPrefix = "" }
+            [pscustomobject]@{ Root = "Tests\WinApp"; FilterPrefix = "Tests" }
             [pscustomobject]@{ Root = "Shaders"; FilterPrefix = "Shaders" }
             [pscustomobject]@{ Root = "Externals\Vender\imgui"; FilterPrefix = "ThirdParty\ImGui" }
             [pscustomobject]@{ Root = "Projects\WinApp\packages.config"; FilterPrefix = "" }

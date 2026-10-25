@@ -1,4 +1,4 @@
-#include "Application/SelfTest/TemporalAALabGpuTimingSelfTests.h"
+#include "TemporalAALabGpuTimingSelfTests.h"
 
 #include "Application/Lab/Sessions/TemporalAALabGpuTiming.h"
 #include "GGLabFoundation/Base/CoreMacros.h"

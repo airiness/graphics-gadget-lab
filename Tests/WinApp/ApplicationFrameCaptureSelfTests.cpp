@@ -1,4 +1,4 @@
-#include "Application/SelfTest/ApplicationFrameCaptureSelfTests.h"
+#include "ApplicationFrameCaptureSelfTests.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Application/Capture/ApplicationFrameCapture.h"
 #include "Application/Capture/CaptureOnReady.h"

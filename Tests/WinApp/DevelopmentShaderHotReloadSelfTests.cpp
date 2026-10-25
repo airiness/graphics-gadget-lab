@@ -1,4 +1,4 @@
-#include "Application/SelfTest/DevelopmentShaderHotReloadSelfTests.h"
+#include "DevelopmentShaderHotReloadSelfTests.h"
 #include "Application/Shader/DevelopmentShaderBuildBridge.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabFoundation/Task/TaskSystem.h"

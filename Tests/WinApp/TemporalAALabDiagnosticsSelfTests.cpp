@@ -1,4 +1,4 @@
-#include "Application/SelfTest/TemporalAALabDiagnosticsSelfTests.h"
+#include "TemporalAALabDiagnosticsSelfTests.h"
 
 #include "Application/Lab/Sessions/TemporalAALabDiagnostics.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"

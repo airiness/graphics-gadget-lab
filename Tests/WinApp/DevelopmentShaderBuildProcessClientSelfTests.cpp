@@ -1,4 +1,4 @@
-#include "Application/SelfTest/DevelopmentShaderBuildProcessClientSelfTests.h"
+#include "DevelopmentShaderBuildProcessClientSelfTests.h"
 #include "Application/Shader/DevelopmentShaderBuildProcessClient.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 #include "ShaderArtifactRuntime/ShaderCompilerProcessContract.h"

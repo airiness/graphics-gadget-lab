@@ -1,4 +1,4 @@
-#include "Application/SelfTest/ApplicationHostConfigurationSelfTests.h"
+#include "ApplicationHostConfigurationSelfTests.h"
 
 #include "Application/ApplicationHostConfiguration.h"
 #include "GGLabFoundation/IO/PathUtils.h"

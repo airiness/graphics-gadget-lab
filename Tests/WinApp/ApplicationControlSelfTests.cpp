@@ -1,4 +1,4 @@
-#include "Application/SelfTest/ApplicationControlSelfTests.h"
+#include "ApplicationControlSelfTests.h"
 
 #include "Application/Control/ApplicationControlCaptureJobs.h"
 #include "Application/Control/ApplicationControlProtocol.h"

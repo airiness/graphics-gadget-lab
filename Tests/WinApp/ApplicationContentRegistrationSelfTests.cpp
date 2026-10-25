@@ -1,4 +1,4 @@
-#include "Application/SelfTest/ApplicationContentRegistrationSelfTests.h"
+#include "ApplicationContentRegistrationSelfTests.h"
 #include "Application/SelfTest/SelfTestRunner.h"
 #include "Application/Content/DesktopApplicationContent.h"
 #include "Application/Content/RuntimeAssetBundle.h"

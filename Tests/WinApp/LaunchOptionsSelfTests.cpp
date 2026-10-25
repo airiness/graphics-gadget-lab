@@ -1,4 +1,4 @@
-#include "Application/SelfTest/LaunchOptionsSelfTests.h"
+#include "LaunchOptionsSelfTests.h"
 
 #include "Application/ApplicationLaunchOptions.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"

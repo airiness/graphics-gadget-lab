@@ -1,4 +1,4 @@
-#include "Application/SelfTest/FrameCaptureImageEncoderSelfTests.h"
+#include "FrameCaptureImageEncoderSelfTests.h"
 
 #include "Application/Platform/Windows/Win32FrameCaptureImageEncoder.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"

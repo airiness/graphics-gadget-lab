@@ -1,4 +1,4 @@
-#include "Application/SelfTest/DevelopGuiVulkanPresentationContractSelfTests.h"
+#include "DevelopGuiVulkanPresentationContractSelfTests.h"
 
 #include "DevTools/DevelopGui/Backends/Vulkan/DevelopGuiVulkanRenderBackend.h"
 

@@ -20,7 +20,7 @@ The source roots below locate those items.
 
 | Project | Source roots | Role |
 | --- | --- | --- |
-| [WinApp](../../Projects/WinApp/WinApp.vcxproj) | [Sources/WinApp](../../Sources/WinApp) | Windows startup and hosts, concrete Labs, DevTools and their self-tests |
+| [WinApp](../../Projects/WinApp/WinApp.vcxproj) | [Sources/WinApp](../../Sources/WinApp), [Tests/WinApp](../../Tests/WinApp) | Windows startup and hosts, concrete Labs, DevTools and SelfTest dispatch |
 | [GGLabAppRuntime](../../Projects/GGLabAppRuntime/GGLabAppRuntime.vcxproj) | [Sources/GGLabAppRuntime](../../Sources/GGLabAppRuntime) | Host-neutral lifecycle, services, frames and content coordination |
 | [GGLabRuntime](../../Projects/GGLabRuntime/GGLabRuntime.vcxproj) | [Sources/GGLabRuntime](../../Sources/GGLabRuntime) | Reusable scene, rendering, RenderGraph, RHI and diagnostics library |
 | [GGLabFoundation](../../Projects/GGLabFoundation/GGLabFoundation.vcxproj) | [Sources/GGLabFoundation](../../Sources/GGLabFoundation) | Tier-0 facilities |
@@ -40,6 +40,10 @@ The source roots below locate those items.
 `GGLabFoundationHeaderSelfContainment.targets` generates the Foundation probes
 inside that test project's intermediate directory. Vendored DirectXTex is a
 separate solution project under `Externals/Vender`, outside this first-party set.
+
+`Sources/WinApp/Application/SelfTest` contains selection, dispatch and reporting.
+Concrete cases and fixtures belong in `Tests/WinApp`. WinApp compiles them and
+exposes them through `--self-test`.
 
 ## Declared project references
 

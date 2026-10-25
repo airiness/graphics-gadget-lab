@@ -1,4 +1,4 @@
-#include "Application/SelfTest/DevToolsViewProfileSelfTests.h"
+#include "DevToolsViewProfileSelfTests.h"
 
 #include "DevTools/DevToolsRuntime.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"

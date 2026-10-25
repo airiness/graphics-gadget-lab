@@ -1,5 +1,5 @@
-#include "Application/SelfTest/NapaVoxelSelfTests.h"
-#include "Application/SelfTest/NapaVoxelSelfTestCases.h"
+#include "NapaVoxelSelfTests.h"
+#include "NapaVoxelSelfTestCases.h"
 
 namespace gglab
 {

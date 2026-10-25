@@ -114,7 +114,7 @@
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;BUILD_DEBUG;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;$(GGLabArtifactOnlyDefine)%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(GGLabRepositoryRoot)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\WinApp;$(GGLabRepositoryRoot)Sources\GGLabAppRuntime;$(GGLabRepositoryRoot)Sources\GGLabRuntime\Public;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Sources\NapaVoxelCore\Public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Tests\WinApp;$(GGLabRepositoryRoot)Sources\WinApp;$(GGLabRepositoryRoot)Sources\GGLabAppRuntime;$(GGLabRepositoryRoot)Sources\GGLabRuntime\Public;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Sources\NapaVoxelCore\Public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -127,7 +127,7 @@
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;$(GGLabArtifactOnlyDefine)%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(GGLabRepositoryRoot)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\WinApp;$(GGLabRepositoryRoot)Sources\GGLabAppRuntime;$(GGLabRepositoryRoot)Sources\GGLabRuntime\Public;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Sources\NapaVoxelCore\Public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Tests\WinApp;$(GGLabRepositoryRoot)Sources\WinApp;$(GGLabRepositoryRoot)Sources\GGLabAppRuntime;$(GGLabRepositoryRoot)Sources\GGLabRuntime\Public;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Sources\NapaVoxelCore\Public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -142,7 +142,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;BUILD_RELEASE;_CONSOLE;GGLAB_ENABLE_STRING_ID_REGISTRY;$(GGLabArtifactOnlyDefine)%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/DSOLUTION_DIR=L\"$([System.String]::Copy('$(GGLabRepositoryRoot)').Replace('\','\\'))\" %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Sources\WinApp;$(GGLabRepositoryRoot)Sources\GGLabAppRuntime;$(GGLabRepositoryRoot)Sources\GGLabRuntime\Public;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Sources\NapaVoxelCore\Public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(GGLabRepositoryRoot)Tests\WinApp;$(GGLabRepositoryRoot)Sources\WinApp;$(GGLabRepositoryRoot)Sources\GGLabAppRuntime;$(GGLabRepositoryRoot)Sources\GGLabRuntime\Public;$(GGLabRepositoryRoot)Sources\ShaderArtifactRuntime\Public;$(GGLabRepositoryRoot)Sources\GGLabFoundation\Public;$(GGLabRepositoryRoot)Sources\GGLabTestCore\Public;$(GGLabRepositoryRoot)Sources\NapaVoxelCore\Public;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -225,25 +225,26 @@
     <ClCompile Include="..\..\Sources\WinApp\Application\RenderingStartup.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildProcessClient.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationHostConfigurationSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationControlSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\FrameCaptureImageEncoderSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationFrameCaptureSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationContentRegistrationSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationInputSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationLifecycleSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\DevelopGuiVulkanPresentationContractSelfTests.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\DevToolsViewProfileSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\TemporalAALabDiagnosticsSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\TemporalAALabGpuTimingSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\DevelopmentShaderBuildProcessClientSelfTests.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\DevelopmentShaderHotReloadSelfTests.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelCommandSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelGGLabAdapterSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\LaunchOptionsSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelPublicationSelfTests.cpp" />
-    <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelRaycastEditSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\ApplicationHostConfigurationSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\ApplicationControlSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\FrameCaptureImageEncoderSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\ApplicationFrameCaptureSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\ApplicationContentRegistrationSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\ApplicationInputSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\ApplicationLifecycleSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\DevelopGuiVulkanPresentationContractSelfTests.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Tests\WinApp\DevToolsViewProfileSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\TemporalAALabDiagnosticsSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\TemporalAALabGpuTimingSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\DevelopmentShaderBuildProcessClientSelfTests.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
+    <ClCompile Include="..\..\Tests\WinApp\DevelopmentShaderHotReloadSelfTests.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
+    <ClCompile Include="..\..\Tests\WinApp\NapaVoxelCommandSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\NapaVoxelSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\NapaVoxelGGLabAdapterSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\LaunchOptionsSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\NapaVoxelPublicationSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\NapaVoxelRaycastEditSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\RuntimePathSelfTests.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\SelfTest\SelfTestRunner.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32PlatformHost.cpp" />
     <ClCompile Include="..\..\Sources\WinApp\Application\Platform\Windows\Win32Window.cpp" />
@@ -355,22 +356,23 @@
     <ClInclude Include="..\..\Sources\WinApp\Application\RenderingStartup.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildBridge.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Shader\DevelopmentShaderBuildProcessClient.h" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationHostConfigurationSelfTests.h" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationControlSelfTests.h" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\FrameCaptureImageEncoderSelfTests.h" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationFrameCaptureSelfTests.h" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationContentRegistrationSelfTests.h" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationInputSelfTests.h" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\ApplicationLifecycleSelfTests.h" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\DevelopGuiVulkanPresentationContractSelfTests.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\DevToolsViewProfileSelfTests.h" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\TemporalAALabDiagnosticsSelfTests.h" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\TemporalAALabGpuTimingSelfTests.h" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\DevelopmentShaderBuildProcessClientSelfTests.h" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\DevelopmentShaderHotReloadSelfTests.h" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelSelfTestCases.h" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\NapaVoxelSelfTests.h" />
-    <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\LaunchOptionsSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\ApplicationHostConfigurationSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\ApplicationControlSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\FrameCaptureImageEncoderSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\ApplicationFrameCaptureSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\ApplicationContentRegistrationSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\ApplicationInputSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\ApplicationLifecycleSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\DevelopGuiVulkanPresentationContractSelfTests.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Tests\WinApp\DevToolsViewProfileSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\TemporalAALabDiagnosticsSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\TemporalAALabGpuTimingSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\DevelopmentShaderBuildProcessClientSelfTests.h" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
+    <ClInclude Include="..\..\Tests\WinApp\DevelopmentShaderHotReloadSelfTests.h" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
+    <ClInclude Include="..\..\Tests\WinApp\NapaVoxelSelfTestCases.h" />
+    <ClInclude Include="..\..\Tests\WinApp\NapaVoxelSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\LaunchOptionsSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\RuntimePathSelfTests.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\SelfTest\SelfTestRunner.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\PlatformHost.h" />
     <ClInclude Include="..\..\Sources\WinApp\Application\Platform\PlatformWindow.h" />

@@ -1,4 +1,4 @@
-#include "Application/SelfTest/ApplicationLifecycleSelfTests.h"
+#include "ApplicationLifecycleSelfTests.h"
 
 #include "Application/Application.h"
 #include "Application/Content/DesktopApplicationContent.h"

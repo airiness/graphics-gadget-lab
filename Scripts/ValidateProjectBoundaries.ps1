@@ -12,7 +12,7 @@ param(
 #                   Vulkan qualification owns the explicit privileged Runtime /
 #                   Shader Toolchain dependency closure.
 #   Source ownership - every first-party source item must live below its owning
-#                      project's source root, and every physical source file must
+#                      project's source roots, and every physical source file must
 #                      belong to exactly one owning project.
 #   Include visibility - Foundation and NapaVoxelCore see only their owned
 #                        Public/Private roots, while ordinary consumers receive
@@ -59,6 +59,7 @@ $root = Get-RepoRoot $RootDir
 $repositorySourcesDir = Join-Path $root "Sources"
 $repositoryTestsDir = Join-Path $root "Tests"
 $winAppSourcesDir = Join-Path $root "Sources/WinApp"
+$winAppTestsDir = Join-Path $root "Tests/WinApp"
 $vulkanQualificationSourcesDir = Join-Path $root "Sources/GGLabVulkanQualification"
 $appRuntimeSourcesDir = Join-Path $root "Sources/GGLabAppRuntime"
 $appRuntimeTestsDir = Join-Path $root "Tests/GGLabAppRuntime"
@@ -2088,91 +2089,93 @@ $firstPartySourceExtensions = @(".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp"
 $publicHeaderExtensions = @(".h", ".hh", ".hpp", ".hxx", ".inl", ".ixx")
 $ownershipSpecifications = @(
     [pscustomobject]@{
-        Name       = "WinApp"
-        SourceRoot = $winAppSourcesDir
-        ItemPaths  = $winAppSourceItems
+        Name        = "WinApp"
+        SourceRoots = @($winAppSourcesDir, $winAppTestsDir)
+        ItemPaths   = $winAppSourceItems
     }
     [pscustomobject]@{
-        Name       = "GGLabVulkanQualification"
-        SourceRoot = $vulkanQualificationSourcesDir
-        ItemPaths  = $vulkanQualificationSourceItems
+        Name        = "GGLabVulkanQualification"
+        SourceRoots = $vulkanQualificationSourcesDir
+        ItemPaths   = $vulkanQualificationSourceItems
     }
     [pscustomobject]@{
-        Name       = "GGLabAppRuntime"
-        SourceRoot = $appRuntimeSourcesDir
-        ItemPaths  = $appRuntimeSourceItems
+        Name        = "GGLabAppRuntime"
+        SourceRoots = $appRuntimeSourcesDir
+        ItemPaths   = $appRuntimeSourceItems
     }
     [pscustomobject]@{
-        Name       = "GGLabAppRuntimeTests"
-        SourceRoot = $appRuntimeTestsDir
-        ItemPaths  = $appRuntimeTestsSourceItems
+        Name        = "GGLabAppRuntimeTests"
+        SourceRoots = $appRuntimeTestsDir
+        ItemPaths   = $appRuntimeTestsSourceItems
     }
     [pscustomobject]@{
-        Name       = "GGLabFoundation"
-        SourceRoot = $foundationSourcesDir
-        ItemPaths  = $foundationSourceItems
+        Name        = "GGLabFoundation"
+        SourceRoots = $foundationSourcesDir
+        ItemPaths   = $foundationSourceItems
     }
     [pscustomobject]@{
-        Name       = "GGLabFoundationTests"
-        SourceRoot = $foundationTestsDir
-        ItemPaths  = $foundationTestsSourceItems
+        Name        = "GGLabFoundationTests"
+        SourceRoots = $foundationTestsDir
+        ItemPaths   = $foundationTestsSourceItems
     }
     [pscustomobject]@{
-        Name       = "GGLabRuntime"
-        SourceRoot = $runtimeSourcesDir
-        ItemPaths  = $runtimeSourceItems
+        Name        = "GGLabRuntime"
+        SourceRoots = $runtimeSourcesDir
+        ItemPaths   = $runtimeSourceItems
     }
     [pscustomobject]@{
-        Name       = "ShaderArtifactRuntime"
-        SourceRoot = $shaderArtifactRuntimeSourcesDir
-        ItemPaths  = $shaderArtifactRuntimeSourceItems
+        Name        = "ShaderArtifactRuntime"
+        SourceRoots = $shaderArtifactRuntimeSourcesDir
+        ItemPaths   = $shaderArtifactRuntimeSourceItems
     }
     [pscustomobject]@{
-        Name       = "ShaderToolchainCore"
-        SourceRoot = $shaderToolchainSourcesDir
-        ItemPaths  = $shaderToolchainSourceItems
+        Name        = "ShaderToolchainCore"
+        SourceRoots = $shaderToolchainSourcesDir
+        ItemPaths   = $shaderToolchainSourceItems
     }
     [pscustomobject]@{
-        Name       = "ShaderCompiler"
-        SourceRoot = $shaderCompilerSourcesDir
-        ItemPaths  = $shaderCompilerSourceItems
+        Name        = "ShaderCompiler"
+        SourceRoots = $shaderCompilerSourcesDir
+        ItemPaths   = $shaderCompilerSourceItems
     }
     [pscustomobject]@{
-        Name       = "NapaVoxelCore"
-        SourceRoot = $napaSourcesDir
-        ItemPaths  = $napaSourceItems
+        Name        = "NapaVoxelCore"
+        SourceRoots = $napaSourcesDir
+        ItemPaths   = $napaSourceItems
     }
     [pscustomobject]@{
-        Name       = "GGLabTestCore"
-        SourceRoot = $testCoreSourcesDir
-        ItemPaths  = $testCoreSourceItems
+        Name        = "GGLabTestCore"
+        SourceRoots = $testCoreSourcesDir
+        ItemPaths   = $testCoreSourceItems
     }
     [pscustomobject]@{
-        Name       = "GGLabRuntimeTests"
-        SourceRoot = $runtimeTestsDir
-        ItemPaths  = $runtimeTestsSourceItems
+        Name        = "GGLabRuntimeTests"
+        SourceRoots = $runtimeTestsDir
+        ItemPaths   = $runtimeTestsSourceItems
     }
     [pscustomobject]@{
-        Name       = "ShaderToolchainTests"
-        SourceRoot = $shaderToolchainTestsDir
-        ItemPaths  = $shaderToolchainTestsSourceItems
+        Name        = "ShaderToolchainTests"
+        SourceRoots = $shaderToolchainTestsDir
+        ItemPaths   = $shaderToolchainTestsSourceItems
     }
     [pscustomobject]@{
-        Name       = "ShaderRuntimeIntegrationTests"
-        SourceRoot = $shaderRuntimeIntegrationTestsDir
-        ItemPaths  = $shaderRuntimeIntegrationTestsSourceItems
+        Name        = "ShaderRuntimeIntegrationTests"
+        SourceRoots = $shaderRuntimeIntegrationTestsDir
+        ItemPaths   = $shaderRuntimeIntegrationTestsSourceItems
     }
     [pscustomobject]@{
-        Name       = "NapaVoxelCoreTests"
-        SourceRoot = $napaTestsDir
-        ItemPaths  = $napaTestsSourceItems
+        Name        = "NapaVoxelCoreTests"
+        SourceRoots = $napaTestsDir
+        ItemPaths   = $napaTestsSourceItems
     }
 )
 
 $firstPartyMemberships = @{}
 foreach ($specification in $ownershipSpecifications) {
-    if (-not (Test-Path -LiteralPath $specification.SourceRoot -PathType Container)) {
-        throw "$($specification.Name) source root not found: $($specification.SourceRoot)"
+    foreach ($sourceRoot in $specification.SourceRoots) {
+        if (-not (Test-Path -LiteralPath $sourceRoot -PathType Container)) {
+            throw "$($specification.Name) source root not found: $sourceRoot"
+        }
     }
 
     $projectItemPathSet = New-Object 'System.Collections.Generic.HashSet[string]' `
@@ -2186,13 +2189,17 @@ foreach ($specification in $ownershipSpecifications) {
             continue
         }
 
-        $itemUnderOwnerRoot = Test-IsPathUnderRoot $itemPath $specification.SourceRoot
+        $itemUnderOwnerRoot = @($specification.SourceRoots | Where-Object {
+                Test-IsPathUnderRoot $itemPath $_
+            }).Count -gt 0
         if (-not $itemUnderOwnerRoot) {
             $projectContractFindings.Add([pscustomobject]@{
                 Rule   = "source-ownership"
                 Target = ConvertTo-RepoRelativePath $itemPath
                 Reason = "$($specification.Name) project item is outside " +
-                    (ConvertTo-RepoRelativePath $specification.SourceRoot)
+                    (($specification.SourceRoots | ForEach-Object {
+                            ConvertTo-RepoRelativePath $_
+                        }) -join ", ")
             })
         }
 
@@ -2203,7 +2210,7 @@ foreach ($specification in $ownershipSpecifications) {
     }
 
     $physicalOwnerFiles = @(
-        Get-ChildItem -LiteralPath $specification.SourceRoot -Recurse -File |
+        Get-ChildItem -LiteralPath $specification.SourceRoots -Recurse -File |
             Where-Object { $_.Extension.ToLowerInvariant() -in $firstPartySourceExtensions }
     )
     foreach ($file in $physicalOwnerFiles) {
@@ -2226,7 +2233,11 @@ $firstPartySourceFiles = @(
 foreach ($file in $firstPartySourceFiles) {
     $matchingOwners = @(
         $ownershipSpecifications |
-            Where-Object { Test-IsPathUnderRoot $file.FullName $_.SourceRoot }
+            Where-Object {
+                @($_.SourceRoots | Where-Object {
+                        Test-IsPathUnderRoot $file.FullName $_
+                    }).Count -gt 0
+            }
     )
     if ($matchingOwners.Count -eq 0) {
         $projectContractFindings.Add([pscustomobject]@{
@@ -3471,6 +3482,11 @@ $logicalIncludeSpecifications = @(
         Name        = "WinApp"
         ScanRoot    = $winAppSourcesDir
         LogicalRoot = $winAppSourcesDir
+    }
+    [pscustomobject]@{
+        Name        = "WinAppTests"
+        ScanRoot    = $winAppTestsDir
+        LogicalRoot = $winAppTestsDir
     }
     [pscustomobject]@{
         Name        = "GGLabFoundation"

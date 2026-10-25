@@ -1,4 +1,4 @@
-#include "Application/SelfTest/ApplicationInputSelfTests.h"
+#include "ApplicationInputSelfTests.h"
 
 #include "Demo/DemoTypes.h"
 #include "ApplicationCameraInput.h"
