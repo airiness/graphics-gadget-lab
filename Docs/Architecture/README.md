@@ -13,6 +13,8 @@ paths and content transitions in detail, the
 render passes belong and how they are composed, and the
 [boundary and drift guide](Boundary_And_Drift_Guide.md) explains how these pages are
 kept current. The [module catalog](Module_Catalog.md) lists every card.
+The [runtime control map](Runtime_Control_Map.md) follows Host view writers,
+display-view resolution and frame evidence to their owning tests.
 For a specific investigation or change, start with the
 [task-routing table](../../.agents/skills/gglab-architecture/references/task-routing.md).
 
