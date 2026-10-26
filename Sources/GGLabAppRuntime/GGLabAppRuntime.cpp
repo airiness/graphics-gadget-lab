@@ -157,21 +157,29 @@ namespace gglab
 	uint64_t GGLabAppRuntime::RequestHostViewOverrides(const HostViewControlStamp& expected,
 		std::span<const HostViewOverrideState> overrides, std::string& error) noexcept
 	{
-		if (m_RunIdentity.empty())
+		return RequestParameters(ParameterRequest::HostViewOverrides(expected, overrides), error);
+	}
+
+	uint64_t GGLabAppRuntime::RequestParameters(const ParameterRequest& request, std::string& error) noexcept
+	{
+		if (request.m_Expected)
 		{
-			error = "RunIdentityUnavailable: this session has no run identity, so it rejects guarded requests.";
-			return 0;
-		}
-		if (expected.m_RunIdentity != m_RunIdentity)
-		{
-			error = "ExpectedRunChanged: the session runs a different process than the expected run; nothing changed.";
-			return 0;
+			if (m_RunIdentity.empty())
+			{
+				error = "RunIdentityUnavailable: this session has no run identity, so it rejects guarded requests.";
+				return 0;
+			}
+			if (request.m_Expected->m_RunIdentity != m_RunIdentity)
+			{
+				error = "ExpectedRunChanged: the session runs a different process than the expected run; nothing changed.";
+				return 0;
+			}
 		}
 		if (!CanRequestParameterBatch(error))
 		{
 			return 0;
 		}
-		return m_ParameterControl->RequestHostViewOverrides(expected, overrides, error);
+		return m_ParameterControl->RequestParameters(request, error);
 	}
 
 	const ParameterBatchStatus* GGLabAppRuntime::GetExternalParameterBatchStatus() const noexcept

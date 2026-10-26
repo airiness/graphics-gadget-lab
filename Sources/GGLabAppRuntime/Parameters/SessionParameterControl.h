@@ -1,5 +1,6 @@
 #pragma once
 #include "Parameters/ParameterBatch.h"
+#include "Parameters/ParameterRequest.h"
 #include "Parameters/ParameterSource.h"
 #include "Parameters/ParameterFrameState.h"
 #include "Parameters/HostViewParameters.h"
@@ -72,6 +73,10 @@ namespace gglab
 			const FrameCaptureGate& gate) const noexcept;
 		void FinishParameterBatch(uint64_t id, ParameterBatchOwner owner = {}) noexcept;
 		void FinishParameterBatches(ParameterBatchOwner owner) noexcept;
+		// Copies caller-owned intent. The caller verifies the run for guarded requests;
+		// Session checks content and Host revision at admission and safe application.
+		[[nodiscard]] uint64_t RequestParameters(const ParameterRequest& request,
+			std::string& error, ParameterBatchOwner owner = {}) noexcept;
 		[[nodiscard]] uint64_t RequestParameterBatch(std::span<const LabParameterValue> values,
 			std::string& error, ParameterBatchOwner owner = {}) noexcept;
 		// Exact Host view override states under the same admission. The caller verifies the
@@ -116,16 +121,15 @@ namespace gglab
 		void EndForContentChange(ParameterBatch& batch, std::string reason) noexcept;
 		void ApplyParameterBatch(ParameterBatch& batch, uint64_t serial) noexcept;
 		[[nodiscard]] bool IsAdmissionBlocked(ParameterBatchOwner owner) const noexcept;
-		[[nodiscard]] uint64_t AdmitParameterBatch(std::span<const LabParameterValue> values,
+		[[nodiscard]] uint64_t AdmitParameterRequest(const ParameterRequest& request,
 			std::string& error, ParameterBatchOwner owner) noexcept;
-		[[nodiscard]] uint64_t AdmitHostViewOverrides(const HostViewControlStamp& expected,
-			std::span<const HostViewOverrideState> overrides, std::string& error,
-			ParameterBatchOwner owner) noexcept;
 		[[nodiscard]] HostViewControlStamp MakeHostViewStamp(std::string_view runIdentity) const;
 		void SupersedeOverwrittenItems(const ParameterBatch& applied) noexcept;
 		void AdvanceHostViewRevision() noexcept;
 		struct ParameterBatch
 		{
+			explicit ParameterBatch(const ParameterRequest& request) : m_Request(request) {}
+			const ParameterRequest m_Request;
 			ParameterBatchStatus m_Status;
 			ParameterBatchOwner m_Owner;
 			std::vector<ParameterEffectReceipt> m_Receipts;

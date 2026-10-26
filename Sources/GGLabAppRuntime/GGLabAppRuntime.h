@@ -9,6 +9,7 @@
 #include "Capture/CapturePlan.h"
 #include "Parameters/HostViewParameters.h"
 #include "Parameters/ParameterBatch.h"
+#include "Parameters/ParameterRequest.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
 #include "GGLabRuntime/Graphics/RenderServicesView.h"
@@ -260,6 +261,7 @@ namespace gglab
 		// Read-only preflight before a transport enables descriptors for type checks.
 		// Submission repeats admission and then validates the complete typed batch.
 		[[nodiscard]] bool CanRequestParameterBatch(std::string& error) const noexcept;
+		[[nodiscard]] uint64_t RequestParameters(const ParameterRequest& request, std::string& error) noexcept;
 		[[nodiscard]] uint64_t RequestParameterBatch(
 			std::span<const LabParameterValue> values, std::string& error) noexcept;
 		// Exact Host view override states, guarded by the complete expected stamp. Shares

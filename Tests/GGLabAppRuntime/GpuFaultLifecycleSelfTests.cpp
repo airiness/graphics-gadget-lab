@@ -11,6 +11,7 @@
 #include "Demo/DemoManager.h"
 #include "GGLabAppRuntime.h"
 #include "Parameters/HostViewParameters.h"
+#include "Parameters/ParameterRequest.h"
 #include "Parameters/SessionParameterControl.h"
 #include "Parameters/ParameterSourceAdapters.h"
 #include "Lab/LabRuntime.h"
@@ -3310,6 +3311,137 @@ namespace gglab
 			runtime.Shutdown();
 		}
 
+		void RunParameterRequestScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = true;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			GGLAB_UNUSED(runtime.Tick());
+			runtime.EnableParameterControl();
+			const auto& control = *runtime.GetParameterControl();
+			const LabParameterId radius("view.gtao.radius");
+			const auto inherited = control.GetHostParameters().Find(radius)->m_Value;
+			const LabValue changed = std::get<float>(inherited) + 1.0f;
+			const auto entry = [&](ParameterOperation operation, std::optional<LabValue> value)
+				{
+					return ParameterRequestEntry{ radius, LabParameterType::Float, operation, std::move(value) };
+				};
+			std::string error;
+			const auto submit = [&](ParameterRequest request)
+				{
+					const auto id = runtime.RequestParameters(request, error);
+					GGLAB_UNUSED(runtime.Tick());
+					return id ? runtime.TakeParameterBatchResult(id) : std::nullopt;
+				};
+			const auto revision = control.GetParameterRevision();
+			const auto hostRevision = control.GetHostViewRevision();
+			auto result = submit({ .m_Entries = { entry(ParameterOperation::Assign, inherited) } });
+			checks.Check(result && result->m_State == ParameterBatchState::Finished &&
+				result->m_Items[0].m_State == ParameterEffectState::NoChange &&
+				!result->m_Items[0].m_FirstConsumed && !result->m_HostViewOperation &&
+				control.GetHostViewOverrides().empty() && control.GetParameterRevision() == revision &&
+				control.GetHostViewRevision() == hostRevision,
+				"Canonical equal Assign preserves inheritance and both revision meanings");
+
+			const auto expected = runtime.GetHostViewControlStamp();
+			uint64_t id = 0;
+			{
+				ParameterRequest request{ .m_Entries = { entry(ParameterOperation::Pin, inherited) },
+					.m_Expected = expected };
+				id = runtime.RequestParameters(request, error);
+				request.m_Entries[0].m_Id = LabParameterId("invalid-after-admission");
+				request.m_Entries[0].m_Value = changed;
+				request.m_Expected->m_RunIdentity.assign(32, 'f');
+				++request.m_Expected->m_ContentIdentity;
+				++request.m_Expected->m_HostViewRevision;
+			}
+			GGLAB_UNUSED(runtime.Tick());
+			result = runtime.TakeParameterBatchResult(id);
+			checks.Check(result && result->m_State == ParameterBatchState::Finished &&
+				result->m_Items[0].m_State == ParameterEffectState::NoChange &&
+				control.GetHostViewRevision() == hostRevision + 1 && control.GetParameterRevision() == revision &&
+				control.GetHostViewOverrides().size() == 1 &&
+				LabValuesEqual(control.GetHostViewOverrides()[0].m_Value, inherited) &&
+				result->m_HostViewOperation->m_Expected.m_RunIdentity == expected.m_RunIdentity &&
+				result->m_HostViewOperation->m_After->m_ContentIdentity == expected.m_ContentIdentity &&
+				LabValuesEqual(*result->m_HostViewOperation->m_Overrides[0].m_Value, inherited),
+				"Admitted Pin owns its entries, values and guard after caller mutation and destruction");
+
+			{
+				ParameterRequest request{ .m_Entries = { entry(ParameterOperation::Assign, changed) } };
+				id = runtime.RequestParameters(request, error);
+				request.m_Entries.clear();
+			}
+			GGLAB_UNUSED(runtime.Tick());
+			result = runtime.TakeParameterBatchResult(id);
+			checks.Check(result && result->m_State == ParameterBatchState::Finished &&
+				result->m_Items[0].m_FirstConsumed && !result->m_HostViewOperation &&
+				LabValuesEqual(result->m_Values[0].m_Value, changed) &&
+				LabValuesEqual(control.GetHostViewOverrides()[0].m_Value, changed),
+				"Admitted Assign owns its value and proves the originally requested submitted frame");
+
+			{
+				ParameterRequest request{ .m_Entries = { entry(ParameterOperation::RemoveOverride, std::nullopt) },
+					.m_Expected = runtime.GetHostViewControlStamp() };
+				id = runtime.RequestParameters(request, error);
+				request.m_Entries[0] = entry(ParameterOperation::Pin, changed);
+				request.m_Expected.reset();
+			}
+			GGLAB_UNUSED(runtime.Tick());
+			result = runtime.TakeParameterBatchResult(id);
+			checks.Check(result && result->m_State == ParameterBatchState::Finished &&
+				result->m_Items[0].m_FirstConsumed && control.GetHostViewOverrides().empty() &&
+				!result->m_HostViewOperation->m_Overrides[0].m_Value &&
+				LabValuesEqual(result->m_Values[0].m_Value, inherited),
+				"Admitted removal remains removal and records its resolved inherited target");
+
+			const auto rejects = [&](ParameterRequest request, std::string_view code)
+				{
+					const auto before = control.GetHostViewRevision();
+					return runtime.RequestParameters(request, error) == 0 && error.starts_with(code) &&
+						control.GetParameterBatchCount() == 0 && control.GetHostViewOverrides().empty() &&
+						control.GetHostViewRevision() == before;
+				};
+			const auto live = runtime.GetHostViewControlStamp();
+			checks.Check(rejects({ .m_Entries = { entry(ParameterOperation::Pin, changed) } },
+				"ParameterRequestInvalid:") &&
+				rejects({ .m_Entries = { entry(ParameterOperation::Assign, changed),
+					entry(ParameterOperation::RemoveOverride, std::nullopt) } }, "ParameterRequestInvalid:") &&
+				rejects({ .m_Entries = { entry(ParameterOperation::Assign, changed) }, .m_Expected = live },
+					"ParameterRequestInvalid:") &&
+				rejects({ .m_Entries = { entry(ParameterOperation::RemoveOverride, changed) }, .m_Expected = live },
+					"ParameterRequestInvalid:") &&
+				rejects({ .m_Entries = { entry(ParameterOperation::Pin, std::nullopt) }, .m_Expected = live },
+					"ParameterRequestInvalid:"),
+				"Malformed operations and mixed request families reject atomically without a result slot");
+			auto wrongType = entry(ParameterOperation::Assign, changed);
+			wrongType.m_Type = LabParameterType::Bool;
+			checks.Check(rejects({ .m_Entries = { wrongType } }, "ParameterRequestInvalid:"),
+				"Canonical Assign validates its declared type even when its value matches the descriptor");
+			checks.Check(rejects({ .m_Entries = {
+				{ LabParameterId("radius"), LabParameterType::Float, ParameterOperation::Pin, changed } },
+				.m_Expected = live }, "HostOverrideUnsupported:"),
+				"The canonical model does not extend Host guards or pinning to Lab parameters");
+			auto stale = live;
+			--stale.m_HostViewRevision;
+			checks.Check(rejects({ .m_Entries = { entry(ParameterOperation::RemoveOverride, std::nullopt) },
+				.m_Expected = stale }, "ExpectedHostViewRevisionMismatch:"),
+				"A stale canonical guard rejects even an absent removal that would be NoChange");
+			result = submit({ .m_Entries = { entry(ParameterOperation::RemoveOverride, std::nullopt) },
+				.m_Expected = live });
+			checks.Check(result && result->m_State == ParameterBatchState::Finished &&
+				result->m_Items[0].m_State == ParameterEffectState::NoChange &&
+				control.GetHostViewRevision() == live.m_HostViewRevision,
+				"Rejected canonical requests leave capacity available for a retained NoChange result");
+			runtime.Shutdown();
+		}
+
 		void RunSequenceParameterEventScenario(SelfTestContext& checks, const std::filesystem::path& root)
 		{
 			LifetimeProbe probe;
@@ -5840,6 +5972,7 @@ namespace gglab
 		RunEffectiveParameterSettingsScenario(context, root / "tooling-lab", true);
 		RunHostViewControlScenario(context, root / "host-view-control");
 		RunHostViewOverrideScenario(context, root / "host-view-overrides");
+		RunParameterRequestScenario(context, root / "parameter-request");
 		RunLightingParameterScenario(context, root / "lighting-parameters");
 		RunBatchPreparationScenario(context, root / "batch-preparation");
 		RunContentBindingScenario(context, root / "content-binding-shutdown", false);
