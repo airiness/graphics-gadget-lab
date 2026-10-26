@@ -77,6 +77,21 @@ namespace gglab
 		{
 			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::ServicesUnavailable };
 		}
+		if (const auto& required = plan.m_RequiredFrameState)
+		{
+			// Plan validity is reported first; then the predicate must be reachable from
+			// the live activation, so a revision above the committed one never waits forever.
+			const CaptureAdmission checked = m_FrameCapture->CheckJobAdmission(plan);
+			if (checked.m_Status != CaptureAdmissionStatus::Accepted)
+			{
+				return checked;
+			}
+			if (!m_ParameterControl || required->m_ContentIdentity != m_ParameterControl->GetContentIdentity() ||
+				required->m_MinHostViewRevision > m_ParameterControl->GetHostViewRevision())
+			{
+				return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::RequiredFrameStateUnavailable };
+			}
+		}
 		return m_FrameCapture->TrySubmit(std::move(plan));
 	}
 

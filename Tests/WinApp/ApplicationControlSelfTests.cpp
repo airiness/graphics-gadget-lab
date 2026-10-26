@@ -1044,6 +1044,75 @@ namespace gglab
 				rejected["controlState"].is_null(),
 				"Rejections carry a machine-readable code beside the error text");
 		}
+
+		void RunRequiredFrameStateTests(SelfTestContext& context) noexcept
+		{
+			const auto capture = [](std::string_view command, std::string_view required)
+				{
+					return ParseApplicationControlRequest(std::format(
+						R"({{"protocol":4,"id":60,"command":"{}","requiredFrameState":{}}})", command, required));
+				};
+			constexpr std::string_view head =
+				R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"minHostViewRevision":13,)";
+			const auto parsed = capture("capture", std::format("{}{}", head,
+				R"("values":[{"id":"view.taa.enabled","type":"bool","value":false,"source":"host"},)"
+				R"({"id":"view.gtao.radius","type":"float","value":1.5}],)"
+				R"("temporalConsumers":[{"consumer":"temporal-aa","status":"disabled","disableReason":"not-requested"},)"
+				R"({"consumer":"temporal-gtao","status":"active"}],"referenceSampling":false})"));
+			const auto* required = parsed.m_Request ? parsed.m_Request->m_Capture.m_RequiredFrameState.get() : nullptr;
+			context.Check(required && required->m_RunIdentity == "0123456789abcdef0123456789abcdef" &&
+				required->m_ContentIdentity == 481 && required->m_MinHostViewRevision == 13 &&
+				required->m_Values.size() == 2 && required->m_Values[0].m_Source == HostViewValueSource::Host &&
+				!std::get<bool>(required->m_Values[0].m_Value) && !required->m_Values[1].m_Source &&
+				required->m_TemporalConsumers.size() == 2 &&
+				required->m_TemporalConsumers[0].m_DisableReason == TemporalConsumerDisableReason::NotRequested &&
+				required->m_TemporalConsumers[1].m_Status == TemporalConsumerStatus::Active &&
+				!required->m_TemporalConsumers[1].m_DisableReason && required->m_ReferenceSampling == false,
+				"A capture carries a typed required frame state with optional sources and reasons");
+			constexpr std::string_view minimal = R"("values":[{"id":"view.taa.enabled","type":"bool","value":true}]})";
+			context.Check(capture("graph", std::format("{}{}", head, minimal)).m_Request &&
+				ParseApplicationControlRequest(std::format(
+					R"({{"protocol":4,"id":61,"command":"export","targets":[{{"resource":"Color","at":"final"}}],"requiredFrameState":{}{}}})",
+					head, minimal)).m_Request,
+				"Graph and export plans accept the same predicate");
+			for (const std::string_view invalid : {
+				std::string_view(R"({"contentIdentity":481,"minHostViewRevision":13,"values":[{"id":"a","type":"bool","value":true}]})"),
+				std::string_view(R"({"runIdentity":"0123456789ABCDEF0123456789ABCDEF","contentIdentity":481,"minHostViewRevision":13,"values":[{"id":"a","type":"bool","value":true}]})"),
+				std::string_view(R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"minHostViewRevision":13,"values":[]})"),
+				std::string_view(R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"minHostViewRevision":13,"values":[{"id":"a","type":"bool","value":1}]})"),
+				std::string_view(R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"minHostViewRevision":13,"values":[{"id":"a","type":"bool","value":true,"source":"user"}]})"),
+				std::string_view(R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"minHostViewRevision":13,"values":[{"id":"a","type":"bool","value":true,"x":1}]})"),
+				std::string_view(R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"minHostViewRevision":13,"values":[{"id":"a","type":"bool","value":true}],"temporalConsumers":[{"consumer":"taa","status":"active"}]})"),
+				std::string_view(R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"minHostViewRevision":13,"values":[{"id":"a","type":"bool","value":true}],"temporalConsumers":[{"consumer":"temporal-aa","status":"on"}]})"),
+				std::string_view(R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"minHostViewRevision":13,"values":[{"id":"a","type":"bool","value":true}],"temporalConsumers":[{"consumer":"temporal-aa","status":"disabled","disableReason":"off"}]})"),
+				std::string_view(R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"minHostViewRevision":13,"values":[{"id":"a","type":"bool","value":true}],"referenceSampling":0})"),
+				std::string_view(R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"minHostViewRevision":13,"values":[{"id":"a","type":"bool","value":true}],"lighting":1})") })
+			{
+				context.Check(!capture("capture", invalid).m_Request,
+					"Malformed predicates, unknown names and unknown fields reject the request");
+			}
+
+			const auto status = Json::parse(SerializeApplicationControlStatus(62, {}));
+			const auto& capability = status["capabilities"]["requiredFrameState"];
+			context.Check(capability["version"] == 1 && capability["commands"].size() == 3 &&
+				capability["maxValues"] == 128 && capability["temporalConsumers"].size() == 3 &&
+				capability["failureCodes"] == Json::array({ "RequiredFrameStateMismatch" }) &&
+				capability["admissionReasons"].size() == 2,
+				"Required frame state capture is advertised with its limits and outcome codes");
+			const auto invalid = Json::parse(SerializeApplicationControlCaptureAdmission(63,
+				{ CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::RequiredFrameStateInvalid }));
+			const auto unavailable = Json::parse(SerializeApplicationControlCaptureAdmission(64,
+				{ CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::RequiredFrameStateUnavailable }));
+			context.Check(invalid["reason"] == "RequiredFrameStateInvalid" &&
+				unavailable["reason"] == "RequiredFrameStateUnavailable" && !unavailable["ok"].get<bool>(),
+				"Predicate admission rejections name their reason");
+			CaptureJobResult result{ .m_JobId = 9, .m_Status = CaptureJobStatus::Failed };
+			const auto plain = Json::parse(SerializeApplicationControlCaptureResult(65, result, false));
+			result.m_FailureCode = "RequiredFrameStateMismatch";
+			const auto mismatched = Json::parse(SerializeApplicationControlCaptureResult(66, result, false));
+			context.Check(plain["failureCode"].is_null() && mismatched["failureCode"] == "RequiredFrameStateMismatch",
+				"A job-level failure code is reported beside the product failures");
+		}
 	}
 
 	void RunApplicationControlSelfTests(SelfTestContext& context) noexcept
@@ -1053,6 +1122,7 @@ namespace gglab
 		RunParseTests(context);
 		RunRunIdentityCheckTests(context);
 		RunHostViewOverrideTests(context);
+		RunRequiredFrameStateTests(context);
 		RunSerializeTests(context);
 		RunCaptureJobOwnershipTests(context);
 		RunPipeServerTests(context);

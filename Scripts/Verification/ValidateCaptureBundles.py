@@ -136,7 +136,43 @@ def validate(path, bundle_validator=None):
 			raise ValueError("Required products disagree on frozen parameters")
 		if frame.get("parameters") is not None:
 			parameters.validate_frame(frame["parameters"], frame["frame"]["serial"])
+		if frame.get("control") != document["provenance"].get("control"):
+			raise ValueError("Required products disagree on Host view control evidence")
+	if document["provenance"].get("control") is not None:
+		validate_control(document["provenance"], document["runIdentity"])
 	return document
+
+
+def validate_control(provenance, run):
+	"""A published required frame state must hold for the observation recorded beside it."""
+	control = provenance["control"]
+	stamp = control["hostViewControl"]
+	if stamp["runIdentity"] is not None and stamp["runIdentity"] != run:
+		raise ValueError("Host view control names another run")
+	required = control["requiredFrameState"]
+	if required is None:
+		return
+	# The exact-run condition needs an observed run; a missing one proves nothing.
+	if (stamp["runIdentity"] != run or required["runIdentity"] != run or
+		required["contentIdentity"] != stamp["contentIdentity"] or
+		stamp["hostViewRevision"] < required["minHostViewRevision"]):
+		raise ValueError("The required run, content or Host view revision disagrees with the issued frame")
+	observed = {entry["id"]: entry for entry in control["hostView"]}
+	for value in required["values"]:
+		entry = observed.get(value["id"])
+		if (entry is None or entry["type"] != value["type"] or entry["value"] != value["value"] or
+			(value["source"] is not None and entry["source"] != value["source"])):
+			raise ValueError(f"Required value {value['id']} disagrees with the issued frame")
+	consumers = {consumer["name"]: consumer for consumer in provenance["temporal"]["consumers"]}
+	for consumer in required["temporalConsumers"]:
+		planned = consumers.get(consumer["consumer"])
+		if (planned is None or planned["status"] != consumer["status"] or
+			(consumer["disableReason"] is not None and planned["disableReason"] != consumer["disableReason"])):
+			raise ValueError(f"Required temporal consumer {consumer['consumer']} disagrees with the issued frame")
+	reference = consumers.get("reference")
+	if (required["referenceSampling"] is not None and
+		bool(reference and reference["requested"]) != required["referenceSampling"]):
+		raise ValueError("Required reference sampling disagrees with the issued frame")
 
 
 def validate_sequence(path, document):
@@ -373,6 +409,41 @@ def self_test(bundle_validator):
 				raise AssertionError(f"Bundle accepted a mismatched required file: {key}")
 			(root / name).write_text(json.dumps(original), encoding="utf-8")
 			rejections += 1
+		# Published control evidence must agree across products and satisfy its own predicate.
+		temporal = dict(consumers=[dict(name="temporal-aa", requested=False, status="disabled",
+			disableReason="not-requested", services=[]), dict(name="reference", requested=False,
+			status="disabled", disableReason="not-requested", services=[])])
+		control = dict(schemaVersion=1, hostViewControl=dict(runIdentity=run, contentIdentity=4, hostViewRevision=7),
+			hostView=[dict(id="view.taa.enabled", type="bool", value=False, source="host", inheritedSource="content",
+				hostOverride=dict(present=True, value=False))],
+			requiredFrameState=dict(runIdentity=run, contentIdentity=4, minHostViewRevision=6,
+				values=[dict(id="view.taa.enabled", type="bool", value=False, source="host")],
+				temporalConsumers=[dict(consumer="temporal-aa", status="disabled", disableReason="not-requested")],
+				referenceSampling=False))
+		def controlled(value, provenance=None):
+			(root / "image.json").write_text(json.dumps(dict(image, temporal=temporal, control=value)), encoding="utf-8")
+			bundle = copy.deepcopy(document)
+			bundle["provenance"] = dict(frame, temporal=temporal, control=value if provenance is None else provenance)
+			return bundle
+		check(controlled(control))
+		check(controlled(dict(control, requiredFrameState=None)))
+		contradictions = [(control, dict(control, requiredFrameState=None)),
+			(dict(control, hostViewControl=dict(control["hostViewControl"], runIdentity=None)), None)]
+		for key, value in (("values", [dict(id="view.taa.enabled", type="bool", value=True, source="host")]),
+			("values", [dict(id="view.taa.enabled", type="bool", value=False, source="tooling")]),
+			("minHostViewRevision", 8), ("contentIdentity", 5), ("runIdentity", "f" * 32),
+			("temporalConsumers", [dict(consumer="temporal-aa", status="active", disableReason=None)]),
+			("referenceSampling", True)):
+			contradictions.append((dict(control, requiredFrameState=dict(control["requiredFrameState"], **{key: value})), None))
+		for value, provenance in contradictions:
+			try:
+				check(controlled(value, provenance))
+			except (ValueError, ValidationError):
+				pass
+			else:
+				raise AssertionError("Bundle accepted control evidence its products or frame contradict")
+			rejections += 1
+		(root / "image.json").write_text(json.dumps(image), encoding="utf-8")
 		watch = dict(schema="gglab.nonfinite-watch", schemaVersion=2, configurationVersion=1, mode="report",
 			coverage="submitted-range", instrumentation="available", claims=["production"], firstFrameSerial=1,
 			lastFrameSerial=1, frames=1, completedFrames=1, complete=True, boundary="Unavailable", production="Failed",

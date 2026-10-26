@@ -3286,6 +3286,27 @@ namespace gglab
 				result->m_HostViewOperation->m_Conflict == "ExpectedContentChanged" &&
 				!result->m_HostViewOperation->m_After && control.GetHostViewOverrides().empty(),
 				"A content change while queued ends the operation with a conflict and applies nothing");
+
+			// A capture predicate must be reachable from the live activation at admission.
+			const auto live = runtime.GetHostViewControlStamp();
+			const auto predicate = [&](uint64_t contentIdentity, uint64_t minHostViewRevision)
+				{
+					auto required = std::make_shared<RequiredFrameState>();
+					required->m_RunIdentity = live.m_RunIdentity;
+					required->m_ContentIdentity = contentIdentity;
+					required->m_MinHostViewRevision = minHostViewRevision;
+					required->m_Values = { { LabParameterId("view.taa.enabled"), Bool, false, std::nullopt } };
+					return CapturePlan{ .m_RequiredProducts = { ImageCaptureProduct{} },
+						.m_RequiredFrameState = std::move(required) };
+				};
+			const auto staleContent = runtime.TrySubmitCaptureJob(predicate(live.m_ContentIdentity + 1, live.m_HostViewRevision));
+			const auto futureRevision = runtime.TrySubmitCaptureJob(predicate(live.m_ContentIdentity, live.m_HostViewRevision + 1));
+			const auto reachable = runtime.TrySubmitCaptureJob(predicate(live.m_ContentIdentity, live.m_HostViewRevision));
+			checks.Check(staleContent.m_Reason == CaptureAdmissionReason::RequiredFrameStateUnavailable &&
+				futureRevision.m_Reason == CaptureAdmissionReason::RequiredFrameStateUnavailable &&
+				reachable.m_Status == CaptureAdmissionStatus::Accepted &&
+				runtime.CancelCaptureJob(reachable.m_JobId) == CaptureCancelResult::Cancelled,
+				"Capture predicates for another activation or an uncommitted revision reject at admission");
 			runtime.Shutdown();
 		}
 

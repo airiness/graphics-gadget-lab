@@ -1,5 +1,6 @@
 #pragma once
 #include "Capture/FrameCaptureReadiness.h"
+#include "Parameters/HostViewParameters.h"
 #include "Parameters/ParameterFrameState.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
 #include "GGLabRuntime/Graphics/Atmosphere.h"
@@ -20,9 +21,12 @@
 namespace gglab
 {
 	struct NonFiniteWatchCoverage;
+	struct RequiredFrameState;
 	// Version of the persisted capture sidecar JSON. Increment it for every
 	// change that renames, removes or reinterprets a field.
 	inline constexpr uint32_t FrameCaptureMetadataSchemaVersion = 1;
+	// Version of the sidecar's own "control" record; absent in earlier artifacts.
+	inline constexpr uint32_t FrameCaptureControlSchemaVersion = 1;
 
 	enum class FrameCaptureTiming : uint8_t
 	{
@@ -151,6 +155,15 @@ namespace gglab
 		float m_ReferenceTextureLodBias = 0.0f;
 	};
 
+	// Host view control evidence of the issued frame, and the predicate it satisfied.
+	struct FrameCaptureControlState
+	{
+		HostViewControlStamp m_HostViewControl;
+		// Final display-view values, attributed through the frame's sequence/reference patches.
+		std::vector<HostViewProjectionEntry> m_HostView;
+		std::shared_ptr<const RequiredFrameState> m_RequiredFrameState;
+	};
+
 	// Everything a capture records about the frame that produced it. Frame-state
 	// fields are sampled when the capture is issued, immediately before the
 	// frame that records it is built.
@@ -189,6 +202,8 @@ namespace gglab
 		bool m_NonFiniteScanActive = false;
 		std::shared_ptr<const NonFiniteWatchCoverage> m_WatchCoverage;
 		std::shared_ptr<const ParameterFrameState> m_Parameters;
+		// Absent when the frame state carried no control evidence.
+		std::optional<FrameCaptureControlState> m_Control;
 	};
 
 	// UTF-8 path text for capture UI, logs and failures; never uses the system code page.

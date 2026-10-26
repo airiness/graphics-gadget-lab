@@ -1,4 +1,5 @@
 #include "Application/Control/ApplicationControlParameters.h"
+#include "Capture/RequiredFrameState.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabRuntime/Graphics/LightingProfile.h"
 #include "Application/Control/ApplicationControlProtocol.h"
@@ -12,7 +13,9 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <format>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <string_view>
 #include <type_traits>
@@ -315,6 +318,118 @@ namespace gglab
 			candidate.push_back(std::move(state));
 		}
 		result = std::move(candidate);
+		return {};
+	}
+
+	std::string ParseApplicationControlRequiredFrameState(
+		const Json& document, std::shared_ptr<const RequiredFrameState>& result)
+	{
+		constexpr std::array<std::string_view, 6> Keys = { "runIdentity", "contentIdentity", "minHostViewRevision",
+			"values", "temporalConsumers", "referenceSampling" };
+		if (!document.is_object())
+		{
+			return "Field 'requiredFrameState' must be an object.";
+		}
+		for (const auto& [key, value] : document.items())
+		{
+			if (std::ranges::find(Keys, key) == Keys.end())
+			{
+				return std::format("Unknown field '{}' in 'requiredFrameState'.", key);
+			}
+		}
+		const auto run = document.find("runIdentity");
+		const auto content = document.find("contentIdentity");
+		const auto revision = document.find("minHostViewRevision");
+		const auto values = document.find("values");
+		const bool runIdentity = run != document.end() && run->is_string() &&
+			run->get_ref<const std::string&>().size() == 32 &&
+			std::ranges::all_of(run->get_ref<const std::string&>(), [](char digit)
+			{
+				return (digit >= '0' && digit <= '9') || (digit >= 'a' && digit <= 'f');
+			});
+		if (!runIdentity || content == document.end() || !content->is_number_unsigned() ||
+			revision == document.end() || !revision->is_number_unsigned() || values == document.end() ||
+			!values->is_array() || values->empty() || values->size() > RequiredFrameStateMaxValues)
+		{
+			return "Field 'requiredFrameState' requires 'runIdentity' (32 lowercase hexadecimal digits), unsigned "
+				"'contentIdentity' and 'minHostViewRevision', and 1 to 128 'values'.";
+		}
+		auto state = std::make_shared<RequiredFrameState>();
+		state->m_RunIdentity = run->get<std::string>();
+		state->m_ContentIdentity = content->get<uint64_t>();
+		state->m_MinHostViewRevision = revision->get<uint64_t>();
+		for (const auto& item : *values)
+		{
+			if (!item.is_object() || !item.contains("id") || !item["id"].is_string() || !item.contains("type") ||
+				!item["type"].is_string() || !item.contains("value") ||
+				item.size() != (item.contains("source") ? 4u : 3u))
+			{
+				return "Each required value takes 'id', 'type', 'value' and an optional 'source'.";
+			}
+			const auto type = std::ranges::find(ParameterTypes, item["type"].get<std::string>());
+			if (type == ParameterTypes.end())
+			{
+				return "Required value types must be declared parameter types.";
+			}
+			RequiredFrameValue required{
+				.m_Id = LabParameterId(item["id"].get<std::string>()),
+				.m_Type = static_cast<LabParameterType>(type - ParameterTypes.begin()),
+			};
+			const auto value = ParseValue(required.m_Type, item["value"]);
+			if (!value)
+			{
+				return "Required value does not match its type or exceeds finite 32-bit storage.";
+			}
+			required.m_Value = *value;
+			if (item.contains("source"))
+			{
+				required.m_Source = item["source"].is_string() ?
+					FindHostViewValueSource(item["source"].get<std::string>()) :
+					std::nullopt;
+				if (!required.m_Source)
+				{
+					return "Field 'source' must be 'content', 'tooling', 'camera', 'host', 'sequence' or "
+						"'forced-reference'.";
+				}
+			}
+			state->m_Values.push_back(std::move(required));
+		}
+		if (const auto consumers = document.find("temporalConsumers"); consumers != document.end())
+		{
+			if (!consumers->is_array() || consumers->size() > TemporalConsumerCount)
+			{
+				return "Field 'temporalConsumers' takes at most one entry per temporal consumer.";
+			}
+			for (const auto& item : *consumers)
+			{
+				const auto name = [&](const char* key) -> std::string
+					{
+						return item.is_object() && item.contains(key) && item[key].is_string() ?
+							item[key].get<std::string>() :
+							std::string();
+					};
+				const auto consumer = FindTemporalConsumer(name("consumer"));
+				const auto status = FindTemporalConsumerStatus(name("status"));
+				const bool hasReason = item.is_object() && item.contains("disableReason");
+				const auto reason = FindTemporalConsumerDisableReason(name("disableReason"));
+				if (!item.is_object() || item.size() != (hasReason ? 3u : 2u) || !consumer || !status ||
+					(hasReason && !reason))
+				{
+					return "Each required temporal consumer takes the 'consumer', 'status' and optional "
+						"'disableReason' names that status.frame reports.";
+				}
+				state->m_TemporalConsumers.push_back({ *consumer, *status, hasReason ? reason : std::nullopt });
+			}
+		}
+		if (const auto reference = document.find("referenceSampling"); reference != document.end())
+		{
+			if (!reference->is_boolean())
+			{
+				return "Field 'referenceSampling' must be a boolean.";
+			}
+			state->m_ReferenceSampling = reference->get<bool>();
+		}
+		result = std::move(state);
 		return {};
 	}
 

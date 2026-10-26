@@ -76,6 +76,7 @@ namespace gglab
 	};
 
 	[[nodiscard]] std::string_view GetHostViewValueSourceName(HostViewValueSource source) noexcept;
+	[[nodiscard]] std::optional<HostViewValueSource> FindHostViewValueSource(std::string_view name) noexcept;
 
 	struct HostViewProjectionEntry
 	{

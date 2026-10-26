@@ -19,7 +19,8 @@ namespace gglab
 	{
 		using Json = nlohmann::ordered_json;
 		constexpr std::array ProvenanceKeys{ "backend", "content", "sceneInputs", "frame",
-			"camera", "time", "developmentTools", "readiness", "temporal", "sequence", "parameters" };
+			"camera", "time", "developmentTools", "readiness", "temporal", "sequence", "parameters",
+			"control" };
 
 		Json Provenance(const FrameCaptureMetadata& metadata)
 		{

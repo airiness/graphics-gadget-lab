@@ -1085,6 +1085,15 @@ namespace gglab
 						return error;
 					}
 				}
+				else if (key == "requiredFrameState")
+				{
+					if (std::string error =
+						ParseApplicationControlRequiredFrameState(value, capture.m_RequiredFrameState);
+						!error.empty())
+					{
+						return error;
+					}
+				}
 				else
 				{
 					return std::format("Unknown field '{}' for command '{}'.", key, graph ? "graph" : resources ? "export" : "capture");
@@ -1773,7 +1782,18 @@ namespace gglab
 				{ "groups", { "view.taa", "view.gtao", "view.exposure" } },
 				{ "maxItems", ApplicationControlMaxParameterItems },
 				{ "expected", { "runIdentity", "contentIdentity", "hostViewRevision" } },
-				{ "errorCodes", ApplicationControlHostViewOverrideErrorCodes } } } };
+				{ "errorCodes", ApplicationControlHostViewOverrideErrorCodes } } },
+			{ "requiredFrameState", {
+				{ "version", 1 },
+				{ "commands", { "capture", "graph", "export" } },
+				{ "valueGroups", { "view.taa", "view.gtao", "view.exposure" } },
+				{ "maxValues", RequiredFrameStateMaxValues },
+				{ "valueSources", { "content", "tooling", "camera", "host", "sequence", "forced-reference" } },
+				{ "temporalConsumers", { "temporal-aa", "reference", "temporal-gtao" } },
+				{ "referenceSampling", true },
+				{ "admissionReasons", { "RequiredFrameStateInvalid", "RequiredFrameStateUnavailable" } },
+				{ "failureCodes", { "RequiredFrameStateMismatch" } },
+				{ "controlSchemaVersion", FrameCaptureControlSchemaVersion } } } };
 		response["capture"] = {
 			{ "limits", {
 				{ "activeJobs", intake.m_Limits.m_MaxActiveJobs },
@@ -1926,6 +1946,12 @@ namespace gglab
 		case CaptureAdmissionReason::ServicesUnavailable:
 			reason = "ServicesUnavailable";
 			break;
+		case CaptureAdmissionReason::RequiredFrameStateInvalid:
+			reason = "RequiredFrameStateInvalid";
+			break;
+		case CaptureAdmissionReason::RequiredFrameStateUnavailable:
+			reason = "RequiredFrameStateUnavailable";
+			break;
 		}
 		response["reason"] = reason;
 		response["jobId"] = accepted ? Json(admission.m_JobId) : Json();
@@ -2013,6 +2039,7 @@ namespace gglab
 		response["frameSerial"] = Json();
 		response["watch"] = Json();
 		response["failure"] = "";
+		response["failureCode"] = result.m_FailureCode.empty() ? Json() : Json(result.m_FailureCode);
 		for (const auto& product : result.m_Products)
 		{
 			Json files = Json::array();

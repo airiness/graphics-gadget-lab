@@ -256,6 +256,11 @@ namespace gglab
 			const CaptureJob& job, const FrameCaptureFrameState& state) noexcept;
 		[[nodiscard]] bool IsDue(
 			const CaptureJob& job, const FrameCaptureFrameState& state) const noexcept;
+		[[nodiscard]] static RequiredFrameStateEvaluation EvaluateRequiredFrameState(
+			const CaptureJob& job, const FrameCaptureFrameState& state);
+		// Fails a due plan whose required frame state the frame contradicts.
+		[[nodiscard]] bool FailRequiredFrameStateMismatch(
+			CaptureJob& job, const FrameCaptureFrameState& state) noexcept;
 		[[nodiscard]] FrameCaptureAvailability GetCaptureAvailability(FrameCaptureSource source,
 			const FrameCaptureFrameState& state, uint32_t requestCount = 1) const noexcept;
 		[[nodiscard]] FrameCaptureAvailability GetCaptureAvailability(
@@ -265,7 +270,7 @@ namespace gglab
 			std::optional<PostProcessDebugTap>& diagnosticTap) noexcept;
 		void Issue(ProductDelivery& entry, const FrameCaptureFrameState& state,
 			bool preAdmitted = false) noexcept;
-		void FailPlan(CaptureJob& job, std::string failure) noexcept;
+		void FailPlan(CaptureJob& job, std::string failure, std::string_view failureCode = {}) noexcept;
 		void RetryPlan(CaptureJob& job, uint64_t consumedRequestId) noexcept;
 		void HandleCaptureResult(FrameCaptureResult result) noexcept;
 		void PollWatchCaptures() noexcept;

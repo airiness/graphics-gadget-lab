@@ -110,12 +110,12 @@ try {
         $taken = Wait-ParameterBatch $admission ([DateTime]::UtcNow.AddSeconds(90))
         Check ($taken.ok -and $taken.consumed -and $state.calls -eq 6) 'parameter-terminal-wait-explicitly-releases-slot'
     }
-    # The real client binds a Host view operation's expected run to its whole wait. The fake
-    # session admits the operation, then answers polling as a same-name restart whose new
-    # process reuses the batch id, so an unguarded query would consume another run's result.
-    & {
-        $session = 'override-wait-' + [Guid]::NewGuid().ToString('N').Substring(0, 12)
-        $run = '0123456789abcdef0123456789abcdef'
+    # The real client binds a guarded command's run to its whole wait. The fake session admits
+    # the command, then answers polling as a same-name restart whose new process reuses the
+    # handle, so an unguarded query would consume another run's result.
+    $run = '0123456789abcdef0123456789abcdef'
+    function Invoke-RestartedSessionWait([hashtable]$Options) {
+        $session = 'restarted-wait-' + [Guid]::NewGuid().ToString('N').Substring(0, 12)
         $server = Start-Job -ArgumentList "gglab-session-$session" -ScriptBlock {
             param([string]$PipeName)
             $encoding = New-Object Text.UTF8Encoding($false)
@@ -127,14 +127,14 @@ try {
                     $reader = New-Object IO.StreamReader($pipe, $encoding, $false, 4096, $true)
                     $request = $reader.ReadLine() | ConvertFrom-Json
                     $requests += $request
-                    $response = if ($request.command -eq 'host-view-overrides') {
-                        @{ protocol=4; id=$request.id; ok=$true; admission='Accepted'; batchId=1; consumed=$false
-                            batch=@{ batchId=1; terminal=$false; revision=$null; items=@() } }
+                    $response = if ($index -eq 0) {
+                        @{ protocol=4; id=$request.id; ok=$true; admission='Accepted'; reason='None'; jobId=1; batchId=1
+                            consumed=$false; batch=@{ batchId=1; terminal=$false; revision=$null; items=@() } }
                     } elseif ($request.PSObject.Properties['expectedRunIdentity']) {
                         @{ protocol=4; id=$request.id; ok=$false; errorCode='ExpectedRunChanged'
                             runIdentity='ffffffffffffffffffffffffffffffff' }
                     } else {
-                        @{ protocol=4; id=$request.id; ok=$true; batchId=1; consumed=$request.consume
+                        @{ protocol=4; id=$request.id; ok=$true; jobId=1; batchId=1; status='completed'; consumed=$request.consume
                             batch=@{ batchId=1; terminal=$true; revision=9; items=@() } }
                     }
                     $writer = New-Object IO.StreamWriter($pipe, $encoding, 4096, $true)
@@ -150,19 +150,31 @@ try {
             $listening = Wait-VerificationCondition -TimeoutSeconds 30 -Poll {
                 [bool]([IO.Directory]::GetFiles('\\.\pipe\') | Where-Object { $_ -ieq "\\.\pipe\gglab-session-$session" })
             } -Until { param($ready) $ready }
-            $client = Invoke-VerificationScript (Join-Path $root 'Scripts/Verification/GGLabSession.ps1') @{
-                Command='host-view-overrides'; Session=$session; TimeoutSeconds=30
-                ExpectedState="{`"runIdentity`":`"$run`",`"contentIdentity`":4,`"hostViewRevision`":2}"
-                Overrides='[{"id":"view.taa.enabled","type":"bool","present":false}]' }
-            $result = $client.output | ConvertFrom-Json
-            $requests = ConvertFrom-Json -InputObject ([string](Receive-Job $server -Wait -AutoRemoveJob))
-            Check ($listening -and $client.exitCode -eq 1 -and -not $result.ok -and $result.errorCode -eq 'ExpectedRunChanged' -and
-                $requests.Count -eq 2 -and -not $requests[0].PSObject.Properties['expectedRunIdentity'] -and
-                $requests[0].expected.runIdentity -eq $run -and $requests[1].command -eq 'parameter-result' -and
-                $requests[1].expectedRunIdentity -eq $run) 'host-view-override-polling-is-bound-to-the-expected-run'
+            $arguments = @{ Session=$session; TimeoutSeconds=30 }
+            foreach ($key in $Options.Keys) { $arguments[$key] = $Options[$key] }
+            $client = Invoke-VerificationScript (Join-Path $root 'Scripts/Verification/GGLabSession.ps1') $arguments
+            return @{ listening=$listening; client=$client; result=($client.output | ConvertFrom-Json)
+                requests=(ConvertFrom-Json -InputObject ([string](Receive-Job $server -Wait -AutoRemoveJob))) }
         }
         finally { Get-Job -Id $server.Id -ErrorAction SilentlyContinue | Remove-Job -Force }
     }
+    $override = Invoke-RestartedSessionWait @{ Command='host-view-overrides'
+        ExpectedState="{`"runIdentity`":`"$run`",`"contentIdentity`":4,`"hostViewRevision`":2}"
+        Overrides='[{"id":"view.taa.enabled","type":"bool","present":false}]' }
+    $requests = $override.requests
+    Check ($override.listening -and $override.client.exitCode -eq 1 -and -not $override.result.ok -and
+        $override.result.errorCode -eq 'ExpectedRunChanged' -and $requests.Count -eq 2 -and
+        -not $requests[0].PSObject.Properties['expectedRunIdentity'] -and $requests[0].expected.runIdentity -eq $run -and
+        $requests[1].command -eq 'parameter-result' -and $requests[1].expectedRunIdentity -eq $run) 'host-view-override-polling-is-bound-to-the-expected-run'
+    # A required frame state names its run too; it guards admission and the result query.
+    $predicate = Invoke-RestartedSessionWait @{ Command='capture'; OutputDirectory=(Join-Path $output 'restarted-capture')
+        RequiredFrameState="{`"runIdentity`":`"$run`",`"contentIdentity`":4,`"minHostViewRevision`":2,`"values`":[{`"id`":`"view.taa.enabled`",`"type`":`"bool`",`"value`":false}]}" }
+    $requests = $predicate.requests
+    Check ($predicate.listening -and $predicate.client.exitCode -eq 1 -and -not $predicate.result.ok -and
+        $predicate.result.errorCode -eq 'ExpectedRunChanged' -and $requests.Count -eq 2 -and
+        $requests[0].command -eq 'capture' -and $requests[0].expectedRunIdentity -eq $run -and
+        $requests[0].requiredFrameState.runIdentity -eq $run -and
+        $requests[1].command -eq 'result' -and $requests[1].expectedRunIdentity -eq $run) 'required-frame-state-polling-is-bound-to-its-run'
     # The client adds an expected run only to commands the session checks.
     & {
         $tokens = $null; $parseErrors = $null

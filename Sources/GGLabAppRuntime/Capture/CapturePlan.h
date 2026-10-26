@@ -1,10 +1,12 @@
 #pragma once
 #include "Capture/FrameCaptureMetadata.h"
+#include "Capture/RequiredFrameState.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 
 #include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <string>
 #include <variant>
@@ -81,5 +83,9 @@ namespace gglab
 		std::string m_Note;
 		// Provenance only: membership never depends on these values matching.
 		std::optional<FrameCaptureSequenceInfo> m_Sequence;
+		// Admission replaces it with a private snapshot, independent of the caller and of
+		// parameter results. A due frame that contradicts it fails the plan; it never
+		// waits for another configuration.
+		std::shared_ptr<const RequiredFrameState> m_RequiredFrameState;
 	};
 }

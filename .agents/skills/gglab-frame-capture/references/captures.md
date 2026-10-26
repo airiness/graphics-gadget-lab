@@ -38,6 +38,7 @@ the next; each view change is a camera cut and restarts settling.
 | `-Timing after-ready` | Default: all gates ready, then `-SettleFrames` submitted frames (default 8). |
 | `-Timing next-frame` | Next eligible frame, including while loading. |
 | `-RequiredContentId <id>` | Require this active Lab or Demo. |
+| `-RequiredFrameState` / `-RequiredFrameStateFile` | Require typed values and temporal state before issue; see [frame predicates](session-jobs.md#required-frame-state). |
 | `-OutputDirectory <path>` | Override `Build/Sessions/<id>/Captures/`. |
 | `-Label`, `-Note` | File subject and metadata annotation. |
 | `-NoWait`, `-KeepResult` | Admission-only or retained-result operation; see [session jobs](session-jobs.md). |
@@ -46,15 +47,16 @@ the next; each view change is a camera cut and restarts settling.
 Hidden runs default to fixed 1/60 s simulation. Settling restarts on camera cuts
 or history resets; loading history resets before settling. Use at least eight
 frames for temporal effects, more for convergence. Inspect pending/failed gates
-in `status`; repeatedly queuing captures cannot bypass a failed gate.
+in `status` when a capture is waiting.
 
 Find diagnostic taps in
 [PostProcessDebug.h](../../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h),
 including `temporal-history-weight`, `temporal-rejection`, depth and `gtao-*` taps.
-One frame records one tap; another tap can delay an ordinary capture. Compare
-actual frame/time, not queue order. Issued captures do not substitute a later
-frame after an abort. For oversized requests, reduce resolution or separate
-optional observations into different jobs rather than retrying unchanged.
+One frame records one tap; another tap can delay an ordinary capture. Each attempt
+keeps its issued frame's evidence. A pre-submit Busy result can retry the plan on a
+new frame, rechecking its predicate. Use the recorded frame and attempt to identify
+the result. For oversized requests, reduce resolution or split observations into
+separate jobs.
 
 ## Inspect output
 
@@ -63,8 +65,8 @@ Use the returned `manifest` and `products[].files`; the
 publication, schema versions and provenance. Each PNG's same-stem JSON sidecar
 records source/content/backend, view/camera, frame serial/index, resolution,
 fixed step/time, readiness, DevTools, temporal settings, frozen parameters and
-applicable sequence/watch metadata. Read the saved metadata and logs alongside
-the image; filenames and live session state are not evidence of its inputs.
+control state, plus applicable sequence/watch metadata. Read the saved metadata
+and logs alongside the image.
 
 ## Compare images
 

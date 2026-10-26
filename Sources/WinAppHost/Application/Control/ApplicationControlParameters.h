@@ -7,6 +7,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -15,6 +16,7 @@
 namespace gglab
 {
 	class GGLabAppRuntime;
+	struct RequiredFrameState;
 	struct HostViewControlStamp;
 	struct HostViewProjectionEntry;
 	struct LightingProfilePublication;
@@ -40,6 +42,9 @@ namespace gglab
 	// Typed exact states: 'value' appears exactly when 'present' is true.
 	[[nodiscard]] std::string ParseApplicationControlHostViewOverrides(
 		const nlohmann::json& overrides, std::vector<HostViewOverrideState>& result);
+	// Shape and names only; admission validates the values against the Host view schema.
+	[[nodiscard]] std::string ParseApplicationControlRequiredFrameState(
+		const nlohmann::json& document, std::shared_ptr<const RequiredFrameState>& result);
 	[[nodiscard]] nlohmann::json SerializeApplicationControlParameterBatch(
 		const ParameterBatchStatus& batch);
 	[[nodiscard]] nlohmann::json SerializeApplicationControlLightingProfiles(

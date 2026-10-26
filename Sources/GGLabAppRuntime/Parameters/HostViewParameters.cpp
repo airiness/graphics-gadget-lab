@@ -241,6 +241,20 @@ namespace gglab
 		return "unknown";
 	}
 
+	std::optional<HostViewValueSource> FindHostViewValueSource(std::string_view name) noexcept
+	{
+		for (const auto source : { HostViewValueSource::Content, HostViewValueSource::Tooling,
+			HostViewValueSource::Camera, HostViewValueSource::Host, HostViewValueSource::Sequence,
+			HostViewValueSource::ForcedReference })
+		{
+			if (GetHostViewValueSourceName(source) == name)
+			{
+				return source;
+			}
+		}
+		return std::nullopt;
+	}
+
 	std::vector<HostViewProjectionEntry> DescribeHostViewProjection(
 		const ResolvedViewRenderSettings& settings, const ApplicationToolingBlocks& tooling,
 		std::span<const LabParameterValue> overrides, const HostViewFramePatches& patches)

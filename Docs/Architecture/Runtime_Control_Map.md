@@ -14,7 +14,7 @@ Frame stages after issue are in the [frame execution map](Frame_Execution_Map.md
 
 | Owner | Interface and implementation | Responsibility |
 | --- | --- | --- |
-| `WinAppHost` | [ApplicationControlParameters.cpp](../../Sources/WinAppHost/Application/Control/ApplicationControlParameters.cpp), [DevToolsRuntime.cpp](../../Sources/WinAppHost/DevTools/DevToolsRuntime.cpp) | Wire adaptation and whole-block GUI tooling overrides; neither owns Host parameter receipts. |
+| `WinAppHost` | [ApplicationControlParameters.cpp](../../Sources/WinAppHost/Application/Control/ApplicationControlParameters.cpp), [DevToolsRuntime.cpp](../../Sources/WinAppHost/DevTools/DevToolsRuntime.cpp) | Wire adaptation and whole-block GUI tooling overrides. |
 | `GGLabAppRuntime` | [GGLabAppRuntime.h](../../Sources/GGLabAppRuntime/GGLabAppRuntime.h), [SessionParameterControl.h](../../Sources/GGLabAppRuntime/Parameters/SessionParameterControl.h), [source adapters](../../Sources/GGLabAppRuntime/Parameters/ParameterSourceAdapters.h) | Session admission, the process run identity, source binding, the private Host override set and its revision, transactions and effect receipts. |
 | `GGLabAppRuntime` | [TickFrame](../../Sources/GGLabAppRuntime/GGLabAppRuntimeFrame.cpp), [CapturePlan.h](../../Sources/GGLabAppRuntime/Capture/CapturePlan.h), [FrameCaptureCoordinator.h](../../Sources/GGLabAppRuntime/Capture/FrameCaptureCoordinator.h) | Display-view planning, sequence masking, capture issue and job/publication coordination. |
 | `GGLabRuntime` | Public [ViewRenderSettings.h](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/ViewRenderSettings.h), [ViewRenderSettingsPatch.h](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/ViewRenderSettingsPatch.h), [TemporalFramePlan.h](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h) | Typed normalization, exposure derivation and temporal consumer/service resolution, independent of parameter strings or session handles. |
@@ -25,9 +25,8 @@ These owners are declared in the [AppRuntime](../../Projects/GGLabAppRuntime/GGL
 
 ## Host override writers
 
-`SessionParameterControl::m_Sources` privately owns `ParameterSourceAdapters`, which
-contains the production `HostViewParameterSource`; its `m_Overrides` vector is
-private. Every production change to that set goes through Session control:
+`SessionParameterControl` owns the Host override set through its private
+`ParameterSourceAdapters::m_View`. All writes use this path:
 
 | Entry | Path to the Host override set |
 | --- | --- |
@@ -46,22 +45,20 @@ the safe boundary and binding policy are in
 
 `SessionParameterControl` advances `hostViewRevision` at the same sites: once after
 a committed batch whose finalized override set differs, and once when content
-binding or shutdown clears a non-empty set. NoChange batches, inherited value
-changes and queries leave it unchanged.
+binding or shutdown clears a non-empty set. Identical override states, inherited
+value changes and queries leave it unchanged.
 
-An exact-state batch records its control evidence in
-`ParameterBatchStatus::m_HostViewOperation`: the expected stamp, the stamp seen at
-the safe boundary, the stamp after commit and the changed override states. Its
-`m_Values` stay empty until commit, which writes each item's resolved target,
-including the inherited value of a removal. A content change while it is queued
-ends it with the `ExpectedContentChanged` conflict through `EndForContentChange`.
+`ParameterBatchStatus::m_HostViewOperation` records the control commit separately
+from effect receipts. `EndForContentChange` rejects an unapplied operation prepared
+against a replaced activation. Command usage and result fields are in
+[session parameters](../../.agents/skills/gglab-frame-capture/references/session-parameters.md#guarded-exact-override-states).
 
-Two similarly named paths do **not** write this set:
+Other layers have separate storage:
 
 - GUI panels edit `DevToolsRuntime::m_ViewRenderSettingsOverrides`; its
   `CaptureFrameSettings` copies active whole blocks into an AppRuntime snapshot.
-- Legacy sequence TAA/GTAO overrides patch a frame-local settings value in
-  `TickFrame`. Scheduled `view.*` parameter events, in contrast, use Session control.
+- Sequence TAA/GTAO overrides patch a frame-local settings value in `TickFrame`.
+  Scheduled `view.*` parameter events use Session control.
 
 `environment.profile` is a separate, Deferred Host source. Lab authoring writes can
 change inherited values but never write Host view overrides.
@@ -81,8 +78,8 @@ For one effective display view, the inherited settings are a pure function of:
 
 The display-view ID and selected camera identify which inputs apply.
 `ApplicationViewSettingsResolution::m_ToolingBlocks` records which whole tooling
-blocks replaced authored settings. `m_Shadow` is not a view-settings input. `m_ScenePreExposure` changes the derived exposure storage
-scale, not the two manual exposure inputs.
+blocks replaced authored settings. `m_ScenePreExposure` changes the derived exposure
+storage scale; manual exposure comes from the display camera.
 
 `GGLabAppRuntime::Tick` captures tooling once before `TickFrame`. The resolver
 lambda composed in [InitializeServices](../../Sources/GGLabAppRuntime/GGLabAppRuntimeServices.cpp)
@@ -95,7 +92,7 @@ content update and safe parameter application
   -> select effective display view
   -> authored profile + tooling blocks + display-camera exposure
   -> Host view overrides
-  -> reference sampling masks OR legacy sequence settings patches
+  -> reference sampling masks OR sequence settings patches
   -> temporal consumer plan and transaction
   -> BuildCaptureFrameState -> FrameCaptureCoordinator::BeginFrame (issue)
   -> BuildFrame -> graph build/record -> EndFrame -> submitted feedback
@@ -108,42 +105,20 @@ Other rendered views resolve separately and do not receive Host overrides.
 ### Host view bindings and the layers that patch them
 
 [HostViewParameters.cpp](../../Sources/GGLabAppRuntime/Parameters/HostViewParameters.cpp)
-declares 25 Immediate Host view bindings; types, ranges and enum members remain
-authoritative there. `TAA` is `m_TemporalAA`, `GTAO` is `m_Lighting.m_GTAO` and
-`Exposure` is `m_Exposure` in `ResolvedViewRenderSettings`. A dash means that layer
-does not patch the binding. Reference sampling and legacy sequence patches are
-mutually exclusive in a frame. `DescribeHostViewProjection` attributes each binding
-to the last layer that wrote it: the inherited layer (`content`, `tooling` or
-`camera`), then `host`, then `sequence` or `forced-reference`. Numeric equality
-never changes the source.
+declares the Immediate Host view bindings, types, ranges and enum members.
+`DescribeHostViewProjection` attributes each binding to the last layer that wrote
+it: inherited `content`, `tooling` or `camera`, then `host`, then `sequence` or
+`forced-reference`. Attribution follows writes even when values are equal.
+Reference sampling and sequence settings patches are mutually exclusive.
 
-| Host ID | Member | Inherited layer | Legacy sequence | Reference mask |
-| --- | --- | --- | --- | --- |
-| `view.taa.enabled` | `TAA.m_Enabled` | content / tooling TAA block | enabled | false |
-| `view.taa.max_history_feedback` | `TAA.m_MaxHistoryFeedback` | content / tooling TAA block | same field | - |
-| `view.taa.depth_absolute_threshold` | `TAA.m_DepthAbsoluteThreshold` | content / tooling TAA block | same field | - |
-| `view.taa.depth_relative_threshold` | `TAA.m_DepthRelativeThreshold` | content / tooling TAA block | same field | - |
-| `view.taa.velocity_weight_scale` | `TAA.m_VelocityWeightScale` | content / tooling TAA block | same field | - |
-| `view.taa.luminance_weight_scale` | `TAA.m_LuminanceWeightScale` | content / tooling TAA block | same field | - |
-| `view.taa.neighborhood_clamp_expansion` | `TAA.m_NeighborhoodClampExpansion` | content / tooling TAA block | same field | - |
-| `view.taa.history_relaxation` | `TAA.m_HistoryRelaxation` | content / tooling TAA block | same field | - |
-| `view.taa.variance_clip_gamma` | `TAA.m_VarianceClipGamma` | content / tooling TAA block | same field | - |
-| `view.taa.texture_lod_bias_offset` | `TAA.m_TextureLodBiasOffset` | content / tooling TAA block | same field | - |
-| `view.taa.history_accumulation` | `TAA.m_HistoryAccumulation` | content / tooling TAA block | same field | - |
-| `view.taa.history_rectification` | `TAA.m_HistoryRectification` | content / tooling TAA block | same field | - |
-| `view.taa.history_filter` | `TAA.m_HistoryFilter` | content / tooling TAA block | same field | - |
-| `view.taa.current_filter` | `TAA.m_CurrentFilter` | content / tooling TAA block | same field | - |
-| `view.taa.motion_selection` | `TAA.m_MotionSelection` | content / tooling TAA block | same field | - |
-| `view.taa.post_temporal_view` | `TAA.m_PostTemporalView` | content / tooling TAA block | same field | - |
-| `view.taa.resolution_preset` | `TAA.m_ResolutionPreset` | content / tooling TAA block | same field | - |
-| `view.gtao.enabled` | `GTAO.m_Enabled` | content / tooling GTAO block | - | - |
-| `view.gtao.radius` | `GTAO.m_Radius` | content / tooling GTAO block | - | - |
-| `view.gtao.direction_count` | `GTAO.m_DirectionCount` | content / tooling GTAO block | same field | - |
-| `view.gtao.step_count` | `GTAO.m_StepCount` | content / tooling GTAO block | same field | - |
-| `view.gtao.temporal_max_samples` | `GTAO.m_TemporalMaxSamples` | content / tooling GTAO block | same field | - |
-| `view.gtao.temporal_accumulation` | `GTAO.m_TemporalAccumulation` | content / tooling GTAO block | same field | false |
-| `view.exposure.ev100` | `Exposure.m_ManualEV100` | camera | - | - |
-| `view.exposure.compensation` | `Exposure.m_CompensationEV` | camera | - | - |
+| Host bindings | Inherited layer | Sequence settings patch | Reference mask |
+| --- | --- | --- | --- |
+| `view.taa.enabled` | content / tooling TAA block | enabled | false |
+| Other `view.taa.*` bindings | content / tooling TAA block | corresponding TAA field | - |
+| `view.gtao.enabled`, `view.gtao.radius` | content / tooling GTAO block | - | - |
+| `view.gtao.direction_count`, `step_count`, `temporal_max_samples` | content / tooling GTAO block | corresponding GTAO field | - |
+| `view.gtao.temporal_accumulation` | content / tooling GTAO block | temporal accumulation | false |
+| `view.exposure.ev100`, `view.exposure.compensation` | camera | - | - |
 
 The sequence patches call Runtime's typed patch functions from
 [FrameSequenceCoordinator.cpp](../../Sources/GGLabAppRuntime/Capture/FrameSequenceCoordinator.cpp).
@@ -151,20 +126,16 @@ A sequence camera or reference view can change exposure only by changing the cam
 
 ### Discovery and tracking
 
-Discovery `default` is the inherited resolved value; `current` includes Host
-overrides but not sequence/reference masks; `source: host` names the parameter
-owner. Discovery also reports `controlState` and, per Host view ID, `hostOverride`,
-`resolved` and `inheritedSource` from `SessionParameterControl::DescribeHostView`:
-the next frame's resolution before sequence or reference patches. Every descriptor
-reports `overrideOperationSupported`; Lab parameters and `environment.profile` add an
-`overrideOperationReason`. Frozen parameter values still hold only values that differ
-from their defaults, without override presence or layer attribution.
+`SessionParameterControl::DescribeHostView` resolves the next display view before
+sequence/reference patches. Discovery exposes inherited and Host-resolved values,
+override presence and attribution; `status.frame` exposes a frame's own projection.
 
 Tracking is lazy: the composed Session control starts disabled, `parameters` and
-`set` enable it through AppRuntime, and unfinished captures or an active sequence
-enable it in `TickFrame`. `RefreshSources` compares effective Host values and Lab
-revisions; content binding and committed batches also advance the legacy revision,
-which capture settling uses. `hostViewRevision` does not depend on this tracking.
+parameter mutations enable it through AppRuntime, and unfinished captures or an
+active sequence enable it in `TickFrame`. `RefreshSources` compares effective Host
+values and Lab revisions; content binding and committed batches also advance the
+parameter revision used by effects and capture settling. `hostViewRevision` is
+maintained independently.
 
 ## Content activation and continuation
 
@@ -196,23 +167,38 @@ and its [serializer](../../Sources/GGLabAppRuntime/Capture/FrameCaptureMetadata.
 | Host view values and sources | `m_HostViewProjection`, after sequence or reference patches |
 | Frame outcome | `m_Outcome`: planned, then submitted (`OnFrameSubmitted`) or aborted (`OnFrameAborted`) |
 | Content activation | `m_Temporal.m_SessionIdentity` from `m_ActiveContentIdentity`; textual `m_LabId`/`m_DemoId` |
-| Parameter revision | `m_ParameterRevision`, used only for settling |
+| Parameter revision | `m_ParameterRevision`, used for effect identity and capture settling |
 | TAA enabled | `m_Temporal.m_Requested` -> `temporal.requested`, after reference masking |
-| Other 16 TAA bindings | `m_Temporal` settings -> `temporal.settings.*` |
-| Six GTAO bindings | `m_Temporal.m_GTAO` -> `temporal.gtao.*` |
-| Exposure bindings | Final `displayViewSettings.m_Exposure` exists before issue but is persisted only after `BuildFrame`, as `sceneInputs.exposure.*` |
+| TAA settings | `m_Temporal` settings -> `temporal.settings.*` |
+| GTAO settings | `m_Temporal.m_GTAO` -> `temporal.gtao.*` |
+| Exposure bindings | The issue-time Host projection includes both manual inputs; `SetFrameSceneInputs` adds the built `sceneInputs.exposure.*` record |
 | Consumer status/reason | `m_Temporal.m_Consumers` -> `temporal.consumers[]`, named `temporal-aa`, `reference`, `temporal-gtao` |
 | Camera, extent and time | `m_Camera`, `m_Temporal` extents, `m_FixedDeltaTime`, `m_TotalTime` |
 
-`status.frame` reports the stamp, values, sources and outcome; capture sidecars do
-not record them.
+`status.frame` reports the stamp, projection and frame outcome. At issue,
+`FrameCaptureCoordinator::Issue` copies the stamp and projection into
+`FrameCaptureMetadata::m_Control`. Its versioned `control` record is saved in image
+sidecars, graph/resource frame metadata and bundle provenance, alongside the plan's
+predicate when present.
+
+### Capture predicates
+
+[TrySubmitCaptureJob](../../Sources/GGLabAppRuntime/GGLabAppRuntimeServices.cpp)
+checks the required content activation and committed Host revision;
+[CheckJobAdmission](../../Sources/GGLabAppRuntime/Capture/FrameCaptureCoordinator.cpp)
+checks the plan, run and
+[typed predicate](../../Sources/GGLabAppRuntime/Capture/RequiredFrameState.cpp).
+Admission copies the predicate into private immutable storage. `BeginFrame`
+evaluates it before capture issue: a lower revision waits, a matching due frame
+issues, and a contradiction fails the job. A retry evaluates the same predicate
+on its new frame; an issued attempt retains its frame's evidence through readback.
 
 `Application::HandleControlRequest` calls
 [CheckApplicationControlRunIdentity](../../Sources/WinAppHost/Application/Control/ApplicationControlProtocol.cpp)
 before any handle lookup or admission. A request whose optional `expectedRunIdentity`
 names another run is rejected, so a reused session name cannot reach the new
-process's job or batch IDs. `host-view-overrides` supplies that run from its required
-expected control state, and the session client carries it into result polling.
+process's job or batch IDs. The session client binds override operations and
+predicate captures to their specified run, including result polling.
 
 After issue, `OnFrameBuilt` checks parameter effects against the built display view,
 `SetFrameSceneInputs` adds exposure and lighting inputs, and only a successful
@@ -224,18 +210,13 @@ omit culled passes and the execution record. The Temporal AA resolve pass is
 `PostProcess.TemporalAA`, declared in
 [RenderPassTemporalAA.h](../../Sources/GGLabRuntime/Private/Graphics/RenderPass/RenderPassTemporalAA.h).
 
-[CompareCaptures.ps1](../../Scripts/Verification/CompareCaptures.ps1) reports
-informational metadata differences with a tolerance; `-RequireMatchingInputs`
-compares the same fields exactly, except `time.totalTime` and IBL publication
-serials. Directory pairing keys include the capture label.
-
 ## Owning tests
 
 | Target / source | Current coverage |
 | --- | --- |
 | `GGLabAppRuntimeTests`: [ParameterTransactionSelfTests.cpp](../../Tests/GGLabAppRuntime/ParameterTransactionSelfTests.cpp) | Batches, receipts, inherited parameters, `RunHostViewProjectionTests` and `RunHostViewAttributionTests` |
 | `GGLabAppRuntimeTests`: [GpuFaultLifecycleSelfTests.cpp](../../Tests/GGLabAppRuntime/GpuFaultLifecycleSelfTests.cpp) | Effective settings, Host view control state, exact Host view override states, content binding, rebuild, parameter-frame and sequence-event scenarios |
-| `GGLabAppRuntimeTests`: [FrameCaptureCoordinatorSelfTests.cpp](../../Tests/GGLabAppRuntime/FrameCaptureCoordinatorSelfTests.cpp) | Capture admission, readiness/settling, retries, SameFrame provenance and cancellation |
+| `GGLabAppRuntimeTests`: [FrameCaptureCoordinatorSelfTests.cpp](../../Tests/GGLabAppRuntime/FrameCaptureCoordinatorSelfTests.cpp) | Capture admission, predicates and immutable snapshots, readiness/settling, retries, SameFrame provenance and cancellation |
 | `WinAppTests`: [ApplicationControlSelfTests.cpp](../../Tests/WinApp/ApplicationControlSelfTests.cpp), [ApplicationLifecycleSelfTests.cpp](../../Tests/WinApp/ApplicationLifecycleSelfTests.cpp), [DevToolsViewProfileSelfTests.cpp](../../Tests/WinApp/DevToolsViewProfileSelfTests.cpp) | Wire parsing, run checks, exact-state operations and their results, status control state, host lifecycle and DevTools view-profile overrides |
 | `GGLabRuntimeTests`: [RenderingContractSelfTests.cpp](../../Tests/GGLabRuntime/RenderingContractSelfTests.cpp) | `RunViewSettingsPatchTests` and temporal history/reference contracts |
 | [TestCompareCaptures.ps1](../../Tests/Verification/TestCompareCaptures.ps1), suite `capture-comparison` | Capture comparison and its input checks |
@@ -256,12 +237,19 @@ Anchors:
   - Sources/GGLabAppRuntime/Parameters/SessionParameterControl.cpp::AdmitHostViewOverrides
   - Sources/GGLabAppRuntime/ApplicationToolingIntegration.cpp::ResolveApplicationViewSettings
   - Sources/GGLabAppRuntime/GGLabAppRuntimeFrame.cpp::BuildCaptureTemporalState
+  - Sources/GGLabAppRuntime/Capture/RequiredFrameState.cpp::ValidateRequiredFrameState
+  - Sources/GGLabAppRuntime/Capture/FrameCaptureCoordinator.cpp::FailRequiredFrameStateMismatch
   - Sources/GGLabRuntime/Private/Graphics/RenderPass/RenderPassTemporalAA.h
   - Sources/WinAppHost/Application/Control/ApplicationControlProtocol.cpp::CheckApplicationControlRunIdentity
   - Scripts/Verification/CompareCaptures.ps1
 ReviewPaths:
   - Sources/GGLabAppRuntime/Parameters/*
-  - Sources/GGLabAppRuntime/Capture/*
+  - Sources/GGLabAppRuntime/Capture/CapturePlan.h
+  - Sources/GGLabAppRuntime/Capture/RequiredFrameState.*
+  - Sources/GGLabAppRuntime/Capture/FrameCaptureCoordinator.*
+  - Sources/GGLabAppRuntime/Capture/FrameCaptureMetadata.*
+  - Sources/GGLabAppRuntime/Capture/FrameSequenceCoordinator.*
+  - Sources/GGLabAppRuntime/Capture/CaptureBundle.cpp
   - Sources/GGLabAppRuntime/ApplicationToolingIntegration.*
   - Sources/GGLabAppRuntime/GGLabAppRuntime*.cpp
   - Sources/GGLabRuntime/Private/Graphics/ViewRenderSettings*.cpp
@@ -275,6 +263,13 @@ ReviewPaths:
   - Projects/GGLabAppRuntime/GGLabAppRuntime.vcxproj
   - Projects/WinAppHost/WinAppHost.vcxproj
   - Projects/GGLabRuntime/GGLabRuntime.vcxproj
-  - Tests/GGLabAppRuntime/*
+  - Tests/GGLabAppRuntime/ParameterTransactionSelfTests.cpp
+  - Tests/GGLabAppRuntime/GpuFaultLifecycleSelfTests.cpp
+  - Tests/GGLabAppRuntime/FrameCaptureCoordinatorSelfTests.cpp
+  - Tests/WinApp/ApplicationControlSelfTests.cpp
+  - Tests/WinApp/DevToolsViewProfileSelfTests.cpp
+  - Tests/Verification/TestHostParameters.ps1
+  - Tests/Verification/TestVerificationSupport.ps1
+  - Scripts/Verification/ValidateCaptureBundles.py
   - Tests/Verification/TestCompareCaptures.ps1
 ```

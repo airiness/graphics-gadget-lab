@@ -1,5 +1,6 @@
 #include "Capture/FrameCaptureMetadata.h"
 #include "Capture/NonFiniteWatchCoordinator.h"
+#include "Capture/RequiredFrameState.h"
 #include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
 #include "GGLabFoundation/Hash/Sha256.h"
 
@@ -371,28 +372,103 @@ namespace gglab
 		return writer.Finish();
 	}
 
+	namespace
+	{
+		using OrderedJson = nlohmann::ordered_json;
+		constexpr std::array ParameterTypeNames{ "bool", "int", "uint", "float", "enum", "vector3", "color" };
+
+		[[nodiscard]] OrderedJson SerializeLabValue(const LabValue& input)
+		{
+			return std::visit([](const auto& item) -> OrderedJson
+				{
+					using T = std::decay_t<decltype(item)>;
+					if constexpr (std::is_same_v<T, Vector3>)
+					{
+						return OrderedJson::array({ item.m_X, item.m_Y, item.m_Z });
+					}
+					else if constexpr (std::is_same_v<T, Color>)
+					{
+						return OrderedJson::array({ item.m_R, item.m_G, item.m_B, item.m_A });
+					}
+					else
+					{
+						return item;
+					}
+				}, input);
+		}
+
+		[[nodiscard]] OrderedJson SerializeHostViewStamp(const HostViewControlStamp& stamp)
+		{
+			return {
+				{ "runIdentity", stamp.m_RunIdentity.empty() ? OrderedJson() : OrderedJson(stamp.m_RunIdentity) },
+				{ "contentIdentity", stamp.m_ContentIdentity },
+				{ "hostViewRevision", stamp.m_HostViewRevision } };
+		}
+
+		// The predicate keeps its requested form; unset optional fields are null.
+		[[nodiscard]] OrderedJson SerializeRequiredFrameState(const RequiredFrameState& state)
+		{
+			OrderedJson values = OrderedJson::array();
+			for (const RequiredFrameValue& value : state.m_Values)
+			{
+				values.push_back({
+					{ "id", value.m_Id.GetName() },
+					{ "type", ParameterTypeNames[static_cast<size_t>(value.m_Type)] },
+					{ "value", SerializeLabValue(value.m_Value) },
+					{ "source", value.m_Source ?
+						OrderedJson(GetHostViewValueSourceName(*value.m_Source)) :
+						OrderedJson() } });
+			}
+			OrderedJson consumers = OrderedJson::array();
+			for (const RequiredTemporalConsumer& consumer : state.m_TemporalConsumers)
+			{
+				consumers.push_back({
+					{ "consumer", GetTemporalConsumerName(consumer.m_Consumer) },
+					{ "status", GetTemporalConsumerStatusName(consumer.m_Status) },
+					{ "disableReason", consumer.m_DisableReason ?
+						OrderedJson(GetTemporalConsumerDisableReasonName(*consumer.m_DisableReason)) :
+						OrderedJson() } });
+			}
+			return {
+				{ "runIdentity", state.m_RunIdentity },
+				{ "contentIdentity", state.m_ContentIdentity },
+				{ "minHostViewRevision", state.m_MinHostViewRevision },
+				{ "values", std::move(values) },
+				{ "temporalConsumers", std::move(consumers) },
+				{ "referenceSampling", state.m_ReferenceSampling ?
+					OrderedJson(*state.m_ReferenceSampling) :
+					OrderedJson() } };
+		}
+
+		[[nodiscard]] std::string SerializeControlState(const FrameCaptureControlState& control)
+		{
+			OrderedJson hostView = OrderedJson::array();
+			for (const HostViewProjectionEntry& entry : control.m_HostView)
+			{
+				hostView.push_back({
+					{ "id", entry.m_Id.GetName() },
+					{ "type", ParameterTypeNames[static_cast<size_t>(entry.m_Type)] },
+					{ "value", SerializeLabValue(entry.m_Value) },
+					{ "source", GetHostViewValueSourceName(entry.m_Source) },
+					{ "inheritedSource", GetHostViewValueSourceName(entry.m_InheritedSource) },
+					{ "hostOverride", entry.m_Override ?
+						OrderedJson{ { "present", true }, { "value", SerializeLabValue(*entry.m_Override) } } :
+						OrderedJson{ { "present", false } } } });
+			}
+			return OrderedJson{
+				{ "schemaVersion", FrameCaptureControlSchemaVersion },
+				{ "hostViewControl", SerializeHostViewStamp(control.m_HostViewControl) },
+				{ "hostView", std::move(hostView) },
+				{ "requiredFrameState", control.m_RequiredFrameState ?
+					SerializeRequiredFrameState(*control.m_RequiredFrameState) :
+					OrderedJson() } }.dump(-1, ' ', false, OrderedJson::error_handler_t::replace);
+		}
+	}
+
 	std::string SerializeParameterFrameState(const ParameterFrameState& frame) noexcept
 	{
 		using Json = nlohmann::ordered_json;
-		const auto value = [](const LabValue& input)
-			{
-				return std::visit([](const auto& item) -> Json
-					{
-						using T = std::decay_t<decltype(item)>;
-						if constexpr (std::is_same_v<T, Vector3>)
-						{
-							return Json::array({ item.m_X, item.m_Y, item.m_Z });
-						}
-						else if constexpr (std::is_same_v<T, Color>)
-						{
-							return Json::array({ item.m_R, item.m_G, item.m_B, item.m_A });
-						}
-						else
-						{
-							return item;
-						}
-					}, input);
-			};
+		const auto value = [](const LabValue& input) { return SerializeLabValue(input); };
 		const auto lighting = [](const ParameterFrameLighting& state)
 			{
 				return Json{
@@ -401,7 +477,6 @@ namespace gglab
 					{ "profileHash", state.m_Profile ? Json(Sha256DigestToHex(state.m_Profile->m_Hash)) : Json() },
 					{ "profileHashVersion", state.m_Profile ? Json(LightingProfileHashVersion) : Json() } };
 			};
-		static constexpr std::array typeNames{ "bool", "int", "uint", "float", "enum", "vector3", "color" };
 		static constexpr std::array classNames{ "Immediate", "Deferred", "Rebuild" };
 		static constexpr std::array stateNames{ "Requested", "Applied", "Published", "Consumed",
 			"Superseded", "NoChange", "EffectNotReached", "Failed" };
@@ -411,7 +486,7 @@ namespace gglab
 			values.push_back({
 				{ "id", item.m_Id },
 				{ "source", item.m_Source },
-				{ "type", typeNames[static_cast<size_t>(item.m_Type)] },
+				{ "type", ParameterTypeNames[static_cast<size_t>(item.m_Type)] },
 				{ "value", value(item.m_Value) },
 				{ "default", value(item.m_Default) } });
 		}
@@ -640,6 +715,15 @@ namespace gglab
 		writer.EndArray();
 		writer.Number("renderScale", temporal.m_RenderScale);
 		writer.EndObject();
+
+		if (metadata.m_Control)
+		{
+			writer.Json("control", SerializeControlState(*metadata.m_Control));
+		}
+		else
+		{
+			writer.Null("control");
+		}
 
 		if (metadata.m_Sequence)
 		{

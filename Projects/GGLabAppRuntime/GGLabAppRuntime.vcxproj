@@ -105,6 +105,7 @@
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\NonFiniteWatchCoordinator.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureMetadata.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\FrameSequenceCoordinator.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\RequiredFrameState.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\ResourceExportWriter.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Demo\DemoManager.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Demo\DemoLoadingShell.cpp" />
@@ -151,6 +152,7 @@
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureMetadata.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\FrameCaptureReadiness.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\FrameSequenceCoordinator.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\RequiredFrameState.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\ResourceExportWriter.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Demo\DemoBase.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Demo\DemoManager.h" />

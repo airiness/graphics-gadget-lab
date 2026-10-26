@@ -490,6 +490,213 @@ namespace gglab
 				"File names retain the sanitized label and a qualified bundle identity");
 		}
 
+		constexpr std::string_view RequiredStateRun = "0123456789abcdef0123456789abcdef";
+
+		[[nodiscard]] FrameCaptureFrameState MakeControlledFrameState(
+			uint64_t serial, uint64_t hostViewRevision, bool temporalAA)
+		{
+			FrameCaptureFrameState state = MakeFrameState(true);
+			state.m_FrameSerial = serial;
+			state.m_HostViewControl = { std::string(RequiredStateRun), 7, hostViewRevision };
+			state.m_HostViewProjection = { HostViewProjectionEntry{
+				.m_Id = LabParameterId("view.taa.enabled"),
+				.m_Type = LabParameterType::Bool,
+				.m_Value = temporalAA,
+				.m_Source = HostViewValueSource::Host,
+				.m_InheritedSource = HostViewValueSource::Content,
+				.m_Override = temporalAA,
+			} };
+			state.m_Temporal.m_Consumers = {
+				{ "temporal-aa", temporalAA, temporalAA ? "active" : "disabled", temporalAA ? "none" : "not-requested", {} },
+				{ "reference", false, "disabled", "not-requested", {} },
+			};
+			return state;
+		}
+
+		[[nodiscard]] std::shared_ptr<RequiredFrameState> MakeRequiredFrameState(
+			bool temporalAA, uint64_t minHostViewRevision)
+		{
+			auto required = std::make_shared<RequiredFrameState>();
+			required->m_RunIdentity = RequiredStateRun;
+			required->m_ContentIdentity = 7;
+			required->m_MinHostViewRevision = minHostViewRevision;
+			required->m_Values = { { LabParameterId("view.taa.enabled"), LabParameterType::Bool, temporalAA,
+				HostViewValueSource::Host } };
+			required->m_TemporalConsumers = { { TemporalConsumer::TemporalAA,
+				temporalAA ? TemporalConsumerStatus::Active : TemporalConsumerStatus::Disabled, std::nullopt } };
+			required->m_ReferenceSampling = false;
+			return required;
+		}
+
+		void RunRequiredFrameStateTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("frame-capture-required-state");
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({
+				.m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(),
+				.m_ImageEncoder = &EncodeTestPng,
+				.m_WriteOnCallingThread = true,
+				.m_RunIdentity = std::string(RequiredStateRun),
+			});
+			CaptureTestJobs coordinatorJobs(coordinator, context);
+			const auto plan = [](std::shared_ptr<const RequiredFrameState> required)
+				{
+					return CapturePlan{ .m_RequiredProducts = { ImageCaptureProduct{} },
+						.m_RequiredFrameState = std::move(required) };
+				};
+
+			auto wrongType = MakeRequiredFrameState(false, 0);
+			wrongType->m_Values[0].m_Type = LabParameterType::Float;
+			auto duplicate = MakeRequiredFrameState(false, 0);
+			duplicate->m_Values.push_back(duplicate->m_Values[0]);
+			auto contradictory = MakeRequiredFrameState(false, 0);
+			contradictory->m_TemporalConsumers[0].m_DisableReason = TemporalConsumerDisableReason::None;
+			auto disabledValueActive = MakeRequiredFrameState(false, 0);
+			disabledValueActive->m_TemporalConsumers[0].m_Status = TemporalConsumerStatus::Active;
+			auto enabledValueDisabled = MakeRequiredFrameState(true, 0);
+			enabledValueDisabled->m_TemporalConsumers[0].m_Status = TemporalConsumerStatus::Disabled;
+			auto unavailableUnrequested = MakeRequiredFrameState(true, 0);
+			unavailableUnrequested->m_TemporalConsumers[0] = { TemporalConsumer::TemporalAA,
+				TemporalConsumerStatus::Unavailable, TemporalConsumerDisableReason::NotRequested };
+			auto referenceWithTemporalAA = MakeRequiredFrameState(true, 0);
+			referenceWithTemporalAA->m_TemporalConsumers.clear();
+			referenceWithTemporalAA->m_ReferenceSampling = true;
+			auto gtaoOffActive = MakeRequiredFrameState(false, 0);
+			gtaoOffActive->m_Values.push_back({ LabParameterId("view.gtao.enabled"), LabParameterType::Bool, false });
+			gtaoOffActive->m_TemporalConsumers.push_back({ TemporalConsumer::AmbientOcclusion,
+				TemporalConsumerStatus::Active, std::nullopt });
+			auto otherRun = MakeRequiredFrameState(false, 0);
+			otherRun->m_RunIdentity = "ffffffffffffffffffffffffffffffff";
+			CapturePlan sequence = plan(MakeRequiredFrameState(false, 0));
+			sequence.m_Sequence = FrameCaptureSequenceInfo{ .m_SequenceId = 1 };
+			const auto reason = [&](const CapturePlan& candidate) { return coordinator.CheckJobAdmission(candidate).m_Reason; };
+			context.Check(reason(plan(wrongType)) == CaptureAdmissionReason::RequiredFrameStateInvalid &&
+				reason(plan(duplicate)) == CaptureAdmissionReason::RequiredFrameStateInvalid &&
+				reason(plan(contradictory)) == CaptureAdmissionReason::RequiredFrameStateInvalid &&
+				reason(sequence) == CaptureAdmissionReason::RequiredFrameStateInvalid &&
+				reason(plan(otherRun)) == CaptureAdmissionReason::RequiredFrameStateUnavailable &&
+				coordinator.GetIntakeSnapshot().m_ActiveJobs == 0,
+				"Invalid predicates and another run's predicate reject before allocating a job");
+			context.Check(reason(plan(disabledValueActive)) == CaptureAdmissionReason::RequiredFrameStateInvalid &&
+				reason(plan(enabledValueDisabled)) == CaptureAdmissionReason::RequiredFrameStateInvalid &&
+				reason(plan(unavailableUnrequested)) == CaptureAdmissionReason::RequiredFrameStateInvalid &&
+				reason(plan(referenceWithTemporalAA)) == CaptureAdmissionReason::RequiredFrameStateInvalid &&
+				reason(plan(gtaoOffActive)) == CaptureAdmissionReason::RequiredFrameStateInvalid,
+				"Values and consumer states that the frame plan cannot resolve together reject at admission");
+
+			const uint64_t waiting = coordinatorJobs.Admit(plan(MakeRequiredFrameState(false, 3)));
+			coordinator.BeginFrame(MakeControlledFrameState(17, 2, false));
+			coordinator.OnFrameSubmitted();
+			context.Check(control.m_Issued.empty() && coordinatorJobs.TakeResults().empty(),
+				"A frame below the required Host view revision keeps the plan waiting");
+			coordinator.BeginFrame(MakeControlledFrameState(18, 3, false));
+			coordinator.OnFrameSubmitted();
+			context.Check(control.m_Issued.size() == 1 && control.m_Issued[0].m_FrameSerial == 18,
+				"The first matching frame at the required revision issues the plan");
+			if (control.m_Issued.size() != 1)
+			{
+				return;
+			}
+			control.Complete(control.m_Issued[0].m_Id);
+			coordinator.Update();
+			auto results = coordinatorJobs.TakeResults();
+			const bool published = results.size() == 1 && results[0].m_JobId == waiting &&
+				results[0].m_Status == CaptureJobStatus::Completed && results[0].m_FailureCode.empty() &&
+				results[0].m_Products[0].m_Metadata && results[0].m_Products[0].m_Metadata->m_Control;
+			context.Check(published, "A matching predicate capture publishes normally");
+			if (published)
+			{
+				const FrameCaptureControlState& evidence = *results[0].m_Products[0].m_Metadata->m_Control;
+				const std::string json = ReadText(ProductFile(results[0], ".json"));
+				context.Check(evidence.m_HostViewControl.m_HostViewRevision == 3 && evidence.m_HostView.size() == 1 &&
+					evidence.m_RequiredFrameState && evidence.m_RequiredFrameState->m_MinHostViewRevision == 3 &&
+					json.find("\"control\": {\"schemaVersion\":1,\"hostViewControl\":") != std::string::npos &&
+					json.find("\"minHostViewRevision\":3") != std::string::npos,
+					"The sidecar records the issued frame's control evidence beside its predicate");
+			}
+
+			const uint64_t mismatched = coordinatorJobs.Admit(plan(MakeRequiredFrameState(false, 0)));
+			coordinator.BeginFrame(MakeControlledFrameState(19, 4, true));
+			coordinator.OnFrameSubmitted();
+			coordinator.Update();
+			results = coordinatorJobs.TakeResults();
+			context.Check(control.m_Issued.size() == 1 && results.size() == 1 && results[0].m_JobId == mismatched &&
+				results[0].m_Status == CaptureJobStatus::Failed &&
+				results[0].m_FailureCode == "RequiredFrameStateMismatch" &&
+				results[0].m_Products[0].m_Failure.find("view.taa.enabled value true, required false") != std::string::npos &&
+				results[0].m_Products[0].m_Failure.find("temporal-aa status active, required disabled") != std::string::npos &&
+				!results[0].m_Products[0].m_Metadata,
+				"A contradicting due frame fails the plan with its differences and is never captured");
+
+			auto sourced = MakeRequiredFrameState(true, 0);
+			sourced->m_Values[0].m_Source = HostViewValueSource::Tooling;
+			GGLAB_UNUSED(coordinatorJobs.Admit(plan(sourced)));
+			coordinator.BeginFrame(MakeControlledFrameState(20, 4, true));
+			coordinator.OnFrameSubmitted();
+			coordinator.Update();
+			results = coordinatorJobs.TakeResults();
+			context.Check(results.size() == 1 && results[0].m_FailureCode == "RequiredFrameStateMismatch" &&
+				results[0].m_Products[0].m_Failure.find("source host, required tooling") != std::string::npos,
+				"A required source is compared with resolver attribution, not value equality");
+
+			const uint64_t retried = coordinatorJobs.Admit(plan(MakeRequiredFrameState(true, 0)));
+			coordinator.BeginFrame(MakeControlledFrameState(21, 5, true));
+			const bool issued = control.m_Issued.size() == 2;
+			if (issued)
+			{
+				control.Busy(control.m_Issued.back().m_Id);
+				coordinator.Update();
+			}
+			coordinator.OnFrameAborted();
+			coordinator.BeginFrame(MakeControlledFrameState(22, 6, false));
+			coordinator.OnFrameSubmitted();
+			coordinator.Update();
+			results = coordinatorJobs.TakeResults();
+			context.Check(issued && control.m_Issued.size() == 2 && results.size() == 1 &&
+				results[0].m_JobId == retried && results[0].m_FailureCode == "RequiredFrameStateMismatch",
+				"A retried attempt re-evaluates its predicate on the new frame");
+
+			auto content = MakeRequiredFrameState(false, 0);
+			content->m_ContentIdentity = 8;
+			GGLAB_UNUSED(coordinatorJobs.Admit(plan(content)));
+			coordinator.BeginFrame(MakeControlledFrameState(23, 6, false));
+			coordinator.OnFrameSubmitted();
+			coordinator.Update();
+			results = coordinatorJobs.TakeResults();
+			context.Check(results.size() == 1 && results[0].m_FailureCode == "RequiredFrameStateMismatch" &&
+				results[0].m_Products[0].m_Failure.find("content identity 7, required 8") != std::string::npos,
+				"A content activation other than the required one fails rather than waits");
+
+			// A caller that keeps a mutable pointer cannot steer an admitted plan or its record.
+			const auto shared = MakeRequiredFrameState(false, 0);
+			const uint64_t frozen = coordinatorJobs.Admit(plan(shared));
+			shared->m_Values[0].m_Value = true;
+			shared->m_TemporalConsumers[0].m_Status = TemporalConsumerStatus::Active;
+			coordinator.BeginFrame(MakeControlledFrameState(24, 6, false));
+			coordinator.OnFrameSubmitted();
+			const bool frozenIssued = control.m_Issued.size() == 3 && control.m_Issued.back().m_FrameSerial == 24;
+			if (frozenIssued)
+			{
+				shared->m_MinHostViewRevision = 99;
+				control.Complete(control.m_Issued.back().m_Id);
+				coordinator.Update();
+			}
+			results = coordinatorJobs.TakeResults();
+			const FrameCaptureMetadata* frozenMetadata =
+				results.size() == 1 && results[0].m_JobId == frozen && results[0].m_Products[0].m_Metadata ?
+					&*results[0].m_Products[0].m_Metadata :
+					nullptr;
+			const RequiredFrameState* recorded = frozenMetadata && frozenMetadata->m_Control ?
+				frozenMetadata->m_Control->m_RequiredFrameState.get() :
+				nullptr;
+			context.Check(frozenIssued && recorded && results[0].m_Status == CaptureJobStatus::Completed &&
+				recorded != shared.get() && !std::get<bool>(recorded->m_Values[0].m_Value) &&
+				recorded->m_TemporalConsumers[0].m_Status == TemporalConsumerStatus::Disabled &&
+				recorded->m_MinHostViewRevision == 0,
+				"Admission keeps a private predicate snapshot for the issue decision and the sidecar");
+		}
+
 		void RunAfterReadyTests(SelfTestContext& context) noexcept
 		{
 			TemporaryDirectory directory("frame-capture-ready");
@@ -5204,6 +5411,7 @@ namespace gglab
 		RunGraphWritingTests(context);
 		RunGraphFailureTests(context);
 		RunNextFrameTests(context);
+		RunRequiredFrameStateTests(context);
 		RunAfterReadyTests(context);
 		RunParameterSettlingTests(context);
 		RunHistoryContinuitySettlingTests(context);

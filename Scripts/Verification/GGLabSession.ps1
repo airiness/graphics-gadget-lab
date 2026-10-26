@@ -42,6 +42,10 @@ Commands:
            terminal receipt unless -NoWait or -KeepResult. -Products/-ProductsFile
            accepts typed products instead of the default single image.
            -View restores a camera reference view of the active content first.
+           -RequiredFrameState/-RequiredFrameStateFile is a JSON object the issued frame
+           must satisfy (also for graph and export); a contradicting due frame fails the job
+           with failureCode RequiredFrameStateMismatch instead of capturing it. Its run also
+           guards admission and result polling, as -ExpectedRunIdentity would.
   graph    Export the full frame graph, or discovery addresses with -Summary.
   export   Export one frame's resource group as NPY arrays and JSON metadata.
            -Targets/-TargetsFile accepts resource addresses; -IncludeGraph pairs
@@ -135,6 +139,9 @@ param(
     [switch]$KeepResult,
     [string]$Products,
     [string]$ProductsFile,
+    # capture/graph/export: the typed frame predicate, directly or from a UTF-8 file.
+    [string]$RequiredFrameState,
+    [string]$RequiredFrameStateFile,
     # graph: only executed passes with resource-version addresses.
     [switch]$Summary,
     # export: a JSON array of resource addresses, directly or from a UTF-8 file.
@@ -336,6 +343,14 @@ function New-CaptureRequest([string]$ViewId) {
     if ($ViewId) { $request['view'] = $ViewId }
     if ($Label) { $request['label'] = $Label }
     if ($Note) { $request['note'] = $Note }
+    if ($RequiredFrameState -or $RequiredFrameStateFile) {
+        try {
+            $required = Read-JsonObject $RequiredFrameState $RequiredFrameStateFile 'RequiredFrameState'
+        }
+        catch { Fail $_.Exception.Message @{ session = $Session } }
+        $script:ExpectedRunIdentity = Get-ExpectedStateRun $required 'RequiredFrameState'
+        $request['requiredFrameState'] = $required
+    }
     return $request
 }
 
@@ -459,17 +474,16 @@ function Read-JsonObject([string]$Text, [string]$File, [string]$Name) {
     catch { Fail "-$Name contains invalid JSON: $($_.Exception.Message)" }
 }
 
-# The expected control state names the run. Binding it guards every later request of this
-# command, including result polling, against a restarted session with the same name.
-function Get-ExpectedStateRun($Expected) {
+# An expected control state or required frame state names the run. Binding it guards every
+# later request of this command, including result polling, against a restarted session with
+# the same name.
+function Get-ExpectedStateRun($Expected, [string]$Name = 'ExpectedState') {
     $run = Get-Field $Expected 'runIdentity'
     if ($run -isnot [string] -or $run -cnotmatch '^[0-9a-f]{32}$') {
-        Fail '-ExpectedState requires a complete control state with a 32-digit lowercase hexadecimal runIdentity.' @{
-            session = $Session
-        }
+        Fail "-$Name requires a 32-digit lowercase hexadecimal runIdentity." @{ session = $Session }
     }
     if ($ExpectedRunIdentity -and $run -ne $ExpectedRunIdentity) {
-        Fail '-ExpectedRunIdentity differs from the run in -ExpectedState.' @{ session = $Session }
+        Fail "-ExpectedRunIdentity differs from the run in -$Name." @{ session = $Session }
     }
     return $run
 }

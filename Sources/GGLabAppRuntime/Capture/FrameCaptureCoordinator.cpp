@@ -255,6 +255,16 @@ namespace gglab
 		{
 			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::InvalidPlan };
 		}
+		// Sequence frames are bound to a camera path, not to a required display state.
+		// Only a predicate plan pays for validation; others admit without allocating.
+		if (plan.m_RequiredFrameState)
+		{
+			std::string error;
+			if (plan.m_Sequence || !ValidateRequiredFrameState(*plan.m_RequiredFrameState, error))
+			{
+				return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::RequiredFrameStateInvalid };
+			}
+		}
 		if (m_NextJobId == 0)
 		{
 			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::IdentityExhausted };
@@ -262,6 +272,10 @@ namespace gglab
 		if (m_RunIdentity.empty())
 		{
 			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::IdentityUnavailable };
+		}
+		if (plan.m_RequiredFrameState && plan.m_RequiredFrameState->m_RunIdentity != m_RunIdentity)
+		{
+			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::RequiredFrameStateUnavailable };
 		}
 		if (m_ActiveJobs >= m_JobLimits.m_MaxActiveJobs)
 		{
@@ -281,6 +295,12 @@ namespace gglab
 		if (admission.m_Status != CaptureAdmissionStatus::Accepted)
 		{
 			return admission;
+		}
+		// An admitted plan owns a private copy of what was validated, so a caller that kept
+		// a mutable pointer can change neither the issue decision nor the recorded predicate.
+		if (plan.m_RequiredFrameState)
+		{
+			plan.m_RequiredFrameState = std::make_shared<const RequiredFrameState>(*plan.m_RequiredFrameState);
 		}
 		const auto slot = std::ranges::find(m_JobReceipts, uint64_t{ 0 }, &JobReceipt::m_JobId);
 		RemoveFinishedJobs();
@@ -740,7 +760,7 @@ namespace gglab
 				{
 					FailPlan(job, readinessFailure);
 				}
-				else if (IsDue(job, state))
+				else if (IsDue(job, state) && !FailRequiredFrameStateMismatch(job, state))
 				{
 					const auto tap = entry.GetDiagnosticTap();
 					if (entry.GetSource() == FrameCaptureSource::Diagnostic && tap &&
@@ -784,7 +804,7 @@ namespace gglab
 				FailPlan(job, readinessFailure);
 				continue;
 			}
-			if (!IsDue(job, state))
+			if (!IsDue(job, state) || FailRequiredFrameStateMismatch(job, state))
 			{
 				continue;
 			}
@@ -1095,8 +1115,33 @@ namespace gglab
 		{
 			return false;
 		}
-		return plan.m_Timing == FrameCaptureTiming::NextFrame ||
+		const bool due = plan.m_Timing == FrameCaptureTiming::NextFrame ||
 			(m_HistoryReady && MatchesRequiredContent(job, state) && m_SettledFrames >= plan.m_SettleFrames);
+		// A frame below the required Host view revision leaves the plan waiting.
+		return due && EvaluateRequiredFrameState(job, state).m_Verdict != RequiredFrameStateVerdict::Wait;
+	}
+
+	RequiredFrameStateEvaluation FrameCaptureCoordinator::EvaluateRequiredFrameState(
+		const CaptureJob& job, const FrameCaptureFrameState& state)
+	{
+		return job.m_Plan.m_RequiredFrameState ?
+			gglab::EvaluateRequiredFrameState(*job.m_Plan.m_RequiredFrameState, state.m_HostViewControl,
+				state.m_HostViewProjection, state.m_Temporal) :
+			RequiredFrameStateEvaluation{};
+	}
+
+	bool FrameCaptureCoordinator::FailRequiredFrameStateMismatch(
+		CaptureJob& job, const FrameCaptureFrameState& state) noexcept
+	{
+		const RequiredFrameStateEvaluation evaluation = EvaluateRequiredFrameState(job, state);
+		if (evaluation.m_Verdict != RequiredFrameStateVerdict::Mismatch)
+		{
+			return false;
+		}
+		// Decided before issue: no tap binds and no recorded GPU work needs to abort.
+		FailPlan(job, std::format("RequiredFrameStateMismatch: frame {}: {}.", state.m_FrameSerial,
+			evaluation.m_Differences), "RequiredFrameStateMismatch");
+		return true;
 	}
 
 	bool FrameCaptureCoordinator::HasFrameGraphExports(uint64_t frameSerial) const noexcept
@@ -1226,6 +1271,14 @@ namespace gglab
 		metadata.m_DevelopmentTools = state.m_DevelopmentTools;
 		metadata.m_Readiness = state.m_Readiness;
 		metadata.m_Temporal = state.m_Temporal;
+		if (!state.m_HostViewProjection.empty())
+		{
+			metadata.m_Control = FrameCaptureControlState{
+				.m_HostViewControl = state.m_HostViewControl,
+				.m_HostView = state.m_HostViewProjection,
+				.m_RequiredFrameState = plan.m_RequiredFrameState,
+			};
+		}
 		metadata.m_Sequence = plan.m_Sequence;
 		metadata.m_DiagnosticTap = tap ? std::string(GetFrameCaptureDiagnosticTapName(*tap)) : std::string();
 		metadata.m_CapturedAtUtc = std::format("{:%FT%TZ}",
@@ -1263,12 +1316,14 @@ namespace gglab
 		entry.m_Phase = Phase::Issued;
 	}
 
-	void FrameCaptureCoordinator::FailPlan(CaptureJob& job, std::string failure) noexcept
+	void FrameCaptureCoordinator::FailPlan(CaptureJob& job, std::string failure,
+		std::string_view failureCode) noexcept
 	{
 		if (job.m_Attempt && !job.m_Attempt->m_Submitted && job.m_DeliveryCount > 1)
 		{
 			m_AbortFrameSerial = job.m_Attempt->m_FrameSerial;
 		}
+		job.m_Result.m_FailureCode = failureCode;
 		for (ProductDelivery* member : GetDeliveries(job))
 		{
 			GGLAB_ASSERT_MSG(member->m_Phase != Phase::Encoding,
