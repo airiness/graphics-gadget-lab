@@ -95,3 +95,59 @@ tolerances; exit 1 also reports missing pairs or size mismatch. Metadata differe
 alone do not fail. Inspect both images and amplified differences; choose tolerances
 for the intended claim rather than assuming bit identity. GPU-free regression:
 `Tests/Verification/TestCompareCaptures.ps1`.
+
+## Guarded TAA comparison
+
+`Invoke-TaaComparison.ps1` runs the static lighting-contract fixture in one fresh
+hidden automation session. It pins TAA's Native preset, captures TAA Active and
+Disabled arms with 32 settled frames each, and requires one Published SameFrame
+image/full-graph bundle per arm. The graph checks `PostProcess.TemporalAA` against
+the recorded executed pass indices. It then restores the original Host override
+presence/value and captures a submitted restoration observation.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/Verification/Invoke-TaaComparison.ps1 `
+    -Configuration Develop -Rhi dx12 -Python python
+powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/RunVerification.ps1 `
+    -Suite taa-comparison -Configuration Develop,Release -Rhi dx12,vulkan -Python python
+```
+
+Python needs `jsonschema`; select an installed environment with `-Python`.
+`-OutputDirectory` creates a unique run child; `-RunDirectory` names an exact new
+directory. `-TimeoutSeconds` bounds each client wait. Read `result.json`,
+`journal.json`, `comparison.json`, the session log and the published products.
+The journal retains requested operations, confirmed handles, receipts and chained
+control stamps. `cleanup.intentRestored`, `effectsSucceeded` and
+`renderingVerified` are separate claims.
+
+By default the runner creates and stops only its own matching run. `-Attach
+-Session <id>` can use an existing automation session only if its fixed fixture,
+640x360 extent, fixed step and disabled DevTools pass preflight/capture checks;
+it never automatically stops an attached process. Developer/F5 lifetime and
+suspended responsiveness remain separate work.
+
+`RestoreConflict` leaves a concurrent writer's state intact, reporting remaining
+differences. Content replacement reports cleared overrides or currently present
+overrides whose retention ownership discovery cannot establish; it never restores
+across the activation change.
+Lost admission or consumption is uncertain: do not replay a mutation or consuming
+query from the journal. Recover confirmed handles only against the recorded
+`runIdentity`, using [session jobs](session-jobs.md#run-checked-requests) and
+[parameter results](session-parameters.md). Terminal evidence is saved before
+consumption. On capture timeout the runner cancels its owned job and reads the
+actual terminal result: `TooLate` can still publish or fail, and an unconfirmed
+cancellation never proves publication was prevented.
+
+The comparer accepts `-AllowedDifferencePolicy <file>`. The shipped
+`TaaComparison.policy.json` declares the TAA differences and static time mode.
+Unknown paths/wildcards reject; consumers compare by name, Host view entries by
+id, and the temporal service union is checked. Both metadata reporting and
+`-RequireMatchingInputs` use the same exact permissions, including explicit
+static-time and IBL-publication exceptions. Image size and render extent must
+match. The runner reports pixel metrics without pixel acceptance thresholds;
+this experiment proves the control/evidence loop, not TAA image quality.
+
+GPU-free suites `capture-comparison` and `taa-comparison-workflow` cover comparison
+policies, cancellation verdicts, lost responses, conflicts, ownership and required
+graph evidence. GPU suite `taa-comparison` supports Debug/Develop/Release on both
+RHIs; each configuration needs its own built executable.

@@ -325,10 +325,10 @@ switch ($Command) {
     Copy-Item -LiteralPath (Join-Path $root 'Scripts/Verification/VerificationSupport.psm1') -Destination $runnerTools
     [IO.File]::WriteAllText((Join-Path $runnerBin 'GraphicsGadgetLab.exe'), '')
     $leafSource = @'
-param([string]$OutputDirectory, [string]$RunDirectory, [string[]]$Configuration, [string[]]$Rhi)
+param([string]$OutputDirectory, [string]$RunDirectory, [string[]]$Configuration, [string[]]$Rhi, [string]$Python)
 Import-Module (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'Scripts/Verification/VerificationSupport.psm1')
 $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory -RunId 'leaf-run-id'
-[Console]::Out.WriteLine((@{ ok=$true; directory=$directory; configuration=$Configuration; rhi=$Rhi } | ConvertTo-Json -Compress))
+[Console]::Out.WriteLine((@{ ok=$true; directory=$directory; configuration=$Configuration; rhi=$Rhi; python=$Python } | ConvertTo-Json -Compress))
 '@
     # Keep catalog expectations and leaf fixtures together so their counts cannot drift.
     $gpuLeaves = [ordered]@{
@@ -338,6 +338,7 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
         'lab-sun-parameters' = 'TestLabSunParameters.ps1'
         'session-rebuild-parameters' = 'TestRebuildParameters.ps1'
         'session-host-parameters' = 'TestHostParameters.ps1'
+        'taa-comparison' = 'TestTaaComparison.ps1'
         'session-parameters' = 'TestSessionParameters.ps1'
         'capture-jobs' = 'TestCaptureJobs.ps1'
         'capture-on-ready' = 'TestCaptureOnReady.ps1'
@@ -350,13 +351,14 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
     }
     $contractSuites = @(
         'coastal-assets', 'verification-support', 'nonfinite-sites', 'render-graph-schema',
-        'resource-export-schema', 'nonfinite-coverage-schema', 'capture-comparison',
+        'resource-export-schema', 'nonfinite-coverage-schema', 'capture-comparison', 'taa-comparison-workflow',
         'capture-bundle-schema', 'gpu-timing-schema', 'parameter-frames-schema'
     )
     foreach ($leaf in $gpuLeaves.Values) {
         [IO.File]::WriteAllText((Join-Path $runnerTests $leaf), $leafSource, (New-Object Text.UTF8Encoding($false)))
     }
-    $execution = Invoke-VerificationScript (Join-Path $runnerTests 'RunVerification.ps1') @{ Group='gpu'; OutputDirectory=(Join-Path $output 'runner-results') }
+    $execution = Invoke-VerificationScript (Join-Path $runnerTests 'RunVerification.ps1') @{
+        Group='gpu'; Python='fixture-python-path'; OutputDirectory=(Join-Path $output 'runner-results') }
     $gpuResult = $execution.output | ConvertFrom-Json
     Check ($execution.exitCode -eq 0 -and $gpuResult.ok -and
         $gpuResult.suites.Count -eq $gpuLeaves.Count -and
@@ -366,6 +368,8 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
         Check ($leafResult.directory -eq (Join-Path $suiteResult.directory 'run') -and
             $leafResult.configuration[0] -eq 'Develop' -and $leafResult.rhi.Count -eq 2) "runner-compact-$($suiteResult.name)"
     }
+    Check (($gpuResult.suites | Where-Object name -eq 'taa-comparison').steps[0].receipt.python -eq
+        'fixture-python-path') 'runner-forwards-selected-python-to-taa-workflow'
     $unused = Join-Path $output 'must-not-create'
     $list = Invoke-VerificationScript $runner @{ List=$true; OutputDirectory=$unused }
     $items = $list.output | ConvertFrom-Json

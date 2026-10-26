@@ -33,6 +33,7 @@ $catalog = @(
     @{ name = 'resource-export-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateResourceExports.py'; arguments = @('--self-test') }) },
     @{ name = 'nonfinite-coverage-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateNonFiniteCoverage.py'; arguments = @('--self-test') }) },
     @{ name = 'capture-comparison'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/TestCompareCaptures.ps1' }) },
+    @{ name = 'taa-comparison-workflow'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/TestTaaComparisonWorkflow.ps1' }) },
     @{ name = 'capture-bundle-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateCaptureBundles.py'; arguments = @('--self-test') }) },
     @{ name = 'gpu-timing-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateGpuTiming.py'; arguments = @('--self-test') }) },
     @{ name = 'parameter-frames-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateParameterFrames.py'; arguments = @('--self-test') }) },
@@ -42,6 +43,7 @@ $catalog = @(
     @{ name = 'lab-sun-parameters'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestLabSunParameters.ps1' }) },
     @{ name = 'session-rebuild-parameters'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestRebuildParameters.ps1' }) },
     @{ name = 'session-host-parameters'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestHostParameters.ps1' }) },
+    @{ name = 'taa-comparison'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestTaaComparison.ps1' }) },
     @{ name = 'session-parameters'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestSessionParameters.ps1' }) },
     @{ name = 'capture-jobs'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestCaptureJobs.ps1' }) },
     @{ name = 'capture-on-ready'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestCaptureOnReady.ps1' }) },
@@ -106,6 +108,7 @@ try {
                     $parameters = @{ OutputDirectory = $directory }
                     if ($item.group -eq 'gpu') {
                         $parameters = @{ RunDirectory = (Join-Path $directory 'run'); Configuration = $config; Rhi = $Rhi }
+                        if ($item.name -eq 'taa-comparison') { $parameters.Python = $Python }
                     }
                     $execution = Invoke-VerificationScript $path $parameters
                     $text = $execution.output + $execution.error
