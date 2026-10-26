@@ -3,7 +3,7 @@ Atlas ID: atlas.application.runtime-control
 
 - Question: who writes Host view overrides, how is the display view resolved, and
   which existing evidence ties a captured frame to that state?
-- VerifiedAgainst: `c88d6294ddd11fa7f1c1ee58cf2d8239d7d97b49`
+- VerifiedAgainst: `ae02368ab1405876c5979467d70acc3777509a8a`
 - Refresh triggers: Host parameter bindings or writers, tooling snapshot inputs,
   content continuation, display-view precedence, capture issue order, provenance
   or owning regression targets change.
@@ -30,9 +30,9 @@ These owners are declared in the [AppRuntime](../../Projects/GGLabAppRuntime/GGL
 
 | Entry | Path to the Host override set |
 | --- | --- |
-| External `set` | WinAppHost parses values, then calls `GGLabAppRuntime::RequestParameterBatch`; AppRuntime checks sequence/external exclusion, and Session adapts the values to canonical Assign entries. |
-| External `host-view-overrides` | WinAppHost parses the expected control state and exact states; AppRuntime adapts them to canonical Pin/removal entries, checks the run and the same exclusion, and Session checks content identity and `hostViewRevision` before admitting a batch in the same external slot. |
-| Scheduled parameter event | `TickFrame` admits the event through the same `SessionParameterControl::RequestParameterBatch`, with its sequence owner ID. |
+| External `set` | WinAppHost converts descriptor-checked values to Assign entries and calls `GGLabAppRuntime::RequestParameters`. |
+| External `host-view-overrides` | WinAppHost converts exact states to guarded Pin/removal entries and calls the same entry. AppRuntime checks the run; Session checks content identity and `hostViewRevision`. |
+| Scheduled parameter event | Whole-plan validation normalizes event values. `TickFrame` builds typed Assign entries through the read-only `MakeAssignmentRequest` and submits them to `SessionParameterControl::RequestParameters` with the sequence owner ID. |
 | Safe application | `OnFrameReady` calls `ApplyParameterBatch`; the Host prepared source stages a copy, `Commit` replaces `m_Overrides`, and `FinalizeEffects` removes newly introduced equal-value overrides. An exact-state batch first rechecks its stamp, then `PrepareOverrides` sets each requested presence, including pins equal to the inherited value and removals, without that equality removal. |
 | Content replacement or release | `SynchronizeContent` calls `ParameterSourceAdapters::Bind`; without continuation it calls `HostViewParameterSource::Bind`, which clears `m_Overrides`. |
 | Shutdown | `SessionParameterControl::Finish` ends batches and binds null sources, clearing the same set. |
@@ -44,10 +44,11 @@ the safe boundary and binding policy are in
 `Refresh` rebuilds the discovery projection without changing override presence.
 
 [ParameterRequest.h](../../Sources/GGLabAppRuntime/Parameters/ParameterRequest.h)
-defines Assign, Pin and RemoveOverride intent. `AdmitParameterRequest` validates
-the family, acquires required source reservations and stores an owned const request in the batch.
-Safe application reads this request; `values` and `m_HostViewOperation` project
-the results.
+defines Assign, Pin and RemoveOverride intent. External requests share AppRuntime
+sequence exclusion and one retained result slot. Session's `AdmitParameterRequest`
+validates the request, reserves sources and stores an owned const copy in the batch.
+Safe application reads that request; `values` and `m_HostViewOperation` are result
+projections.
 
 `SessionParameterControl` advances `hostViewRevision` at the same sites: once after
 a committed batch whose finalized override set differs, and once when content
@@ -221,7 +222,7 @@ omit culled passes and the execution record. The Temporal AA resolve pass is
 | Target / source | Current coverage |
 | --- | --- |
 | `GGLabAppRuntimeTests`: [ParameterTransactionSelfTests.cpp](../../Tests/GGLabAppRuntime/ParameterTransactionSelfTests.cpp) | Batches, receipts, inherited parameters, `RunHostViewProjectionTests` and `RunHostViewAttributionTests` |
-| `GGLabAppRuntimeTests`: [GpuFaultLifecycleSelfTests.cpp](../../Tests/GGLabAppRuntime/GpuFaultLifecycleSelfTests.cpp) | Effective settings, Host view control state, exact Host view override states, canonical request ownership/rejection, content binding, rebuild, parameter-frame and sequence-event scenarios |
+| `GGLabAppRuntimeTests`: [GpuFaultLifecycleSelfTests.cpp](../../Tests/GGLabAppRuntime/GpuFaultLifecycleSelfTests.cpp) | Effective settings, Host view control state, exact Host view override states, canonical request ownership/rejection, sequence-only coercion and read-only request projection, content binding, rebuild, parameter-frame and sequence-event scenarios |
 | `GGLabAppRuntimeTests`: [FrameCaptureCoordinatorSelfTests.cpp](../../Tests/GGLabAppRuntime/FrameCaptureCoordinatorSelfTests.cpp) | Capture admission, predicates and immutable snapshots, readiness/settling, retries, SameFrame provenance and cancellation |
 | `WinAppTests`: [ApplicationControlSelfTests.cpp](../../Tests/WinApp/ApplicationControlSelfTests.cpp), [ApplicationLifecycleSelfTests.cpp](../../Tests/WinApp/ApplicationLifecycleSelfTests.cpp), [DevToolsViewProfileSelfTests.cpp](../../Tests/WinApp/DevToolsViewProfileSelfTests.cpp) | Wire parsing, run checks, exact-state operations and their results, status control state, host lifecycle and DevTools view-profile overrides |
 | `GGLabRuntimeTests`: [RenderingContractSelfTests.cpp](../../Tests/GGLabRuntime/RenderingContractSelfTests.cpp) | `RunViewSettingsPatchTests` and temporal history/reference contracts |
