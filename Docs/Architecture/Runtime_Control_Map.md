@@ -3,9 +3,7 @@ Atlas ID: atlas.application.runtime-control
 
 - Question: who writes Host view overrides, how is the display view resolved, and
   which existing evidence ties a captured frame to that state?
-- VerifiedAgainst: `652fa04d159994b45a12b30c62c5b535f40aed59`
-- Reviewed overlay: protected Lab/profile assignments and their working-tree
-  regression coverage.
+- VerifiedAgainst: `cdcb3caddffb1fb85f2c227ed262887f3b0ec654`
 - Refresh triggers: Host parameter bindings or writers, tooling snapshot inputs,
   content continuation, display-view precedence, capture issue order, provenance
   or owning regression targets change.
