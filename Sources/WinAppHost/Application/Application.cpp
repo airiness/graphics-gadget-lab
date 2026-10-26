@@ -609,6 +609,10 @@ namespace gglab
 			pipeRequest->Respond(QueryApplicationControlParameters(request.m_Id,
 				request.m_ParameterBatchId, request.m_Consume, m_AppRuntime.get()));
 			return;
+		case ApplicationControlCommand::HostViewOverrides:
+			pipeRequest->Respond(SubmitApplicationControlHostViewOverrides(request.m_Id,
+				request.m_ExpectedHostView, request.m_HostViewOverrides, m_AppRuntime.get()));
+			return;
 		case ApplicationControlCommand::Watch:
 		{
 			auto* watch = m_AppRuntime ? m_AppRuntime->GetNonFiniteWatchCoordinator() : nullptr;

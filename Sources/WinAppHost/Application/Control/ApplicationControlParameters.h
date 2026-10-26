@@ -4,10 +4,12 @@
 
 #include <nlohmann/json_fwd.hpp>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace gglab
@@ -18,6 +20,12 @@ namespace gglab
 	struct LightingProfilePublication;
 
 	inline constexpr size_t ApplicationControlMaxParameterItems = 128;
+	// Rejection codes of host-view-overrides; each is the leading word of its error text.
+	inline constexpr std::array<std::string_view, 8> ApplicationControlHostViewOverrideErrorCodes =
+	{
+		"NoParameterSource", "Busy", "ExpectedRunChanged", "RunIdentityUnavailable", "ExpectedContentChanged",
+		"ExpectedHostViewRevisionMismatch", "HostOverrideUnsupported", "HostOverrideInvalid",
+	};
 
 	struct ApplicationControlParameterChange
 	{
@@ -29,6 +37,9 @@ namespace gglab
 		const nlohmann::json& changes, std::vector<ApplicationControlParameterChange>& result);
 	[[nodiscard]] std::string ParseApplicationControlParameterAssignments(
 		const nlohmann::json& assignments, std::vector<LabParameterValue>& result);
+	// Typed exact states: 'value' appears exactly when 'present' is true.
+	[[nodiscard]] std::string ParseApplicationControlHostViewOverrides(
+		const nlohmann::json& overrides, std::vector<HostViewOverrideState>& result);
 	[[nodiscard]] nlohmann::json SerializeApplicationControlParameterBatch(
 		const ParameterBatchStatus& batch);
 	[[nodiscard]] nlohmann::json SerializeApplicationControlLightingProfiles(
@@ -42,6 +53,10 @@ namespace gglab
 		uint64_t id, GGLabAppRuntime* runtime) noexcept;
 	[[nodiscard]] std::string SubmitApplicationControlParameters(uint64_t id,
 		std::span<const ApplicationControlParameterChange> changes, GGLabAppRuntime* runtime) noexcept;
+	// Rejections carry 'errorCode' and the live 'controlState' for recovery.
+	[[nodiscard]] std::string SubmitApplicationControlHostViewOverrides(uint64_t id,
+		const HostViewControlStamp& expected, std::span<const HostViewOverrideState> overrides,
+		GGLabAppRuntime* runtime) noexcept;
 	[[nodiscard]] std::string QueryApplicationControlParameters(
 		uint64_t id, uint64_t batchId, bool consume, GGLabAppRuntime* runtime) noexcept;
 }

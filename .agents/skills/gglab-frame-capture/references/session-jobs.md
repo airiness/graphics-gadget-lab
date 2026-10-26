@@ -81,6 +81,8 @@ different run answers `ok: false` with `errorCode: ExpectedRunChanged` and its o
 `runIdentity` before looking up any handle, so nothing is submitted, consumed,
 cancelled or stopped. Treat that as a lost session rather than retrying without the
 check. `status.capabilities.runIdentityChecks` lists the checked commands.
+[`host-view-overrides`](session-parameters.md#guarded-exact-override-states) always
+checks the run named in its required expected state instead.
 
 ## Interpret results and artifacts
 

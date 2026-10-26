@@ -938,6 +938,112 @@ namespace gglab
 				AcceptsApplicationControlExpectedRun(ApplicationControlCommand::Sequence),
 				"Run checks are advertised for every protected command");
 		}
+
+		void RunHostViewOverrideTests(SelfTestContext& context) noexcept
+		{
+			constexpr std::string_view run = "0123456789abcdef0123456789abcdef";
+			const auto request = [](std::string_view expected, std::string_view overrides)
+				{
+					return ParseApplicationControlRequest(std::format(
+						R"({{"protocol":4,"id":50,"command":"host-view-overrides","expected":{},"overrides":{}}})",
+						expected, overrides));
+				};
+			constexpr std::string_view stamp =
+				R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"hostViewRevision":12})";
+			const auto parsed = request(stamp,
+				R"([{"id":"view.taa.enabled","type":"bool","present":true,"value":false},)"
+				R"({"id":"view.gtao.radius","type":"float","present":false}])");
+			const auto* overrides = parsed.m_Request ? &parsed.m_Request->m_HostViewOverrides : nullptr;
+			context.Check(parsed.m_Request && parsed.m_Request->m_Command == ApplicationControlCommand::HostViewOverrides &&
+				parsed.m_Request->m_ExpectedHostView.m_RunIdentity == run &&
+				parsed.m_Request->m_ExpectedHostView.m_ContentIdentity == 481 &&
+				parsed.m_Request->m_ExpectedHostView.m_HostViewRevision == 12 &&
+				parsed.m_Request->m_ExpectedRunIdentity == run && overrides->size() == 2 &&
+				(*overrides)[0].m_Type == LabParameterType::Bool && (*overrides)[0].m_Value &&
+				!std::get<bool>(*(*overrides)[0].m_Value) &&
+				(*overrides)[1].m_Type == LabParameterType::Float && !(*overrides)[1].m_Value,
+				"Host view operations parse a complete stamp and typed present/absent states");
+			const auto changed = CheckApplicationControlRunIdentity(*parsed.m_Request, "ffffffffffffffffffffffffffffffff");
+			context.Check(changed && Json::parse(*changed)["errorCode"] == "ExpectedRunChanged" &&
+				!CheckApplicationControlRunIdentity(*parsed.m_Request, run),
+				"The expected stamp's run feeds the check that precedes admission");
+
+			constexpr std::string_view valid = R"([{"id":"view.gtao.radius","type":"float","present":false}])";
+			for (const auto& [expected, states] : std::initializer_list<std::pair<std::string_view, std::string_view>>{
+				{ R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481})", valid },
+				{ R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"hostViewRevision":12,"x":1})", valid },
+				{ R"({"runIdentity":"0123456789ABCDEF0123456789ABCDEF","contentIdentity":481,"hostViewRevision":12})", valid },
+				{ R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":-1,"hostViewRevision":12})", valid },
+				{ stamp, R"([])" },
+				{ stamp, R"([{"id":"view.gtao.radius","type":"float","present":false,"value":1.0}])" },
+				{ stamp, R"([{"id":"view.gtao.radius","type":"float","present":true}])" },
+				{ stamp, R"([{"id":"view.gtao.radius","type":"float","present":1}])" },
+				{ stamp, R"([{"id":"view.gtao.radius","type":"float","value":1.0}])" },
+				{ stamp, R"([{"id":"view.gtao.radius","type":"real","present":false}])" },
+				{ stamp, R"([{"id":"view.gtao.radius","type":"float","present":true,"value":"1"}])" },
+				{ stamp, R"([{"id":"view.gtao.radius","type":"float","present":false,"x":1}])" },
+				{ stamp, R"([{"id":"a","type":"bool","present":false},{"id":"a","type":"bool","present":false}])" } })
+			{
+				context.Check(!request(expected, states).m_Request,
+					"Partial stamps and malformed or ambiguous override states reject the request");
+			}
+			context.Check(!ParseApplicationControlRequest(
+				R"({"protocol":4,"id":51,"command":"host-view-overrides","expected":{"runIdentity":"0123456789abcdef0123456789abcdef",)"
+				R"("contentIdentity":481,"hostViewRevision":12},"overrides":[{"id":"a","type":"bool","present":false}],)"
+				R"("expectedRunIdentity":"0123456789abcdef0123456789abcdef"})").m_Request &&
+				!ParseApplicationControlRequest(
+					R"({"protocol":4,"id":52,"command":"host-view-overrides","overrides":[{"id":"a","type":"bool","present":false}]})").m_Request,
+				"The operation names its run only in the required stamp");
+
+			ParameterBatchStatus batch;
+			batch.m_BatchId = 7;
+			batch.m_Source = "host";
+			batch.m_HostViewOperation = HostViewOverrideOperation{
+				.m_Expected = { std::string(run), 481, 12 },
+				.m_Overrides = { { LabParameterId("view.taa.enabled"), LabParameterType::Bool, false } },
+			};
+			const Json queued = SerializeApplicationControlParameterBatch(batch);
+			context.Check(queued["overrides"].size() == 1 && queued["overrides"][0]["present"] == true &&
+				queued["overrides"][0]["value"] == false && queued["overrides"][0]["type"] == "bool" &&
+				queued["controlCommit"]["expected"]["hostViewRevision"] == 12 && queued["controlCommit"]["before"].is_null() &&
+				queued["controlCommit"]["after"].is_null() && queued["controlCommit"]["changed"].is_null() &&
+				queued["values"].empty(),
+				"A queued operation reports its requested states without fabricated commit evidence");
+			batch.m_State = ParameterBatchState::Finished;
+			batch.m_HostViewOperation->m_Before = HostViewControlStamp{ std::string(run), 481, 12 };
+			batch.m_HostViewOperation->m_After = HostViewControlStamp{ std::string(run), 481, 13 };
+			batch.m_HostViewOperation->m_Changes = { { LabParameterId("view.taa.enabled"), std::nullopt, false } };
+			const Json committed = SerializeApplicationControlParameterBatch(batch);
+			context.Check(committed["controlCommit"]["before"]["hostViewRevision"] == 12 &&
+				committed["controlCommit"]["after"]["hostViewRevision"] == 13 && committed["controlCommit"]["changed"] == true &&
+				committed["controlCommit"]["changes"][0]["before"]["present"] == false &&
+				committed["controlCommit"]["changes"][0]["after"]["value"] == false &&
+				committed["controlCommit"]["conflict"].is_null(),
+				"A committed operation reports before/after stamps and the changed override states");
+			batch.m_HostViewOperation->m_After.reset();
+			batch.m_HostViewOperation->m_Changes.clear();
+			batch.m_HostViewOperation->m_Conflict = "ExpectedHostViewRevisionMismatch";
+			batch.m_State = ParameterBatchState::Failed;
+			const Json conflict = SerializeApplicationControlParameterBatch(batch);
+			context.Check(conflict["controlCommit"]["after"].is_null() && conflict["controlCommit"]["changed"] == false &&
+				conflict["controlCommit"]["conflict"] == "ExpectedHostViewRevisionMismatch" &&
+				!SerializeApplicationControlParameterBatch(ParameterBatchStatus{}).contains("controlCommit"),
+				"A conflict applies nothing, and legacy batches carry no control-commit record");
+
+			const auto status = Json::parse(SerializeApplicationControlStatus(53, {}));
+			const auto& capability = status["capabilities"]["hostViewOverrides"];
+			const auto& checked = status["capabilities"]["runIdentityChecks"]["commands"];
+			context.Check(capability["version"] == 1 && capability["command"] == "host-view-overrides" &&
+				capability["groups"].size() == 3 && capability["maxItems"] == 128 && capability["expected"].size() == 3 &&
+				capability["errorCodes"].size() == ApplicationControlHostViewOverrideErrorCodes.size() &&
+				std::ranges::find(checked, Json("host-view-overrides")) == checked.end() &&
+				!AcceptsApplicationControlExpectedRun(ApplicationControlCommand::HostViewOverrides),
+				"The guarded operation is advertised with its stamp, limits and error codes");
+			const auto rejected = Json::parse(SubmitApplicationControlHostViewOverrides(54, {}, {}, nullptr));
+			context.Check(!rejected["ok"] && rejected["errorCode"] == "NoParameterSource" &&
+				rejected["controlState"].is_null(),
+				"Rejections carry a machine-readable code beside the error text");
+		}
 	}
 
 	void RunApplicationControlSelfTests(SelfTestContext& context) noexcept
@@ -946,6 +1052,7 @@ namespace gglab
 		RunDeferredParameterSerializationTests(context);
 		RunParseTests(context);
 		RunRunIdentityCheckTests(context);
+		RunHostViewOverrideTests(context);
 		RunSerializeTests(context);
 		RunCaptureJobOwnershipTests(context);
 		RunPipeServerTests(context);

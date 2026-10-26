@@ -60,11 +60,20 @@ namespace gglab
 			}, value);
 		}
 
-		[[nodiscard]] Json HostOverride(const HostViewProjectionEntry& entry)
+		[[nodiscard]] Json HostOverride(const std::optional<LabValue>& value)
 		{
-			return entry.m_Override ?
-				Json{ { "present", true }, { "value", Value(*entry.m_Override) } } :
+			return value ?
+				Json{ { "present", true }, { "value", Value(*value) } } :
 				Json{ { "present", false } };
+		}
+
+		[[nodiscard]] Json ErrorCode(std::string_view error)
+		{
+			const auto code = error.substr(0, error.find(':'));
+			return std::ranges::find(ApplicationControlHostViewOverrideErrorCodes, code) !=
+				ApplicationControlHostViewOverrideErrorCodes.end() ?
+					Json(std::string(code)) :
+					Json();
 		}
 
 		[[nodiscard]] const char* EffectClass(ParameterEffectClass value)
@@ -263,6 +272,52 @@ namespace gglab
 		return {};
 	}
 
+	std::string ParseApplicationControlHostViewOverrides(
+		const Json& overrides, std::vector<HostViewOverrideState>& result)
+	{
+		if (!overrides.is_array() || overrides.empty() || overrides.size() > ApplicationControlMaxParameterItems)
+		{
+			return "Field 'overrides' must contain 1 to 128 typed Host view override states.";
+		}
+		std::vector<HostViewOverrideState> candidate;
+		for (const auto& item : overrides)
+		{
+			const auto presence = item.find("present");
+			const bool present = presence != item.end() && presence->is_boolean() && presence->get<bool>();
+			if (!item.is_object() || presence == item.end() || !presence->is_boolean() ||
+				item.size() != (present ? 4u : 3u) || item.contains("value") != present ||
+				!item.contains("id") || !item["id"].is_string() || !item.contains("type") || !item["type"].is_string())
+			{
+				return "Each override state takes 'id', 'type' and boolean 'present', plus 'value' exactly when present.";
+			}
+			const std::string name = item["id"].get<std::string>();
+			const auto type = std::ranges::find(ParameterTypes, item["type"].get<std::string>());
+			if (name.empty() || name.size() > 128 || name.find('\0') != std::string::npos ||
+				type == ParameterTypes.end() || std::ranges::any_of(candidate, [&name](const auto& state)
+				{
+					return state.m_Id.GetName() == name;
+				}))
+			{
+				return "Override ids must be distinct non-empty strings (at most 128 UTF-8 bytes); types must be declared parameter types.";
+			}
+			HostViewOverrideState state{
+				.m_Id = LabParameterId(name),
+				.m_Type = static_cast<LabParameterType>(type - ParameterTypes.begin()),
+			};
+			if (present)
+			{
+				state.m_Value = ParseValue(state.m_Type, item["value"]);
+				if (!state.m_Value)
+				{
+					return "Override value does not match its type or exceeds finite 32-bit storage; strings and numeric coercion to integers/bools are not supported.";
+				}
+			}
+			candidate.push_back(std::move(state));
+		}
+		result = std::move(candidate);
+		return {};
+	}
+
 	Json SerializeApplicationControlParameterBatch(const ParameterBatchStatus& batch)
 	{
 		const char* state = "Queued";
@@ -303,7 +358,7 @@ namespace gglab
 		{
 			values.push_back({ { "id", value.m_Id.GetName() }, { "value", Value(value.m_Value) } });
 		}
-		return {
+		Json result = {
 			{ "batchId", batch.m_BatchId },
 			{ "source", batch.m_Source },
 			{ "contentId", batch.m_ContentId },
@@ -315,6 +370,50 @@ namespace gglab
 			{ "values", std::move(values) },
 			{ "items", std::move(items) },
 			{ "failure", batch.m_Failure } };
+		if (const auto& operation = batch.m_HostViewOperation)
+		{
+			Json overrides = Json::array();
+			for (const auto& entry : operation->m_Overrides)
+			{
+				auto state = HostOverride(entry.m_Value);
+				state["id"] = entry.m_Id.GetName();
+				state["type"] = ParameterTypes[static_cast<size_t>(entry.m_Type)];
+				overrides.push_back(std::move(state));
+			}
+			Json changes = Json::array();
+			for (const auto& change : operation->m_Changes)
+			{
+				changes.push_back({
+					{ "id", change.m_Id.GetName() },
+					{ "before", HostOverride(change.m_Before) },
+					{ "after", HostOverride(change.m_After) } });
+			}
+			const auto stamp = [](const std::optional<HostViewControlStamp>& value)
+				{
+					return value ? SerializeApplicationControlHostViewStamp(*value) : Json();
+				};
+			// Unknown until the operation commits; an operation that ended uncommitted changed nothing.
+			Json changed;
+			if (operation->m_After)
+			{
+				changed = !operation->m_Changes.empty();
+			}
+			else if (batch.IsTerminal())
+			{
+				changed = false;
+			}
+			result["overrides"] = std::move(overrides);
+			// Control evidence, separate from effect items: a pin can change the control
+			// state while its effect item is truthfully NoChange.
+			result["controlCommit"] = {
+				{ "expected", SerializeApplicationControlHostViewStamp(operation->m_Expected) },
+				{ "before", stamp(operation->m_Before) },
+				{ "after", stamp(operation->m_After) },
+				{ "changed", std::move(changed) },
+				{ "changes", std::move(changes) },
+				{ "conflict", operation->m_Conflict.empty() ? Json() : Json(operation->m_Conflict) } };
+		}
+		return result;
 	}
 
 	Json SerializeApplicationControlLightingProfiles(const LightingProfilePublication* profiles)
@@ -354,7 +453,7 @@ namespace gglab
 				{ "value", Value(entry.m_Value) },
 				{ "source", GetHostViewValueSourceName(entry.m_Source) },
 				{ "inheritedSource", GetHostViewValueSourceName(entry.m_InheritedSource) },
-				{ "hostOverride", HostOverride(entry) } });
+				{ "hostOverride", HostOverride(entry.m_Override) } });
 		}
 		return result;
 	}
@@ -410,10 +509,18 @@ namespace gglab
 						{ "max", desc.m_MaxValue ? Value(*desc.m_MaxValue) : Json() },
 						{ "enumItems", std::move(enums) } });
 					const auto entry = std::ranges::find(hostView, desc.m_Id, &HostViewProjectionEntry::m_Id);
-					if (entry != hostView.end())
+					auto& item = response["parameters"].back();
+					item["overrideOperationSupported"] = entry != hostView.end();
+					if (entry == hostView.end())
 					{
-						auto& item = response["parameters"].back();
-						item["hostOverride"] = HostOverride(*entry);
+						// environment.profile is the only Host parameter outside the display view.
+						item["overrideOperationReason"] = std::string_view(sourceName) == "lab" ?
+							"lab-parameter" :
+							"lighting-profile";
+					}
+					else
+					{
+						item["hostOverride"] = HostOverride(entry->m_Override);
 						// The next frame's value before sequence or reference patches.
 						item["resolved"] = {
 							{ "value", Value(entry->m_Value) },
@@ -465,6 +572,29 @@ namespace gglab
 		response["batchId"] = batchId;
 		response["consumed"] = false;
 		response["batch"] = SerializeApplicationControlParameterBatch(*parameterControl->GetParameterBatchStatus());
+		return Dump(response);
+	}
+
+	std::string SubmitApplicationControlHostViewOverrides(uint64_t id, const HostViewControlStamp& expected,
+		std::span<const HostViewOverrideState> overrides, GGLabAppRuntime* runtime) noexcept
+	{
+		std::string error = "NoParameterSource: ready active content is required.";
+		const uint64_t batchId = runtime ? runtime->RequestHostViewOverrides(expected, overrides, error) : 0;
+		if (batchId == 0)
+		{
+			Json response = Response(id, false);
+			response["errorCode"] = ErrorCode(error);
+			response["error"] = error;
+			response["controlState"] = runtime ?
+				SerializeApplicationControlHostViewStamp(runtime->GetHostViewControlStamp()) :
+				Json();
+			return Dump(response);
+		}
+		Json response = Response(id, true);
+		response["admission"] = "Accepted";
+		response["batchId"] = batchId;
+		response["consumed"] = false;
+		response["batch"] = SerializeApplicationControlParameterBatch(*runtime->GetExternalParameterBatchStatus());
 		return Dump(response);
 	}
 

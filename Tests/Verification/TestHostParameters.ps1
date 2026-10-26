@@ -1,7 +1,9 @@
 <#
 .SYNOPSIS
 Verifies session Host Immediate parameters on Demo and Lab content, mixed-source
-atomic admission, actual built settings, exposure response and result ownership.
+atomic admission, actual built settings, exposure response and result ownership,
+and guarded exact Host view override states: pinning, stale-stamp conflicts and
+exact restoration.
 #>
 [CmdletBinding()]
 param(
@@ -31,6 +33,16 @@ function Set-Values($Items, [hashtable]$Options = @{}, [switch]$AllowFailure) {
     $arguments = @{ Changes=(ConvertTo-Json -InputObject @($Items) -Compress -Depth 8) }
     foreach ($key in $Options.Keys) { $arguments[$key] = $Options[$key] }
     return Invoke-VerificationSession set $session $arguments -AllowFailure:$AllowFailure
+}
+function Get-OverrideState($Descriptor) {
+    $state = [ordered]@{ id=$Descriptor.id; type=$Descriptor.type; present=[bool]$Descriptor.hostOverride.present }
+    if ($state.present) { $state.value = $Descriptor.hostOverride.value }
+    return $state
+}
+function Set-Overrides($Expected, $States, [switch]$AllowFailure) {
+    return Invoke-VerificationSession host-view-overrides $session @{
+        ExpectedState=(ConvertTo-Json -InputObject $Expected -Compress -Depth 4)
+        Overrides=(ConvertTo-Json -InputObject @($States) -Compress -Depth 8); WaitConsumed=$true } -AllowFailure:$AllowFailure
 }
 function Capture-View([string]$Label, [double]$Ev) {
     $capture = Invoke-VerificationSession capture $session @{SettleFrames=8;OutputDirectory=$directory;Label=$Label;TimeoutSeconds=$TimeoutSeconds}
@@ -152,6 +164,47 @@ try {
                         Write-VerificationJson "$directory/exposure-response.json" @{sampledPixels=$count;before=$luminanceBefore;after=$luminanceAfter}
                         Check ($luminanceBefore -gt 0 -and $luminanceAfter -lt $luminanceBefore * 0.95) "$case-visible-exposure-response"
                     } finally { $a.Dispose(); $b.Dispose() }
+                    # Guarded exact states chain from the last confirmed commit, never a fresh query.
+                    $snapshot = Invoke-VerificationSession parameters $session
+                    Write-VerificationJson "$directory/override-snapshot.json" $snapshot
+                    $hostView = @($snapshot.parameters | Where-Object { $_.source -eq 'host' -and $_.id -like 'view.*' })
+                    Check ($status.capabilities.hostViewOverrides.version -eq 1 -and
+                        @($hostView | Where-Object overrideOperationSupported).Count -eq 25 -and
+                        @($snapshot.parameters | Where-Object { $_.id -notlike 'view.*' -and ($_.overrideOperationSupported -or
+                            $_.overrideOperationReason -ne $(if ($_.source -eq 'lab') {'lab-parameter'} else {'lighting-profile'})) }).Count -eq 0) "$case-override-discovery"
+                    $taa = @($hostView | Where-Object id -eq 'view.taa.enabled')[0]
+                    $directions = @($hostView | Where-Object id -eq 'view.gtao.direction_count')[0]
+                    $original = @((Get-OverrideState $taa), (Get-OverrideState $directions))
+                    $arm = Set-Overrides $snapshot.controlState @(
+                        @{id='view.taa.enabled';type='bool';present=$true;value=(-not $taa.resolved.value)},
+                        @{id='view.gtao.direction_count';type='uint';present=$true;value=$directions.resolved.value})
+                    Write-VerificationJson "$directory/override-arm.json" $arm
+                    $armCommit = $arm.batch.controlCommit
+                    Check ($arm.batch.succeeded -and $arm.consumed -and $armCommit.changed -and
+                        @($arm.batch.items | Where-Object { $_.id -eq 'view.taa.enabled' -and $_.state -eq 'Consumed' }).Count -eq 1 -and
+                        @($arm.batch.items | Where-Object { $_.id -eq 'view.gtao.direction_count' -and $_.state -eq 'NoChange' -and
+                            $null -eq $_.firstConsumed }).Count -eq 1 -and
+                        $armCommit.before.hostViewRevision -eq $snapshot.controlState.hostViewRevision -and
+                        $armCommit.after.hostViewRevision -eq ($armCommit.before.hostViewRevision + 1)) "$case-override-arm"
+                    $stale = Set-Overrides $snapshot.controlState $original -AllowFailure
+                    Check (-not $stale.ok -and $stale.errorCode -eq 'ExpectedHostViewRevisionMismatch' -and
+                        $stale.controlState.hostViewRevision -eq $armCommit.after.hostViewRevision) "$case-override-stale-stamp-conflicts"
+                    $restored = Set-Overrides $armCommit.after $original
+                    Write-VerificationJson "$directory/override-restore.json" $restored
+                    $after = Invoke-VerificationSession parameters $session
+                    Write-VerificationJson "$directory/override-restored.json" $after
+                    Check ($restored.batch.succeeded -and
+                        $restored.batch.controlCommit.after.hostViewRevision -eq ($armCommit.after.hostViewRevision + 1) -and
+                        $after.controlState.hostViewRevision -eq $restored.batch.controlCommit.after.hostViewRevision) "$case-override-restore-commit"
+                    foreach ($state in $original) {
+                        $now = @($after.parameters | Where-Object id -eq $state.id)[0]
+                        $before = @($snapshot.parameters | Where-Object id -eq $state.id)[0]
+                        Check ($now.hostOverride.present -eq $state.present -and
+                            (-not $state.present -or $now.hostOverride.value -eq $state.value) -and
+                            $now.resolved.value -eq $before.resolved.value -and
+                            $now.resolved.source -eq $before.resolved.source) "$case-override-restored-$($state.id)"
+                    }
+                    $null = Capture-View 'override-restored' $darkerEv
                     $null = Invoke-VerificationSession sequence $session @{CameraPath='unused';RequiredContentId='Missing.Host.Content';NoWait=$true}
                     $during = Set-Values $valid -AllowFailure
                     Check (-not $during.ok -and $during.error -match 'sequence') "$case-sequence-exclusion"

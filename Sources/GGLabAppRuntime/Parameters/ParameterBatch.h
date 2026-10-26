@@ -1,8 +1,10 @@
 #pragma once
 #include "Lab/LabParameter.h"
+#include "Parameters/HostViewParameters.h"
 #include "Parameters/ParameterEffectReceipt.h"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -39,9 +41,11 @@ namespace gglab
 		ParameterBatchState m_State = ParameterBatchState::Queued;
 		LabChangeImpact m_Impact = LabChangeImpact::Immediate;
 		// Owned admission values remain queryable before application or after session replacement.
+		// A Host view operation records each item's resolved target when it applies.
 		std::vector<LabParameterValue> m_Values;
 		std::vector<ParameterEffectSnapshot> m_Items;
 		std::string m_Failure;
+		std::optional<HostViewOverrideOperation> m_HostViewOperation;
 
 		[[nodiscard]] bool IsTerminal() const noexcept
 		{

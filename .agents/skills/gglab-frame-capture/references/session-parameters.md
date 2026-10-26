@@ -137,7 +137,8 @@ NoChange preserve settling. Receipt `frameSerial` is the render clock;
 `frameIndex` is the simulation clock.
 
 Overrides clear on content replacement/restart except the owned Rebuild
-continuation below; there is no unset/reset verb. Legacy sequence overrides are
+continuation below. `set` cannot remove one or pin an inherited-equal value; use
+[guarded exact states](#guarded-exact-override-states). Legacy sequence overrides are
 temporary and do not replace Host values. Reference sampling forces temporal AA
 and temporal GTAO inactive. Preview tap, camera input/FOV and other Immediate
 fields without frozen projections remain unavailable through `set`.
@@ -161,6 +162,56 @@ active tooling block attributes all of its fields to `tooling`.
 carries that frame's own `controlState`, a `hostView` array whose `source` can also
 be `sequence` or `forced-reference`, the temporal consumer plan, and `outcome`
 (`planned`, `submitted` or `aborted`). Capture sidecars do not record these fields.
+
+### Guarded exact override states
+
+Check `status.capabilities.hostViewOverrides` first. `host-view-overrides` sets
+exact Host view override states for `view.taa.*`, `view.gtao.*` and
+`view.exposure.*` (descriptors report `overrideOperationSupported`; Lab and
+lighting-profile ids report `false` with `overrideOperationReason`). It takes the
+complete `controlState` the request was prepared against and 1-128 distinct typed
+entries; unspecified ids stay untouched:
+
+```powershell
+$state = Join-Path (Get-Location) 'Build/control-state.json'
+$pin = Join-Path (Get-Location) 'Build/taa-off.json'
+$parameters = powershell -NoProfile -ExecutionPolicy Bypass -File $script parameters -Session check | ConvertFrom-Json
+[IO.File]::WriteAllText($state, ($parameters.controlState | ConvertTo-Json -Compress),
+    (New-Object Text.UTF8Encoding($false)))
+[IO.File]::WriteAllText($pin,
+    '[{"id":"view.taa.enabled","type":"bool","present":true,"value":false}]',
+    (New-Object Text.UTF8Encoding($false)))
+powershell -NoProfile -ExecutionPolicy Bypass -File $script host-view-overrides -Session check `
+    -ExpectedStateFile $state -OverridesFile $pin -WaitConsumed
+```
+
+A present entry stays pinned even when it equals the inherited value; an entry
+`{"id":...,"type":...,"present":false}` removes the override and follows the
+inheritance resolved when it applies. The state names the run, so the command takes
+no `-ExpectedRunIdentity`. It shares the external result slot and waiting options
+with `set`; `set` itself is unchanged.
+
+| Before → requested | Control state | Effect item |
+| --- | --- | --- |
+| Already the requested presence and value | Unchanged; the batch is still admitted and retained | `NoChange` |
+| Absent → present at the inherited value, or present → absent at an equal inherited value | `hostViewRevision` advances | `NoChange`, no `firstConsumed` |
+| Any change of the resolved value | `hostViewRevision` advances | Immediate proof of the new value |
+
+The stamp is checked at admission and again at the safe boundary. A mismatch
+applies nothing: admission answers `ok: false` with `errorCode`
+(`ExpectedContentChanged`, `ExpectedHostViewRevisionMismatch`, `ExpectedRunChanged`)
+and the live `controlState`; a queued operation whose content changes ends `Failed`
+with `controlCommit.conflict`. Unsupported ids or types (`HostOverrideUnsupported`),
+invalid values (`HostOverrideInvalid`) and `Busy` also reject the whole request.
+
+The batch adds `overrides` (the requested states) and `controlCommit`: `expected`,
+the `before` stamp seen at the safe boundary, the `after` stamp once committed,
+`changed`, the changed `changes[]` with `before`/`after` presence and value, and
+`conflict`. It is control evidence, separate from effect items. `values` lists the
+value each item proves once applied, including the inherited value of a removal.
+To restore a snapshot, submit its states against the last committed `after` stamp,
+not a fresh query; any intervening Host view change then conflicts instead of being
+overwritten. Restoring Host intent does not rewind temporal history or other layers.
 
 ## Content-registered lighting profiles
 
@@ -205,7 +256,7 @@ Select suites with [RunVerification.ps1](../../../../Tests/Verification/RunVerif
 | Suite | Main evidence |
 | --- | --- |
 | `session-parameters` | GTAO Immediate and texture/Physical Sky Deferred receipts, captured settings/generations and cache-publication paths. |
-| `session-host-parameters` | Demo/Lab overrides, mixed-source atomicity, settling, exposure response and result retention. |
+| `session-host-parameters` | Demo/Lab overrides, mixed-source atomicity, settling, exposure response, result retention and guarded exact states. |
 | `lighting-profiles` | Profile discovery/transitions, exposure independence and requested/active identities. |
 | `lab-sun-parameters` | Authored sun elevation, profile rebasing and NoChange. |
 | `session-rebuild-parameters` | Zero/one/64-light fixtures, retained results and built scene/frame provenance. |

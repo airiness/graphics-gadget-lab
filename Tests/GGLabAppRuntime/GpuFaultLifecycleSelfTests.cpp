@@ -3092,6 +3092,203 @@ namespace gglab
 			runtime.Shutdown();
 		}
 
+		void RunHostViewOverrideScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = true;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			ParameterTestTooling tooling;
+			tooling.m_Settings.m_TemporalAA = TemporalAASettings{};
+			const auto tick = [&]()
+				{
+					return runtime.Tick({ .m_ApplicationTooling = &tooling });
+				};
+			GGLAB_UNUSED(tick());
+			runtime.EnableParameterControl();
+			const auto& control = *runtime.GetParameterControl();
+			const auto& capture = *runtime.GetFrameCaptureCoordinator();
+			const auto find = [](std::span<const HostViewProjectionEntry> projection, std::string_view id)
+				{
+					const auto found = std::ranges::find(projection, LabParameterId(id), &HostViewProjectionEntry::m_Id);
+					GGLAB_ASSERT_MSG(found != projection.end(), "Every Host view binding is projected.");
+					return *found;
+				};
+			const auto present = [&](std::string_view id) -> std::optional<LabValue>
+				{
+					const auto overrides = control.GetHostViewOverrides();
+					const auto found = std::ranges::find(overrides, LabParameterId(id), &LabParameterValue::m_Id);
+					return found != overrides.end() ? std::optional(found->m_Value) : std::nullopt;
+				};
+			const auto pin = [](std::string_view id, LabParameterType type, LabValue value)
+				{
+					return HostViewOverrideState{ LabParameterId(id), type, std::move(value) };
+				};
+			const auto release = [](std::string_view id, LabParameterType type)
+				{
+					return HostViewOverrideState{ LabParameterId(id), type, std::nullopt };
+				};
+			std::string error;
+			const auto apply = [&](std::vector<HostViewOverrideState> states)
+				{
+					const auto id = runtime.RequestHostViewOverrides(runtime.GetHostViewControlStamp(), states, error);
+					GGLAB_UNUSED(tick());
+					return id ? runtime.TakeParameterBatchResult(id) : std::nullopt;
+				};
+			const auto revisions = [&](uint64_t before, uint64_t after, const ParameterBatchStatus& batch)
+				{
+					const auto& operation = *batch.m_HostViewOperation;
+					return control.GetHostViewRevision() == after && operation.m_Before &&
+						operation.m_Before->m_HostViewRevision == before && operation.m_After &&
+						operation.m_After->m_HostViewRevision == after &&
+						operation.m_After->m_RunIdentity == runtime.GetRunIdentity() && operation.m_Conflict.empty();
+				};
+			const LabValue inherited = find(control.DescribeHostView(), "view.gtao.radius").m_Value;
+			const LabValue changed = std::get<float>(inherited) + 1.0f;
+			constexpr auto Float = LabParameterType::Float;
+			constexpr auto Bool = LabParameterType::Bool;
+
+			uint64_t revision = control.GetHostViewRevision();
+			uint64_t legacy = control.GetParameterRevision();
+			auto result = apply({ pin("view.gtao.radius", Float, inherited) });
+			const auto* frame = capture.GetLastFrameState();
+			checks.Check(result && result->m_State == ParameterBatchState::Finished &&
+				result->m_Items[0].m_State == ParameterEffectState::NoChange && !result->m_Items[0].m_FirstConsumed &&
+				revisions(revision, revision + 1, *result) && control.GetParameterRevision() == legacy &&
+				result->m_HostViewOperation->m_Changes.size() == 1 &&
+				!result->m_HostViewOperation->m_Changes[0].m_Before &&
+				LabValuesEqual(*result->m_HostViewOperation->m_Changes[0].m_After, inherited) &&
+				present("view.gtao.radius") && LabValuesEqual(*present("view.gtao.radius"), inherited) &&
+				LabValuesEqual(result->m_Values[0].m_Value, inherited) &&
+				find(frame->m_HostViewProjection, "view.gtao.radius").m_Source == HostViewValueSource::Host,
+				"Pinning an inherited-equal value is structural: Host revision only and a NoChange effect");
+
+			revision = control.GetHostViewRevision();
+			const std::array equal{ LabParameterValue{ LabParameterId("view.gtao.radius"), inherited } };
+			const auto equalId = runtime.RequestParameterBatch(equal, error);
+			GGLAB_UNUSED(tick());
+			const auto legacyEqual = runtime.TakeParameterBatchResult(equalId);
+			checks.Check(legacyEqual && legacyEqual->m_Items[0].m_State == ParameterEffectState::NoChange &&
+				!legacyEqual->m_HostViewOperation && present("view.gtao.radius") &&
+				control.GetHostViewRevision() == revision,
+				"An equal legacy set keeps an explicit pin and its revision");
+
+			result = apply({ pin("view.gtao.radius", Float, inherited) });
+			checks.Check(result && result->m_State == ParameterBatchState::Finished &&
+				result->m_Items[0].m_State == ParameterEffectState::NoChange &&
+				revisions(revision, revision, *result) && control.GetParameterRevision() == legacy &&
+				result->m_HostViewOperation->m_Changes.empty(),
+				"Repeating an exact present state is a retained semantic NoChange without counter advances");
+
+			result = apply({ release("view.gtao.radius", Float) });
+			checks.Check(result && result->m_Items[0].m_State == ParameterEffectState::NoChange &&
+				revisions(revision, revision + 1, *result) && control.GetParameterRevision() == legacy &&
+				!present("view.gtao.radius") && result->m_HostViewOperation->m_Changes.size() == 1 &&
+				!result->m_HostViewOperation->m_Changes[0].m_After,
+				"Removing an override equal to its inherited value is structural only");
+
+			revision = control.GetHostViewRevision();
+			result = apply({ release("view.gtao.radius", Float) });
+			checks.Check(result && result->m_Items[0].m_State == ParameterEffectState::NoChange &&
+				revisions(revision, revision, *result),
+				"Removing an absent override is a semantic NoChange");
+
+			// The tooling block inherits Temporal AA disabled.
+			result = apply({ pin("view.gtao.radius", Float, changed), pin("view.taa.enabled", Bool, true) });
+			checks.Check(result && result->m_State == ParameterBatchState::Finished &&
+				std::ranges::all_of(result->m_Items, [](const auto& item)
+				{
+					return item.m_State == ParameterEffectState::Consumed;
+				}) &&
+				revisions(revision, revision + 1, *result) && control.GetParameterRevision() == legacy + 1 &&
+				result->m_HostViewOperation->m_Changes.size() == 2 && present("view.taa.enabled"),
+				"Value-changing entries commit atomically with one revision and Immediate effect proof");
+
+			revision = control.GetHostViewRevision();
+			const LabValue replaced = std::get<float>(changed) + 1.0f;
+			result = apply({ pin("view.gtao.radius", Float, replaced) });
+			checks.Check(result && result->m_Items[0].m_State == ParameterEffectState::Consumed &&
+				revisions(revision, revision + 1, *result) && control.GetParameterRevision() == legacy + 2 &&
+				LabValuesEqual(*result->m_HostViewOperation->m_Changes[0].m_Before, changed) &&
+				LabValuesEqual(*present("view.gtao.radius"), replaced),
+				"Replacing a present value is a value change with Immediate effect proof");
+
+			revision = control.GetHostViewRevision();
+			legacy = control.GetParameterRevision();
+			result = apply({ release("view.gtao.radius", Float) });
+			frame = capture.GetLastFrameState();
+			checks.Check(result && result->m_Items[0].m_State == ParameterEffectState::Consumed &&
+				result->m_Items[0].m_FirstConsumed && LabValuesEqual(result->m_Values[0].m_Value, inherited) &&
+				revisions(revision, revision + 1, *result) && control.GetParameterRevision() == legacy + 1 &&
+				!present("view.gtao.radius") && present("view.taa.enabled") &&
+				find(frame->m_HostViewProjection, "view.gtao.radius").m_Source == HostViewValueSource::Content,
+				"Removal resolves inheritance at the safe boundary and proves the inherited value");
+
+			const auto rejects = [&](std::vector<HostViewOverrideState> states, const HostViewControlStamp& expected,
+				std::string_view code)
+				{
+					const std::vector before(control.GetHostViewOverrides().begin(), control.GetHostViewOverrides().end());
+					const uint64_t hostViewRevision = control.GetHostViewRevision();
+					return runtime.RequestHostViewOverrides(expected, states, error) == 0 &&
+						error.starts_with(std::string(code) + ":") && control.GetParameterBatchCount() == 0 &&
+						control.GetHostViewRevision() == hostViewRevision &&
+						std::ranges::equal(before, control.GetHostViewOverrides(), [](const auto& a, const auto& b)
+						{
+							return a.m_Id == b.m_Id && LabValuesEqual(a.m_Value, b.m_Value);
+						});
+				};
+			const auto stamp = runtime.GetHostViewControlStamp();
+			auto stale = stamp;
+			--stale.m_HostViewRevision;
+			auto otherContent = stamp;
+			++otherContent.m_ContentIdentity;
+			auto otherRun = stamp;
+			otherRun.m_RunIdentity = "ffffffffffffffffffffffffffffffff";
+			checks.Check(rejects({ pin("view.gtao.radius", Float, changed), pin("radius", Float, 2.0f) }, stamp,
+				"HostOverrideUnsupported") &&
+				rejects({ pin("view.gtao.radius", Bool, true) }, stamp, "HostOverrideUnsupported") &&
+				rejects({ pin("view.gtao.radius", Float, 1.0e9f) }, stamp, "HostOverrideInvalid") &&
+				rejects({ release("view.gtao.radius", Float), release("view.gtao.radius", Float) }, stamp,
+					"HostOverrideInvalid"),
+				"Unsupported or invalid entries reject the complete operation before admission");
+			checks.Check(rejects({ release("view.gtao.radius", Float) }, stale, "ExpectedHostViewRevisionMismatch") &&
+				rejects({ release("view.taa.enabled", Bool) }, otherContent, "ExpectedContentChanged") &&
+				rejects({ release("view.taa.enabled", Bool) }, otherRun, "ExpectedRunChanged"),
+				"A stale stamp rejects even a would-be NoChange and creates no batch");
+
+			revision = control.GetHostViewRevision();
+			const auto retained = runtime.RequestHostViewOverrides(stamp,
+				std::vector{ release("view.taa.enabled", Bool) }, error);
+			GGLAB_UNUSED(tick());
+			const bool busy = runtime.RequestHostViewOverrides(runtime.GetHostViewControlStamp(),
+				std::vector{ release("view.taa.enabled", Bool) }, error) == 0 && error.starts_with("Busy:");
+			result = runtime.TakeParameterBatchResult(retained);
+			checks.Check(busy && result && revisions(revision, revision + 1, *result) && !present("view.taa.enabled"),
+				"A retained terminal result holds the external slot shared with set");
+
+			const auto queued = runtime.RequestHostViewOverrides(runtime.GetHostViewControlStamp(),
+				std::vector{ pin("view.gtao.radius", Float, changed) }, error);
+			const auto* pending = runtime.GetExternalParameterBatchStatus();
+			const bool unresolved = pending && pending->m_Values.empty() && !pending->m_HostViewOperation->m_Before;
+			probe.m_ParameterRuntime->OnExit();
+			probe.m_ParameterRuntime->RequestRestartSession();
+			probe.m_ParameterRuntime->ProcessPendingCommands();
+			probe.m_ParameterRuntime->OnEnter();
+			GGLAB_UNUSED(tick());
+			result = runtime.TakeParameterBatchResult(queued);
+			checks.Check(queued && unresolved && result && result->m_State == ParameterBatchState::Failed &&
+				result->m_Items.empty() && result->m_Failure.starts_with("ExpectedContentChanged:") &&
+				result->m_HostViewOperation->m_Conflict == "ExpectedContentChanged" &&
+				!result->m_HostViewOperation->m_After && control.GetHostViewOverrides().empty(),
+				"A content change while queued ends the operation with a conflict and applies nothing");
+			runtime.Shutdown();
+		}
+
 		void RunSequenceParameterEventScenario(SelfTestContext& checks, const std::filesystem::path& root)
 		{
 			LifetimeProbe probe;
@@ -5621,6 +5818,7 @@ namespace gglab
 		RunEffectiveParameterSettingsScenario(context, root / "tooling-host", false);
 		RunEffectiveParameterSettingsScenario(context, root / "tooling-lab", true);
 		RunHostViewControlScenario(context, root / "host-view-control");
+		RunHostViewOverrideScenario(context, root / "host-view-overrides");
 		RunLightingParameterScenario(context, root / "lighting-parameters");
 		RunBatchPreparationScenario(context, root / "batch-preparation");
 		RunContentBindingScenario(context, root / "content-binding-shutdown", false);

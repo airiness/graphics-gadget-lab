@@ -29,6 +29,15 @@ Commands:
            -NoWait returns admission. Terminal results are consumed unless -KeepResult.
   parameter-result
            Query -BatchId; -Consume releases its terminal receipt. Status also reports it.
+  host-view-overrides
+           Set exact Host view override states -Overrides/-OverridesFile, as
+           [{"id":"view.taa.enabled","type":"bool","present":true,"value":false}] or
+           {"id":...,"type":...,"present":false} to remove one. -ExpectedState/-ExpectedStateFile
+           is the complete control state the request was prepared against, the controlState
+           object from parameters or status. It names the run, which also guards the result
+           polling, so -ExpectedRunIdentity is not needed. A stale state rejects with errorCode
+           ExpectedContentChanged or ExpectedHostViewRevisionMismatch and changes nothing.
+           Waiting matches set.
   capture  Submit required SameFrame products; waits and explicitly consumes the
            terminal receipt unless -NoWait or -KeepResult. -Products/-ProductsFile
            accepts typed products instead of the default single image.
@@ -76,7 +85,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/Verification/GGLabSe
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('start', 'status', 'parameters', 'set', 'parameter-result', 'capture', 'graph', 'export', 'watch', 'batch', 'result', 'capture-cancel', 'sequence', 'sequence-cancel', 'stop', 'list')]
+    [ValidateSet('start', 'status', 'parameters', 'set', 'parameter-result', 'host-view-overrides', 'capture', 'graph', 'export', 'watch', 'batch', 'result', 'capture-cancel', 'sequence', 'sequence-cancel', 'stop', 'list')]
     [string]$Command,
 
     [ValidatePattern('^[A-Za-z0-9_-]{1,64}$')]
@@ -147,6 +156,12 @@ param(
     [switch]$WaitConsumed,
     # parameter-result: separate from capture JobId.
     [uint64]$BatchId,
+    # host-view-overrides: exact states [{id, type, present, value}] and the expected
+    # control state {runIdentity, contentIdentity, hostViewRevision}, directly or from files.
+    [string]$Overrides,
+    [string]$OverridesFile,
+    [string]$ExpectedState,
+    [string]$ExpectedStateFile,
 
     # result / capture-cancel
     [uint64]$JobId,
@@ -436,6 +451,29 @@ function Read-JsonArray([string]$Text, [string]$File, [string]$Name) {
     return ,([object[]]$array)
 }
 
+function Read-JsonObject([string]$Text, [string]$File, [string]$Name) {
+    if ($Text -and $File) { Fail "Use either -$Name or -${Name}File, not both." }
+    if ($File) { $Text = Get-Content -LiteralPath $File -Encoding UTF8 -Raw }
+    if (-not $Text -or -not $Text.TrimStart().StartsWith('{')) { Fail "-$Name requires a JSON object." }
+    try { return ConvertFrom-Json -InputObject $Text }
+    catch { Fail "-$Name contains invalid JSON: $($_.Exception.Message)" }
+}
+
+# The expected control state names the run. Binding it guards every later request of this
+# command, including result polling, against a restarted session with the same name.
+function Get-ExpectedStateRun($Expected) {
+    $run = Get-Field $Expected 'runIdentity'
+    if ($run -isnot [string] -or $run -cnotmatch '^[0-9a-f]{32}$') {
+        Fail '-ExpectedState requires a complete control state with a 32-digit lowercase hexadecimal runIdentity.' @{
+            session = $Session
+        }
+    }
+    if ($ExpectedRunIdentity -and $run -ne $ExpectedRunIdentity) {
+        Fail '-ExpectedRunIdentity differs from the run in -ExpectedState.' @{ session = $Session }
+    }
+    return $run
+}
+
 function Require-Session {
     if (-not $Session) {
         Fail "Command '$Command' requires -Session."
@@ -555,6 +593,30 @@ switch ($Command) {
         }
         catch {
             Fail $_.Exception.Message @{ session = $Session; batchId = $BatchId; consumptionUnknown = [bool]$Consume }
+        }
+        Complete-SessionResponse $response $Session
+    }
+    'host-view-overrides' {
+        Require-Session
+        if ($NoWait -and $WaitConsumed) { Fail '-NoWait and -WaitConsumed cannot be combined.' }
+        try {
+            $items = Read-JsonArray $Overrides $OverridesFile 'Overrides'
+            $expected = Read-JsonObject $ExpectedState $ExpectedStateFile 'ExpectedState'
+        }
+        catch { Fail $_.Exception.Message @{ session = $Session } }
+        $ExpectedRunIdentity = Get-ExpectedStateRun $expected
+        try {
+            $response = Invoke-SessionRequest $Session @{
+                command = 'host-view-overrides'; expected = $expected; overrides = $items
+            } ([Math]::Max(30, $TimeoutSeconds))
+        }
+        catch {
+            Fail "$($_.Exception.Message) Admission is unknown; inspect status before submitting again." @{
+                session = $Session; admissionUnknown = $true
+            }
+        }
+        if ($response.ok -and -not $NoWait) {
+            $response = Wait-ParameterBatch $response ([DateTime]::UtcNow.AddSeconds($TimeoutSeconds))
         }
         Complete-SessionResponse $response $Session
     }

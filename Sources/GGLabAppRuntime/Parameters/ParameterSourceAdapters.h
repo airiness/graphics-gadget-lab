@@ -1,6 +1,7 @@
 #pragma once
 #include "Parameters/ParameterSource.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
+#include "Parameters/HostViewParameters.h"
 #include "Parameters/LightingParameterDomain.h"
 #include "ApplicationToolingIntegration.h"
 #include "GGLabRuntime/Graphics/LightingProfile.h"
@@ -29,6 +30,12 @@ namespace gglab
 		[[nodiscard]] bool Supports(const LabParameterDesc&) const noexcept override { return true; }
 		[[nodiscard]] std::unique_ptr<PreparedParameterSourceBase> Prepare(uint64_t id,
 			std::span<const LabParameterValue> values, std::string& error) noexcept override;
+		// Exact states: a present entry stays pinned even when it equals its inherited value,
+		// and an absent entry follows the inheritance resolved now. Targets receive each
+		// entry's resulting value in request order.
+		[[nodiscard]] std::unique_ptr<PreparedParameterSourceBase> PrepareOverrides(
+			std::span<const HostViewOverrideState> states, std::vector<LabParameterValue>& targets,
+			std::string& error) noexcept;
 		[[nodiscard]] bool MatchesFrame(const LabParameterValue& value,
 			const ParameterSourceFrame& frame) const noexcept override;
 		void ApplyViewSettings(ResolvedViewRenderSettings& settings, bool enablePreExposure) const noexcept;
@@ -38,6 +45,7 @@ namespace gglab
 
 	private:
 		class Prepared;
+		class PreparedOverrides;
 		[[nodiscard]] std::optional<ApplicationViewSettingsResolution> ResolveInherited() const noexcept;
 		ViewResolver m_Resolver;
 		DemoBase* m_Demo = nullptr;

@@ -109,6 +109,10 @@ namespace gglab
 			{
 				return ApplicationControlCommand::SequenceCancel;
 			}
+			if (command == "host-view-overrides")
+			{
+				return ApplicationControlCommand::HostViewOverrides;
+			}
 			return std::nullopt;
 		}
 
@@ -1369,6 +1373,36 @@ namespace gglab
 				});
 		}
 
+		// A partial expected state rejects; its run feeds the shared run check.
+		[[nodiscard]] std::string ParseHostViewOverrideFields(const Json& fields,
+			ApplicationControlRequest& request)
+		{
+			const auto expected = fields.find("expected");
+			if (fields.size() != 5 || expected == fields.end() || !fields.contains("overrides"))
+			{
+				return "Command 'host-view-overrides' takes only 'expected' and 'overrides'.";
+			}
+			const auto isUnsigned = [&](const char* name)
+				{
+					const auto found = expected->find(name);
+					return found != expected->end() && found->is_number_unsigned();
+				};
+			if (!expected->is_object() || expected->size() != 3 || !expected->contains("runIdentity") ||
+				!IsRunIdentity(expected->at("runIdentity")) || !isUnsigned("contentIdentity") ||
+				!isUnsigned("hostViewRevision"))
+			{
+				return "Field 'expected' must hold exactly 'runIdentity' (32 lowercase hexadecimal digits) "
+					"and unsigned 'contentIdentity' and 'hostViewRevision'.";
+			}
+			request.m_ExpectedHostView = {
+				.m_RunIdentity = expected->at("runIdentity").get<std::string>(),
+				.m_ContentIdentity = expected->at("contentIdentity").get<uint64_t>(),
+				.m_HostViewRevision = expected->at("hostViewRevision").get<uint64_t>(),
+			};
+			request.m_ExpectedRunIdentity = request.m_ExpectedHostView.m_RunIdentity;
+			return ParseApplicationControlHostViewOverrides(fields["overrides"], request.m_HostViewOverrides);
+		}
+
 		[[nodiscard]] Json SerializeTemporalPlan(const FrameCaptureTemporalState& temporal)
 		{
 			Json consumers = Json::array();
@@ -1524,7 +1558,8 @@ namespace gglab
 		if (!command)
 		{
 			result.m_Error = "Field 'command' must be 'status', 'capture', 'graph', 'export', 'result', 'stop', "
-				"'capture-cancel', 'watch', 'sequence', 'sequence-cancel', 'parameters', 'set' or 'parameter-result'.";
+				"'capture-cancel', 'watch', 'sequence', 'sequence-cancel', 'parameters', 'set', 'parameter-result' "
+				"or 'host-view-overrides'.";
 			return result;
 		}
 
@@ -1603,6 +1638,9 @@ namespace gglab
 		case ApplicationControlCommand::Sequence:
 			error = ParseSequenceFields(fields, request);
 			break;
+		case ApplicationControlCommand::HostViewOverrides:
+			error = ParseHostViewOverrideFields(fields, request);
+			break;
 		case ApplicationControlCommand::Parameters:
 		case ApplicationControlCommand::Status:
 		case ApplicationControlCommand::Stop:
@@ -1626,7 +1664,8 @@ namespace gglab
 	bool AcceptsApplicationControlExpectedRun(ApplicationControlCommand command) noexcept
 	{
 		return command != ApplicationControlCommand::Status &&
-			command != ApplicationControlCommand::Parameters;
+			command != ApplicationControlCommand::Parameters &&
+			command != ApplicationControlCommand::HostViewOverrides;
 	}
 
 	std::optional<std::string> CheckApplicationControlRunIdentity(
@@ -1648,8 +1687,8 @@ namespace gglab
 		{
 			Json response = MakeResponse(request.m_Id, false);
 			response["errorCode"] = "ExpectedRunChanged";
-			response["error"] = "ExpectedRunChanged: the session runs a different process than "
-				"'expectedRunIdentity'; the request changed nothing.";
+			response["error"] = "ExpectedRunChanged: the session runs a different process than the "
+				"request's expected run identity; the request changed nothing.";
 			response["runIdentity"] = std::string(runIdentity);
 			return Dump(response);
 		}
@@ -1727,7 +1766,14 @@ namespace gglab
 				{ "field", "expectedRunIdentity" },
 				{ "commands", { "set", "parameter-result", "capture", "graph", "export", "watch", "result",
 					"capture-cancel", "sequence", "sequence-cancel", "stop" } },
-				{ "errorCodes", { "ExpectedRunChanged", "RunIdentityUnavailable" } } } } };
+				{ "errorCodes", { "ExpectedRunChanged", "RunIdentityUnavailable" } } } },
+			{ "hostViewOverrides", {
+				{ "version", 1 },
+				{ "command", "host-view-overrides" },
+				{ "groups", { "view.taa", "view.gtao", "view.exposure" } },
+				{ "maxItems", ApplicationControlMaxParameterItems },
+				{ "expected", { "runIdentity", "contentIdentity", "hostViewRevision" } },
+				{ "errorCodes", ApplicationControlHostViewOverrideErrorCodes } } } };
 		response["capture"] = {
 			{ "limits", {
 				{ "activeJobs", intake.m_Limits.m_MaxActiveJobs },

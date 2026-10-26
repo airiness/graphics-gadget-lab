@@ -110,6 +110,59 @@ try {
         $taken = Wait-ParameterBatch $admission ([DateTime]::UtcNow.AddSeconds(90))
         Check ($taken.ok -and $taken.consumed -and $state.calls -eq 6) 'parameter-terminal-wait-explicitly-releases-slot'
     }
+    # The real client binds a Host view operation's expected run to its whole wait. The fake
+    # session admits the operation, then answers polling as a same-name restart whose new
+    # process reuses the batch id, so an unguarded query would consume another run's result.
+    & {
+        $session = 'override-wait-' + [Guid]::NewGuid().ToString('N').Substring(0, 12)
+        $run = '0123456789abcdef0123456789abcdef'
+        $server = Start-Job -ArgumentList "gglab-session-$session" -ScriptBlock {
+            param([string]$PipeName)
+            $encoding = New-Object Text.UTF8Encoding($false)
+            $requests = @()
+            for ($index = 0; $index -lt 2; ++$index) {
+                $pipe = New-Object IO.Pipes.NamedPipeServerStream($PipeName, [IO.Pipes.PipeDirection]::InOut)
+                try {
+                    if (-not $pipe.WaitForConnectionAsync().Wait(30000)) { break }
+                    $reader = New-Object IO.StreamReader($pipe, $encoding, $false, 4096, $true)
+                    $request = $reader.ReadLine() | ConvertFrom-Json
+                    $requests += $request
+                    $response = if ($request.command -eq 'host-view-overrides') {
+                        @{ protocol=4; id=$request.id; ok=$true; admission='Accepted'; batchId=1; consumed=$false
+                            batch=@{ batchId=1; terminal=$false; revision=$null; items=@() } }
+                    } elseif ($request.PSObject.Properties['expectedRunIdentity']) {
+                        @{ protocol=4; id=$request.id; ok=$false; errorCode='ExpectedRunChanged'
+                            runIdentity='ffffffffffffffffffffffffffffffff' }
+                    } else {
+                        @{ protocol=4; id=$request.id; ok=$true; batchId=1; consumed=$request.consume
+                            batch=@{ batchId=1; terminal=$true; revision=9; items=@() } }
+                    }
+                    $writer = New-Object IO.StreamWriter($pipe, $encoding, 4096, $true)
+                    $writer.NewLine = "`n"
+                    $writer.WriteLine(($response | ConvertTo-Json -Compress -Depth 8))
+                    $writer.Flush()
+                }
+                finally { $pipe.Dispose() }
+            }
+            ConvertTo-Json -InputObject @($requests) -Compress -Depth 8
+        }
+        try {
+            $listening = Wait-VerificationCondition -TimeoutSeconds 30 -Poll {
+                [bool]([IO.Directory]::GetFiles('\\.\pipe\') | Where-Object { $_ -ieq "\\.\pipe\gglab-session-$session" })
+            } -Until { param($ready) $ready }
+            $client = Invoke-VerificationScript (Join-Path $root 'Scripts/Verification/GGLabSession.ps1') @{
+                Command='host-view-overrides'; Session=$session; TimeoutSeconds=30
+                ExpectedState="{`"runIdentity`":`"$run`",`"contentIdentity`":4,`"hostViewRevision`":2}"
+                Overrides='[{"id":"view.taa.enabled","type":"bool","present":false}]' }
+            $result = $client.output | ConvertFrom-Json
+            $requests = ConvertFrom-Json -InputObject ([string](Receive-Job $server -Wait -AutoRemoveJob))
+            Check ($listening -and $client.exitCode -eq 1 -and -not $result.ok -and $result.errorCode -eq 'ExpectedRunChanged' -and
+                $requests.Count -eq 2 -and -not $requests[0].PSObject.Properties['expectedRunIdentity'] -and
+                $requests[0].expected.runIdentity -eq $run -and $requests[1].command -eq 'parameter-result' -and
+                $requests[1].expectedRunIdentity -eq $run) 'host-view-override-polling-is-bound-to-the-expected-run'
+        }
+        finally { Get-Job -Id $server.Id -ErrorAction SilentlyContinue | Remove-Job -Force }
+    }
     # The client adds an expected run only to commands the session checks.
     & {
         $tokens = $null; $parseErrors = $null
@@ -127,10 +180,13 @@ try {
         $ExpectedRunIdentity = '0123456789abcdef0123456789abcdef'
         $set = @{ command='set' }; Add-ExpectedRunIdentity $set
         $status = @{ command='status' }; Add-ExpectedRunIdentity $status
+        # The guarded override operation names its run in the expected control state.
+        $guarded = @{ command='host-view-overrides' }; Add-ExpectedRunIdentity $guarded
         $ExpectedRunIdentity = ''
         $unchecked = @{ command='stop' }; Add-ExpectedRunIdentity $unchecked
         Check ($set.expectedRunIdentity -eq '0123456789abcdef0123456789abcdef' -and
-            -not $status.ContainsKey('expectedRunIdentity') -and -not $unchecked.ContainsKey('expectedRunIdentity') -and
+            -not $status.ContainsKey('expectedRunIdentity') -and -not $guarded.ContainsKey('expectedRunIdentity') -and
+            -not $unchecked.ContainsKey('expectedRunIdentity') -and
             $RunCheckedCommands.Count -eq 11) 'client-expected-run-identity-only-on-protected-commands'
     }
     $invalidParameter = Invoke-VerificationScript (Join-Path $root 'Scripts/Verification/GGLabSession.ps1') @{
@@ -141,6 +197,31 @@ try {
         Command='set';Session='parameter-invalid';ChangesFile=(Join-Path $output 'missing-changes.json') }
     $missingChangesResult = $missingChanges.output | ConvertFrom-Json
     Check ($missingChanges.exitCode -eq 1 -and -not $missingChangesResult.ok) 'parameter-missing-input-file-returns-json'
+    $missingState = Invoke-VerificationScript (Join-Path $root 'Scripts/Verification/GGLabSession.ps1') @{
+        Command='host-view-overrides';Session='parameter-invalid'
+        Overrides='[{"id":"view.taa.enabled","type":"bool","present":false}]' }
+    $missingStateResult = $missingState.output | ConvertFrom-Json
+    Check ($missingState.exitCode -eq 1 -and -not $missingStateResult.ok -and
+        $missingStateResult.error -match 'ExpectedState') 'host-view-overrides-require-expected-state'
+    $stamp = '{"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":4,"hostViewRevision":2}'
+    $release = '[{"id":"view.taa.enabled","type":"bool","present":false}]'
+    foreach ($case in @(
+        @{ name='host-view-overrides-missing-overrides-file-returns-json'; pattern='missing-overrides'
+            options=@{ OverridesFile=(Join-Path $output 'missing-overrides.json'); ExpectedState=$stamp } },
+        @{ name='host-view-overrides-missing-expected-state-file-returns-json'; pattern='missing-state'
+            options=@{ Overrides=$release; ExpectedStateFile=(Join-Path $output 'missing-state.json') } },
+        @{ name='host-view-overrides-reject-malformed-expected-run'; pattern='runIdentity'
+            options=@{ Overrides=$release; ExpectedState=$stamp.ToUpperInvariant() } },
+        @{ name='host-view-overrides-reject-a-conflicting-expected-run'; pattern='differs'
+            options=@{ Overrides=$release; ExpectedState=$stamp; ExpectedRunIdentity='ffffffffffffffffffffffffffffffff' } })) {
+        $arguments = @{ Command='host-view-overrides'; Session='parameter-invalid' }
+        foreach ($key in $case.options.Keys) { $arguments[$key] = $case.options[$key] }
+        $invalid = Invoke-VerificationScript (Join-Path $root 'Scripts/Verification/GGLabSession.ps1') $arguments
+        # An uncaught script error leaves stdout empty, which parses as null.
+        $invalidResult = $invalid.output | ConvertFrom-Json
+        Check ($invalid.exitCode -eq 1 -and $null -ne $invalidResult -and -not $invalidResult.ok -and
+            $invalidResult.error -match $case.pattern) $case.name
+    }
     $standaloneRoot = Join-Path $output 'standalone'
     $firstRun = New-VerificationRunDirectory -OutputDirectory $standaloneRoot -RunId 'first'
     $secondRun = New-VerificationRunDirectory -OutputDirectory $standaloneRoot -RunId 'second'

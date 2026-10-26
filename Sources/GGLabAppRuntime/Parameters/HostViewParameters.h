@@ -33,6 +33,37 @@ namespace gglab
 		uint64_t m_HostViewRevision = 0;
 	};
 
+	// One exact Host view override state; the value is engaged exactly when present.
+	struct HostViewOverrideState
+	{
+		LabParameterId m_Id;
+		LabParameterType m_Type = LabParameterType::Bool;
+		std::optional<LabValue> m_Value;
+	};
+
+	struct HostViewOverrideChange
+	{
+		LabParameterId m_Id;
+		std::optional<LabValue> m_Before;
+		std::optional<LabValue> m_After;
+	};
+
+	// A guarded Host view operation: the requested states and its control-commit
+	// evidence, kept separate from effect receipts.
+	struct HostViewOverrideOperation
+	{
+		HostViewControlStamp m_Expected;
+		std::vector<HostViewOverrideState> m_Overrides;
+		// Observed at the safe boundary; absent when the operation ended before it.
+		std::optional<HostViewControlStamp> m_Before;
+		// Engaged only after the operation committed.
+		std::optional<HostViewControlStamp> m_After;
+		// Requested entries whose presence or value the commit changed.
+		std::vector<HostViewOverrideChange> m_Changes;
+		// The machine-readable conflict that ended the operation without applying it.
+		std::string m_Conflict;
+	};
+
 	// The resolver layer that supplied a display-view value, in application order.
 	enum class HostViewValueSource : uint8_t
 	{

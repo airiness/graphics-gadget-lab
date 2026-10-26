@@ -74,6 +74,12 @@ namespace gglab
 		void FinishParameterBatches(ParameterBatchOwner owner) noexcept;
 		[[nodiscard]] uint64_t RequestParameterBatch(std::span<const LabParameterValue> values,
 			std::string& error, ParameterBatchOwner owner = {}) noexcept;
+		// Exact Host view override states under the same admission. The caller verifies the
+		// expected run, which recorded stamps carry. Content and Host view revision are
+		// checked at admission and again at the safe boundary; a mismatch applies nothing.
+		[[nodiscard]] uint64_t RequestHostViewOverrides(const HostViewControlStamp& expected,
+			std::span<const HostViewOverrideState> overrides, std::string& error,
+			ParameterBatchOwner owner = {}) noexcept;
 		// Internal owners may append after application; external admission retains one result slot.
 		// Status borrows survive other records' admission/collection, until their own collection.
 		// The compatibility view exposes only the external client's single retained result.
@@ -105,9 +111,17 @@ namespace gglab
 		struct ParameterBatch;
 		void RefreshParameterBatchStatus(ParameterBatch& batch) noexcept;
 		void EndParameterBatch(ParameterBatch& batch, bool superseded, std::string reason) noexcept;
+		void EndHostViewOperation(ParameterBatch& batch, std::string_view conflict,
+			std::string_view reason) noexcept;
+		void EndForContentChange(ParameterBatch& batch, std::string reason) noexcept;
 		void ApplyParameterBatch(ParameterBatch& batch, uint64_t serial) noexcept;
+		[[nodiscard]] bool IsAdmissionBlocked(ParameterBatchOwner owner) const noexcept;
 		[[nodiscard]] uint64_t AdmitParameterBatch(std::span<const LabParameterValue> values,
 			std::string& error, ParameterBatchOwner owner) noexcept;
+		[[nodiscard]] uint64_t AdmitHostViewOverrides(const HostViewControlStamp& expected,
+			std::span<const HostViewOverrideState> overrides, std::string& error,
+			ParameterBatchOwner owner) noexcept;
+		[[nodiscard]] HostViewControlStamp MakeHostViewStamp(std::string_view runIdentity) const;
 		void SupersedeOverwrittenItems(const ParameterBatch& applied) noexcept;
 		void AdvanceHostViewRevision() noexcept;
 		struct ParameterBatch
