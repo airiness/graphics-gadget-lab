@@ -53,6 +53,8 @@ namespace gglab
 		[[nodiscard]] const std::string& GetContentId() const noexcept { return m_ContentId; }
 		[[nodiscard]] uint64_t GetContentIdentity() const noexcept { return m_ContentSerial; }
 		[[nodiscard]] uint64_t GetParameterRevision() const noexcept { return m_ParameterRevision; }
+		[[nodiscard]] std::optional<ParameterControlStamp> GetDomainControlStamp(
+			ParameterControlDomain domain, std::string_view runIdentity) const;
 		// Advances once for each committed or discarded change to Host view override
 		// presence or value. NoChange and inherited value changes leave it unchanged.
 		[[nodiscard]] uint64_t GetHostViewRevision() const noexcept { return m_HostViewRevision; }
@@ -77,7 +79,7 @@ namespace gglab
 		void FinishParameterBatch(uint64_t id, ParameterBatchOwner owner = {}) noexcept;
 		void FinishParameterBatches(ParameterBatchOwner owner) noexcept;
 		// Copies caller-owned intent. The caller verifies the run for guarded requests;
-		// Session checks content and Host revision at admission and safe application.
+		// Session rechecks the applicable Host/domain stamp at admission and safe commit.
 		[[nodiscard]] uint64_t RequestParameters(const ParameterRequest& request,
 			std::string& error, ParameterBatchOwner owner = {}) noexcept;
 		// Internal owners may append after application; external admission retains one result slot.
@@ -119,6 +121,8 @@ namespace gglab
 		[[nodiscard]] uint64_t AdmitParameterRequest(const ParameterRequest& request,
 			std::string& error, ParameterBatchOwner owner) noexcept;
 		[[nodiscard]] HostViewControlStamp MakeHostViewStamp(std::string_view runIdentity) const;
+		[[nodiscard]] bool CheckDomainControl(const ParameterControlStamp& expected, std::string& error) const;
+		void EndDomainOperation(ParameterBatch& batch, std::string error) noexcept;
 		void SupersedeOverwrittenItems(const ParameterBatch& applied) noexcept;
 		void AdvanceHostViewRevision() noexcept;
 		struct ParameterBatch
@@ -143,10 +147,12 @@ namespace gglab
 			bool m_WaitingForContent = false;
 		};
 		std::unique_ptr<ParameterSourceAdapters> m_Sources;
+		WorldLightingControlBase* m_WorldLighting = nullptr;
 		DemoBase* m_Demo = nullptr;
 		LabRuntime* m_Lab = nullptr;
 		std::string m_ContentId;
 		uint64_t m_ContentSerial = 0;
+		uint64_t m_ActivationRevision = 1;
 		uint64_t m_ObservedLabRevision = 0;
 		// Heap records keep query borrows stable when another record is added/collected.
 		std::vector<std::unique_ptr<ParameterBatch>> m_ParameterBatches;

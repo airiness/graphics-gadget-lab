@@ -166,6 +166,18 @@ try {
         $override.result.errorCode -eq 'ExpectedRunChanged' -and $requests.Count -eq 2 -and
         -not $requests[0].PSObject.Properties['expectedRunIdentity'] -and $requests[0].expected.runIdentity -eq $run -and
         $requests[1].command -eq 'parameter-result' -and $requests[1].expectedRunIdentity -eq $run) 'host-view-override-polling-is-bound-to-the-expected-run'
+    # Protected Assign binds its result polling to the stamp's run as well.
+    $domainState = @{runIdentity=$run;contentIdentity=4;activationRevision=3;domain='lab'
+        labRevision=2;valuesRevision=5;worldRevision=7;environmentRevision=11} | ConvertTo-Json -Compress
+    $assignment = Invoke-RestartedSessionWait @{Command='assign';ExpectedState=$domainState
+        Changes='[{"id":"radius","type":"float","value":2.0}]'}
+    $requests = $assignment.requests
+    Check ($assignment.listening -and $assignment.client.exitCode -eq 1 -and -not $assignment.result.ok -and
+        $assignment.result.errorCode -eq 'ExpectedRunChanged' -and $requests.Count -eq 2 -and
+        $requests[0].command -eq 'assign' -and -not $requests[0].PSObject.Properties['expectedRunIdentity'] -and
+        $requests[0].expected.runIdentity -eq $run -and $requests[1].command -eq 'parameter-result' -and
+        $requests[1].expectedRunIdentity -eq $run) 'protected-assign-polling-is-bound-to-the-expected-run'
+
     # A required frame state names its run too; it guards admission and the result query.
     $predicate = Invoke-RestartedSessionWait @{ Command='capture'; OutputDirectory=(Join-Path $output 'restarted-capture')
         RequiredFrameState="{`"runIdentity`":`"$run`",`"contentIdentity`":4,`"minHostViewRevision`":2,`"values`":[{`"id`":`"view.taa.enabled`",`"type`":`"bool`",`"value`":false}]}" }
@@ -338,6 +350,7 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
         'lab-sun-parameters' = 'TestLabSunParameters.ps1'
         'session-rebuild-parameters' = 'TestRebuildParameters.ps1'
         'session-host-parameters' = 'TestHostParameters.ps1'
+        'protected-assignments' = 'TestProtectedAssignments.ps1'
         'taa-comparison' = 'TestTaaComparison.ps1'
         'session-parameters' = 'TestSessionParameters.ps1'
         'capture-jobs' = 'TestCaptureJobs.ps1'

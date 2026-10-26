@@ -124,6 +124,14 @@ namespace gglab
 	class LabParameterSet
 	{
 	public:
+		LabParameterSet() = default;
+		LabParameterSet(const LabParameterSet&) = default;
+		LabParameterSet(LabParameterSet&&) noexcept = default;
+		LabParameterSet& operator=(const LabParameterSet& other);
+		LabParameterSet& operator=(LabParameterSet&& other) noexcept;
+		// Tracks authored values, defaults and explicit inherited intent, including
+		// direct tooling writes. Copies are snapshots; assignment never rewinds it.
+		[[nodiscard]] uint64_t GetControlRevision() const noexcept { return m_ControlRevision; }
 		bool Add(LabParameterDesc desc) noexcept;
 		LabChangeImpact ResetAll() noexcept;
 		bool Set(const LabParameterId& id, const LabValue& value,
@@ -161,11 +169,14 @@ namespace gglab
 		}
 
 	private:
+		[[nodiscard]] bool SameControlState(const LabParameterSet& other) const noexcept;
+		void AdvanceControlRevision() noexcept;
 		static bool IsValueCompatible(LabParameterType type, const LabValue& value) noexcept;
 		static LabValue SanitizeValue(const LabParameterDesc& desc, const LabValue& value) noexcept;
 		static LabChangeImpact MaxImpact(LabChangeImpact lhs, LabChangeImpact rhs) noexcept;
 
 		std::vector<LabParameter> m_Parameters;
+		uint64_t m_ControlRevision = 1;
 	};
 
 	// Parses a textual value for one declared parameter without the clamping that

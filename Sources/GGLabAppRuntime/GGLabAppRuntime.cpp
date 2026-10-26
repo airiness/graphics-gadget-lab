@@ -146,14 +146,19 @@ namespace gglab
 
 	uint64_t GGLabAppRuntime::RequestParameters(const ParameterRequest& request, std::string& error) noexcept
 	{
-		if (request.m_Expected)
+		const auto* expectedRun = request.m_Expected ?
+			&request.m_Expected->m_RunIdentity :
+			request.m_ExpectedDomain ?
+				&request.m_ExpectedDomain->m_RunIdentity :
+				nullptr;
+		if (expectedRun)
 		{
 			if (m_RunIdentity.empty())
 			{
 				error = "RunIdentityUnavailable: this session has no run identity, so it rejects guarded requests.";
 				return 0;
 			}
-			if (request.m_Expected->m_RunIdentity != m_RunIdentity)
+			if (*expectedRun != m_RunIdentity)
 			{
 				error = "ExpectedRunChanged: the session runs a different process than the expected run; nothing changed.";
 				return 0;
@@ -164,6 +169,13 @@ namespace gglab
 			return 0;
 		}
 		return m_ParameterControl->RequestParameters(request, error);
+	}
+
+	std::optional<ParameterControlStamp> GGLabAppRuntime::GetDomainControlStamp(ParameterControlDomain domain) const
+	{
+		return m_ParameterControl ?
+			m_ParameterControl->GetDomainControlStamp(domain, m_RunIdentity) :
+			std::nullopt;
 	}
 
 	const ParameterBatchStatus* GGLabAppRuntime::GetExternalParameterBatchStatus() const noexcept

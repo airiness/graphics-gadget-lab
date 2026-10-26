@@ -47,56 +47,6 @@ namespace gglab
 			TextureIndex::IBL_BrdfLut,
 		};
 
-		const std::array<ShaderProgramRef, 12> IBLProducerPrograms =
-		{
-			shader_programs::IBLEnvironmentVertex,
-			shader_programs::IBLEnvironmentPixel,
-			shader_programs::IBLEnvironmentMipVertex,
-			shader_programs::IBLEnvironmentMipPixel,
-			shader_programs::IBLIrradianceVertex,
-			shader_programs::IBLIrradiancePixel,
-			shader_programs::IBLPrefilteredSpecularVertex,
-			shader_programs::IBLPrefilteredSpecularPixel,
-			shader_programs::IBLBrdfLUTVertex,
-			shader_programs::IBLBrdfLUTPixel,
-			shader_programs::IBLImportanceVertex,
-			shader_programs::IBLImportancePixel,
-		};
-
-		[[nodiscard]] bool CaptureIBLProducerArtifacts(ShaderManager& shaderManager,
-			IBLShaderArtifactIdentities& outIdentities,
-			ShaderProgramRegistryArtifactRef& outRegistryRef) noexcept
-		{
-			std::array<ShaderArtifactRef, IBLProducerPrograms.size()> artifacts{};
-			if (!shaderManager.CaptureArtifactRefs(
-				IBLProducerPrograms, artifacts, outRegistryRef))
-			{
-				return false;
-			}
-
-			auto assignStage = [&outIdentities, &artifacts](IBLArtifactStage stage,
-				std::initializer_list<size_t> indices) noexcept
-				{
-					auto& identity = outIdentities[static_cast<size_t>(stage)];
-					identity.m_Count = static_cast<uint32_t>(indices.size());
-					size_t destination = 0;
-					for (const size_t index : indices)
-					{
-						identity.m_ArtifactRefs[destination++] = artifacts[index];
-					}
-				};
-
-			assignStage(IBLArtifactStage::Environment, { 0, 1, 2, 3 });
-			assignStage(IBLArtifactStage::Irradiance, { 4, 5 });
-			assignStage(IBLArtifactStage::PrefilteredSpecular, { 6, 7, 10, 11 });
-			assignStage(IBLArtifactStage::BrdfLut, { 8, 9 });
-			return std::ranges::all_of(outIdentities,
-				[](const IBLStageShaderArtifactIdentity& identity) noexcept
-				{
-					return identity.IsValid();
-				});
-		}
-
 		[[nodiscard]] consteval bool ValidateResourceInitializationAbortSupersede() noexcept
 		{
 			detail::IBLBakeResourceInitializationState state;
@@ -157,6 +107,57 @@ namespace gglab
 				return 0.0f;
 			}
 		}
+	}
+
+	bool detail::CaptureIBLProducerArtifacts(ShaderManager& shaderManager,
+		IBLShaderArtifactIdentities& outIdentities,
+		ShaderProgramRegistryArtifactRef& outRegistryRef) noexcept
+	{
+		outIdentities = {};
+		// ShaderProgramRef owns dynamically initialized strings. A namespace-scope
+		// copy can run before those canonical identities and permanently capture empties.
+		static const std::array<ShaderProgramRef, 12> producerPrograms =
+		{
+			shader_programs::IBLEnvironmentVertex,
+			shader_programs::IBLEnvironmentPixel,
+			shader_programs::IBLEnvironmentMipVertex,
+			shader_programs::IBLEnvironmentMipPixel,
+			shader_programs::IBLIrradianceVertex,
+			shader_programs::IBLIrradiancePixel,
+			shader_programs::IBLPrefilteredSpecularVertex,
+			shader_programs::IBLPrefilteredSpecularPixel,
+			shader_programs::IBLBrdfLUTVertex,
+			shader_programs::IBLBrdfLUTPixel,
+			shader_programs::IBLImportanceVertex,
+			shader_programs::IBLImportancePixel,
+		};
+		std::array<ShaderArtifactRef, producerPrograms.size()> artifacts{};
+		if (!shaderManager.CaptureArtifactRefs(producerPrograms, artifacts, outRegistryRef))
+		{
+			return false;
+		}
+
+		const auto assignStage = [&outIdentities, &artifacts](IBLArtifactStage stage,
+			std::initializer_list<size_t> indices) noexcept
+			{
+				auto& identity = outIdentities[static_cast<size_t>(stage)];
+				identity.m_Count = static_cast<uint32_t>(indices.size());
+				size_t destination = 0;
+				for (const size_t index : indices)
+				{
+					identity.m_ArtifactRefs[destination++] = artifacts[index];
+				}
+			};
+
+		assignStage(IBLArtifactStage::Environment, { 0, 1, 2, 3 });
+		assignStage(IBLArtifactStage::Irradiance, { 4, 5 });
+		assignStage(IBLArtifactStage::PrefilteredSpecular, { 6, 7, 10, 11 });
+		assignStage(IBLArtifactStage::BrdfLut, { 8, 9 });
+		return std::ranges::all_of(outIdentities,
+			[](const IBLStageShaderArtifactIdentity& identity) noexcept
+			{
+				return identity.IsValid();
+			});
 	}
 
 	void detail::ApplyIBLCacheLookupResult(
@@ -437,7 +438,7 @@ namespace gglab
 		const uint64_t bakeAttempt = m_NextBakeAttempt++;
 		ShaderProgramRegistryArtifactRef shaderRegistryRef{};
 		IBLShaderArtifactIdentities shaderArtifacts{};
-		if (!CaptureIBLProducerArtifacts(
+		if (!detail::CaptureIBLProducerArtifacts(
 			*m_ShaderManager, shaderArtifacts, shaderRegistryRef))
 		{
 			SetStage(IBLBakeStage::Failed, 0.0f);

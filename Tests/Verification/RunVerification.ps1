@@ -43,6 +43,7 @@ $catalog = @(
     @{ name = 'lab-sun-parameters'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestLabSunParameters.ps1' }) },
     @{ name = 'session-rebuild-parameters'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestRebuildParameters.ps1' }) },
     @{ name = 'session-host-parameters'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestHostParameters.ps1' }) },
+    @{ name = 'protected-assignments'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestProtectedAssignments.ps1' }) },
     @{ name = 'taa-comparison'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestTaaComparison.ps1' }) },
     @{ name = 'session-parameters'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestSessionParameters.ps1' }) },
     @{ name = 'capture-jobs'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestCaptureJobs.ps1' }) },

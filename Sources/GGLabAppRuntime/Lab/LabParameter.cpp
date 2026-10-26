@@ -8,8 +8,10 @@
 #include <cmath>
 #include <cstddef>
 #include <format>
+#include <limits>
 #include <system_error>
 #include <type_traits>
+#include <utility>
 
 namespace gglab
 {
@@ -113,17 +115,93 @@ namespace gglab
 			.m_Dirty = false,
 			});
 		m_Parameters.back().m_Value = m_Parameters.back().m_Desc.m_DefaultValue;
+		AdvanceControlRevision();
 		return true;
+	}
+
+	bool LabParameterSet::SameControlState(const LabParameterSet& other) const noexcept
+	{
+		const auto sameOptional = [](const std::optional<LabValue>& a, const std::optional<LabValue>& b)
+			{
+				return a.has_value() == b.has_value() && (!a || LabValuesEqual(*a, *b));
+			};
+		if (m_Parameters.size() != other.m_Parameters.size())
+		{
+			return false;
+		}
+		for (size_t i = 0; i < m_Parameters.size(); ++i)
+		{
+			const auto& a = m_Parameters[i];
+			const auto& b = other.m_Parameters[i];
+			if (a.m_Desc.m_Id != b.m_Desc.m_Id || a.m_Desc.m_Type != b.m_Desc.m_Type ||
+				a.m_Desc.m_Impact != b.m_Desc.m_Impact || a.m_Desc.m_EffectClass != b.m_Desc.m_EffectClass ||
+				a.m_Desc.m_EditPolicy != b.m_Desc.m_EditPolicy || a.m_Desc.m_InheritOnEnter != b.m_Desc.m_InheritOnEnter ||
+				!sameOptional(a.m_Desc.m_MinValue, b.m_Desc.m_MinValue) ||
+				!sameOptional(a.m_Desc.m_MaxValue, b.m_Desc.m_MaxValue) ||
+				!std::ranges::equal(a.m_Desc.m_EnumItems, b.m_Desc.m_EnumItems, [](const auto& x, const auto& y)
+					{
+						return x.m_Value == y.m_Value && x.m_Name == y.m_Name;
+					}) ||
+				a.m_Dirty != b.m_Dirty || !LabValuesEqual(a.m_Value, b.m_Value) ||
+				!LabValuesEqual(a.m_Desc.m_DefaultValue, b.m_Desc.m_DefaultValue))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	void LabParameterSet::AdvanceControlRevision() noexcept
+	{
+		// Saturation is permanent; protected requests reject exhausted stamps.
+		if (m_ControlRevision != std::numeric_limits<uint64_t>::max())
+		{
+			++m_ControlRevision;
+		}
+	}
+
+	LabParameterSet& LabParameterSet::operator=(const LabParameterSet& other)
+	{
+		if (this != &other)
+		{
+			if (!SameControlState(other))
+			{
+				m_ControlRevision = std::max(m_ControlRevision, other.m_ControlRevision);
+				AdvanceControlRevision();
+			}
+			m_Parameters = other.m_Parameters;
+		}
+		return *this;
+	}
+
+	LabParameterSet& LabParameterSet::operator=(LabParameterSet&& other) noexcept
+	{
+		if (this != &other)
+		{
+			if (!SameControlState(other))
+			{
+				m_ControlRevision = std::max(m_ControlRevision, other.m_ControlRevision);
+				AdvanceControlRevision();
+			}
+			m_Parameters = std::move(other.m_Parameters);
+		}
+		return *this;
 	}
 
 	LabChangeImpact LabParameterSet::ResetAll() noexcept
 	{
 		LabChangeImpact impact = LabChangeImpact::Immediate;
+		bool changed = false;
 		for (LabParameter& parameter : m_Parameters)
 		{
+			changed |= !parameter.m_Dirty || !LabValuesEqual(parameter.m_Value, parameter.m_Desc.m_DefaultValue);
 			parameter.m_Value = parameter.m_Desc.m_DefaultValue;
 			parameter.m_Dirty = true;
 			impact = MaxImpact(impact, parameter.m_Desc.m_Impact);
+		}
+		if (changed)
+		{
+			AdvanceControlRevision();
 		}
 		return impact;
 	}
@@ -138,7 +216,12 @@ namespace gglab
 			return false;
 		}
 
-		iter->m_Value = SanitizeValue(iter->m_Desc, value);
+		auto sanitized = SanitizeValue(iter->m_Desc, value);
+		if (!iter->m_Dirty || !LabValuesEqual(iter->m_Value, sanitized))
+		{
+			AdvanceControlRevision();
+		}
+		iter->m_Value = std::move(sanitized);
 		iter->m_Dirty = true;
 		if (impact)
 		{
@@ -247,6 +330,10 @@ namespace gglab
 			}
 		}
 		// Validation completes before any live value or dirty bit is changed.
+		if (!result.m_Changed.empty())
+		{
+			AdvanceControlRevision();
+		}
 		for (size_t item = 0; item < changes.size(); ++item)
 		{
 			LabParameter& parameter = m_Parameters[indices[item]];
@@ -304,6 +391,11 @@ namespace gglab
 		{
 			return false;
 		}
+		if (!LabValuesEqual(found->m_Desc.m_DefaultValue, value) ||
+			(!found->m_Dirty && !LabValuesEqual(found->m_Value, value)))
+		{
+			AdvanceControlRevision();
+		}
 		found->m_Desc.m_DefaultValue = value;
 		if (!found->m_Dirty)
 		{
@@ -325,6 +417,10 @@ namespace gglab
 			return false;
 		}
 		const bool changed = found->m_Dirty || !LabValuesEqual(found->m_Value, value);
+		if (changed)
+		{
+			AdvanceControlRevision();
+		}
 		found->m_Value = value;
 		found->m_Dirty = false;
 		return changed;

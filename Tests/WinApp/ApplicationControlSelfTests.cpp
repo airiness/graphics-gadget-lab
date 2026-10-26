@@ -1045,6 +1045,68 @@ namespace gglab
 				"Rejections carry a machine-readable code beside the error text");
 		}
 
+		void RunProtectedAssignmentTests(SelfTestContext& context) noexcept
+		{
+			const ParameterControlStamp stamp{
+				.m_RunIdentity = "0123456789abcdef0123456789abcdef", .m_ContentIdentity = 21, .m_ActivationRevision = 3,
+				.m_Domain = ParameterControlDomain::Lab, .m_LabRevision = 8, .m_ValuesRevision = 9,
+				.m_WorldRevision = 13, .m_EnvironmentRevision = 17 };
+			const Json document{
+				{ "protocol", 4 }, { "id", 57 }, { "command", "assign" },
+				{ "expected", SerializeApplicationControlDomainStamp(stamp) },
+				{ "changes", Json::array({ { { "id", "radius" }, { "type", "float" }, { "value", 2.0f } } }) } };
+			const auto parsed = ParseApplicationControlRequest(document.dump());
+			context.Check(parsed.m_Request && parsed.m_Request->m_Command == ApplicationControlCommand::Assign &&
+				parsed.m_Request->m_ExpectedParameterControl == stamp &&
+				parsed.m_Request->m_ExpectedRunIdentity == stamp.m_RunIdentity &&
+				parsed.m_Request->m_ParameterChanges.size() == 1,
+				"Protected Assign parses a complete typed domain guard and binds subsequent polling to its run");
+			for (const auto& field : { "runIdentity", "contentIdentity", "activationRevision", "domain", "labRevision",
+				"valuesRevision", "worldRevision", "environmentRevision" })
+			{
+				auto partial = document;
+				partial["expected"].erase(field);
+				context.Check(!ParseApplicationControlRequest(partial.dump()).m_Request,
+					"Partial domain control stamps reject before admission");
+			}
+			auto invalid = document;
+			invalid["expected"]["domain"] = "host";
+			context.Check(!ParseApplicationControlRequest(invalid.dump()).m_Request,
+				"Protected Assign cannot reinterpret Host view ownership");
+			invalid = document;
+			invalid["expected"]["worldRevision"] = -1;
+			context.Check(!ParseApplicationControlRequest(invalid.dump()).m_Request,
+				"Signed or fractional control revisions are not accepted as unsigned identities");
+			invalid = document;
+			invalid["expectedRunIdentity"] = stamp.m_RunIdentity;
+			context.Check(!ParseApplicationControlRequest(invalid.dump()).m_Request,
+				"The protected stamp is the single run authority for Assign");
+			if (parsed.m_Request)
+			{
+				const auto rejection = CheckApplicationControlRunIdentity(*parsed.m_Request,
+					"ffffffffffffffffffffffffffffffff");
+				context.Check(rejection && Json::parse(*rejection)["errorCode"] == "ExpectedRunChanged",
+					"A restarted session rejects protected Assign without touching process-local state");
+			}
+			ParameterBatchStatus batch;
+			batch.m_DomainOperation = ParameterControlOperation{ .m_Expected = stamp, .m_Before = stamp,
+				.m_Committed = false, .m_Conflict = "ExpectedParameterControlMismatch" };
+			const auto failed = SerializeApplicationControlParameterBatch(batch);
+			context.Check(failed["domainControl"]["committed"] == false &&
+				failed["domainControl"]["after"].is_null() &&
+				failed["domainControl"]["conflict"] == "ExpectedParameterControlMismatch" &&
+				!SerializeApplicationControlParameterBatch(ParameterBatchStatus{}).contains("domainControl"),
+				"Domain commit observations are separate from receipts and absent on legacy results");
+			const auto status = Json::parse(SerializeApplicationControlStatus(58, {}));
+			context.Check(status["capabilities"]["protectedAssignments"]["domains"].size() == 2 &&
+				status["capabilities"]["protectedAssignments"]["mixedDomains"] == false,
+				"Capabilities advertise the bounded protected domain contract");
+			const auto absent = Json::parse(SubmitApplicationControlParameters(59, {}, nullptr, &stamp));
+			context.Check(!absent["ok"] && absent["errorCode"] == "NoParameterSource" &&
+				absent["domainControlState"].is_null(),
+				"Protected rejections report an error code and current domain availability");
+		}
+
 		void RunRequiredFrameStateTests(SelfTestContext& context) noexcept
 		{
 			const auto capture = [](std::string_view command, std::string_view required)
@@ -1122,6 +1184,7 @@ namespace gglab
 		RunParseTests(context);
 		RunRunIdentityCheckTests(context);
 		RunHostViewOverrideTests(context);
+		RunProtectedAssignmentTests(context);
 		RunRequiredFrameStateTests(context);
 		RunSerializeTests(context);
 		RunCaptureJobOwnershipTests(context);

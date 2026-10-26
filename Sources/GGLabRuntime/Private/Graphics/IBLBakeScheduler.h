@@ -5,6 +5,7 @@
 #include "Graphics/EnvironmentLightingSystem.h"
 #include "GGLabRuntime/Graphics/IBLBakeTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
+#include "ShaderArtifactRuntime/ShaderProgramRegistryArtifact.h"
 
 #include <algorithm>
 #include <array>
@@ -15,8 +16,15 @@
 
 namespace gglab
 {
+	class ShaderManager;
+
 	namespace detail
 	{
+		// Capture the complete producer mapping from one active registry at runtime.
+		[[nodiscard]] bool CaptureIBLProducerArtifacts(ShaderManager& shaderManager,
+			IBLShaderArtifactIdentities& outIdentities,
+			ShaderProgramRegistryArtifactRef& outRegistryRef) noexcept;
+
 		[[nodiscard]] constexpr bool HasIBLBakeShaderRegistryChanged(
 			const ShaderProgramRegistryArtifactRef& bakeRegistry,
 			const ShaderProgramRegistryArtifactRef& activeRegistry) noexcept
@@ -123,7 +131,6 @@ namespace gglab
 	class RHIDevice;
 	class RenderResourceRegistry;
 	class TaskSystem;
-	class ShaderManager;
 	class TransferManager;
 	class AtmosphereSystem;
 

@@ -222,6 +222,7 @@ namespace gglab
 			bool m_FailParameterPreparation = false;
 			bool m_FailParameterCreation = false;
 			std::function<void()> m_ParameterEffectCallback;
+			std::function<void()> m_ParameterPrepareCallback;
 			uint64_t m_ParameterBuiltSerial = 0;
 			float m_ParameterBuiltRadius = 0.0f;
 			ResolvedViewRenderSettings m_ParameterBuiltView{};
@@ -1157,6 +1158,10 @@ namespace gglab
 				uint64_t contentIdentity, std::string& error) noexcept override
 			{
 				const auto publication = control.GetWorldLightingPublication();
+				if (auto callback = std::exchange(m_Probe.m_ParameterPrepareCallback, std::function<void()>{}))
+				{
+					callback();
+				}
 				if (!SupportsWorldLightingParameter(id) || !publication.m_Requested)
 				{
 					error = "LightingPreparationFailed: the fixture lost its authored sun.";
@@ -3335,6 +3340,127 @@ namespace gglab
 			runtime.Shutdown();
 		}
 
+		void RunProtectedParameterScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			probe.m_EnableParameterLab = true;
+			probe.m_EnableLightingProfiles = true;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			GGLAB_UNUSED(runtime.Tick());
+			runtime.EnableParameterControl();
+			auto& lab = *probe.m_ParameterRuntime;
+			const auto& control = *runtime.GetParameterControl();
+			const auto domain = ParameterControlDomain::Lab;
+			const auto initial = runtime.GetDomainControlStamp(domain);
+			checks.Check(initial && runtime.GetDomainControlStamp(ParameterControlDomain::LightingProfile),
+				"Ready Lab/profile discovery exposes distinct complete domain guards");
+			if (!initial)
+			{
+				runtime.Shutdown();
+				return;
+			}
+			std::string error;
+			const LabParameterId radius("radius");
+			const auto make = [&](const LabParameterId& id, LabValue value)
+				{
+					const std::array values{ LabParameterValue{ id, std::move(value) } };
+					auto request = AssignmentRequest(runtime, values);
+					request.m_ExpectedDomain = runtime.GetDomainControlStamp(domain).value();
+					return request;
+				};
+			auto equal = make(radius, 1.0f);
+			const auto noChangeId = runtime.RequestParameters(equal, error);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto noChange = runtime.TakeParameterBatchResult(noChangeId);
+			checks.Check(noChange && noChange->m_DomainOperation->m_Committed &&
+				noChange->m_Items[0].m_State == ParameterEffectState::NoChange &&
+				noChange->m_DomainOperation->m_Before == noChange->m_DomainOperation->m_After,
+				"Protected semantic NoChange retains its receipt without changing control identity");
+			auto wrong = make(radius, 2.0f);
+			wrong.m_ExpectedDomain->m_RunIdentity = "ffffffffffffffffffffffffffffffff";
+			checks.Check(!runtime.RequestParameters(wrong, error) && error.starts_with("ExpectedRunChanged:"),
+				"Protected Assign rejects another run before Session admission");
+			wrong = make(radius, 2.0f);
+			++wrong.m_ExpectedDomain->m_ContentIdentity;
+			checks.Check(!runtime.RequestParameters(wrong, error) && error.starts_with("ExpectedContentChanged:"),
+				"Protected Assign rejects another activation without reserving a result");
+			wrong = make(radius, 2.0f);
+			wrong.m_Entries.push_back({ LabParameterId("view.exposure.ev100"), LabParameterType::Float,
+				ParameterOperation::Assign, 8.0f });
+			checks.Check(!runtime.RequestParameters(wrong, error) && error.starts_with("ParameterDomainUnsupported:") &&
+				control.GetParameterBatchCount() == 0,
+				"A guarded Lab request cannot acquire Host or cross-domain writes");
+
+			auto owned = make(radius, 2.0f);
+			const auto expected = *owned.m_ExpectedDomain;
+			const auto id = runtime.RequestParameters(owned, error);
+			owned.m_Entries[0].m_Value = 99.0f;
+			++owned.m_ExpectedDomain->m_ValuesRevision;
+			GGLAB_UNUSED(runtime.Tick());
+			const bool busy = !runtime.RequestParameters(make(radius, 3.0f), error) && error.starts_with("Busy:");
+			const auto applied = runtime.TakeParameterBatchResult(id);
+			checks.Check(busy && applied && applied->m_DomainOperation->m_Expected == expected &&
+				applied->m_DomainOperation->m_Committed && applied->m_Items[0].m_FirstConsumed &&
+				lab.GetActiveSession()->GetParameters().Get(radius, 0.0f) == 2.0f,
+				"Protected intent/guard snapshots survive caller edits and retain the external result slot");
+
+			auto stale = make(radius, 2.0f);
+			GGLAB_UNUSED(lab.GetActiveSession()->SetParameter(radius, 3.0f));
+			GGLAB_UNUSED(lab.GetActiveSession()->SetParameter(radius, 2.0f));
+			checks.Check(!runtime.RequestParameters(stale, error) && error.starts_with("ExpectedParameterControlMismatch:") &&
+				control.GetParameterBatchCount() == 0,
+				"Direct Lab ABA rejects a stale would-be NoChange before reservations or receipts");
+			const auto queued = runtime.RequestParameters(make(radius, 3.0f), error);
+			GGLAB_UNUSED(lab.GetActiveSession()->SetParameter(radius, 4.0f));
+			GGLAB_UNUSED(runtime.Tick());
+			const auto conflict = runtime.TakeParameterBatchResult(queued);
+			checks.Check(conflict && !conflict->m_DomainOperation->m_Committed &&
+				conflict->m_DomainOperation->m_Conflict == "ExpectedParameterControlMismatch" &&
+				conflict->m_Items.empty() && lab.GetActiveSession()->GetParameters().Get(radius, 0.0f) == 4.0f,
+				"A queued protected assignment rechecks live intent and preserves a competing writer");
+			probe.m_ParameterPrepareCallback = [&]()
+				{
+					GGLAB_UNUSED(lab.GetActiveSession()->SetParameter(radius, 2.0f));
+				};
+			const auto prepareId = runtime.RequestParameters(make(LabParameterId("sun-input"), 2.0f), error);
+			GGLAB_UNUSED(runtime.Tick());
+			const auto duringPrepare = runtime.TakeParameterBatchResult(prepareId);
+			checks.Check(duringPrepare && !duringPrepare->m_DomainOperation->m_Committed &&
+				duringPrepare->m_DomainOperation->m_Conflict == "ExpectedParameterControlMismatch" &&
+				duringPrepare->m_Items.empty(),
+				"A source prepare callback cannot invalidate CAS before the final no-callback commit region");
+
+			stale = make(radius, 2.0f);
+			auto& world = runtime.GetDemoManager()->GetActiveDemo()->GetWorld();
+			const auto atmosphere = world.m_Atmosphere;
+			world.m_Atmosphere = AtmosphereSettings{};
+			world.MarkLightingAuthoringChanged();
+			world.m_Atmosphere = atmosphere;
+			world.MarkLightingAuthoringChanged();
+			checks.Check(!runtime.RequestParameters(stale, error) && error.starts_with("ExpectedParameterControlMismatch:"),
+				"World authoring ABA is visible without relying on a bake generation or refresh sampling");
+			stale = make(radius, 2.0f);
+			const auto intensity = probe.m_ContentServices.m_EnvironmentLighting->GetEnvironmentLightingSettings().m_Intensity;
+			probe.m_ParameterEnvironment->SetIntensity(intensity + 1.0f);
+			probe.m_ParameterEnvironment->SetIntensity(intensity);
+			checks.Check(!runtime.RequestParameters(stale, error) && error.starts_with("ExpectedParameterControlMismatch:"),
+				"Environment setting ABA invalidates the guard independently of effect publication");
+			const auto replaced = runtime.RequestParameters(make(radius, 3.0f), error);
+			lab.RequestRestartSession();
+			GGLAB_UNUSED(runtime.Tick());
+			const auto replacement = runtime.TakeParameterBatchResult(replaced);
+			checks.Check(replacement && !replacement->m_DomainOperation->m_Committed &&
+				replacement->m_DomainOperation->m_Conflict == "ExpectedContentChanged",
+				"Unapplied guards cannot follow an unrelated activation replacement");
+			runtime.Shutdown();
+		}
+
 		void RunParameterRequestScenario(SelfTestContext& checks, const std::filesystem::path& root)
 		{
 			LifetimeProbe probe;
@@ -4513,7 +4639,8 @@ namespace gglab
 			runtime.Shutdown();
 		}
 
-		void RunRebuildParameterScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		void RunRebuildParameterScenario(SelfTestContext& checks, const std::filesystem::path& root,
+			bool protectedAssignments = false)
 		{
 			LifetimeProbe probe;
 			probe.m_EnableParameterLab = true;
@@ -4532,8 +4659,27 @@ namespace gglab
 			const auto request = [&](std::string_view name, uint32_t value)
 				{
 					const std::array values{ LabParameterValue{ LabParameterId(name), value } };
-					return runtime.RequestParameters(AssignmentRequest(runtime, values), error);
+					auto intent = AssignmentRequest(runtime, values);
+					if (protectedAssignments)
+					{
+						const auto stamp = runtime.GetDomainControlStamp(ParameterControlDomain::Lab);
+						if (!stamp)
+						{
+							error = "Protected Lab control is unavailable.";
+							return uint64_t(0);
+						}
+						intent.m_ExpectedDomain = *stamp;
+					}
+					return runtime.RequestParameters(intent, error);
 				};
+			if (protectedAssignments)
+			{
+				const std::array baseline{ LabParameterValue{ LabParameterId("view.exposure.ev100"), 2.0f } };
+				const auto configured = runtime.RequestParameters(AssignmentRequest(runtime, baseline), error);
+				GGLAB_UNUSED(runtime.Tick());
+				checks.Check(runtime.TakeParameterBatchResult(configured).has_value(),
+					"Protected Rebuild starts with a separately owned Host override");
+			}
 			const auto created = probe.m_ParameterSessionCreations;
 			const auto originalIdentity = control.GetContentIdentity();
 			const auto revision = control.GetParameterRevision();
@@ -4563,7 +4709,16 @@ namespace gglab
 				LabParameterValue{ LabParameterId("radius"), 2.0f },
 				LabParameterValue{ LabParameterId("view.exposure.ev100"), 2.0f },
 				};
-			const auto batchId = runtime.RequestParameters(AssignmentRequest(runtime, mixed), error);
+			auto rebuildIntent = AssignmentRequest(runtime, mixed);
+			if (protectedAssignments)
+			{
+				std::erase_if(rebuildIntent.m_Entries, [](const auto& entry)
+					{
+						return entry.m_Id == LabParameterId("view.exposure.ev100");
+					});
+				rebuildIntent.m_ExpectedDomain = runtime.GetDomainControlStamp(ParameterControlDomain::Lab);
+			}
+			const auto batchId = runtime.RequestParameters(rebuildIntent, error);
 			checks.Check(batchId != 0 && lab.GetActiveSession()->GetParameters().Get(
 				LabParameterId("layout"), uint32_t(0)) == 1, "Rebuild admission reserves without mutating the active Lab");
 			{
@@ -4594,10 +4749,23 @@ namespace gglab
 			checks.Check(!transitionFrame.m_Available && requestedRadius != transitionFrame.m_Values.end() &&
 				std::get<float>(requestedRadius->m_Value) == 2.0f && probe.m_ParameterBuiltRadius == 1.0f,
 				"Closed edit admission does not erase the transition frame's requested candidate values");
-			checks.Check(generation.m_Domain == "lab-session" && generation.m_Generation != 0 &&
+			checks.Check(preparing->m_Items.size() == (protectedAssignments ? 4 : 5) &&
+				generation.m_Domain == "lab-session" && generation.m_Generation != 0 &&
 				preparing->m_Items[0].m_Applied && !preparing->m_Items[0].m_Published &&
-				!preparing->m_Items[3].m_FirstConsumed && preparing->m_Items[4].m_FirstConsumed,
-				"Rebuild and Lab Immediate receipts await activation; Host Immediate consumption uses its actual old-session frame");
+				!preparing->m_Items[3].m_FirstConsumed,
+				"Rebuild and Lab Immediate receipts await their candidate activation");
+			// Protected Assign excludes Host entries; never index its four-item receipt
+			// vector as the legacy five-item mixed batch, even if spare capacity exists.
+			if (protectedAssignments)
+			{
+				checks.Check(probe.m_ParameterBuiltView.m_Exposure.m_ManualEV100 == 2.0f,
+					"Protected Rebuild preserves the separately committed Host exposure on old-session frames");
+			}
+			else
+			{
+				checks.Check(preparing->m_Items.size() == 5 && preparing->m_Items[4].m_FirstConsumed,
+					"Mixed Host Immediate consumption uses its actual old-session frame");
+			}
 			GGLAB_UNUSED(runtime.Tick());
 			checks.Check(probe.m_ParameterSessionCreations == created + 1 &&
 				control.GetContentIdentity() == originalIdentity && !control.GetParameterBatchStatus()->IsTerminal(),
@@ -4623,6 +4791,15 @@ namespace gglab
 				consumed->m_Items[0].m_FirstConsumed > publishedFrame &&
 				probe.m_ParameterSessionCreations == created + 1 && probe.m_ParameterBuiltRadius == 2.0f,
 				"Retry consumption matches the target operation and retains first publication without recreating the session");
+			if (protectedAssignments)
+			{
+				checks.Check(consumed && consumed->m_DomainOperation && consumed->m_DomainOperation->m_Committed &&
+					consumed->m_DomainOperation->m_Before->m_ContentIdentity == originalIdentity &&
+					consumed->m_DomainOperation->m_After->m_ContentIdentity == originalIdentity &&
+					runtime.GetDomainControlStamp(ParameterControlDomain::Lab)->m_ContentIdentity != originalIdentity &&
+					!runtime.RequestParameters(rebuildIntent, error) && error.starts_with("ExpectedContentChanged:"),
+					"Rebuild commits under the source guard, consumes its owned target and requires a fresh target guard");
+			}
 			for (const auto name : { "scene-layout", "pipeline-layout", "layout" })
 			{
 				const auto id = request(name, 3);
@@ -5484,7 +5661,8 @@ namespace gglab
 			runtime.Shutdown();
 		}
 
-		void RunLightingProfileScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		void RunLightingProfileScenario(SelfTestContext& checks, const std::filesystem::path& root,
+			bool protectedAssignments = false)
 		{
 			LifetimeProbe probe;
 			probe.m_EnableLightingProfiles = true;
@@ -5520,10 +5698,32 @@ namespace gglab
 			std::string error;
 			const auto request = [&](int32_t profile)
 				{
-					const std::array values{ LabParameterValue{ LabParameterId("environment.profile"), profile },
-						LabParameterValue{ LabParameterId("view.exposure.ev100"), 8.0f } };
-					return runtime.RequestParameters(AssignmentRequest(runtime, values), error);
+					std::vector values{ LabParameterValue{ LabParameterId("environment.profile"), profile } };
+					if (!protectedAssignments)
+					{
+						values.push_back({ LabParameterId("view.exposure.ev100"), 8.0f });
+					}
+					auto intent = AssignmentRequest(runtime, values);
+					if (protectedAssignments)
+					{
+						const auto stamp = runtime.GetDomainControlStamp(ParameterControlDomain::LightingProfile);
+						if (!stamp)
+						{
+							error = "Protected lighting profile control is unavailable.";
+							return uint64_t(0);
+						}
+						intent.m_ExpectedDomain = *stamp;
+					}
+					return runtime.RequestParameters(intent, error);
 				};
+			if (protectedAssignments)
+			{
+				const std::array baseline{ LabParameterValue{ LabParameterId("view.exposure.ev100"), 8.0f } };
+				const auto configured = runtime.RequestParameters(AssignmentRequest(runtime, baseline), error);
+				GGLAB_UNUSED(runtime.Tick());
+				checks.Check(runtime.TakeParameterBatchResult(configured).has_value(),
+					"Protected profile workflow keeps exposure under its separate Host owner");
+			}
 			const auto initialRevision = parameters.GetParameterRevision();
 			checks.Check(request(-1) == 0 && request(99) == 0 &&
 				parameters.GetParameterRevision() == initialRevision && !parameters.GetParameterBatchStatus(),
@@ -5531,6 +5731,12 @@ namespace gglab
 			const auto id = request(1);
 			GGLAB_UNUSED(runtime.Tick());
 			const auto first = *parameters.GetParameterBatchStatus();
+			if (protectedAssignments)
+			{
+				checks.Check(first.m_DomainOperation && first.m_DomainOperation->m_Committed &&
+					first.m_DomainOperation->m_Before && first.m_DomainOperation->m_After,
+					"Profile CAS commits once while its Deferred effect still waits for real consumption");
+			}
 			const auto state = parameters.GetLightingProfilePublication();
 			const auto transitionFrame = parameters.CaptureFrameState(probe.m_ParameterBuiltSerial,
 				environment.GetBakeRequestGeneration(), environment.GetBakingStatus().m_ActiveGeneration);
@@ -5574,6 +5780,7 @@ namespace gglab
 					auto& rotation = world.GetRegistry().get<components::TransformComponent>(entity).m_Rotation;
 					rotation = Quaternion(-rotation.m_X, -rotation.m_Y, -rotation.m_Z, -rotation.m_W);
 					light.m_WorldSun->m_Chromaticity *= 0.5f;
+					world.MarkLightingAuthoringChanged();
 				}
 			}
 			const auto equivalent = request(1);
@@ -5585,6 +5792,7 @@ namespace gglab
 				probe.m_LightingProfileQueries == queries,
 				"Equivalent Quaternion/chromaticity authoring stays NoChange and never rebuilds static registrations or relabels a request");
 			world.m_Atmosphere->m_RayleighScaleHeightMeters *= 2.0f;
+			world.MarkLightingAuthoringChanged();
 			const auto retry = request(0);
 			probe.m_SkipLightingPublication = true;
 			checks.Check(tickUntil([&]()
@@ -6024,6 +6232,7 @@ namespace gglab
 		RunHostViewControlScenario(context, root / "host-view-control");
 		RunHostViewOverrideScenario(context, root / "host-view-overrides");
 		RunParameterRequestScenario(context, root / "parameter-request");
+		RunProtectedParameterScenario(context, root / "protected-parameters");
 		RunLightingParameterScenario(context, root / "lighting-parameters");
 		RunBatchPreparationScenario(context, root / "batch-preparation");
 		RunContentBindingScenario(context, root / "content-binding-shutdown", false);
@@ -6032,6 +6241,7 @@ namespace gglab
 		RunLightingProfileRegistrationScenario(context, root / "profile-invalid-registration", false, false);
 		RunLightingProfileRegistrationScenario(context, root / "profile-equivalent-registration", false, true);
 		RunLightingProfileScenario(context, root / "lighting-profiles");
+		RunLightingProfileScenario(context, root / "protected-lighting-profiles", true);
 		RunLabWorldLightingScenario(context, root / "lab-world-lighting");
 		RunSequenceParameterEventScenario(context, root / "sequence-events");
 		RunDeferredSequenceEventScenario(context, root / "deferred-sequence-events");
@@ -6043,6 +6253,7 @@ namespace gglab
 		RunLabSessionRetirementScenario(context, root / "lab-session-retirement");
 		RunParameterFrameScenario(context, root / "parameter-frames", false);
 		RunRebuildParameterScenario(context, root / "parameter-rebuild");
+		RunRebuildParameterScenario(context, root / "protected-rebuild", true);
 		RunParameterFrameScenario(context, root / "parameter-failed-submit", true);
 		RunFrameOutcomeScenarios(context, root / "outcomes");
 		RunOwnedJobRoutingScenario(context, root / "owned-job-routing");

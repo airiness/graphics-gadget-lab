@@ -3,7 +3,9 @@ Atlas ID: atlas.application.runtime-control
 
 - Question: who writes Host view overrides, how is the display view resolved, and
   which existing evidence ties a captured frame to that state?
-- VerifiedAgainst: `ae02368ab1405876c5979467d70acc3777509a8a`
+- VerifiedAgainst: `652fa04d159994b45a12b30c62c5b535f40aed59`
+- Reviewed overlay: protected Lab/profile assignments and their working-tree
+  regression coverage.
 - Refresh triggers: Host parameter bindings or writers, tooling snapshot inputs,
   content continuation, display-view precedence, capture issue order, provenance
   or owning regression targets change.
@@ -69,6 +71,23 @@ Other layers have separate storage:
 
 `environment.profile` is a separate, Deferred Host source. Lab authoring writes can
 change inherited values but never write Host view overrides.
+
+## Protected Lab/profile assignments
+
+WinAppHost translates `assign` to single-domain Assign requests carrying
+`ParameterRequest::m_ExpectedDomain`. AppRuntime checks the run;
+`SessionParameterControl` validates the stamp at admission and safe commit.
+
+The stamp combines Session binding and Lab owner/value revisions with
+[World authoring](../../Sources/GGLabRuntime/Public/GGLabRuntime/Core/World.h) and
+[environment control](../../Sources/GGLabRuntime/Private/Graphics/EnvironmentLightingSystem.cpp)
+revisions. World sun/atmosphere writers call `MarkLightingAuthoringChanged`;
+environment settings and lease changes track intent rather than bake publication.
+
+`ParameterBatchStatus::m_DomainOperation` separates control commit/conflicts from
+effect receipts. Rebuild uses its [owned continuation](#content-activation-and-continuation);
+target edits require a fresh stamp. Discovery, conflicts and waiting are described
+in [session parameters](../../.agents/skills/gglab-frame-capture/references/session-parameters.md#protected-labprofile-assignment).
 
 ## Display-view resolution
 
@@ -222,16 +241,16 @@ omit culled passes and the execution record. The Temporal AA resolve pass is
 | Target / source | Current coverage |
 | --- | --- |
 | `GGLabAppRuntimeTests`: [ParameterTransactionSelfTests.cpp](../../Tests/GGLabAppRuntime/ParameterTransactionSelfTests.cpp) | Batches, receipts, inherited parameters, `RunHostViewProjectionTests` and `RunHostViewAttributionTests` |
-| `GGLabAppRuntimeTests`: [GpuFaultLifecycleSelfTests.cpp](../../Tests/GGLabAppRuntime/GpuFaultLifecycleSelfTests.cpp) | Effective settings, Host view control state, exact Host view override states, canonical request ownership/rejection, sequence-only coercion and read-only request projection, content binding, rebuild, parameter-frame and sequence-event scenarios |
+| `GGLabAppRuntimeTests`: [GpuFaultLifecycleSelfTests.cpp](../../Tests/GGLabAppRuntime/GpuFaultLifecycleSelfTests.cpp) | Effective settings, Host view control state, exact Host view override states, canonical request ownership/rejection, protected Lab/profile conflicts and Deferred/Rebuild lifecycle, sequence-only coercion and read-only request projection, content binding, parameter-frame and sequence-event scenarios |
 | `GGLabAppRuntimeTests`: [FrameCaptureCoordinatorSelfTests.cpp](../../Tests/GGLabAppRuntime/FrameCaptureCoordinatorSelfTests.cpp) | Capture admission, predicates and immutable snapshots, readiness/settling, retries, SameFrame provenance and cancellation |
 | `WinAppTests`: [ApplicationControlSelfTests.cpp](../../Tests/WinApp/ApplicationControlSelfTests.cpp), [ApplicationLifecycleSelfTests.cpp](../../Tests/WinApp/ApplicationLifecycleSelfTests.cpp), [DevToolsViewProfileSelfTests.cpp](../../Tests/WinApp/DevToolsViewProfileSelfTests.cpp) | Wire parsing, run checks, exact-state operations and their results, status control state, host lifecycle and DevTools view-profile overrides |
-| `GGLabRuntimeTests`: [RenderingContractSelfTests.cpp](../../Tests/GGLabRuntime/RenderingContractSelfTests.cpp) | `RunViewSettingsPatchTests` and temporal history/reference contracts |
+| `GGLabRuntimeTests`: [RenderingContractSelfTests.cpp](../../Tests/GGLabRuntime/RenderingContractSelfTests.cpp), [DiagnosticsContractSelfTests.cpp](../../Tests/GGLabRuntime/DiagnosticsContractSelfTests.cpp) | View/temporal contracts, environment control ownership and direct World authoring revisions |
 | [TestCompareCaptures.ps1](../../Tests/Verification/TestCompareCaptures.ps1), suite `capture-comparison` | Capture comparison and its input checks |
 | [TestTaaComparisonWorkflow.ps1](../../Tests/Verification/TestTaaComparisonWorkflow.ps1), suite `taa-comparison-workflow` | Guarded experiment recovery, cancellation verdicts, uncertain responses, exact restoration, process ownership and full-graph execution evidence |
 | [Invoke-TaaComparison.ps1](../../Scripts/Verification/Invoke-TaaComparison.ps1), native suite `taa-comparison` | Static Native-pinned TAA A/B orchestration, comparison policy, SameFrame bundle validation and submitted restoration proof; operational syntax in [captures](../../.agents/skills/gglab-frame-capture/references/captures.md#guarded-taa-comparison) |
 | [TestVerificationSupport.ps1](../../Tests/Verification/TestVerificationSupport.ps1), suite `verification-support` | Session client run binding, result polling and input errors |
 | [Capture bundle](../../Scripts/Verification/ValidateCaptureBundles.py), [graph](../../Scripts/Verification/ValidateRenderGraphExports.py) and [parameter-frame](../../Scripts/Verification/ValidateParameterFrames.py) validators | Persisted schemas and provenance |
-| Native suites in [RunVerification.ps1](../../Tests/Verification/RunVerification.ps1) | `session-host-parameters`, `session-parameters`, `sequence-parameter-events`, `session-rebuild-parameters`, `capture-jobs` |
+| Native suites in [RunVerification.ps1](../../Tests/Verification/RunVerification.ps1) | `protected-assignments`, `session-host-parameters`, `session-parameters`, `sequence-parameter-events`, `session-rebuild-parameters`, `capture-jobs` |
 
 `GGLabAppRuntimeTests` runs as a whole executable without a suite selector. Windows
 host cases belong in `WinAppTests`; the product executable has no regression entry.
@@ -244,6 +263,9 @@ Anchors:
   - Sources/GGLabAppRuntime/Parameters/SessionParameterControl.cpp::SynchronizeContent
   - Sources/GGLabAppRuntime/Parameters/SessionParameterControl.cpp::AdvanceHostViewRevision
   - Sources/GGLabAppRuntime/Parameters/SessionParameterControl.cpp::AdmitParameterRequest
+  - Sources/GGLabAppRuntime/Lab/LabParameter.cpp::AdvanceControlRevision
+  - Sources/GGLabRuntime/Public/GGLabRuntime/Core/World.h::MarkLightingAuthoringChanged
+  - Sources/GGLabRuntime/Private/Graphics/EnvironmentLightingSystem.cpp::RecordSettingsWrite
   - Sources/GGLabAppRuntime/ApplicationToolingIntegration.cpp::ResolveApplicationViewSettings
   - Sources/GGLabAppRuntime/GGLabAppRuntimeFrame.cpp::BuildCaptureTemporalState
   - Sources/GGLabAppRuntime/Capture/RequiredFrameState.cpp::ValidateRequiredFrameState
@@ -255,6 +277,11 @@ Anchors:
   - Scripts/Verification/TaaComparison.policy.json
 ReviewPaths:
   - Sources/GGLabAppRuntime/Parameters/*
+  - Sources/GGLabAppRuntime/Lab/LabParameter.*
+  - Sources/GGLabRuntime/Public/GGLabRuntime/Core/World.h
+  - Sources/GGLabRuntime/Private/Diagnostics/DirectionalLightTooling.cpp
+  - Sources/GGLabRuntime/Private/Diagnostics/WorldTooling.cpp
+  - Sources/GGLabRuntime/Private/Graphics/EnvironmentLightingSystem.*
   - Sources/GGLabAppRuntime/Capture/CapturePlan.h
   - Sources/GGLabAppRuntime/Capture/RequiredFrameState.*
   - Sources/GGLabAppRuntime/Capture/FrameCaptureCoordinator.*
@@ -280,6 +307,7 @@ ReviewPaths:
   - Tests/WinApp/ApplicationControlSelfTests.cpp
   - Tests/WinApp/DevToolsViewProfileSelfTests.cpp
   - Tests/Verification/TestHostParameters.ps1
+  - Tests/Verification/TestProtectedAssignments.ps1
   - Tests/Verification/TestVerificationSupport.ps1
   - Scripts/Verification/ValidateCaptureBundles.py
   - Tests/Verification/TestCompareCaptures.ps1

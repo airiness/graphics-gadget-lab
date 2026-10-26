@@ -529,7 +529,33 @@ namespace gglab
 				{ "changes", std::move(changes) },
 				{ "conflict", operation->m_Conflict.empty() ? Json() : Json(operation->m_Conflict) } };
 		}
+		if (const auto& operation = batch.m_DomainOperation)
+		{
+			const auto stamp = [](const std::optional<ParameterControlStamp>& value)
+				{
+					return value ? SerializeApplicationControlDomainStamp(*value) : Json();
+				};
+			result["domainControl"] = {
+				{ "expected", SerializeApplicationControlDomainStamp(operation->m_Expected) },
+				{ "before", stamp(operation->m_Before) },
+				{ "after", stamp(operation->m_After) },
+				{ "committed", operation->m_Committed },
+				{ "conflict", operation->m_Conflict.empty() ? Json() : Json(operation->m_Conflict) } };
+		}
 		return result;
+	}
+
+	Json SerializeApplicationControlDomainStamp(const ParameterControlStamp& stamp)
+	{
+		return {
+			{ "runIdentity", stamp.m_RunIdentity },
+			{ "contentIdentity", stamp.m_ContentIdentity },
+			{ "activationRevision", stamp.m_ActivationRevision },
+			{ "domain", stamp.m_Domain == ParameterControlDomain::Lab ? "lab" : "lighting-profile" },
+			{ "labRevision", stamp.m_LabRevision },
+			{ "valuesRevision", stamp.m_ValuesRevision },
+			{ "worldRevision", stamp.m_WorldRevision },
+			{ "environmentRevision", stamp.m_EnvironmentRevision } };
 	}
 
 	Json SerializeApplicationControlLightingProfiles(const LightingProfilePublication* profiles)
@@ -586,6 +612,13 @@ namespace gglab
 		response["contentId"] = parameterControl->GetContentId();
 		response["revision"] = parameterControl->GetParameterRevision();
 		response["controlState"] = SerializeApplicationControlHostViewStamp(runtime->GetHostViewControlStamp());
+		response["domainControlStates"] = Json::object();
+		for (const auto domain : { ParameterControlDomain::Lab, ParameterControlDomain::LightingProfile })
+		{
+			const auto stamp = runtime->GetDomainControlStamp(domain);
+			response["domainControlStates"][domain == ParameterControlDomain::Lab ? "lab" : "lighting-profile"] =
+				stamp ? SerializeApplicationControlDomainStamp(*stamp) : Json();
+		}
 		const auto hostView = parameterControl->DescribeHostView();
 		response["parameters"] = Json::array();
 		response["lighting"] = SerializeApplicationControlLightingProfiles(&parameterControl->GetLightingProfilePublication());
@@ -655,16 +688,46 @@ namespace gglab
 	}
 
 	std::string SubmitApplicationControlParameters(uint64_t id,
-		std::span<const ApplicationControlParameterChange> changes, GGLabAppRuntime* runtime) noexcept
+		std::span<const ApplicationControlParameterChange> changes, GGLabAppRuntime* runtime,
+		const ParameterControlStamp* expected) noexcept
 	{
+		const auto reject = [&](std::string_view error)
+			{
+				if (!expected)
+				{
+					return SerializeApplicationControlError(id, error);
+				}
+				Json response = Response(id, false);
+				response["error"] = error;
+				response["errorCode"] = error.find(':') == std::string_view::npos ?
+					"ParameterDomainInvalid" :
+					std::string(error.substr(0, error.find(':')));
+				const auto stamp = runtime ? runtime->GetDomainControlStamp(expected->m_Domain) : std::nullopt;
+				response["domainControlState"] = stamp ? SerializeApplicationControlDomainStamp(*stamp) : Json();
+				return Dump(response);
+			};
+		if (expected && runtime)
+		{
+			ApplicationControlRequest check{ .m_Id = id };
+			check.m_ExpectedRunIdentity = expected->m_RunIdentity;
+			if (const auto rejection = CheckApplicationControlRunIdentity(check,
+				runtime->GetHostViewControlStamp().m_RunIdentity))
+			{
+				return *rejection;
+			}
+		}
 		std::string error = "NoParameterSource: ready active content is required.";
 		if (!runtime || !runtime->CanRequestParameters(error))
 		{
-			return SerializeApplicationControlError(id, error);
+			return reject(error);
 		}
 		runtime->EnableParameterControl();
 		const auto* parameterControl = runtime->GetParameterControl();
 		ParameterRequest request;
+		if (expected)
+		{
+			request.m_ExpectedDomain = *expected;
+		}
 		for (const auto& change : changes)
 		{
 			const auto* parameter = parameterControl->GetHostParameters().Find(change.m_Value.m_Id);
@@ -674,7 +737,7 @@ namespace gglab
 			}
 			if (!parameter || parameter->m_Desc.m_Type != change.m_Type)
 			{
-				return SerializeApplicationControlError(id, "Unknown parameter or a type different from its descriptor.");
+				return reject("Unknown parameter or a type different from its descriptor.");
 			}
 			request.m_Entries.push_back({ change.m_Value.m_Id, change.m_Type,
 				ParameterOperation::Assign, change.m_Value.m_Value });
@@ -682,7 +745,7 @@ namespace gglab
 		const uint64_t batchId = runtime->RequestParameters(request, error);
 		if (batchId == 0)
 		{
-			return SerializeApplicationControlError(id, error);
+			return reject(error);
 		}
 		Json response = Response(id, true);
 		response["admission"] = "Accepted";

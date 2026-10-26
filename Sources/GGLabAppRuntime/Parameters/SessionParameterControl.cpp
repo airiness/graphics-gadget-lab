@@ -3,6 +3,8 @@
 #include "Capture/FrameCaptureReadiness.h"
 #include "Demo/DemoBase.h"
 #include "Lab/LabRuntime.h"
+#include "GGLabRuntime/Core/World.h"
+#include "GGLabRuntime/Graphics/WorldLightingControlBase.h"
 #include "GGLabRuntime/Graphics/RenderSceneTypes.h"
 
 #include <algorithm>
@@ -37,7 +39,8 @@ namespace gglab
 	SessionParameterControl::SessionParameterControl(RenderEnvironmentAccess& environment,
 		WorldLightingControlBase* worldLighting,
 		std::function<std::optional<ApplicationViewSettingsResolution>(DemoBase&)> viewResolver) noexcept :
-		m_Sources(std::make_unique<ParameterSourceAdapters>(environment, worldLighting, std::move(viewResolver)))
+		m_Sources(std::make_unique<ParameterSourceAdapters>(environment, worldLighting, std::move(viewResolver))),
+		m_WorldLighting(worldLighting)
 	{
 	}
 
@@ -50,6 +53,10 @@ namespace gglab
 		GGLAB_ASSERT_MSG(!demo || serial != 0, "Bound content requires its owner's frame identity.");
 		if (demo != m_Demo || serial != m_ContentSerial)
 		{
+			if (m_ActivationRevision != std::numeric_limits<uint64_t>::max())
+			{
+				++m_ActivationRevision;
+			}
 			bool continuing = false;
 			// Release source reservations while their previous content owner is alive.
 			for (auto& batch : m_ParameterBatches)
@@ -426,10 +433,82 @@ namespace gglab
 		return request;
 	}
 
+	std::optional<ParameterControlStamp> SessionParameterControl::GetDomainControlStamp(
+		ParameterControlDomain domain, std::string_view runIdentity) const
+	{
+		if (!IsAvailable() || !m_WorldLighting || !m_Enabled ||
+			(domain != ParameterControlDomain::Lab && domain != ParameterControlDomain::LightingProfile))
+		{
+			return std::nullopt;
+		}
+		ParameterControlStamp stamp{
+			.m_RunIdentity = std::string(runIdentity),
+			.m_ContentIdentity = m_ContentSerial,
+			.m_ActivationRevision = m_ActivationRevision,
+			.m_Domain = domain,
+			.m_WorldRevision = m_Demo->GetWorld().GetLightingControlRevision(),
+			.m_EnvironmentRevision = m_WorldLighting->GetLightingControlRevision() };
+		if (domain == ParameterControlDomain::Lab)
+		{
+			const auto* parameters = GetLabParameters();
+			if (!m_Lab || !parameters)
+			{
+				return std::nullopt;
+			}
+			stamp.m_LabRevision = m_Lab->GetParameterRevision();
+			stamp.m_ValuesRevision = parameters->GetControlRevision();
+		}
+		else if (GetLightingProfiles().empty())
+		{
+			return std::nullopt;
+		}
+		return stamp;
+	}
+
+	bool SessionParameterControl::CheckDomainControl(
+		const ParameterControlStamp& expected, std::string& error) const
+	{
+		if (expected.m_ContentIdentity != m_ContentSerial ||
+			expected.m_ActivationRevision != m_ActivationRevision)
+		{
+			error = "ExpectedContentChanged: the protected assignment belongs to another activation.";
+			return false;
+		}
+		const auto current = GetDomainControlStamp(expected.m_Domain, expected.m_RunIdentity);
+		if (!current)
+		{
+			error = "ParameterDomainUnavailable: the protected domain is unavailable.";
+			return false;
+		}
+		constexpr auto last = std::numeric_limits<uint64_t>::max();
+		if (current->m_ActivationRevision == last ||
+			current->m_LabRevision == last || current->m_ValuesRevision == last ||
+			current->m_WorldRevision == last || current->m_EnvironmentRevision == last)
+		{
+			error = "ParameterControlExhausted: the protected domain has exhausted revision capacity.";
+			return false;
+		}
+		if (*current != expected)
+		{
+			error = "ExpectedParameterControlMismatch: authored domain intent changed; nothing committed.";
+			return false;
+		}
+		return true;
+	}
+
 	uint64_t SessionParameterControl::AdmitParameterRequest(const ParameterRequest& request,
 		std::string& error, ParameterBatchOwner owner) noexcept
 	{
 		const bool exact = request.m_Expected.has_value();
+		if (request.m_ExpectedDomain &&
+			(exact || !CheckDomainControl(*request.m_ExpectedDomain, error)))
+		{
+			if (exact)
+			{
+				error = "ParameterRequestInvalid: Host exact states cannot include a Lab/profile guard.";
+			}
+			return 0;
+		}
 		if (!IsAvailable() || (exact && !m_Sources->m_View.HasDisplayView()))
 		{
 			error = exact ?
@@ -470,6 +549,17 @@ namespace gglab
 		for (size_t index = 0; index < request.m_Entries.size(); ++index)
 		{
 			const auto& entry = request.m_Entries[index];
+			if (request.m_ExpectedDomain)
+			{
+				const auto* required = request.m_ExpectedDomain->m_Domain == ParameterControlDomain::Lab ?
+					static_cast<const ParameterSourceBase*>(&m_Sources->m_Lab) :
+					static_cast<const ParameterSourceBase*>(&m_Sources->m_Profiles);
+				if (m_Sources->Find(entry.m_Id) != required || entry.m_Operation != ParameterOperation::Assign)
+				{
+					error = "ParameterDomainUnsupported: protected Assign requires one Lab or lighting-profile source.";
+					return 0;
+				}
+			}
 			const bool assign = entry.m_Operation == ParameterOperation::Assign;
 			const bool pin = entry.m_Operation == ParameterOperation::Pin;
 			const bool remove = entry.m_Operation == ParameterOperation::RemoveOverride;
@@ -576,6 +666,10 @@ namespace gglab
 		batch.m_Status.m_ContentId = m_ContentId;
 		batch.m_Status.m_Source = hasHost ? (hasLab ? "mixed" : "host") : "lab";
 		batch.m_Session = m_ContentSerial;
+		if (request.m_ExpectedDomain)
+		{
+			batch.m_Status.m_DomainOperation = ParameterControlOperation{ .m_Expected = *request.m_ExpectedDomain };
+		}
 		if (exact)
 		{
 			batch.m_Status.m_HostViewOperation = HostViewOverrideOperation{
@@ -762,6 +856,11 @@ namespace gglab
 
 	void SessionParameterControl::EndForContentChange(ParameterBatch& batch, std::string reason) noexcept
 	{
+		if (batch.m_Request.m_ExpectedDomain && batch.m_Receipts.empty() && !batch.m_Status.IsTerminal())
+		{
+			EndDomainOperation(batch, "ExpectedContentChanged: content changed before protected assignment committed.");
+			return;
+		}
 		// An unapplied operation was prepared against the replaced activation.
 		if (batch.m_Request.m_Expected && batch.m_Receipts.empty() && !batch.m_Status.IsTerminal())
 		{
@@ -770,6 +869,13 @@ namespace gglab
 			return;
 		}
 		EndParameterBatch(batch, true, std::move(reason));
+	}
+
+	void SessionParameterControl::EndDomainOperation(ParameterBatch& batch, std::string error) noexcept
+	{
+		GGLAB_ASSERT(batch.m_Status.m_DomainOperation && batch.m_Receipts.empty());
+		batch.m_Status.m_DomainOperation->m_Conflict = error.substr(0, error.find(':'));
+		EndParameterBatch(batch, false, std::move(error));
 	}
 
 	void SessionParameterControl::OnRuntimeFailed(std::string_view reason) noexcept
@@ -870,6 +976,18 @@ namespace gglab
 			return;
 		}
 		const auto& request = batch.m_Request;
+		if (request.m_ExpectedDomain)
+		{
+			auto& control = *batch.m_Status.m_DomainOperation;
+			control.m_Before = GetDomainControlStamp(request.m_ExpectedDomain->m_Domain,
+				request.m_ExpectedDomain->m_RunIdentity);
+			std::string conflict;
+			if (!CheckDomainControl(*request.m_ExpectedDomain, conflict))
+			{
+				EndDomainOperation(batch, std::move(conflict));
+				return;
+			}
+		}
 		const auto& expected = request.m_Expected;
 		auto& operation = batch.m_Status.m_HostViewOperation;
 		if (expected)
@@ -980,6 +1098,11 @@ namespace gglab
 
 		const std::vector<LabParameterValue> hostViewBefore(
 			GetHostViewOverrides().begin(), GetHostViewOverrides().end());
+		if (request.m_ExpectedDomain && !CheckDomainControl(*request.m_ExpectedDomain, error))
+		{
+			EndDomainOperation(batch, std::move(error));
+			return;
+		}
 		// No callbacks or rejection in this region. Install every source and the
 		// unique receipt owner before allowing any content handler to observe state.
 		for (auto& plan : plans)
@@ -992,6 +1115,13 @@ namespace gglab
 			batch.m_Status.m_Values = std::move(targets);
 		}
 		m_QueuedParameterBatch = 0;
+		if (batch.m_Status.m_DomainOperation)
+		{
+			batch.m_Status.m_DomainOperation->m_Committed = true;
+		}
+		const auto committedControl = request.m_ExpectedDomain ?
+			GetDomainControlStamp(request.m_ExpectedDomain->m_Domain, request.m_ExpectedDomain->m_RunIdentity) :
+			std::nullopt;
 		m_Sources->PublishHostParameters();
 		m_ParameterRevision = revision;
 		m_ObservedLabRevision = m_Lab ? m_Lab->GetParameterRevision() : 0;
@@ -1033,6 +1163,12 @@ namespace gglab
 		}
 		RefreshSources();
 		m_ParameterRevision = revision;
+		if (request.m_ExpectedDomain)
+		{
+			const auto current = GetDomainControlStamp(
+				request.m_ExpectedDomain->m_Domain, request.m_ExpectedDomain->m_RunIdentity);
+			batch.m_Status.m_DomainOperation->m_After = current ? current : committedControl;
+		}
 		m_Sources->m_Domain.CompleteEffects(batch.m_Domain);
 		for (size_t index = 0; index < batch.m_Receipts.size(); ++index)
 		{

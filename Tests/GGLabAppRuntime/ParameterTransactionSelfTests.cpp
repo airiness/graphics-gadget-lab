@@ -339,6 +339,47 @@ namespace gglab
 			return *ParameterEffectReceipt::Begin(LabParameterId("test.parameter"), effectClass, 7, 10);
 		}
 
+		void RunControlRevisionTests(SelfTestContext& context) noexcept
+		{
+			auto live = MakeParameters(context);
+			const LabParameterId radius("radius");
+			const auto revision = live.GetControlRevision();
+			auto candidate = live;
+			GGLAB_UNUSED(candidate.Set(radius, 2.0f));
+			context.Check(live.GetControlRevision() == revision && live.Get(radius, 0.0f) == 1.0f,
+				"Preparing a parameter snapshot changes no live control revision");
+			const auto saved = live;
+			GGLAB_UNUSED(live.Set(radius, 3.0f));
+			GGLAB_UNUSED(live.Set(radius, 1.0f));
+			const auto afterAba = live.GetControlRevision();
+			live = saved;
+			context.Check(afterAba > revision && live.GetControlRevision() > afterAba &&
+				live.Get(radius, 0.0f) == 1.0f,
+				"ABA and restoring an older parameter snapshot cannot rewind authored control identity");
+			std::string error;
+			const std::array equal{ LabParameterValue{ radius, 1.0f } };
+			const auto stable = live.GetControlRevision();
+			const auto noChange = live.ApplyBatch(equal, error);
+			const std::array invalid{ LabParameterValue{ radius, uint32_t(1) } };
+			context.Check(noChange && noChange->m_Changed.empty() && !live.ApplyBatch(invalid, error) &&
+				live.GetControlRevision() == stable,
+				"Strict rejection and semantic NoChange preserve the authored control revision");
+			live = std::move(candidate);
+			context.Check(live.GetControlRevision() > stable && live.Get(radius, 0.0f) == 2.0f,
+				"Moving a prepared value set into a live owner advances rather than replaces its revision");
+			LabParameterSet schema;
+			GGLAB_UNUSED(schema.Add({ .m_Id = radius, .m_Name = "Radius",
+				.m_Type = LabParameterType::Float, .m_DefaultValue = 1.0f }));
+			auto desc = schema.Find(radius)->m_Desc;
+			desc.m_Impact = LabChangeImpact::RestartSession;
+			LabParameterSet replacement;
+			GGLAB_UNUSED(replacement.Add(std::move(desc)));
+			const auto beforeSchema = schema.GetControlRevision();
+			schema = std::move(replacement);
+			context.Check(schema.GetControlRevision() > beforeSchema,
+				"Replacing declaration policy invalidates control identity even when all values are equal");
+		}
+
 		void RunReceiptTests(SelfTestContext& context) noexcept
 		{
 			const ParameterStateIdentity immediate{ .m_Revision = 7 };
@@ -442,5 +483,6 @@ namespace gglab
 		RunHostViewProjectionTests(context);
 		RunHostViewAttributionTests(context);
 		RunReceiptTests(context);
+		RunControlRevisionTests(context);
 	}
 }

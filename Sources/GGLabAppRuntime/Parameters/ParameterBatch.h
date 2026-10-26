@@ -1,6 +1,7 @@
 #pragma once
 #include "Lab/LabParameter.h"
 #include "Parameters/HostViewParameters.h"
+#include "Parameters/ParameterRequest.h"
 #include "Parameters/ParameterEffectReceipt.h"
 
 #include <cstdint>
@@ -46,6 +47,7 @@ namespace gglab
 		std::vector<ParameterEffectSnapshot> m_Items;
 		std::string m_Failure;
 		std::optional<HostViewOverrideOperation> m_HostViewOperation;
+		std::optional<ParameterControlOperation> m_DomainOperation;
 
 		[[nodiscard]] bool IsTerminal() const noexcept
 		{

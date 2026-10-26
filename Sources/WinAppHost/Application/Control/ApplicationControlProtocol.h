@@ -39,6 +39,7 @@ namespace gglab
 		SequenceCancel,
 		// Sets exact Host view override states, guarded by the expected control state.
 		HostViewOverrides,
+		Assign,
 	};
 
 	struct ApplicationControlRequest
@@ -60,8 +61,9 @@ namespace gglab
 		// HostViewOverrides: the complete expected control state and exact override states.
 		HostViewControlStamp m_ExpectedHostView;
 		std::vector<HostViewOverrideState> m_HostViewOverrides;
+		ParameterControlStamp m_ExpectedParameterControl;
 		// Protected commands only: the process run this request was prepared against.
-		// HostViewOverrides takes it from its required expected control state.
+		// HostViewOverrides and Assign take it from their required expected control state.
 		std::optional<std::string> m_ExpectedRunIdentity;
 	};
 
@@ -76,7 +78,7 @@ namespace gglab
 	[[nodiscard]] ApplicationControlParseResult ParseApplicationControlRequest(
 		std::string_view line) noexcept;
 	// Commands that accept the optional 'expectedRunIdentity' field: every command except the
-	// status and parameters queries and host-view-overrides, whose expected state names the run.
+	// status/parameters queries and host-view-overrides/assign, whose expected state names the run.
 	[[nodiscard]] bool AcceptsApplicationControlExpectedRun(ApplicationControlCommand command) noexcept;
 	// An error response when a run-checked request names another process run, or when
 	// this run has no identity; empty when the request may touch process-local state.

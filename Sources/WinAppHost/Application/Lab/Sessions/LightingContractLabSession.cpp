@@ -76,6 +76,7 @@ namespace gglab
 			return;
 		}
 		m_PhysicalSun = physicalSun;
+		m_World.MarkLightingAuthoringChanged();
 		const bool materialReferences = GetParameters().Get(SceneSourceId,
 			int32_t(SceneSource::Original)) == int32_t(SceneSource::MaterialReferences);
 		const auto references = BuildLightingContractReferenceViews(physicalSun, materialReferences);
@@ -175,6 +176,7 @@ namespace gglab
 			light.m_WorldSun = WorldSunSettings{};
 		}
 		registry.emplace<components::LightComponent>(lightEntity, light);
+		m_World.MarkLightingAuthoringChanged();
 	}
 
 	void LightingContractLabSession::CancelPrepare() noexcept

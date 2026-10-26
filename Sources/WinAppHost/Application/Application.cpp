@@ -605,6 +605,10 @@ namespace gglab
 			pipeRequest->Respond(SubmitApplicationControlParameters(request.m_Id,
 				request.m_ParameterChanges, m_AppRuntime.get()));
 			return;
+		case ApplicationControlCommand::Assign:
+			pipeRequest->Respond(SubmitApplicationControlParameters(request.m_Id,
+				request.m_ParameterChanges, m_AppRuntime.get(), &request.m_ExpectedParameterControl));
+			return;
 		case ApplicationControlCommand::ParameterResult:
 			pipeRequest->Respond(QueryApplicationControlParameters(request.m_Id,
 				request.m_ParameterBatchId, request.m_Consume, m_AppRuntime.get()));

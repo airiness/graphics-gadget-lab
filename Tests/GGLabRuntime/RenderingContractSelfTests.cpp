@@ -694,8 +694,12 @@ namespace gglab
 			scope = environment.AcquireOverride();
 			scope->Apply({ .m_Intensity = 4.0f, .m_PrefilteredSpecularSampleCount = 64 });
 			const auto beforeSameValue = environment.GetBakeRequestGeneration();
+			const auto beforeOwnership = environment.GetLightingControlRevision();
 			environment.SetIntensity(4.0f);
 			environment.SetPrefilteredSpecularSampleCount(64);
+			context.Check(environment.GetLightingControlRevision() > beforeOwnership &&
+				environment.GetBakeRequestGeneration() == beforeSameValue,
+				"Equal writes by another lighting owner advance control identity without another bake");
 			context.Check(!scope->OwnsBakeConfiguration() &&
 				environment.GetBakeRequestGeneration() == beforeSameValue,
 				"A same-value ordinary write takes ownership without scheduling a redundant bake");
@@ -704,6 +708,16 @@ namespace gglab
 				environment.GetSettings().m_BakeConfig.m_PrefilteredSpecularSampleCount == 64 &&
 				environment.GetBakeRequestGeneration() == beforeSameValue,
 				"Release never undoes a same-value write by another owner");
+			const auto stableControl = environment.GetLightingControlRevision();
+			environment.SetIntensity(4.0f);
+			environment.SetPrefilteredSpecularSampleCount(64);
+			context.Check(environment.GetLightingControlRevision() == stableControl,
+				"Repeated writes by the same owner with equal settings are control NoChange");
+			environment.SetIntensity(5.0f);
+			environment.SetIntensity(4.0f);
+			context.Check(environment.GetLightingControlRevision() > stableControl &&
+				environment.GetBakeRequestGeneration() == beforeSameValue,
+				"Lighting setting ABA advances control identity independently of effect generation");
 
 			scope = environment.AcquireOverride();
 			scope->Apply({ .m_Intensity = 5.0f, .m_PrefilteredSpecularSampleCount = 128 });

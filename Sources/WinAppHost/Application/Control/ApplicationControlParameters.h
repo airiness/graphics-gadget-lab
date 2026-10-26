@@ -51,13 +51,15 @@ namespace gglab
 		const LightingProfilePublication* profiles);
 	[[nodiscard]] nlohmann::json SerializeApplicationControlHostViewStamp(
 		const HostViewControlStamp& stamp);
+	[[nodiscard]] nlohmann::json SerializeApplicationControlDomainStamp(const ParameterControlStamp& stamp);
 	// One object per Host view binding: final value, its source and override presence.
 	[[nodiscard]] nlohmann::json SerializeApplicationControlHostViewProjection(
 		std::span<const HostViewProjectionEntry> projection);
 	[[nodiscard]] std::string SerializeApplicationControlParameters(
 		uint64_t id, GGLabAppRuntime* runtime) noexcept;
 	[[nodiscard]] std::string SubmitApplicationControlParameters(uint64_t id,
-		std::span<const ApplicationControlParameterChange> changes, GGLabAppRuntime* runtime) noexcept;
+		std::span<const ApplicationControlParameterChange> changes, GGLabAppRuntime* runtime,
+		const ParameterControlStamp* expected = nullptr) noexcept;
 	// Rejections carry 'errorCode' and the live 'controlState' for recovery.
 	[[nodiscard]] std::string SubmitApplicationControlHostViewOverrides(uint64_t id,
 		const HostViewControlStamp& expected, std::span<const HostViewOverrideState> overrides,

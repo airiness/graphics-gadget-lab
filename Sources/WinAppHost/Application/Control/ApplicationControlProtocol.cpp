@@ -69,6 +69,10 @@ namespace gglab
 			{
 				return ApplicationControlCommand::Set;
 			}
+			if (command == "assign")
+			{
+				return ApplicationControlCommand::Assign;
+			}
 			if (command == "parameter-result")
 			{
 				return ApplicationControlCommand::ParameterResult;
@@ -1412,6 +1416,46 @@ namespace gglab
 			return ParseApplicationControlHostViewOverrides(fields["overrides"], request.m_HostViewOverrides);
 		}
 
+		[[nodiscard]] std::string ParseDomainAssignmentFields(const Json& fields, ApplicationControlRequest& request)
+		{
+			if (fields.size() != 5 || !fields.contains("expected") || !fields.contains("changes"))
+			{
+				return "Command 'assign' takes only 'expected' and 'changes'.";
+			}
+			const auto& expected = fields["expected"];
+			if (!expected.is_object() || expected.size() != 8 || !expected.contains("runIdentity") ||
+				!IsRunIdentity(expected["runIdentity"]) || !expected.contains("domain") ||
+				!expected["domain"].is_string())
+			{
+				return "Field 'expected' requires the complete Lab/profile control stamp.";
+			}
+			for (const auto* name : { "contentIdentity", "activationRevision", "labRevision",
+				"valuesRevision", "worldRevision", "environmentRevision" })
+			{
+				if (!expected.contains(name) || !expected[name].is_number_unsigned())
+				{
+					return "Control identities and revisions must be unsigned integers.";
+				}
+			}
+			const auto domain = expected["domain"].get<std::string>();
+			if (domain != "lab" && domain != "lighting-profile")
+			{
+				return "Protected Assign supports 'lab' or 'lighting-profile'.";
+			}
+			request.m_ExpectedParameterControl = {
+				.m_RunIdentity = expected["runIdentity"].get<std::string>(),
+				.m_ContentIdentity = expected["contentIdentity"].get<uint64_t>(),
+				.m_ActivationRevision = expected["activationRevision"].get<uint64_t>(),
+				.m_Domain = domain == "lab" ? ParameterControlDomain::Lab : ParameterControlDomain::LightingProfile,
+				.m_LabRevision = expected["labRevision"].get<uint64_t>(),
+				.m_ValuesRevision = expected["valuesRevision"].get<uint64_t>(),
+				.m_WorldRevision = expected["worldRevision"].get<uint64_t>(),
+				.m_EnvironmentRevision = expected["environmentRevision"].get<uint64_t>(),
+			};
+			request.m_ExpectedRunIdentity = request.m_ExpectedParameterControl.m_RunIdentity;
+			return ParseApplicationControlParameterChanges(fields["changes"], request.m_ParameterChanges);
+		}
+
 		[[nodiscard]] Json SerializeTemporalPlan(const FrameCaptureTemporalState& temporal)
 		{
 			Json consumers = Json::array();
@@ -1568,7 +1612,7 @@ namespace gglab
 		{
 			result.m_Error = "Field 'command' must be 'status', 'capture', 'graph', 'export', 'result', 'stop', "
 				"'capture-cancel', 'watch', 'sequence', 'sequence-cancel', 'parameters', 'set', 'parameter-result' "
-				"or 'host-view-overrides'.";
+				"'host-view-overrides' or 'assign'.";
 			return result;
 		}
 
@@ -1630,6 +1674,9 @@ namespace gglab
 				error = ParseApplicationControlParameterChanges(fields["changes"], request.m_ParameterChanges);
 			}
 			break;
+		case ApplicationControlCommand::Assign:
+			error = ParseDomainAssignmentFields(fields, request);
+			break;
 		case ApplicationControlCommand::ParameterResult:
 		{
 			const auto batch = fields.find("batchId");
@@ -1674,7 +1721,8 @@ namespace gglab
 	{
 		return command != ApplicationControlCommand::Status &&
 			command != ApplicationControlCommand::Parameters &&
-			command != ApplicationControlCommand::HostViewOverrides;
+			command != ApplicationControlCommand::HostViewOverrides &&
+			command != ApplicationControlCommand::Assign;
 	}
 
 	std::optional<std::string> CheckApplicationControlRunIdentity(
@@ -1756,6 +1804,13 @@ namespace gglab
 				{ "maxItems", ApplicationControlMaxParameterItems },
 				{ "mixedSources", true },
 				{ "explicitConsumption", true } } },
+			{ "protectedAssignments", {
+				{ "version", 1 },
+				{ "command", "assign" },
+				{ "domains", { "lab", "lighting-profile" } },
+				{ "mixedDomains", false },
+				{ "expected", { "runIdentity", "contentIdentity", "activationRevision", "domain", "labRevision",
+					"valuesRevision", "worldRevision", "environmentRevision" } } } },
 			{ "sequenceCaptureJobs", true },
 			{ "sequenceImmediateEvents", true },
 			{ "sequenceDeferredEvents", true },

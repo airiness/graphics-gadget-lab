@@ -224,6 +224,7 @@ namespace gglab
 			auto& rotation = m_World.GetRegistry().get<components::TransformComponent>(m_SunEntity).m_Rotation;
 			rotation = ResolveWorldLightingRotation(WithSunElevation(m_SunHorizontalDirection,
 				GetParameters().Get(SunElevationId, DefaultSunElevation)));
+			m_World.MarkLightingAuthoringChanged();
 			return {};
 		}
 		return m_LightingOverride->ApplyPrefilteredSpecularSampleCount(
@@ -305,6 +306,7 @@ namespace gglab
 			components::ModelComponent{ .m_ModelId = m_PendingModelId });
 		m_PendingModelId.Reset();
 		m_World.m_Atmosphere = AtmosphereSettings{};
+		m_World.MarkLightingAuthoringChanged();
 		m_SunEntity = registry.create();
 		const Vector3 direction = WithSunElevation(Vector3::Forward, DefaultSunElevation);
 		components::TransformComponent transform{};
@@ -324,6 +326,7 @@ namespace gglab
 		m_World.GetRegistry().clear();
 		m_SunEntity = entt::null;
 		m_World.m_Atmosphere.reset();
+		m_World.MarkLightingAuthoringChanged();
 		m_LoadingProgress = LoadingProgress::Ready();
 	}
 

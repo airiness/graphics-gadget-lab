@@ -29,6 +29,9 @@ Commands:
            -NoWait returns admission. Terminal results are consumed unless -KeepResult.
   parameter-result
            Query -BatchId; -Consume releases its terminal receipt. Status also reports it.
+  assign   Submit typed -Changes/-ChangesFile under a complete Lab/profile
+           -ExpectedState/-ExpectedStateFile from parameters.domainControlStates.
+           Uses the same waiting/consumption options as set and binds polling to that run.
   host-view-overrides
            Set exact Host view override states -Overrides/-OverridesFile, as
            [{"id":"view.taa.enabled","type":"bool","present":true,"value":false}] or
@@ -89,7 +92,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/Verification/GGLabSe
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('start', 'status', 'parameters', 'set', 'parameter-result', 'host-view-overrides', 'capture', 'graph', 'export', 'watch', 'batch', 'result', 'capture-cancel', 'sequence', 'sequence-cancel', 'stop', 'list')]
+    [ValidateSet('start', 'status', 'parameters', 'set', 'assign', 'parameter-result', 'host-view-overrides', 'capture', 'graph', 'export', 'watch', 'batch', 'result', 'capture-cancel', 'sequence', 'sequence-cancel', 'stop', 'list')]
     [string]$Command,
 
     [ValidatePattern('^[A-Za-z0-9_-]{1,64}$')]
@@ -622,6 +625,30 @@ switch ($Command) {
         try {
             $response = Invoke-SessionRequest $Session @{
                 command = 'host-view-overrides'; expected = $expected; overrides = $items
+            } ([Math]::Max(30, $TimeoutSeconds))
+        }
+        catch {
+            Fail "$($_.Exception.Message) Admission is unknown; inspect status before submitting again." @{
+                session = $Session; admissionUnknown = $true
+            }
+        }
+        if ($response.ok -and -not $NoWait) {
+            $response = Wait-ParameterBatch $response ([DateTime]::UtcNow.AddSeconds($TimeoutSeconds))
+        }
+        Complete-SessionResponse $response $Session
+    }
+    'assign' {
+        Require-Session
+        if ($NoWait -and $WaitConsumed) { Fail '-NoWait and -WaitConsumed cannot be combined.' }
+        try {
+            $items = Read-JsonArray $Changes $ChangesFile 'Changes'
+            $expected = Read-JsonObject $ExpectedState $ExpectedStateFile 'ExpectedState'
+        }
+        catch { Fail $_.Exception.Message @{ session = $Session } }
+        $ExpectedRunIdentity = Get-ExpectedStateRun $expected
+        try {
+            $response = Invoke-SessionRequest $Session @{
+                command = 'assign'; expected = $expected; changes = $items
             } ([Math]::Max(30, $TimeoutSeconds))
         }
         catch {

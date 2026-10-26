@@ -268,6 +268,7 @@ namespace gglab
 		// control; empty before composition or when creation failed.
 		[[nodiscard]] const std::string& GetRunIdentity() const noexcept { return m_RunIdentity; }
 		[[nodiscard]] HostViewControlStamp GetHostViewControlStamp() const;
+		[[nodiscard]] std::optional<ParameterControlStamp> GetDomainControlStamp(ParameterControlDomain domain) const;
 		// Borrowed read-only views; null before composition. Commands enter through
 		// AppRuntime so a C++ host cannot bypass admission or forge owner callbacks.
 		[[nodiscard]] const SessionParameterControl* GetParameterControl() const noexcept

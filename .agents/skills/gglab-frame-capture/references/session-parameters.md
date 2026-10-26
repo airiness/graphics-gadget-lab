@@ -252,6 +252,27 @@ committed Host values. Aborted target frames retain publication and retry withou
 another operation. Unrelated content switches supersede the wait; shutdown closes
 unresolved effects. Sequence events reject Rebuild.
 
+## Protected Lab/profile assignment
+
+`parameters.domainControlStates` returns complete stamps for `lab` and
+`lighting-profile`, or null when unavailable. Save the required object as a UTF-8
+JSON file and submit typed changes from that same discovery:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File $script assign -Session check `
+    -ExpectedStateFile Build/lab-control.json -ChangesFile Build/lab-changes.json -WaitConsumed
+```
+
+`assign` accepts one Lab or profile source with the same limits and wait/consume
+options as `set`. The stamp binds submission/polling to the run and is checked at
+admission and safe commit, even for would-be NoChange. Conflict responses include
+`errorCode` and `domainControlState`.
+
+`batch.domainControl` reports expected/before/after stamps, `committed` and conflicts
+separately from [effect receipts](#read-effect-receipts). Rediscover after conflicts
+or content activation; Rebuild's `after` stamp describes the source commit, not the
+target. Host exact states use `host-view-overrides`; legacy `set` remains unguarded.
+
 ## Focused verification
 
 Select suites with [RunVerification.ps1](../../../../Tests/Verification/RunVerification.ps1);
@@ -261,6 +282,7 @@ Select suites with [RunVerification.ps1](../../../../Tests/Verification/RunVerif
 | --- | --- |
 | `session-parameters` | GTAO Immediate and texture/Physical Sky Deferred receipts, captured settings/generations and cache-publication paths. |
 | `session-host-parameters` | Demo/Lab overrides, mixed-source atomicity, settling, exposure response, result retention and guarded exact states. |
+| `protected-assignments` | Lab/profile guards, stale NoChange and shared-domain conflicts; activation and submitted Immediate/Deferred/Rebuild effects. |
 | `lighting-profiles` | Profile discovery/transitions, exposure independence and requested/active identities. |
 | `lab-sun-parameters` | Authored sun elevation, profile rebasing and NoChange. |
 | `session-rebuild-parameters` | Zero/one/64-light fixtures, retained results and built scene/frame provenance. |
