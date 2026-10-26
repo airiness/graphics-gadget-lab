@@ -411,17 +411,9 @@ namespace gglab
 		return id;
 	}
 
-	uint64_t SessionParameterControl::RequestParameterBatch(std::span<const LabParameterValue> values,
-		std::string& error, ParameterBatchOwner owner) noexcept
+	ParameterRequest SessionParameterControl::MakeAssignmentRequest(
+		std::span<const LabParameterValue> values) const
 	{
-		error.clear();
-		if (IsAdmissionBlocked(owner))
-		{
-			error = "Busy: an application, another owner or retained result capacity blocks admission.";
-			return 0;
-		}
-		m_MutatingParameterBatch = true;
-		Enable();
 		ParameterRequest request;
 		request.m_Entries.reserve(values.size());
 		for (const auto& value : values)
@@ -431,15 +423,7 @@ namespace gglab
 				parameter ? parameter->m_Desc.m_Type : LabParameterType::Bool,
 				ParameterOperation::Assign, value.m_Value });
 		}
-		const auto id = AdmitParameterRequest(request, error, owner);
-		m_MutatingParameterBatch = false;
-		return id;
-	}
-
-	uint64_t SessionParameterControl::RequestHostViewOverrides(const HostViewControlStamp& expected,
-		std::span<const HostViewOverrideState> overrides, std::string& error, ParameterBatchOwner owner) noexcept
-	{
-		return RequestParameters(ParameterRequest::HostViewOverrides(expected, overrides), error, owner);
+		return request;
 	}
 
 	uint64_t SessionParameterControl::AdmitParameterRequest(const ParameterRequest& request,

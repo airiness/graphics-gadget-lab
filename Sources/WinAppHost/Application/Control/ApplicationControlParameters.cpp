@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Graphics/LightingProfile.h"
 #include "Application/Control/ApplicationControlProtocol.h"
 #include "Parameters/HostViewParameters.h"
+#include "Parameters/ParameterRequest.h"
 #include "Parameters/SessionParameterControl.h"
 #include "GGLabAppRuntime.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
@@ -657,13 +658,13 @@ namespace gglab
 		std::span<const ApplicationControlParameterChange> changes, GGLabAppRuntime* runtime) noexcept
 	{
 		std::string error = "NoParameterSource: ready active content is required.";
-		if (!runtime || !runtime->CanRequestParameterBatch(error))
+		if (!runtime || !runtime->CanRequestParameters(error))
 		{
 			return SerializeApplicationControlError(id, error);
 		}
 		runtime->EnableParameterControl();
 		const auto* parameterControl = runtime->GetParameterControl();
-		std::vector<LabParameterValue> values;
+		ParameterRequest request;
 		for (const auto& change : changes)
 		{
 			const auto* parameter = parameterControl->GetHostParameters().Find(change.m_Value.m_Id);
@@ -675,9 +676,10 @@ namespace gglab
 			{
 				return SerializeApplicationControlError(id, "Unknown parameter or a type different from its descriptor.");
 			}
-			values.push_back(change.m_Value);
+			request.m_Entries.push_back({ change.m_Value.m_Id, change.m_Type,
+				ParameterOperation::Assign, change.m_Value.m_Value });
 		}
-		const uint64_t batchId = runtime->RequestParameterBatch(values, error);
+		const uint64_t batchId = runtime->RequestParameters(request, error);
 		if (batchId == 0)
 		{
 			return SerializeApplicationControlError(id, error);
@@ -694,7 +696,9 @@ namespace gglab
 		std::span<const HostViewOverrideState> overrides, GGLabAppRuntime* runtime) noexcept
 	{
 		std::string error = "NoParameterSource: ready active content is required.";
-		const uint64_t batchId = runtime ? runtime->RequestHostViewOverrides(expected, overrides, error) : 0;
+		const uint64_t batchId = runtime ?
+			runtime->RequestParameters(ParameterRequest::HostViewOverrides(expected, overrides), error) :
+			0;
 		if (batchId == 0)
 		{
 			Json response = Response(id, false);

@@ -118,7 +118,7 @@ namespace gglab
 		}
 	}
 
-	bool GGLabAppRuntime::CanRequestParameterBatch(std::string& error) const noexcept
+	bool GGLabAppRuntime::CanRequestParameters(std::string& error) const noexcept
 	{
 		error.clear();
 		if (!CanAcceptSessionCommands() || !m_ParameterControl)
@@ -144,22 +144,6 @@ namespace gglab
 		return true;
 	}
 
-	uint64_t GGLabAppRuntime::RequestParameterBatch(
-		std::span<const LabParameterValue> values, std::string& error) noexcept
-	{
-		if (!CanRequestParameterBatch(error))
-		{
-			return 0;
-		}
-		return m_ParameterControl->RequestParameterBatch(values, error);
-	}
-
-	uint64_t GGLabAppRuntime::RequestHostViewOverrides(const HostViewControlStamp& expected,
-		std::span<const HostViewOverrideState> overrides, std::string& error) noexcept
-	{
-		return RequestParameters(ParameterRequest::HostViewOverrides(expected, overrides), error);
-	}
-
 	uint64_t GGLabAppRuntime::RequestParameters(const ParameterRequest& request, std::string& error) noexcept
 	{
 		if (request.m_Expected)
@@ -175,7 +159,7 @@ namespace gglab
 				return 0;
 			}
 		}
-		if (!CanRequestParameterBatch(error))
+		if (!CanRequestParameters(error))
 		{
 			return 0;
 		}

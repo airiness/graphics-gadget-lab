@@ -65,6 +65,9 @@ namespace gglab
 		[[nodiscard]] const LightingProfilePublication& GetLightingProfilePublication() const noexcept;
 		[[nodiscard]] const std::string& GetLightingProfileError() const noexcept;
 		[[nodiscard]] bool SupportsParameterEffect(const LabParameterDesc& desc) const noexcept;
+		// Builds Assign intent from enabled source descriptors without admitting work.
+		// RequestParameters validates the complete request against the live sources.
+		[[nodiscard]] ParameterRequest MakeAssignmentRequest(std::span<const LabParameterValue> values) const;
 		// Descriptor validation without reservations, mutation or retained source borrows.
 		[[nodiscard]] bool ValidateSequenceAssignments(std::span<LabParameterValue> values,
 			const std::optional<std::vector<std::string>>& expectedEffects, std::string& error) const noexcept;
@@ -77,14 +80,6 @@ namespace gglab
 		// Session checks content and Host revision at admission and safe application.
 		[[nodiscard]] uint64_t RequestParameters(const ParameterRequest& request,
 			std::string& error, ParameterBatchOwner owner = {}) noexcept;
-		[[nodiscard]] uint64_t RequestParameterBatch(std::span<const LabParameterValue> values,
-			std::string& error, ParameterBatchOwner owner = {}) noexcept;
-		// Exact Host view override states under the same admission. The caller verifies the
-		// expected run, which recorded stamps carry. Content and Host view revision are
-		// checked at admission and again at the safe boundary; a mismatch applies nothing.
-		[[nodiscard]] uint64_t RequestHostViewOverrides(const HostViewControlStamp& expected,
-			std::span<const HostViewOverrideState> overrides, std::string& error,
-			ParameterBatchOwner owner = {}) noexcept;
 		// Internal owners may append after application; external admission retains one result slot.
 		// Status borrows survive other records' admission/collection, until their own collection.
 		// The compatibility view exposes only the external client's single retained result.

@@ -534,7 +534,8 @@ namespace gglab
 		{
 			std::string error;
 			const ParameterBatchOwner owner{ m_FrameSequence->GetStatus()->m_SequenceId };
-			const auto batch = m_ParameterControl->RequestParameterBatch(event->m_Values, error, owner);
+			const auto request = m_ParameterControl->MakeAssignmentRequest(event->m_Values);
+			const auto batch = m_ParameterControl->RequestParameters(request, error, owner);
 			if (!batch)
 			{
 				m_FrameSequence->OnParameterEventFailed(std::move(error));
