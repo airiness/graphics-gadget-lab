@@ -19,9 +19,11 @@ with errorCode ExpectedRunChanged and changes nothing.
 
 Commands:
   start    Launch a session (hidden by default) and wait until it accepts requests.
+           -SessionLifetime developer disables automation idle expiry.
            -LabParameters "id=value",... sets startup Lab parameters (Debug and Develop builds).
            -Validation off|standard|gpu overrides validation (gpu: DX12 only).
-  status   Report readiness gates, settled frames, camera and pending captures.
+  attach   Inspect an existing session and return its run identity with attached ownership.
+  status   Report lifetime, runtime state, readiness, camera and pending captures.
   parameters
            List Host and active Lab descriptors, current/default values and revision.
   set      Submit -Changes/-ChangesFile as [{"id":"gtao.radius","type":"float","value":2.0}].
@@ -92,7 +94,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/Verification/GGLabSe
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('start', 'status', 'parameters', 'set', 'assign', 'parameter-result', 'host-view-overrides', 'capture', 'graph', 'export', 'watch', 'batch', 'result', 'capture-cancel', 'sequence', 'sequence-cancel', 'stop', 'list')]
+    [ValidateSet('start', 'attach', 'status', 'parameters', 'set', 'assign', 'parameter-result', 'host-view-overrides', 'capture', 'graph', 'export', 'watch', 'batch', 'result', 'capture-cancel', 'sequence', 'sequence-cancel', 'stop', 'list')]
     [string]$Command,
 
     [ValidatePattern('^[A-Za-z0-9_-]{1,64}$')]
@@ -113,6 +115,8 @@ param(
     [ValidateSet('off', 'standard', 'gpu')]
     [string]$Validation,
     [double]$IdleTimeout = 900,
+    [ValidateSet('automation', 'developer')]
+    [string]$SessionLifetime = 'automation',
     [double]$FixedDeltaTime,
     [switch]$Visible,
     [switch]$NoDevTools,
@@ -145,6 +149,8 @@ param(
     # capture/graph/export: the typed frame predicate, directly or from a UTF-8 file.
     [string]$RequiredFrameState,
     [string]$RequiredFrameStateFile,
+    [ValidateRange(1, 300000)]
+    [int]$FrameSelectionTimeoutMs = 300000,
     # graph: only executed passes with resource-version addresses.
     [switch]$Summary,
     # export: a JSON array of resource addresses, directly or from a UTF-8 file.
@@ -353,6 +359,12 @@ function New-CaptureRequest([string]$ViewId) {
         catch { Fail $_.Exception.Message @{ session = $Session } }
         $script:ExpectedRunIdentity = Get-ExpectedStateRun $required 'RequiredFrameState'
         $request['requiredFrameState'] = $required
+        if ($script:PSBoundParameters.ContainsKey('FrameSelectionTimeoutMs')) {
+            $request['frameSelectionTimeoutMs'] = $FrameSelectionTimeoutMs
+        }
+    }
+    elseif ($script:PSBoundParameters.ContainsKey('FrameSelectionTimeoutMs')) {
+        Fail '-FrameSelectionTimeoutMs requires -RequiredFrameState or -RequiredFrameStateFile.'
     }
     return $request
 }
@@ -499,6 +511,10 @@ function Require-Session {
 
 switch ($Command) {
     'start' {
+        $SessionLifetime = $SessionLifetime.ToLowerInvariant()
+        if ($SessionLifetime -eq 'developer' -and $PSBoundParameters.ContainsKey('IdleTimeout')) {
+            Fail 'Developer sessions cannot specify -IdleTimeout.'
+        }
         if (-not $Session) {
             $Session = 's' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + (Get-Random -Maximum 10000)
         }
@@ -514,8 +530,9 @@ switch ($Command) {
         $outputLog = Join-Path $sessionDirectory 'output.log'
         if (Test-Path $outputLog) { Remove-Item $outputLog -Force }
 
-        $arguments = @('--rhi', $Rhi, '--session', $Session, '--idle-timeout', "$IdleTimeout",
+        $arguments = @('--rhi', $Rhi, '--session', $Session, '--session-lifetime', $SessionLifetime,
             '--output-log', "`"$outputLog`"")
+        if ($SessionLifetime -eq 'automation') { $arguments += @('--idle-timeout', "$IdleTimeout") }
         if ($Lab) { $arguments += @('--lab', $Lab) }
         if ($Demo) { $arguments += @('--demo', $Demo) }
         if ($WindowSize) { $arguments += @('--window-size', $WindowSize) }
@@ -567,10 +584,24 @@ switch ($Command) {
             session = $Session; pid = $process.Id; rhi = $Rhi; arguments = $arguments
             startedAt = (Get-Date).ToString('o'); outputLog = $outputLog
             directory = $sessionDirectory; runIdentity = $runIdentity
+            ownership = 'created'; lifetime = $SessionLifetime
         }
         ($record | ConvertTo-Json -Depth 5) | Set-Content -Encoding UTF8 -Path (Join-Path $sessionDirectory 'session.json')
         $record['ok'] = $true
         Write-Result $record 0
+    }
+    'attach' {
+        Require-Session
+        $status = Invoke-SessionCommand $Session @{ command = 'status' } 30
+        if (-not $status.ok) { Complete-SessionResponse $status $Session }
+        $run = Get-Field (Get-Field (Get-Field $status 'environment') 'process') 'runIdentity'
+        if (-not $run -or ($ExpectedRunIdentity -and $ExpectedRunIdentity -cne $run)) {
+            Fail 'The attached session does not match the expected run identity.' @{ session = $Session }
+        }
+        Write-Result @{
+            ok = $true; session = $Session; ownership = 'attached'; runIdentity = $run
+            pid = $status.session.pid; lifetime = (Get-Field $status.session 'lifetime')
+        } 0
     }
     'status' {
         Require-Session

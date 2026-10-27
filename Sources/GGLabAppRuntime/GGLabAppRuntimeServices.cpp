@@ -100,6 +100,31 @@ namespace gglab
 		return m_FrameCapture ? m_FrameCapture->CancelJob(jobId) : CaptureCancelResult::NotFound;
 	}
 
+	std::optional<std::chrono::steady_clock::time_point> GGLabAppRuntime::GetNextControlDeadline() const noexcept
+	{
+		CheckOwnerThread();
+		if (m_RenderHost)
+		{
+			m_RenderHost->CheckServiceLifecycleAccess();
+		}
+		return CanAcceptSessionCommands() && m_FrameCapture ?
+			m_FrameCapture->GetNextFrameSelectionDeadline() : std::nullopt;
+	}
+
+	void GGLabAppRuntime::ServiceControlDeadlines(std::chrono::steady_clock::time_point now) noexcept
+	{
+		CheckOwnerThread();
+		if (m_RenderHost)
+		{
+			m_RenderHost->CheckServiceLifecycleAccess();
+		}
+		if (CanAcceptSessionCommands() && m_FrameCapture)
+		{
+			m_FrameCapture->ExpireFrameSelections(now);
+			m_FrameCapture->PublishAppRuntimeJobResults();
+		}
+	}
+
 	std::optional<CaptureJobSnapshot> GGLabAppRuntime::GetCaptureJobSnapshot(uint64_t jobId) const noexcept
 	{
 		return m_FrameCapture ? m_FrameCapture->GetJobSnapshot(jobId) : std::nullopt;

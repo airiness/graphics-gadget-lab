@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 
+#include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -14,6 +15,7 @@
 
 namespace gglab
 {
+	inline constexpr std::chrono::milliseconds MaxFrameSelectionTimeout{ 300000 };
 	enum class CaptureImageSource : uint8_t
 	{
 		Scene,
@@ -87,5 +89,7 @@ namespace gglab
 		// parameter results. A due frame that contradicts it fails the plan; it never
 		// waits for another configuration.
 		std::shared_ptr<const RequiredFrameState> m_RequiredFrameState;
+		// Predicate plans default to the maximum; retries share the admission deadline.
+		std::optional<std::chrono::milliseconds> m_FrameSelectionTimeout;
 	};
 }

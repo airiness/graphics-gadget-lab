@@ -330,6 +330,7 @@
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32Shell.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Control\ApplicationControlCaptureJobs.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Control\ApplicationControlProtocol.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Control\ApplicationSessionLifetime.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Control\ApplicationControlParameters.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\DevTools\EnumText\EnumText.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\DevTools\EnumText\EnumTextGraphics.h" />

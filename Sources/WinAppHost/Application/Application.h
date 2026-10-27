@@ -1,5 +1,6 @@
 #pragma once
 #include "ApplicationContentRegistration.h"
+#include "Application/Control/ApplicationSessionLifetime.h"
 #include "AppRuntimeConfig.h"
 #include "AppRuntimeHostServices.h"
 #include "Capture/CapturePlan.h"
@@ -64,6 +65,7 @@ namespace gglab
 			double m_CaptureTimeoutSeconds = 120.0;
 			// Non-empty serves the session control protocol under this id.
 			std::string m_SessionId;
+			ApplicationSessionLifetime m_SessionLifetime = ApplicationSessionLifetime::Automation;
 			double m_IdleTimeoutSeconds = 900.0;
 		};
 
@@ -128,6 +130,7 @@ namespace gglab
 		std::chrono::steady_clock::time_point m_NextHiddenFrameTime{};
 
 		std::string m_SessionId;
+		ApplicationSessionLifetime m_SessionLifetime = ApplicationSessionLifetime::Automation;
 		std::chrono::duration<double> m_IdleTimeout{ 900.0 };
 		std::unique_ptr<win32::NamedPipeServer> m_ControlServer;
 		// Session-admitted job identities; other owners' jobs are not-found to clients.

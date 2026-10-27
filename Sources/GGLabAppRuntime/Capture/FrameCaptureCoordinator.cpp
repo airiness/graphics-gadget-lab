@@ -47,6 +47,7 @@ namespace gglab
 		bool m_ViewApplied = false;
 		std::optional<uint64_t> m_ViewCameraResetSerial;
 		std::optional<FrameAttempt> m_Attempt;
+		std::optional<std::chrono::steady_clock::time_point> m_SelectionDeadline;
 
 		[[nodiscard]] uint64_t GetRuntimeGroupId() const noexcept
 		{
@@ -195,6 +196,53 @@ namespace gglab
 		FinishWriting();
 	}
 
+	std::optional<std::chrono::steady_clock::time_point>
+		FrameCaptureCoordinator::GetNextFrameSelectionDeadline() const noexcept
+	{
+		std::optional<std::chrono::steady_clock::time_point> next;
+		for (const JobReceipt& slot : m_JobReceipts)
+		{
+			if (slot.m_Job && slot.m_Job->m_SelectionDeadline &&
+				!(m_HasOpenFrame && slot.m_Job->m_Attempt))
+			{
+				const auto deadline = *slot.m_Job->m_SelectionDeadline;
+				next = next ? std::min(*next, deadline) : deadline;
+			}
+		}
+		return next;
+	}
+
+	bool FrameCaptureCoordinator::ExpireFrameSelection(CaptureJob& job,
+		std::chrono::steady_clock::time_point now) noexcept
+	{
+		if (job.m_RemainingDeliveries == 0)
+		{
+			return true;
+		}
+		if (!job.m_SelectionDeadline || now < *job.m_SelectionDeadline ||
+			(m_HasOpenFrame && job.m_Attempt))
+		{
+			return false;
+		}
+		const auto jobId = job.m_Result.m_JobId;
+		FailPlan(job, "FrameSelectionExpired: no matching frame was submitted before the selection deadline.",
+			"FrameSelectionExpired");
+		GGLAB_LOG_INFO_ALWAYS("Frame capture job {} expired before a matching frame was submitted.", jobId);
+		return true;
+	}
+
+	void FrameCaptureCoordinator::ExpireFrameSelections(std::chrono::steady_clock::time_point now) noexcept
+	{
+		for (const JobReceipt& slot : m_JobReceipts)
+		{
+			const auto job = slot.m_Job;
+			if (job)
+			{
+				GGLAB_UNUSED(ExpireFrameSelection(*job, now));
+			}
+		}
+	}
+
 	CaptureAdmission FrameCaptureCoordinator::CheckJobAdmission(const CapturePlan& plan) const noexcept
 	{
 		if (m_IsShuttingDown)
@@ -252,6 +300,12 @@ namespace gglab
 			}
 		}
 		if (resources > 1 || graphs > 1 || (resources != 0 && graphs != 0 && graphSummary))
+		{
+			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::InvalidPlan };
+		}
+		if (plan.m_FrameSelectionTimeout && (!plan.m_RequiredFrameState ||
+			*plan.m_FrameSelectionTimeout < std::chrono::milliseconds(1) ||
+			*plan.m_FrameSelectionTimeout > MaxFrameSelectionTimeout))
 		{
 			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::InvalidPlan };
 		}
@@ -526,6 +580,11 @@ namespace gglab
 		job->m_Result.m_Products.resize(plan.m_RequiredProducts.size());
 		job->m_RemainingDeliveries = GetDeliveryCount(plan);
 		job->m_Plan = std::move(plan);
+		if (job->m_Plan.m_RequiredFrameState)
+		{
+			job->m_SelectionDeadline = std::chrono::steady_clock::now() +
+				job->m_Plan.m_FrameSelectionTimeout.value_or(MaxFrameSelectionTimeout);
+		}
 		job->m_DeliveryCount = job->m_RemainingDeliveries;
 		for (size_t index = 0; index < job->m_Plan.m_RequiredProducts.size(); ++index)
 		{
@@ -710,6 +769,7 @@ namespace gglab
 
 	void FrameCaptureCoordinator::BeginFrame(FrameCaptureFrameState state) noexcept
 	{
+		ExpireFrameSelections();
 		const bool ready = state.m_Readiness.IsReady();
 		const bool historyRestarted =
 			!m_LastFrameState || !state.m_SettleKey.Continues(m_LastFrameState->m_SettleKey);
@@ -1004,6 +1064,7 @@ namespace gglab
 					attempt->m_FrameSerial == m_LastFrameState->m_FrameSerial)
 				{
 					attempt->m_Submitted = true;
+					entry.m_Job->m_SelectionDeadline.reset();
 					if (m_NonFiniteWatch && attempt->m_WatchCoverageId != 0)
 					{
 						m_NonFiniteWatch->TrackCoverageFrame(attempt->m_WatchCoverageId, attempt->m_FrameSerial);
@@ -1025,6 +1086,7 @@ namespace gglab
 
 	void FrameCaptureCoordinator::OnFrameAborted() noexcept
 	{
+		m_HasOpenFrame = false;
 		if (m_LastFrameState && m_LastFrameState->m_Outcome == FrameCaptureFrameOutcome::Planned)
 		{
 			m_LastFrameState->m_Outcome = FrameCaptureFrameOutcome::Aborted;
@@ -1033,6 +1095,7 @@ namespace gglab
 
 	void FrameCaptureCoordinator::Update() noexcept
 	{
+		ExpireFrameSelections();
 		if (m_NonFiniteWatch)
 		{
 			m_NonFiniteWatch->UpdateCoverage();
@@ -1058,6 +1121,7 @@ namespace gglab
 				}
 			}
 		}
+		ExpireFrameSelections();
 		PollWatchCaptures();
 		CollectWrittenJobs();
 	}
@@ -1208,6 +1272,10 @@ namespace gglab
 	{
 		CaptureJob& job = *entry.m_Job;
 		const CapturePlan& plan = job.m_Plan;
+		if (ExpireFrameSelection(job, std::chrono::steady_clock::now()))
+		{
+			return;
+		}
 		if (!m_Capture)
 		{
 			FailPlan(job, "Frame capture is unavailable.");
@@ -1330,7 +1398,8 @@ namespace gglab
 				"Every required product and watch verdict must be ready before writing starts.");
 			if (member->m_Phase == Phase::Issued && member->m_Attempt->m_CaptureRequestId != 0)
 			{
-				m_DiscardedCaptureResults.push_back(member->m_Attempt->m_CaptureRequestId);
+				// Failed issued work keeps its reservation until Runtime returns its payload.
+				m_DrainingCaptureRequests.push_back(member->m_Attempt->m_CaptureRequestId);
 			}
 			Finish(*member, CaptureJobStatus::Failed, failure);
 		}

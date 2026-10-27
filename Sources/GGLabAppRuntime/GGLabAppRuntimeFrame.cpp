@@ -380,11 +380,7 @@ namespace gglab
 
 	AppRuntimeTickResult GGLabAppRuntime::Tick(AppRuntimeTickInfo tickInfo) noexcept
 	{
-		CheckOwnerThread();
-		if (m_RenderHost)
-		{
-			m_RenderHost->CheckServiceLifecycleAccess();
-		}
+		ServiceControlDeadlines();
 		switch (m_LifecycleState)
 		{
 		case AppRuntimeLifecycleState::Suspended:

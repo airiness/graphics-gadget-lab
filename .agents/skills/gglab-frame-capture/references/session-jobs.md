@@ -169,6 +169,13 @@ waiting, retries and publication, independently of parameter-result retention.
 | Due frame contradicts the run, content, values, sources or temporal state | Fail before issue with `failureCode: RequiredFrameStateMismatch` and details in `failure`. |
 | Due frame matches | Issue; a retry checks the same predicate on its new frame. |
 
+Predicate captures accept `frameSelectionTimeoutMs` (`-FrameSelectionTimeoutMs`),
+an integer from 1 to 300000, default 300000. One absolute admission deadline covers
+readiness, settling, capacity waits and retries, including while minimized.
+`FrameSelectionExpired` releases active-job capacity and retains the failure until
+consumed. Successful matching submission ends the deadline; GPU/readback and
+publication then follow their existing lifetimes.
+
 The published `control` record pairs the predicate with the issued observation;
 `ValidateCaptureBundles.py` checks their agreement offline.
 

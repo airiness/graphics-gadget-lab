@@ -94,6 +94,7 @@ namespace gglab
 	{
 		ApplicationLaunchParseResult result{};
 		bool demoSpecified = false;
+		bool sessionLifetimeSpecified = false;
 		// Capture detail options are collected first and require --capture-on-ready.
 		ApplicationCaptureOnReadyOptions capture{};
 		std::optional<std::filesystem::path> captureOutputDirectory;
@@ -515,6 +516,28 @@ namespace gglab
 				result.m_Options.m_SessionId = std::string(arguments[index]);
 				continue;
 			}
+			if (argument == "--session-lifetime")
+			{
+				if (sessionLifetimeSpecified)
+				{
+					result.m_Error = "Option '--session-lifetime' may only be specified once.";
+					return result;
+				}
+				if (!requireValue(index, argument))
+				{
+					return result;
+				}
+				const bool developer = utils::EqualsAsciiIgnoreCase(arguments[index], "developer");
+				if (!developer && !utils::EqualsAsciiIgnoreCase(arguments[index], "automation"))
+				{
+					result.m_Error = "Option '--session-lifetime' expects automation or developer.";
+					return result;
+				}
+				result.m_Options.m_SessionLifetime = developer ?
+					ApplicationSessionLifetime::Developer : ApplicationSessionLifetime::Automation;
+				sessionLifetimeSpecified = true;
+				continue;
+			}
 			if (argument == "--idle-timeout")
 			{
 				if (result.m_Options.m_IdleTimeoutSpecified)
@@ -562,6 +585,17 @@ namespace gglab
 		if (result.m_Options.m_IdleTimeoutSpecified && !result.m_Options.m_SessionId)
 		{
 			result.m_Error = "Option '--idle-timeout' requires '--session'.";
+			return result;
+		}
+		if (sessionLifetimeSpecified && !result.m_Options.m_SessionId)
+		{
+			result.m_Error = "Option '--session-lifetime' requires '--session'.";
+			return result;
+		}
+		if (result.m_Options.m_SessionLifetime == ApplicationSessionLifetime::Developer &&
+			result.m_Options.m_IdleTimeoutSpecified)
+		{
+			result.m_Error = "Developer sessions cannot specify '--idle-timeout'.";
 			return result;
 		}
 		if (result.m_Options.m_Hidden && result.m_Options.m_StartWithRelativeMouse)
@@ -663,7 +697,8 @@ namespace gglab
 			"  --capture-timeout <seconds>     Limit from the first frame (default: 120).\n"
 			"  --session <id>                  Serve the session control protocol on\n"
 			"                                  \\.\\pipe\\gglab-session-<id> ([A-Za-z0-9_-]).\n"
-			"  --idle-timeout <seconds>        Exit a session after this long without a\n"
+			"  --session-lifetime <mode>       automation (default) or developer (no idle exit).\n"
+			"  --idle-timeout <seconds>        Exit an automation session after this long without a\n"
 			"                                  control request (default: 900).\n"
 			"  --output-log <absolute-file>    Write stdout and stderr to this file.\n"
 			"  --inspect-runtime             Print effective runtime paths/backend as JSON and exit.\n"

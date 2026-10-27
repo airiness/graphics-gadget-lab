@@ -243,6 +243,9 @@ namespace gglab
 		// Tick and Shutdown publish terminal receipts at the result-routing boundary;
 		// publication retains the original reserved slot, with no second result queue.
 		[[nodiscard]] CaptureAdmission TrySubmitCaptureJob(CapturePlan&& plan) noexcept;
+		[[nodiscard]] std::optional<std::chrono::steady_clock::time_point> GetNextControlDeadline() const noexcept;
+		void ServiceControlDeadlines(
+			std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now()) noexcept;
 		[[nodiscard]] CaptureCancelResult CancelCaptureJob(uint64_t jobId) noexcept;
 		[[nodiscard]] std::optional<CaptureJobSnapshot> GetCaptureJobSnapshot(uint64_t jobId) const noexcept;
 		[[nodiscard]] CaptureIntakeSnapshot GetCaptureIntakeSnapshot() const noexcept;

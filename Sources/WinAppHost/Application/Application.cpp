@@ -57,6 +57,7 @@ namespace gglab
 		m_CaptureOnReady(std::move(createInfo.m_CaptureOnReady)),
 		m_CaptureTimeout(createInfo.m_CaptureTimeoutSeconds),
 		m_SessionId(std::move(createInfo.m_SessionId)),
+		m_SessionLifetime(createInfo.m_SessionLifetime),
 		m_IdleTimeout(createInfo.m_IdleTimeoutSeconds),
 		m_Hidden(createInfo.m_Hidden)
 	{
@@ -544,7 +545,8 @@ namespace gglab
 
 		// Client polling counts as activity, retained receipts do not. Waiting for
 		// content that never loads must not keep an abandoned session alive.
-		if (now - m_LastControlActivity >= m_IdleTimeout)
+		if (m_SessionLifetime == ApplicationSessionLifetime::Automation &&
+			now - m_LastControlActivity >= m_IdleTimeout)
 		{
 			GGLAB_LOG_INFO_ALWAYS("Session '{}' exits after {} idle seconds.", m_SessionId,
 				m_IdleTimeout.count());
@@ -555,6 +557,7 @@ namespace gglab
 
 	bool Application::WaitWhileSuspended() noexcept
 	{
+		m_AppRuntime->ServiceControlDeadlines();
 		std::optional<std::chrono::steady_clock::time_point> deadline;
 		if (m_ControlServer)
 		{
@@ -562,8 +565,16 @@ namespace gglab
 			{
 				return false;
 			}
-			deadline = m_LastControlActivity +
-				std::chrono::ceil<std::chrono::steady_clock::duration>(m_IdleTimeout);
+			if (m_SessionLifetime == ApplicationSessionLifetime::Automation)
+			{
+				const auto idleDeadline = m_LastControlActivity +
+					std::chrono::ceil<std::chrono::steady_clock::duration>(m_IdleTimeout);
+				deadline = deadline ? std::min(*deadline, idleDeadline) : idleDeadline;
+			}
+		}
+		if (const auto selectionDeadline = m_AppRuntime->GetNextControlDeadline())
+		{
+			deadline = deadline ? std::min(*deadline, *selectionDeadline) : *selectionDeadline;
 		}
 		m_PlatformHost->WaitForEvents(deadline);
 		return true;
@@ -596,6 +607,9 @@ namespace gglab
 					.count(),
 				.m_Hidden = m_Hidden,
 				.m_RuntimeState = m_AppRuntime->GetLifecycleState(),
+				.m_Lifetime = m_SessionLifetime,
+				.m_IdleTimeoutSeconds = m_SessionLifetime == ApplicationSessionLifetime::Automation ?
+					std::optional(m_IdleTimeout.count()) : std::nullopt,
 				.m_Width = m_WindowWidth,
 				.m_Height = m_WindowHeight,
 				.m_CaptureIntake = m_AppRuntime ? m_AppRuntime->GetCaptureIntakeSnapshot() : CaptureIntakeSnapshot{},

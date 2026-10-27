@@ -1089,6 +1089,16 @@ namespace gglab
 						return error;
 					}
 				}
+				else if (key == "frameSelectionTimeoutMs")
+				{
+					if (!IsUint32(value) || value.get<uint32_t>() == 0 ||
+						value.get<uint32_t>() > MaxFrameSelectionTimeout.count() ||
+						!document.contains("requiredFrameState"))
+					{
+						return "Field 'frameSelectionTimeoutMs' requires a predicate and an integer in [1, 300000].";
+					}
+					capture.m_FrameSelectionTimeout = std::chrono::milliseconds(value.get<uint32_t>());
+				}
 				else if (key == "requiredFrameState")
 				{
 					if (std::string error =
@@ -1784,6 +1794,8 @@ namespace gglab
 			{ "uptimeSeconds", status.m_UptimeSeconds },
 			{ "hidden", status.m_Hidden },
 			{ "runtimeState", runtimeState() },
+			{ "lifetime", status.m_Lifetime == ApplicationSessionLifetime::Developer ? "developer" : "automation" },
+			{ "idleTimeoutSeconds", status.m_IdleTimeoutSeconds ? Json(*status.m_IdleTimeoutSeconds) : Json(nullptr) },
 			{ "width", status.m_Width },
 			{ "height", status.m_Height },
 		};
@@ -1791,6 +1803,10 @@ namespace gglab
 		response["environment"] = environment.is_object() ? environment : Json(nullptr);
 		const auto& intake = status.m_CaptureIntake;
 		response["capabilities"] = {
+			{ "sessionLifetime", {
+				{ "version", 1 },
+				{ "modes", { "automation", "developer" } },
+				{ "suspendedControl", true } } },
 			{ "labParameterControl", {
 				{ "sources", Json::array({ "lab" }) },
 				{ "effectClasses", Json::array({ "Immediate", "Deferred", "Rebuild" }) },
@@ -1863,7 +1879,11 @@ namespace gglab
 				{ "temporalConsumers", { "temporal-aa", "reference", "temporal-gtao" } },
 				{ "referenceSampling", true },
 				{ "admissionReasons", { "RequiredFrameStateInvalid", "RequiredFrameStateUnavailable" } },
-				{ "failureCodes", { "RequiredFrameStateMismatch" } },
+				{ "failureCodes", { "RequiredFrameStateMismatch", "FrameSelectionExpired" } },
+				{ "frameSelectionTimeoutMs", {
+					{ "min", 1 },
+					{ "max", MaxFrameSelectionTimeout.count() },
+					{ "default", MaxFrameSelectionTimeout.count() } } },
 				{ "controlSchemaVersion", FrameCaptureControlSchemaVersion } } } };
 		response["capture"] = {
 			{ "limits", {

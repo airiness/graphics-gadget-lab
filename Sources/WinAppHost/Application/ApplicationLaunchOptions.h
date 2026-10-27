@@ -1,4 +1,5 @@
 #pragma once
+#include "Application/Control/ApplicationSessionLifetime.h"
 #include "Capture/CapturePlan.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 #include "Lab/LabTypes.h"
@@ -75,6 +76,7 @@ namespace gglab
 		std::optional<ApplicationCaptureOnReadyOptions> m_CaptureOnReady;
 		// Serves the session control protocol on \\.\pipe\gglab-session-<id>.
 		std::optional<std::string> m_SessionId;
+		ApplicationSessionLifetime m_SessionLifetime = ApplicationSessionLifetime::Automation;
 		// A session exits after this long without a control request.
 		double m_IdleTimeoutSeconds = 900.0;
 		bool m_IdleTimeoutSpecified = false;

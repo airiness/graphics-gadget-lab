@@ -137,6 +137,11 @@ namespace gglab
 		// Advisory preflight with the same validation/pressure ordering. Accepted
 		// reserves nothing and has no job ID; only TrySubmit creates an accepted job.
 		[[nodiscard]] CaptureAdmission CheckJobAdmission(const CapturePlan& plan) const noexcept;
+		[[nodiscard]] std::optional<std::chrono::steady_clock::time_point>
+			GetNextFrameSelectionDeadline() const noexcept;
+		// CPU-only expiry; an open issued attempt settles before its deadline is applied.
+		void ExpireFrameSelections(
+			std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now()) noexcept;
 		// All methods run on the AppRuntime owner thread. Receipts do not expire:
 		// consumption releases the reserved slot; polling an active/unknown job does not.
 		// Standalone use only: a composed coordinator leaves consumption to AppRuntime.
@@ -271,6 +276,8 @@ namespace gglab
 		void Issue(ProductDelivery& entry, const FrameCaptureFrameState& state,
 			bool preAdmitted = false) noexcept;
 		void FailPlan(CaptureJob& job, std::string failure, std::string_view failureCode = {}) noexcept;
+		[[nodiscard]] bool ExpireFrameSelection(CaptureJob& job,
+			std::chrono::steady_clock::time_point now) noexcept;
 		void RetryPlan(CaptureJob& job, uint64_t consumedRequestId) noexcept;
 		void HandleCaptureResult(FrameCaptureResult result) noexcept;
 		void PollWatchCaptures() noexcept;

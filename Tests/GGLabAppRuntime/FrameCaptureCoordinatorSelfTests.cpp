@@ -528,6 +528,146 @@ namespace gglab
 			return required;
 		}
 
+		void RunFrameSelectionDeadlineTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("capture-selection-deadline");
+			const auto plan = []()
+				{
+					return CapturePlan{ .m_RequiredProducts = { ImageCaptureProduct{} },
+						.m_WaitForCapacity = true, .m_RequiredFrameState = MakeRequiredFrameState(false, 0),
+						.m_FrameSelectionTimeout = std::chrono::seconds(1) };
+				};
+			for (int blocker = 0; blocker < 4; ++blocker)
+			{
+				FakeCaptureControl control;
+				FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+					.m_DefaultOutputDirectory = directory.GetPath(), .m_ImageEncoder = &EncodeTestPng,
+					.m_WriteOnCallingThread = true, .m_JobLimits = { .m_MaxActiveJobs = 1, .m_MaxReceipts = 2 },
+					.m_RunIdentity = std::string(RequiredStateRun) });
+				auto waitingPlan = plan();
+				waitingPlan.m_Timing = FrameCaptureTiming::AfterReady;
+				waitingPlan.m_SettleFrames = blocker == 2 ? 100 : 0;
+				const auto admitted = coordinator.TrySubmit(std::move(waitingPlan));
+				const auto deadline = coordinator.GetNextFrameSelectionDeadline().value();
+				if (blocker != 0)
+				{
+					auto state = MakeControlledFrameState(100, 0, false);
+					state.m_Readiness = MakeFrameState(blocker != 1).m_Readiness;
+					control.m_RequestAvailability = blocker == 3 ?
+						FrameCaptureAvailability::Busy : FrameCaptureAvailability::Available;
+					coordinator.BeginFrame(std::move(state));
+					coordinator.OnFrameSubmitted();
+				}
+				coordinator.ExpireFrameSelections(deadline - std::chrono::nanoseconds(1));
+				context.Check(coordinator.GetIntakeSnapshot().m_ActiveJobs == 1 && control.m_Issued.empty(),
+					"No frame, readiness, settling and capacity waits retain the job until its absolute deadline");
+				coordinator.ExpireFrameSelections(deadline);
+				const auto intake = coordinator.GetIntakeSnapshot();
+				const auto result = coordinator.TakeJobResult(admitted.m_JobId);
+				control.m_RequestAvailability = FrameCaptureAvailability::Available;
+				coordinator.BeginFrame(MakeControlledFrameState(101, 0, false));
+				coordinator.OnFrameSubmitted();
+				context.Check(result && result->m_Status == CaptureJobStatus::Failed &&
+					result->m_FailureCode == "FrameSelectionExpired" &&
+					result->m_Publication == CaptureJobPublication::NotPublished &&
+					intake.m_ActiveJobs == 0 && intake.m_ReservedReceipts == 1 && intake.m_TerminalReceipts == 1 &&
+					control.m_Issued.empty() && !coordinator.GetNextFrameSelectionDeadline() &&
+					!coordinator.TakeJobResult(admitted.m_JobId),
+					"Expiry releases active capacity, retains one consumable failure and cannot issue after resume");
+			}
+			for (const auto& [submitted, grouped] : { std::pair{ false, false }, std::pair{ true, false },
+				std::pair{ false, true }, std::pair{ true, true } })
+			{
+				FakeCaptureControl control;
+				FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+					.m_DefaultOutputDirectory = directory.GetPath(), .m_ImageEncoder = &EncodeTestPng,
+					.m_WriteOnCallingThread = true, .m_RunIdentity = std::string(RequiredStateRun) });
+				auto issuedPlan = plan();
+				if (grouped)
+				{
+					issuedPlan.m_RequiredProducts.push_back(GraphCaptureProduct{});
+				}
+				const auto id = coordinator.TrySubmit(std::move(issuedPlan)).m_JobId;
+				const auto deadline = coordinator.GetNextFrameSelectionDeadline().value();
+				coordinator.BeginFrame(MakeControlledFrameState(110, 0, false));
+				coordinator.ExpireFrameSelections(deadline);
+				context.Check(coordinator.GetIntakeSnapshot().m_ActiveJobs == 1 &&
+					!coordinator.GetNextFrameSelectionDeadline(),
+					"An issued open frame completes its submit-or-abort decision before selection expiry");
+				if (submitted)
+				{
+					coordinator.OnFrameSubmitted();
+				}
+				else
+				{
+					coordinator.OnFrameAborted();
+				}
+				coordinator.ExpireFrameSelections(deadline);
+				const auto expired = submitted ? std::optional<CaptureJobResult>{} : coordinator.TakeJobResult(id);
+				context.Check(submitted ? coordinator.GetIntakeSnapshot().m_ActiveJobs == 1 :
+					(expired && expired->m_FailureCode == "FrameSelectionExpired" &&
+						coordinator.GetIntakeSnapshot().m_DrainingRuntimeRequests == (grouped ? 2u : 1u) &&
+						control.GetUnfinishedRequestCount() == (grouped ? 2u : 1u)),
+					"Submission ends the selection deadline; abort expiry retains Runtime work after receipt consumption");
+				for (const auto& issued : control.m_Issued)
+				{
+					control.Complete(issued.m_Id);
+				}
+				coordinator.Update();
+				const auto completed = coordinator.TakeJobResult(id);
+				context.Check(submitted ?
+					(completed && completed->m_Publication == CaptureJobPublication::Published) :
+					(!completed && coordinator.GetIntakeSnapshot().m_DrainingRuntimeRequests == 0),
+					"Late readback publishes only submitted matching jobs and drains expired jobs without another receipt");
+			}
+			{
+				FakeCaptureControl control;
+				FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+					.m_RunIdentity = std::string(RequiredStateRun) });
+				const auto id = coordinator.TrySubmit(plan()).m_JobId;
+				const auto deadline = coordinator.GetNextFrameSelectionDeadline().value();
+				coordinator.BeginFrame(MakeControlledFrameState(120, 0, false));
+				control.Busy(control.m_Issued.front().m_Id);
+				coordinator.Update();
+				coordinator.OnFrameAborted();
+				context.Check(coordinator.GetNextFrameSelectionDeadline() == deadline &&
+					coordinator.GetJobSnapshot(id)->m_Stage == CaptureJobStage::Waiting,
+					"A Busy unsubmitted attempt returns to Waiting with the original admission deadline");
+				coordinator.ExpireFrameSelections(deadline);
+				context.Check(coordinator.TakeJobResult(id)->m_FailureCode == "FrameSelectionExpired",
+					"A retry that reaches its original deadline fails instead of acquiring a new wait budget");
+				auto ordinary = plan();
+				ordinary.m_RequiredFrameState.reset();
+				context.Check(coordinator.CheckJobAdmission(ordinary).m_Status == CaptureAdmissionStatus::Rejected,
+					"A typed selection timeout without a predicate is invalid");
+				ordinary.m_FrameSelectionTimeout.reset();
+				const auto legacy = coordinator.TrySubmit(std::move(ordinary));
+				coordinator.ExpireFrameSelections(deadline + std::chrono::hours(1));
+				context.Check(legacy.m_JobId != 0 && !coordinator.GetNextFrameSelectionDeadline() &&
+					coordinator.GetIntakeSnapshot().m_ActiveJobs == 1,
+					"Plans without a predicate retain their existing unlimited frame-selection behavior");
+				GGLAB_UNUSED(coordinator.CancelJob(legacy.m_JobId));
+				GGLAB_UNUSED(coordinator.TakeJobResult(legacy.m_JobId));
+				auto defaultPlan = plan();
+				defaultPlan.m_FrameSelectionTimeout.reset();
+				const auto beforeAdmission = std::chrono::steady_clock::now();
+				const auto defaultJob = coordinator.TrySubmit(std::move(defaultPlan));
+				context.Check(coordinator.GetNextFrameSelectionDeadline().value() >=
+					beforeAdmission + MaxFrameSelectionTimeout,
+					"Existing predicate callers acquire the finite default selection deadline");
+				GGLAB_UNUSED(coordinator.CancelJob(defaultJob.m_JobId));
+				GGLAB_UNUSED(coordinator.TakeJobResult(defaultJob.m_JobId));
+				for (int timeout : { -1, 0, 300001 })
+				{
+					auto invalid = plan();
+					invalid.m_FrameSelectionTimeout = std::chrono::milliseconds(timeout);
+					context.Check(coordinator.TrySubmit(std::move(invalid)).m_Status == CaptureAdmissionStatus::Rejected &&
+						coordinator.GetIntakeSnapshot().m_ReservedReceipts == 0,
+						"Out-of-range typed deadlines reject without reserving a receipt");
+				}
+			}
+		}
+
 		void RunRequiredFrameStateTests(SelfTestContext& context) noexcept
 		{
 			TemporaryDirectory directory("frame-capture-required-state");
@@ -5412,6 +5552,7 @@ namespace gglab
 		RunGraphFailureTests(context);
 		RunNextFrameTests(context);
 		RunRequiredFrameStateTests(context);
+		RunFrameSelectionDeadlineTests(context);
 		RunAfterReadyTests(context);
 		RunParameterSettlingTests(context);
 		RunHistoryContinuitySettlingTests(context);

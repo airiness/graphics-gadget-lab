@@ -1158,9 +1158,25 @@ namespace gglab
 			const auto& capability = status["capabilities"]["requiredFrameState"];
 			context.Check(capability["version"] == 1 && capability["commands"].size() == 3 &&
 				capability["maxValues"] == 128 && capability["temporalConsumers"].size() == 3 &&
-				capability["failureCodes"] == Json::array({ "RequiredFrameStateMismatch" }) &&
+				capability["failureCodes"] == Json::array({ "RequiredFrameStateMismatch", "FrameSelectionExpired" }) &&
+				capability["frameSelectionTimeoutMs"] == Json({ { "min", 1 }, { "max", 300000 }, { "default", 300000 } }) &&
 				capability["admissionReasons"].size() == 2,
 				"Required frame state capture is advertised with its limits and outcome codes");
+			for (const std::string_view timeout : { "0", "300001", "-1", "1.5", "null", "\"100\"" })
+			{
+				context.Check(!ParseApplicationControlRequest(std::format(
+					R"({{"protocol":4,"id":62,"command":"capture","frameSelectionTimeoutMs":{},"requiredFrameState":{}{}}})",
+					timeout, head, minimal)).m_Request,
+					"Invalid selection timeout values reject before admission");
+			}
+			const auto bounded = ParseApplicationControlRequest(std::format(
+				R"({{"protocol":4,"id":62,"command":"capture","frameSelectionTimeoutMs":17,"requiredFrameState":{}{}}})",
+				head, minimal));
+			context.Check(bounded.m_Request &&
+				bounded.m_Request->m_Capture.m_FrameSelectionTimeout == std::chrono::milliseconds(17) &&
+				!ParseApplicationControlRequest(
+					R"({"protocol":4,"id":62,"command":"capture","frameSelectionTimeoutMs":17})").m_Request,
+				"Selection deadlines apply only to predicate-bound captures");
 			const auto invalid = Json::parse(SerializeApplicationControlCaptureAdmission(63,
 				{ CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::RequiredFrameStateInvalid }));
 			const auto unavailable = Json::parse(SerializeApplicationControlCaptureAdmission(64,

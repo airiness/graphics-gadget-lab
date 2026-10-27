@@ -2,7 +2,7 @@
 .SYNOPSIS
 Runs a guarded hidden TAA A/B experiment and restores exact Host override states.
 .DESCRIPTION
-Creates a fresh automation session by default. -Attach uses an existing automation
+Creates a fresh automation session by default. -Attach uses an existing
 session and never stops it. The fixed lighting-contract fixture must pass preflight.
 Every mutation and confirmed handle is journaled before the next operation. Lost
 admission or consumption responses stop automatic mutation; journal.json retains

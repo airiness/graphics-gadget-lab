@@ -5995,6 +5995,54 @@ namespace gglab
 			}
 		}
 
+		void RunControlDeadlineScenario(SelfTestContext& checks, const std::filesystem::path& root)
+		{
+			LifetimeProbe probe;
+			FaultFactory factory(probe);
+			ApplicationInput input;
+			GGLabAppRuntime runtime;
+			if (!InitializeOutcomeRuntime(checks, runtime, factory, input, probe, root))
+			{
+				return;
+			}
+			runtime.EnableParameterControl();
+			const auto stamp = runtime.GetHostViewControlStamp();
+			auto required = std::make_shared<RequiredFrameState>();
+			required->m_RunIdentity = stamp.m_RunIdentity;
+			required->m_ContentIdentity = stamp.m_ContentIdentity;
+			required->m_MinHostViewRevision = stamp.m_HostViewRevision;
+			required->m_Values = { { LabParameterId("view.taa.enabled"), LabParameterType::Bool, false } };
+			runtime.HandleHostEvent({ .m_Type = AppHostEventType::Suspended });
+			const auto admission = runtime.TrySubmitCaptureJob({ .m_RequiredProducts = { ImageCaptureProduct{} },
+				.m_Timing = FrameCaptureTiming::AfterReady, .m_SettleFrames = 1000,
+				.m_RequiredFrameState = std::move(required), .m_FrameSelectionTimeout = std::chrono::seconds(1) });
+			const auto deadline = runtime.GetNextControlDeadline();
+			checks.Check(admission.m_Status == CaptureAdmissionStatus::Accepted && deadline.has_value(),
+				"Suspended AppRuntime admits a predicate job and exposes its monotonic control deadline");
+			if (deadline)
+			{
+				const auto executions = probe.m_GraphExecutions;
+				const auto serial = runtime.GetFrameCaptureCoordinator()->GetLastFrameState()->m_FrameSerial;
+				runtime.ServiceControlDeadlines(*deadline);
+				const auto* result = runtime.FindCaptureJobResult(admission.m_JobId);
+				checks.Check(result && result->m_FailureCode == "FrameSelectionExpired" &&
+					result->m_Publication == CaptureJobPublication::NotPublished &&
+					runtime.GetCaptureIntakeSnapshot().m_ActiveJobs == 0 &&
+					runtime.GetCaptureIntakeSnapshot().m_ReservedReceipts == 1 &&
+					probe.m_GraphExecutions == executions &&
+					runtime.GetFrameCaptureCoordinator()->GetLastFrameState()->m_FrameSerial == serial &&
+					runtime.GetLifecycleState() == AppRuntimeLifecycleState::Suspended,
+					"Frame-free deadline servicing publishes the real failure and releases active capacity without GPU work");
+				GGLAB_UNUSED(runtime.TakeCaptureJobResult(admission.m_JobId));
+				runtime.HandleHostEvent({ .m_Type = AppHostEventType::Resumed });
+				GGLAB_UNUSED(runtime.Tick());
+				checks.Check(!runtime.FindCaptureJobResult(admission.m_JobId) &&
+					!runtime.GetNextControlDeadline() && probe.m_GraphExecutions == executions + 1,
+					"Resume renders normally without reviving an expired capture or its consumed receipt");
+			}
+			runtime.Shutdown();
+		}
+
 		void RunFrameOutcomeScenarios(SelfTestContext& checks, const std::filesystem::path& root)
 		{
 			for (const auto injection : { FrameEndInjection::Completed, FrameEndInjection::FatalFenced,
@@ -6225,6 +6273,7 @@ namespace gglab
 			("gglab-fault-lifecycle-" + std::to_string(GetCurrentProcessId()) + "-" +
 				std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
 		RunServicePublicationScenario(context, root / "service-publication");
+		RunControlDeadlineScenario(context, root / "control-deadline");
 		RunHostParameterScenario(context, root / "host-demo", false);
 		RunHostParameterScenario(context, root / "host-lab", true);
 		RunEffectiveParameterSettingsScenario(context, root / "tooling-host", false);

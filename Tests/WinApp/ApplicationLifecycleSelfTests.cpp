@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <format>
+#include <initializer_list>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -52,6 +53,11 @@ namespace gglab
 			application.m_LifecycleState = Application::LifecycleState::Running;
 			application.HandlePlatformEvent({ .m_Type = PlatformEventType::Suspended });
 			return application.m_AppRuntime->GetLifecycleState() == AppRuntimeLifecycleState::Suspended;
+		}
+
+		static void Resume(Application& application) noexcept
+		{
+			application.HandlePlatformEvent({ .m_Type = PlatformEventType::Resumed });
 		}
 	};
 
@@ -264,6 +270,62 @@ namespace gglab
 				context.Check(elapsed >= std::chrono::milliseconds(30) && elapsed < std::chrono::seconds(1),
 					"An abandoned suspended automation session wakes at its idle deadline without pipe traffic");
 			}
+
+			auto developerInfo = MakeCreateInfo(std::make_unique<SuspendedPlatformHost>());
+			developerInfo.m_SessionId = std::format("developer-{}", GetCurrentProcessId());
+			developerInfo.m_SessionLifetime = ApplicationSessionLifetime::Developer;
+			developerInfo.m_IdleTimeoutSeconds = 0.04;
+			const auto developerPipe = L"\\\\.\\pipe\\gglab-session-" +
+				std::wstring(developerInfo.m_SessionId.begin(), developerInfo.m_SessionId.end());
+			Application developer(std::move(developerInfo));
+			const bool developerStarted = ApplicationLifecycleTestAccess::StartSuspended(developer);
+			context.Check(developerStarted, "The developer-lifetime fixture starts suspended");
+			if (developerStarted)
+			{
+				Json developerStatus;
+				std::thread attached([&]()
+					{
+						std::this_thread::sleep_for(std::chrono::milliseconds(120));
+						developerStatus = Json::parse(RequestSession(developerPipe, "status"), nullptr, false);
+						GGLAB_UNUSED(RequestSession(developerPipe, "stop"));
+					});
+				developer.Run();
+				developer.Shutdown();
+				attached.join();
+				context.Check(developerStatus.is_object() && developerStatus.value("ok", false) &&
+					developerStatus["session"]["lifetime"] == "developer" &&
+					developerStatus["session"]["idleTimeoutSeconds"].is_null() &&
+					developerStatus["session"]["runtimeState"] == "suspended",
+					"Developer lifetime survives silence beyond the automation idle timeout and reports no idle expiry");
+			}
+		}
+
+		void RunRunningSessionLifetimeTests(SelfTestContext& context) noexcept
+		{
+			for (const auto lifetime : { ApplicationSessionLifetime::Automation,
+				ApplicationSessionLifetime::Developer })
+			{
+				auto host = std::make_unique<SuspendedPlatformHost>();
+				const auto* platform = host.get();
+				auto info = MakeCreateInfo(std::move(host));
+				info.m_SessionId = std::format("running-{}-{}", GetCurrentProcessId(),
+					lifetime == ApplicationSessionLifetime::Developer);
+				info.m_SessionLifetime = lifetime;
+				info.m_IdleTimeoutSeconds = 0.04;
+				info.m_Hidden = true;
+				Application application(std::move(info));
+				const bool started = ApplicationLifecycleTestAccess::StartSuspended(application);
+				context.Check(started, "The running-lifetime fixture starts without GPU services");
+				if (started)
+				{
+					ApplicationLifecycleTestAccess::Resume(application);
+					application.Run();
+					context.Check(platform->IsQuitRequested() ==
+						(lifetime == ApplicationSessionLifetime::Developer),
+						"Without IPC, running automation idle-exits while developer lifetime awaits the host quit");
+				}
+				application.Shutdown();
+			}
 		}
 
 		void RunPlatformWakeTests(SelfTestContext& context) noexcept
@@ -298,6 +360,7 @@ namespace gglab
 	{
 		RunPlatformWakeTests(context);
 		RunSuspendedSessionTests(context);
+		RunRunningSessionLifetimeTests(context);
 		{
 			Application application(MakeCreateInfo(nullptr));
 			context.Check(

@@ -196,6 +196,19 @@ namespace gglab
 					session.m_Options.m_IdleTimeoutSeconds == 60.0 &&
 					parse({ "--session", "a" }).m_Options.m_IdleTimeoutSeconds == 900.0,
 					"Sessions take a pipe-safe id and an optional idle timeout");
+				const auto developer = parse({ "--session", "dev", "--session-lifetime", "developer" });
+				context.Check(developer.IsValid() &&
+					developer.m_Options.m_SessionLifetime == ApplicationSessionLifetime::Developer &&
+					parse({ "--session", "a", "--session-lifetime", "DeVeLoPeR" }).IsValid() &&
+					parse({ "--session", "a" }).m_Options.m_SessionLifetime == ApplicationSessionLifetime::Automation &&
+					parse({ "--session", "a", "--session-lifetime", "automation", "--idle-timeout", "1" }).IsValid(),
+					"Developer lifetime is explicit and legacy sessions retain automation lifetime");
+				context.Check(!parse({ "--session-lifetime", "developer" }).IsValid() &&
+					!parse({ "--session", "a", "--session-lifetime", "unknown" }).IsValid() &&
+					!parse({ "--session", "a", "--session-lifetime", "developer", "--idle-timeout", "1" }).IsValid() &&
+					!parse({ "--session", "a", "--idle-timeout", "1", "--session-lifetime", "developer" }).IsValid() &&
+					!parse({ "--session", "a", "--session-lifetime", "developer", "--session-lifetime", "automation" }).IsValid(),
+					"Orphan, duplicate and conflicting lifetime options reject in either argument order");
 				context.Check(!parse({ "--session", "bad id" }).IsValid() &&
 					!parse({ "--session", "bad/id" }).IsValid() &&
 					!parse({ "--session", std::string(65, 'a') }).IsValid() &&

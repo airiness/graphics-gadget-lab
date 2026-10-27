@@ -1,5 +1,6 @@
 #pragma once
 #include "Application/Control/ApplicationControlParameters.h"
+#include "Application/Control/ApplicationSessionLifetime.h"
 #include "Capture/CaptureJobTypes.h"
 #include "Capture/CapturePlan.h"
 #include "Capture/FrameSequenceCoordinator.h"
@@ -93,6 +94,8 @@ namespace gglab
 		double m_UptimeSeconds = 0.0;
 		bool m_Hidden = false;
 		AppRuntimeLifecycleState m_RuntimeState = AppRuntimeLifecycleState::Uninitialized;
+		ApplicationSessionLifetime m_Lifetime = ApplicationSessionLifetime::Automation;
+		std::optional<double> m_IdleTimeoutSeconds = 900.0;
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
 		CaptureIntakeSnapshot m_CaptureIntake;

@@ -203,6 +203,7 @@ int main(int argc, char* argv[])
 	createInfo.m_Hidden = launchResult.m_Options.m_Hidden;
 	createInfo.m_SessionId = launchResult.m_Options.m_SessionId.value_or(std::string{});
 	createInfo.m_IdleTimeoutSeconds = launchResult.m_Options.m_IdleTimeoutSeconds;
+	createInfo.m_SessionLifetime = launchResult.m_Options.m_SessionLifetime;
 	createInfo.m_CaptureOnReady = gglab::TranslateCaptureOnReadyOptions(launchResult.m_Options);
 	if (launchResult.m_Options.m_CaptureOnReady)
 	{

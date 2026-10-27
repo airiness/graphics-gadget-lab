@@ -446,6 +446,9 @@
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Control\ApplicationControlProtocol.h">
       <Filter>Application\Control</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Control\ApplicationSessionLifetime.h">
+      <Filter>Application\Control</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Demo\CoastalSceneCameraPaths.h">
       <Filter>Application\Demo</Filter>
     </ClInclude>
