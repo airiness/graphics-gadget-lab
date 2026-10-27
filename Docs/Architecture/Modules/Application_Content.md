@@ -2,7 +2,7 @@
 
 - Question: which application module owns frame orchestration and content hosting,
   and where are its interfaces?
-- VerifiedAgainst: `96ba1316b36a31bb1a983b0cf5719b55cc4427fa`
+- VerifiedAgainst: `e4efde1cd33bdc37be3c1652d0f16a23e4acf060`
 - Refresh triggers: a card's source owner, Public interface, lifetime, linked
   contract or owning tests change.
 
@@ -13,7 +13,9 @@ Atlas ID: atlas.application.frame-orchestration
 
 - **Source owner:** `GGLabAppRuntime`, under `Sources/GGLabAppRuntime`.
 - **Responsibility:** begin, build, validate, execute and end each frame, then send
-  host-level feedback. WinAppHost calls in through `GGLabAppRuntime::Tick`.
+  host-level feedback. WinAppHost calls in through `GGLabAppRuntime::Tick` and
+  services [control deadlines](../Runtime_Control_Map.md#session-servicing) without
+  frames through `GetNextControlDeadline` / `ServiceControlDeadlines`.
 - **Public interface:** [GGLabAppRuntime.h](../../../Sources/GGLabAppRuntime/GGLabAppRuntime.h).
 - **Implementation:** [TickFrame](../../../Sources/GGLabAppRuntime/GGLabAppRuntimeFrame.cpp)
   and [InitializeServices / Shutdown](../../../Sources/GGLabAppRuntime/GGLabAppRuntimeServices.cpp).

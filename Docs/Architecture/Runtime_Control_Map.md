@@ -3,7 +3,7 @@ Atlas ID: atlas.application.runtime-control
 
 - Question: who writes Host view overrides, how is the display view resolved, and
   which existing evidence ties a captured frame to that state?
-- VerifiedAgainst: `cdcb3caddffb1fb85f2c227ed262887f3b0ec654`
+- VerifiedAgainst: `e4efde1cd33bdc37be3c1652d0f16a23e4acf060`
 - Refresh triggers: Host parameter bindings or writers, tooling snapshot inputs,
   content continuation, display-view precedence, capture issue order, provenance
   or owning regression targets change.
@@ -26,10 +26,18 @@ These owners are declared in the [AppRuntime](../../Projects/GGLabAppRuntime/GGL
 ## Session servicing
 
 The Host pipe server wakes the platform owner when a request is queued. While
-AppRuntime is Suspended, Application answers control requests and evaluates the
-automation idle deadline without ticking a frame. The platform wait observes
-both window events and the next control deadline. `status.session.runtimeState`
-reports the live AppRuntime lifecycle state. Stop follows normal shutdown.
+AppRuntime is Suspended, Application answers control requests and calls
+`ServiceControlDeadlines` without ticking a frame. `GetNextControlDeadline`
+supplies the capture deadline to the platform wait alongside window events and
+the automation idle deadline. Developer lifetime has no idle exit.
+`status.session` reports `runtimeState`, `lifetime` and nullable
+`idleTimeoutSeconds`. Stop follows normal shutdown.
+
+Predicate captures have one admission-time deadline of 1–300000 ms, defaulting
+to 300000 ms. Readiness, settling, capacity waits and retries share it. An issued
+frame settles first; successful submission ends the deadline. Otherwise expiry
+returns `FrameSelectionExpired`, releases active-job capacity and retains the
+terminal receipt until consumption. Issued Runtime work drains normally.
 
 ## Host override writers
 
@@ -256,7 +264,7 @@ omit culled passes and the execution record. The Temporal AA resolve pass is
 | [Invoke-TaaComparison.ps1](../../Scripts/Verification/Invoke-TaaComparison.ps1), native suite `taa-comparison` | Static Native-pinned TAA A/B orchestration, comparison policy, SameFrame bundle validation and submitted restoration proof; operational syntax in [captures](../../.agents/skills/gglab-frame-capture/references/captures.md#guarded-taa-comparison) |
 | [TestVerificationSupport.ps1](../../Tests/Verification/TestVerificationSupport.ps1), suite `verification-support` | Session client run binding, result polling and input errors |
 | [Capture bundle](../../Scripts/Verification/ValidateCaptureBundles.py), [graph](../../Scripts/Verification/ValidateRenderGraphExports.py) and [parameter-frame](../../Scripts/Verification/ValidateParameterFrames.py) validators | Persisted schemas and provenance |
-| Native suites in [RunVerification.ps1](../../Tests/Verification/RunVerification.ps1) | `protected-assignments`, `session-host-parameters`, `session-parameters`, `sequence-parameter-events`, `session-rebuild-parameters`, `capture-jobs` |
+| Native suites in [RunVerification.ps1](../../Tests/Verification/RunVerification.ps1) | `session-lifecycle`, `protected-assignments`, `session-host-parameters`, `session-parameters`, `sequence-parameter-events`, `session-rebuild-parameters`, `capture-jobs` |
 
 `GGLabAppRuntimeTests` runs as a whole executable without a suite selector. Windows
 host cases belong in `WinAppTests`; the product executable has no regression entry.
@@ -281,6 +289,9 @@ Anchors:
   - Scripts/Verification/CompareCaptures.ps1
   - Scripts/Verification/Invoke-TaaComparison.ps1
   - Scripts/Verification/TaaComparison.policy.json
+  - Sources/GGLabAppRuntime/GGLabAppRuntimeServices.cpp::ServiceControlDeadlines
+  - Sources/WinAppHost/Application/Application.cpp::WaitWhileSuspended
+  - Sources/WinAppHost/Application/Platform/Windows/Win32PlatformHost.cpp::WaitForEvents
 ReviewPaths:
   - Sources/GGLabAppRuntime/Parameters/*
   - Sources/GGLabAppRuntime/Lab/LabParameter.*
@@ -303,6 +314,8 @@ ReviewPaths:
   - Sources/WinAppHost/Application/Control/ApplicationControlParameters.cpp
   - Sources/WinAppHost/Application/Control/ApplicationControlProtocol.cpp
   - Sources/WinAppHost/DevTools/DevToolsRuntime.*
+  - Sources/WinAppHost/Application/Platform/Windows/Win32NamedPipeServer.*
+  - Sources/WinAppHost/Application/Platform/Windows/Win32PlatformHost.*
   - Scripts/Verification/GGLabSession.ps1
   - Projects/GGLabAppRuntime/GGLabAppRuntime.vcxproj
   - Projects/WinAppHost/WinAppHost.vcxproj
@@ -311,8 +324,10 @@ ReviewPaths:
   - Tests/GGLabAppRuntime/GpuFaultLifecycleSelfTests.cpp
   - Tests/GGLabAppRuntime/FrameCaptureCoordinatorSelfTests.cpp
   - Tests/WinApp/ApplicationControlSelfTests.cpp
+  - Tests/WinApp/ApplicationLifecycleSelfTests.cpp
   - Tests/WinApp/DevToolsViewProfileSelfTests.cpp
   - Tests/Verification/TestHostParameters.ps1
+  - Tests/Verification/TestSessionLifecycle.ps1
   - Tests/Verification/TestProtectedAssignments.ps1
   - Tests/Verification/TestVerificationSupport.ps1
   - Scripts/Verification/ValidateCaptureBundles.py

@@ -34,6 +34,13 @@ try {
     $missingStop = Stop-VerificationSession $missingSession -AllowFailure
     Check (-not $missingStop.ok -and $missingStop.session -eq $missingSession -and
         $missingStop.error -match 'not running') 'real-session-client-reports-missing-session-as-json'
+    $missingAttach = Invoke-VerificationSession attach $missingSession -AllowFailure
+    Check (-not $missingAttach.ok -and $missingAttach.error -match 'not running') 'attach-transport-failure-remains-json'
+    $conflict = Invoke-VerificationScript (Join-Path $root 'Scripts/Verification/GGLabSession.ps1') @{
+        Command='start';Session=$missingSession;SessionLifetime='developer';IdleTimeout=1 }
+    $conflictResult = $conflict.output | ConvertFrom-Json
+    Check ($conflict.exitCode -eq 1 -and -not $conflictResult.ok -and
+        $conflictResult.error -match 'cannot specify -IdleTimeout') 'developer-launch-rejects-explicit-idle-timeout'
     # Exercise the real waiting client with deterministic transport outcomes.
     & {
         $tokens = $null; $parseErrors = $null
@@ -354,6 +361,7 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
         'taa-comparison' = 'TestTaaComparison.ps1'
         'session-parameters' = 'TestSessionParameters.ps1'
         'capture-jobs' = 'TestCaptureJobs.ps1'
+        'session-lifecycle' = 'TestSessionLifecycle.ps1'
         'capture-on-ready' = 'TestCaptureOnReady.ps1'
         'pass-profile-identity' = 'TestPassProfileIdentity.ps1'
         'graph-allocation-facts' = 'TestGraphAllocationFacts.ps1'
@@ -383,6 +391,8 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
     }
     Check (($gpuResult.suites | Where-Object name -eq 'taa-comparison').steps[0].receipt.python -eq
         'fixture-python-path') 'runner-forwards-selected-python-to-taa-workflow'
+    Check (($gpuResult.suites | Where-Object name -eq 'session-lifecycle').steps[0].receipt.python -eq
+        'fixture-python-path') 'runner-forwards-selected-python-to-session-lifecycle'
     $unused = Join-Path $output 'must-not-create'
     $list = Invoke-VerificationScript $runner @{ List=$true; OutputDirectory=$unused }
     $items = $list.output | ConvertFrom-Json
