@@ -165,23 +165,16 @@ stamp and `hostView` in their [`control`](session-jobs.md#frame-provenance) reco
 
 ### GUI observations
 
-The TAA, Ambient Occlusion and Post Processing Inspectors expose a read-only
-**Display-view control** section. It separates inherited values/sources, exact
-Host override presence/value, Host-resolved values and the current planned frame
-after sequence/reference masks. Equal-value pins still mask inheritance.
-The Camera Inspector shows this exposure observation only for the display camera;
-other cameras keep their independent authored exposure.
+In the TAA, Ambient Occlusion and Post Processing Inspectors, **Display-view
+control (read only)** shows inherited and Host-resolved values/sources, explicit
+pins and the current planned frame after sequence/reference masks. Equal-value
+pins still mask inheritance. The Camera Inspector shows exposure observations
+only for the display camera.
 
-The previous frame carries its own serial, outcome and run/content/revision.
-Planned/aborted is not submitted-frame evidence; aborted does not certify that no
-GPU work ran. Submitted does not prove GPU completion or pass execution.
-Temporal consumer state is separate from an enabled setting.
-Pending GUI edits enter a later tick and do not change either frozen observation.
-Missing evidence is shown as unavailable. These observations do not enable lazy
-parameter tracking or change capture settling.
-
-GUI edits still use the tooling/camera layer. Host override release is not yet a
-GUI action; use `host-view-overrides` below when removal is required.
+The previous frame has its own identity and planned/submitted/aborted outcome;
+it is not a live-state query. GUI edits stay in the tooling/camera layer and enter
+a later tick. To remove a Host override, use
+[`host-view-overrides`](#guarded-exact-override-states).
 
 ### Guarded exact override states
 

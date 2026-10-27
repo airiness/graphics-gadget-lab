@@ -59,21 +59,16 @@ The Deferred `environment.profile` source and Lab authoring affect inherited val
 
 ### GUI observation
 
-AppRuntime builds an owned [ViewControlSnapshot](../../Sources/GGLabAppRuntime/Parameters/ViewControlSnapshot.h)
-before replacing the capture coordinator's previous frame. The tooling frame
-context lends it read-only for Draw. It carries inherited values, Host-resolved
-values before masks, the current planned frame and the previous frame's own
-outcome, control identity, values and temporal consumers. Observation does not
-enable parameter tracking or advance revisions.
+AppRuntime supplies an owned, read-only
+[ViewControlSnapshot](../../Sources/GGLabAppRuntime/Parameters/ViewControlSnapshot.h)
+for each tooling Draw. It separates inherited values/sources, exact Host override
+presence/value, Host-resolved values and the current frame plan after masks.
+The previous frame retains its own control stamp, outcome and temporal consumers.
+Observation leaves parameter tracking and revisions unchanged.
 
 [View control widgets](../../Sources/WinAppHost/DevTools/DevelopGui/ViewControlWidgets.cpp)
-show TAA/GTAO and display-view exposure provenance, equal-value pins and
-Host/sequence/reference masking. The Camera Inspector distinguishes the inspected
-camera from the display view. Pending GUI edits enter a later tick; a planned or
-aborted frame is not submitted evidence, and submission is not GPU completion or
-pass-execution proof. Aborted does not certify that no GPU work ran. Missing
-observations remain unavailable. Host override release is not a GUI action yet;
-existing tooling/camera write paths remain unchanged.
+expose TAA/GTAO and display-view exposure provenance and masking. The Camera
+Inspector distinguishes the inspected camera from the display view.
 
 ## Protected Lab/profile assignments
 
