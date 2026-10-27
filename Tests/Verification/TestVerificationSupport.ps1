@@ -41,6 +41,103 @@ try {
     $conflictResult = $conflict.output | ConvertFrom-Json
     Check ($conflict.exitCode -eq 1 -and -not $conflictResult.ok -and
         $conflictResult.error -match 'cannot specify -IdleTimeout') 'developer-launch-rejects-explicit-idle-timeout'
+    # Exercise the production startup path without launching a process. A same-name
+    # replacement must never acquire created ownership or receive cleanup commands.
+    & {
+        $tokens = $null; $parseErrors = $null
+        $ast = [Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $root 'Scripts/Verification/GGLabSession.ps1'), [ref]$tokens, [ref]$parseErrors)
+        foreach ($name in @('Get-Field', 'Fail')) {
+            $definition = $ast.Find({ param($node)
+                $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name
+            }, $true)
+            . ([scriptblock]::Create($definition.Extent.Text))
+        }
+        $commandSwitch = $ast.Find({ param($node)
+            $node -is [Management.Automation.Language.SwitchStatementAst] -and
+                $node.Condition.Extent.Text -eq '$Command'
+        }, $true)
+        $startClause = @($commandSwitch.Clauses | Where-Object { $_.Item1.Value -eq 'start' })[0].Item2
+        $body = $startClause.Extent.Text.Trim()
+        $startBlock = [scriptblock]::Create($body.Substring(1, $body.Length - 2))
+        $RepositoryRoot = Join-Path $output 'startup-client'
+        $configurationDirectory = Join-Path $RepositoryRoot 'Build/Output/x64/Develop'
+        $null = New-Item -ItemType Directory -Path $configurationDirectory -Force
+        [IO.File]::WriteAllText((Join-Path $configurationDirectory 'GraphicsGadgetLab.exe'), '')
+        $SessionLifetime='automation'; $Configuration='Develop'; $Rhi='dx12'
+        $IdleTimeout=900; $StartTimeoutSeconds=5; $Lab=$null; $Demo=$null; $WindowSize=$null
+        $Visible=$false; $WatchNonFinite=$false; $Validation=$null; $LabParameters=@()
+        $NoDevTools=$false; $StateRoot=$null
+        function Test-SessionPipe { return $false }
+        function Get-SessionDirectory([string]$Id) { return Join-Path $RepositoryRoot $Id }
+        function Start-Process { return $state.process }
+        function Read-SharedText { return 'session-ready: startup-fixture' }
+        function Invoke-SessionRequest([string]$Id, [hashtable]$Request, [int]$ResponseTimeoutSeconds) {
+            $state.commands += $Request.command
+            $state.queryHadHandle = $state.process.handleRetained
+            if ($state.scenario -eq 'lost-status') { throw 'lost startup status response' }
+            if ($state.scenario -eq 'exited-during-query') { $state.process.HasExited=$true }
+            return $state.status
+        }
+        function Write-Result([hashtable]$Result, [int]$ExitCode = 0) {
+            $state.result=$Result; $state.exitCode=$ExitCode
+            throw 'StartupFixtureComplete'
+        }
+        foreach ($scenario in @('matching', 'replacement-pid', 'missing-pid', 'other-session',
+            'missing-run', 'malformed-run', 'non-string-run', 'rejected-status', 'lost-status',
+            'exited-during-query', 'cleanup-failure')) {
+            $Session = "startup-$scenario"
+            $state = @{ scenario=$scenario;commands=@();queryHadHandle=$false;result=$null;exitCode=$null
+                process=[pscustomobject]@{ Id=4242;HasExited=$false;handleRetained=$false;killed=$false
+                    cleanupFails=($scenario -eq 'cleanup-failure') }
+                status=[pscustomobject]@{ ok=$true;session=[pscustomobject]@{id=$Session;pid=4242}
+                    environment=[pscustomobject]@{process=[pscustomobject]@{runIdentity=('a'*32)}} } }
+            $state.process | Add-Member ScriptProperty Handle {
+                $this.handleRetained=$true
+                return [IntPtr]1
+            }
+            $state.process | Add-Member ScriptMethod Kill {
+                if (-not $this.handleRetained) { throw 'Cleanup lost the created process handle.' }
+                if ($this.cleanupFails) { throw 'Created process cleanup failed.' }
+                $this.killed=$true; $this.HasExited=$true
+            }
+            switch ($scenario) {
+                'replacement-pid' { $state.status.session.pid=9001 }
+                'missing-pid' { $state.status.session.PSObject.Properties.Remove('pid') }
+                'other-session' { $state.status.session.id='another-session' }
+                'missing-run' { $state.status.environment.process.runIdentity=$null }
+                'malformed-run' { $state.status.environment.process.runIdentity='NOT-A-RUN' }
+                'non-string-run' { $state.status.environment.process.runIdentity=1234 }
+                'rejected-status' { $state.status.ok=$false }
+                'cleanup-failure' { $state.status.session.pid=9001 }
+            }
+            try { . $startBlock }
+            catch { if ($_.Exception.Message -ne 'StartupFixtureComplete') { throw } }
+            $recordPath = Join-Path (Get-SessionDirectory $Session) 'session.json'
+            Check ($state.queryHadHandle -and $state.commands.Count -eq 1 -and
+                $state.commands[0] -eq 'status') "startup-$scenario-uses-created-handle-and-query-only"
+            if ($scenario -eq 'matching') {
+                $saved = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
+                Check ($state.exitCode -eq 0 -and $state.result.ok -and -not $state.process.killed -and
+                    $state.result.ownership -eq 'created' -and $state.result.pid -eq 4242 -and
+                    $state.result.runIdentity -eq ('a'*32) -and $saved.runIdentity -eq ('a'*32)) `
+                    'startup-matching-live-process-confirms-created-ownership'
+            } else {
+                Check ($state.exitCode -eq 1 -and -not $state.result.ok -and
+                    $state.result.errorCode -eq 'StartIdentityUnconfirmed' -and
+                    $null -eq $state.result.runIdentity -and -not $state.result.ContainsKey('ownership') -and
+                    $state.result.pid -eq 4242 -and -not (Test-Path -LiteralPath $recordPath)) `
+                    "startup-$scenario-grants-no-run-ownership-or-record"
+                if ($scenario -eq 'cleanup-failure') {
+                    Check (-not $state.process.killed -and $state.result.cleanupError -match
+                        'Created process cleanup failed') 'startup-cleanup-failure-retains-recovery-error'
+                } else {
+                    Check ($state.process.killed -eq ($scenario -ne 'exited-during-query')) `
+                        "startup-$scenario-cleans-up-only-live-created-process"
+                }
+            }
+        }
+    }
     # Exercise the real waiting client with deterministic transport outcomes.
     & {
         $tokens = $null; $parseErrors = $null

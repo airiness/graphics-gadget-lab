@@ -19,6 +19,8 @@ with errorCode ExpectedRunChanged and changes nothing.
 
 Commands:
   start    Launch a session (hidden by default) and wait until it accepts requests.
+           Confirms its run identity belongs to the live created process before
+           reporting created ownership; an unconfirmed start cleans up only that process.
            -SessionLifetime developer disables automation idle expiry.
            -LabParameters "id=value",... sets startup Lab parameters (Debug and Develop builds).
            -Validation off|standard|gpu overrides validation (gpu: DX12 only).
@@ -552,6 +554,9 @@ switch ($Command) {
         # inherits nothing; the session writes its own output log.
         $process = Start-Process -FilePath $executable -ArgumentList $arguments `
             -WorkingDirectory (Split-Path -Parent $executable) -WindowStyle Hidden -PassThru
+        # Retain the created process handle for identity checks and failure cleanup;
+        # neither cleanup nor ownership may target a replacement found by session name.
+        $null = $process.Handle
         $deadline = (Get-Date).AddSeconds($StartTimeoutSeconds)
         $ready = $false
         while ((Get-Date) -lt $deadline) {
@@ -563,7 +568,7 @@ switch ($Command) {
             Start-Sleep -Milliseconds 200
         }
         if (-not $ready) {
-            if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
+            if (-not $process.HasExited) { $process.Kill() }
             $tail = @()
             $tail = @((Read-SharedText $outputLog) -split "`r?`n" | Select-Object -Last 20)
             Fail "Session '$Session' did not become ready." @{
@@ -571,14 +576,34 @@ switch ($Command) {
                 exitCode = $(if ($process.HasExited) { $process.ExitCode } else { $null })
             }
         }
-        # The run identity lets later commands reject a restarted session with this name.
+        # Bind the queried run to the created process before granting created ownership.
+        # Readiness alone cannot exclude replacement while the status query is in flight.
         $runIdentity = $null
         try {
-            $environment = Get-Field (Invoke-SessionRequest $Session @{ command = 'status' } 30) 'environment'
+            $status = Invoke-SessionRequest $Session @{ command = 'status' } 30
+            $identity = Get-Field $status 'session'
+            $environment = Get-Field $status 'environment'
             $runIdentity = Get-Field (Get-Field $environment 'process') 'runIdentity'
+            if ((Get-Field $status 'ok') -ne $true -or
+                (Get-Field $identity 'id') -cne $Session -or
+                (Get-Field $identity 'pid') -ne $process.Id -or
+                $runIdentity -isnot [string] -or $runIdentity -cnotmatch '^[0-9a-f]{32}$' -or
+                $process.HasExited) {
+                throw 'Status did not confirm a valid run identity for the live created process.'
+            }
         }
         catch {
-            $runIdentity = $null
+            $identityError = $_.Exception.Message
+            $cleanupError = $null
+            try {
+                if (-not $process.HasExited) { $process.Kill() }
+            }
+            catch { $cleanupError = $_.Exception.Message }
+            Fail "Session '$Session' could not confirm startup ownership: $identityError" @{
+                session = $Session; pid = $process.Id; directory = $sessionDirectory
+                outputLog = $outputLog; runIdentity = $null
+                errorCode = 'StartIdentityUnconfirmed'; cleanupError = $cleanupError
+            }
         }
         $record = @{
             session = $Session; pid = $process.Id; rhi = $Rhi; arguments = $arguments
