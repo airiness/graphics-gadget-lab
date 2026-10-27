@@ -1,7 +1,7 @@
 # Runtime Control and Frame Evidence
 Atlas ID: atlas.application.runtime-control
 
-- VerifiedAgainst: `e4efde1cd33bdc37be3c1652d0f16a23e4acf060`
+- VerifiedAgainst: `811373cb8ee28874fe4101bf5e33c01b3237b47d`
 
 This map connects session requests, resolved display settings and captured-frame
 state. Frame execution and settlement are in the [frame map](Frame_Execution_Map.md).

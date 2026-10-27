@@ -75,6 +75,19 @@ Transport failures still print one JSON error result and exit 1.
 A session name and its numeric handles can be reused after a process restart.
 `start.runIdentity` and `status.environment.process.runIdentity` identify the run.
 
+Before returning `ownership: created`, `start` retains the launched process handle
+and confirms that a successful status response names the same session and PID,
+contains a valid run identity, and still belongs to a live created process.
+Readiness alone does not establish that ownership.
+
+If startup status cannot confirm it, the client returns
+`errorCode: StartIdentityUnconfirmed`, `runIdentity: null` and no creation ownership,
+without writing a new `session.json` record. It attempts to terminate only the
+created process through its retained handle, never by sending `stop` to the named
+endpoint. A non-null `cleanupError` means that cleanup failed; inspect the returned
+PID and output log before explicit recovery. Do not adopt a replacement run from
+a later status query as a process this workflow created.
+
 | Request | Run binding |
 | --- | --- |
 | Commands listed in `status.capabilities.runIdentityChecks.commands` | Pass `-ExpectedRunIdentity` from the intended run. |
