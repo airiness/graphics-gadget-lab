@@ -359,7 +359,7 @@ namespace gglab
 
 	void GTAOInspectorPanel::Draw(DevelopGuiContext& context) noexcept
 	{
-		devtools::DrawViewControlSnapshot(context.m_ViewControl, "view.gtao.");
+		devtools::DrawViewControlSnapshot(context.m_ViewControl, context.m_ViewControlActions, "view.gtao.");
 		if (!context.m_Diagnostics)
 		{
 			ImGui::TextDisabled("GTAO diagnostics are unavailable.");

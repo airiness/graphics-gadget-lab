@@ -7,6 +7,7 @@
 #include "DevTools/DevelopGui/Panels/GTAOInspectorPanel.h"
 #include "DevTools/DevelopGui/Panels/PostProcessInspectorPanel.h"
 #include "Parameters/ViewControlSnapshot.h"
+#include "Parameters/ViewControlActions.h"
 #include "Capture/FrameCaptureCoordinator.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderingSettingsDiagnosticsSnapshot.h"
@@ -91,6 +92,24 @@ namespace gglab
 			std::string_view m_Path;
 			uint32_t& m_Draws;
 			std::string& m_WindowName;
+		};
+
+		class ReleaseControlProbe final : public ViewControlActionsBase
+		{
+		public:
+			ViewOverrideReleaseStatus m_Status;
+			uint32_t m_Requests = 0;
+			LabParameterType m_Type = LabParameterType::Float;
+			bool ReleaseOverride(const HostViewControlStamp& expected,
+				const LabParameterId& parameter, LabParameterType type) noexcept override
+			{
+				++m_Requests;
+				m_Type = type;
+				m_Status = { .m_Parameter = parameter, .m_Expected = expected,
+					.m_Batch = ParameterBatchStatus{ .m_BatchId = 17 } };
+				return true;
+			}
+			const ViewOverrideReleaseStatus& GetReleaseStatus() const noexcept override { return m_Status; }
 		};
 
 		void RunViewControlPanelChecks(SelfTestContext& context) noexcept
@@ -203,6 +222,61 @@ namespace gglab
 			context.Check(missing.find("Previous frame observation unavailable") != std::string::npos &&
 				missing.find("Temporal consumer observation unavailable") != std::string::npos,
 				"Missing prior frame and consumer evidence remain explicitly unavailable");
+			ReleaseControlProbe release;
+			gui.m_ViewControlActions = &release;
+			const auto activateRelease = [](const char* prefix, const char* parameter)
+				{
+					const auto window = ImHashStr("ViewControlFixture");
+					const auto scope = ImHashStr(prefix, 0, window);
+					const auto table = ImHashStr("ViewControlValues", 0, scope);
+					const auto row = ImHashStr(parameter, 0, table);
+					ImGui::ActivateItemByID(ImHashStr("Release override", 0, row));
+				};
+			activateRelease("view.taa.", "view.taa.enabled");
+			GGLAB_UNUSED(draw(taa, "view.taa."));
+			context.Check(release.m_Requests == 1 && release.m_Status.m_Expected == observation.m_Control &&
+				release.m_Status.m_Parameter == LabParameterId("view.taa.enabled") && release.m_Type == LabParameterType::Bool &&
+				std::get<bool>(*observation.m_HostView.front().m_Override) &&
+				devTools.GetViewRenderSettingsOverrides().GetActiveCount() == 0,
+				"The real Release button submits the displayed complete stamp and field type without editing Host/tooling observations");
+			activateRelease("view.taa.", "view.taa.enabled");
+			const auto pending = draw(taa, "view.taa.");
+			context.Check(release.m_Requests == 1 && pending.find("pending") != std::string::npos,
+				"Pending release disables repeated activation rather than adding a GUI FIFO");
+			release.m_Status.m_Batch->m_State = ParameterBatchState::Finished;
+			release.m_Status.m_Batch->m_HostViewOperation = HostViewOverrideOperation{
+				.m_Expected = observation.m_Control, .m_After = observation.m_Control };
+			release.m_Status.m_Batch->m_Items = { { .m_State = ParameterEffectState::NoChange } };
+			const auto noChange = draw(taa, "view.taa.");
+			context.Check(noChange.find("Control committed") != std::string::npos &&
+				noChange.find("Effect: NoChange") != std::string::npos &&
+				noChange.find("First consumed in submitted frame") == std::string::npos,
+				"GUI separates a structural control commit from NoChange and never invents submitted evidence");
+			release.m_Status.m_Batch.reset();
+			release.m_Status.m_Error = "Busy: consume the previous parameter batch result first.";
+			release.m_Status.m_BlockingOwner = ParameterBatchOwner{};
+			const auto busy = draw(taa, "view.taa.");
+			context.Check(busy.find("Busy:") != std::string::npos && busy.find("Blocking owner: external") != std::string::npos,
+				"Release admission rejection shows Busy and the blocking owner");
+			release.m_Status.m_Error.clear();
+			release.m_Status.m_BlockingOwner.reset();
+			activateRelease("view.gtao.", "view.gtao.radius");
+			GGLAB_UNUSED(draw(gtao, "view.gtao."));
+			context.Check(release.m_Requests == 2 && release.m_Status.m_Parameter == LabParameterId("view.gtao.radius") &&
+				release.m_Type == LabParameterType::Float, "GTAO Release uses the same typed action capability");
+			release.m_Status.m_Batch.reset();
+			activateRelease("view.exposure.", "view.exposure.ev100");
+			GGLAB_UNUSED(draw(exposure, "view.exposure."));
+			context.Check(release.m_Requests == 3 && release.m_Status.m_Parameter == LabParameterId("view.exposure.ev100") &&
+				release.m_Type == LabParameterType::Float, "Exposure Release targets the displayed view rather than authoring the camera");
+			release.m_Status.m_Batch.reset();
+			activateRelease("view.taa.", "view.taa.resolution_preset");
+			GGLAB_UNUSED(draw(taa, "view.taa."));
+			context.Check(release.m_Requests == 3, "An absent override has no active Release button");
+			gui.m_ViewControlActions = nullptr;
+			activateRelease("view.taa.", "view.taa.enabled");
+			GGLAB_UNUSED(draw(taa, "view.taa."));
+			context.Check(release.m_Requests == 3, "A missing action capability leaves observations read-only");
 			gui.m_ViewControl = nullptr;
 			const auto unavailable = draw(taa, "view.taa.");
 			context.Check(unavailable.find("Display-view control observation unavailable") != std::string::npos &&

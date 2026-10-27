@@ -10,6 +10,7 @@
 #include "Parameters/HostViewParameters.h"
 #include "Parameters/ParameterBatch.h"
 #include "Parameters/ParameterRequest.h"
+#include "Parameters/ViewControlActions.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
 #include "GGLabRuntime/Graphics/RenderServicesView.h"
@@ -267,6 +268,7 @@ namespace gglab
 		[[nodiscard]] uint64_t RequestParameters(const ParameterRequest& request, std::string& error) noexcept;
 		[[nodiscard]] std::optional<ParameterBatchStatus> TakeParameterBatchResult(uint64_t id) noexcept;
 		[[nodiscard]] const ParameterBatchStatus* GetExternalParameterBatchStatus() const noexcept;
+		[[nodiscard]] ViewControlActionsBase& GetViewControlActions() noexcept { return m_ToolingViewControl; }
 		// Created once with runtime services and shared by capture artifacts and session
 		// control; empty before composition or when creation failed.
 		[[nodiscard]] const std::string& GetRunIdentity() const noexcept { return m_RunIdentity; }
@@ -296,6 +298,9 @@ namespace gglab
 		[[nodiscard]] AppRuntimeTickResult TickFrame(AppRuntimeTickInfo tickInfo) noexcept;
 		void CollectFrameCaptureResults() noexcept;
 		[[nodiscard]] bool CanAcceptSessionCommands() const noexcept;
+		friend class ToolingViewControl;
+		[[nodiscard]] uint64_t RequestParametersForOwner(const ParameterRequest& request,
+			std::string& error, ParameterBatchOwner owner) noexcept;
 		void SynchronizeContentBinding() noexcept;
 		void ReleaseContentBinding() noexcept;
 		[[nodiscard]] AppRuntimeServiceInitializeResult FailServiceInitialization(
@@ -339,6 +344,7 @@ namespace gglab
 		// Declared after the capture coordinator it submits to, so it is destroyed first.
 		std::unique_ptr<FrameSequenceCoordinator> m_FrameSequence;
 		std::unique_ptr<SessionParameterControl> m_ParameterControl;
+		ToolingViewControl m_ToolingViewControl;
 		// Frozen after content update; shared by parameters and this frame's planning.
 		uint64_t m_ActiveContentIdentity = 0;
 		// Results already routed to the sequence, awaiting host publication.

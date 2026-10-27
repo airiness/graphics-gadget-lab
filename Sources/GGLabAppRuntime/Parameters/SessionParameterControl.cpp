@@ -725,6 +725,11 @@ namespace gglab
 		return result;
 	}
 
+	std::optional<ParameterBatchOwner> SessionParameterControl::GetRetainedParameterOwner() const noexcept
+	{
+		return m_ParameterBatches.empty() ? std::nullopt : std::optional(m_ParameterBatches.front()->m_Owner);
+	}
+
 	bool SessionParameterControl::HasPendingParameterBatches() const noexcept
 	{
 		return std::ranges::any_of(m_ParameterBatches,

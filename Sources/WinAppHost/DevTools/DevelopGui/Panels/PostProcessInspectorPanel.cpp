@@ -258,7 +258,7 @@ namespace gglab
 
 	void PostProcessInspectorPanel::Draw(DevelopGuiContext& context) noexcept
 	{
-		devtools::DrawViewControlSnapshot(context.m_ViewControl, "view.exposure.");
+		devtools::DrawViewControlSnapshot(context.m_ViewControl, context.m_ViewControlActions, "view.exposure.");
 		auto* diagnostics = context.m_Diagnostics;
 		if (!diagnostics)
 		{

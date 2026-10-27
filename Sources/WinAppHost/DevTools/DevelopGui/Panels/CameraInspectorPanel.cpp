@@ -336,7 +336,7 @@ namespace gglab
 		if (!context.m_ViewControl ||
 			camera.m_RenderViewId == context.m_ViewControl->m_PlannedFrame.m_DisplayViewId)
 		{
-			devtools::DrawViewControlSnapshot(context.m_ViewControl, "view.exposure.");
+			devtools::DrawViewControlSnapshot(context.m_ViewControl, context.m_ViewControlActions, "view.exposure.");
 		}
 		else
 		{

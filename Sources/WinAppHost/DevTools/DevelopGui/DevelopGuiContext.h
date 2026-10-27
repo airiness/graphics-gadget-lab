@@ -38,6 +38,7 @@ namespace gglab
 	class DebugDrawChannelViewBase;
 	struct ViewRenderSettingsOverrides;
 	struct ViewControlSnapshot;
+	class ViewControlActionsBase;
 
 	class DevelopGuiStateStore;
 
@@ -76,6 +77,7 @@ namespace gglab
 		ViewRenderSettingsOverrides* m_ViewRenderSettingsOverrides = nullptr;
 		// Borrowed immutable AppRuntime snapshot for this draw only.
 		const ViewControlSnapshot* m_ViewControl = nullptr;
+		ViewControlActionsBase* m_ViewControlActions = nullptr;
 		DevelopGuiSystem* m_DevelopGuiSystem = nullptr;
 		DevelopGuiRegistry* m_PanelRegistry = nullptr;
 		// Borrowed from the active authoring owner for this draw.

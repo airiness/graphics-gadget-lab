@@ -320,7 +320,7 @@ namespace gglab
 
 	void TemporalAAInspectorPanel::Draw(DevelopGuiContext& context) noexcept
 	{
-		devtools::DrawViewControlSnapshot(context.m_ViewControl, "view.taa.");
+		devtools::DrawViewControlSnapshot(context.m_ViewControl, context.m_ViewControlActions, "view.taa.");
 		if (!context.m_Diagnostics)
 		{
 			ImGui::TextDisabled("Temporal AA diagnostics are unavailable.");

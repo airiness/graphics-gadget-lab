@@ -109,6 +109,9 @@
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\SessionParameterControl.cpp">
       <Filter>Parameters</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\ViewControlActions.cpp">
+      <Filter>Parameters</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\ViewControlSnapshot.cpp">
       <Filter>Parameters</Filter>
     </ClCompile>
@@ -234,6 +237,9 @@
       <Filter>Parameters</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\SessionParameterControl.h">
+      <Filter>Parameters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ViewControlActions.h">
       <Filter>Parameters</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ViewControlSnapshot.h">

@@ -5,11 +5,12 @@
 namespace gglab
 {
 	struct ViewControlSnapshot;
+	class ViewControlActionsBase;
 }
 
 namespace gglab::devtools
 {
-	// Read-only display-view observation; no parameter or tooling writes.
+	// Display-view observation with an optional guarded Host override release action.
 	void DrawViewControlSnapshot(const ViewControlSnapshot* snapshot,
-		std::string_view parameterPrefix) noexcept;
+		ViewControlActionsBase* actions, std::string_view parameterPrefix) noexcept;
 }

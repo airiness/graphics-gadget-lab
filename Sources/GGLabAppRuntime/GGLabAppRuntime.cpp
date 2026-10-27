@@ -146,6 +146,12 @@ namespace gglab
 
 	uint64_t GGLabAppRuntime::RequestParameters(const ParameterRequest& request, std::string& error) noexcept
 	{
+		return RequestParametersForOwner(request, error, {});
+	}
+
+	uint64_t GGLabAppRuntime::RequestParametersForOwner(const ParameterRequest& request,
+		std::string& error, ParameterBatchOwner owner) noexcept
+	{
 		const auto* expectedRun = request.m_Expected ?
 			&request.m_Expected->m_RunIdentity :
 			request.m_ExpectedDomain ?
@@ -168,7 +174,7 @@ namespace gglab
 		{
 			return 0;
 		}
-		return m_ParameterControl->RequestParameters(request, error);
+		return m_ParameterControl->RequestParameters(request, error, owner);
 	}
 
 	std::optional<ParameterControlStamp> GGLabAppRuntime::GetDomainControlStamp(ParameterControlDomain domain) const
@@ -199,7 +205,7 @@ namespace gglab
 		{
 			return;
 		}
-		const ParameterBatchOwner owner{ sequence->m_SequenceId };
+		const auto owner = ParameterBatchOwner::Sequence(sequence->m_SequenceId);
 		const auto publish = [&]()
 			{
 				const auto batches = m_ParameterControl->GetParameterBatchStatuses(owner);
@@ -250,6 +256,7 @@ namespace gglab
 				std::string_view{};
 			m_ParameterControl->SynchronizeContent(m_DemoManager->GetActiveDemo(),
 				m_ActiveContentIdentity, demoId, m_DemoManager->HasPendingActiveDemo());
+			m_ToolingViewControl.Update();
 			if (m_FrameSequence)
 			{
 				m_FrameSequence->OnContentBindingChanged(m_ActiveContentIdentity);

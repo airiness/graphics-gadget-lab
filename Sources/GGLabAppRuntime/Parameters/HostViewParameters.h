@@ -31,6 +31,7 @@ namespace gglab
 		std::string m_RunIdentity;
 		uint64_t m_ContentIdentity = 0;
 		uint64_t m_HostViewRevision = 0;
+		bool operator==(const HostViewControlStamp&) const noexcept = default;
 	};
 
 	// One exact Host view override state; the value is engaged exactly when present.

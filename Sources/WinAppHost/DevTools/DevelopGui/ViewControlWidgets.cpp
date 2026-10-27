@@ -1,6 +1,8 @@
 #include "DevTools/DevelopGui/ViewControlWidgets.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "Parameters/ViewControlSnapshot.h"
+#include "Parameters/ViewControlActions.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <algorithm>
 #include <format>
@@ -101,6 +103,89 @@ namespace gglab::devtools
 				consumer->m_Requested ? "true" : "false", consumer->m_DisableReason.c_str());
 		}
 
+		[[nodiscard]] const char* EffectName(ParameterEffectState state) noexcept
+		{
+			switch (state)
+			{
+			case ParameterEffectState::Requested:
+				return "Requested";
+			case ParameterEffectState::Applied:
+				return "Applied";
+			case ParameterEffectState::Published:
+				return "Published";
+			case ParameterEffectState::Consumed:
+				return "Consumed";
+			case ParameterEffectState::Superseded:
+				return "Superseded";
+			case ParameterEffectState::NoChange:
+				return "NoChange";
+			case ParameterEffectState::EffectNotReached:
+				return "EffectNotReached";
+			case ParameterEffectState::Failed:
+				return "Failed";
+			}
+			return "Unavailable";
+		}
+
+		void DrawReleaseStatus(const ViewControlActionsBase* actions, std::string_view prefix) noexcept
+		{
+			if (!actions)
+			{
+				return;
+			}
+			const auto& status = actions->GetReleaseStatus();
+			const auto id = status.m_Parameter.GetName();
+			if (!id.starts_with(prefix))
+			{
+				return;
+			}
+			ImGui::TextWrapped("Release expected: run %s | content %llu | Host revision %llu",
+				status.m_Expected.m_RunIdentity.c_str(),
+				static_cast<unsigned long long>(status.m_Expected.m_ContentIdentity),
+				static_cast<unsigned long long>(status.m_Expected.m_HostViewRevision));
+			if (!status.m_Error.empty())
+			{
+				ImGui::TextWrapped("Release %.*s rejected: %s", static_cast<int>(id.size()), id.data(),
+					status.m_Error.c_str());
+				if (status.m_BlockingOwner)
+				{
+					const auto owner = *status.m_BlockingOwner;
+					const char* kind = owner.IsExternal() ?
+						"external" :
+						owner.GetKind() == ParameterBatchOwnerKind::Sequence ? "sequence" : "tooling";
+					ImGui::Text("Blocking owner: %s (%llu)", kind,
+						static_cast<unsigned long long>(owner.GetIdentity()));
+				}
+				return;
+			}
+			if (const auto& batch = status.m_Batch)
+			{
+				const char* state = status.IsPending() ?
+					"pending" :
+					batch->m_State == ParameterBatchState::Failed ? "failed" : "finished";
+				ImGui::Text("Release %.*s | batch %llu | %s", static_cast<int>(id.size()), id.data(),
+					static_cast<unsigned long long>(batch->m_BatchId), state);
+				if (batch->m_HostViewOperation && batch->m_HostViewOperation->m_After)
+				{
+					ImGui::Text("Control committed | Host revision: %llu",
+						static_cast<unsigned long long>(batch->m_HostViewOperation->m_After->m_HostViewRevision));
+				}
+				for (const auto& item : batch->m_Items)
+				{
+					ImGui::Text("Effect: %s", EffectName(item.m_State));
+					if (item.m_FirstConsumed)
+					{
+						ImGui::Text("First consumed in submitted frame: %llu",
+							static_cast<unsigned long long>(*item.m_FirstConsumed));
+					}
+				}
+				if (!batch->m_Failure.empty())
+				{
+					ImGui::TextWrapped("%s", batch->m_Failure.c_str());
+				}
+			}
+		}
+
 		[[nodiscard]] const HostViewProjectionEntry* FindValue(
 			const ViewControlFrameObservation& frame, const LabParameterId& id) noexcept
 		{
@@ -110,7 +195,7 @@ namespace gglab::devtools
 	}
 
 	void DrawViewControlSnapshot(const ViewControlSnapshot* snapshot,
-		std::string_view parameterPrefix) noexcept
+		ViewControlActionsBase* actions, std::string_view parameterPrefix) noexcept
 	{
 		ImGui::PushID(parameterPrefix.data(), parameterPrefix.data() + parameterPrefix.size());
 		if (!snapshot)
@@ -143,7 +228,7 @@ namespace gglab::devtools
 			ImGui::TextColored(MaskColor, "Frame-local masking: %s",
 				referenceMasked ? "forced-reference" : "sequence");
 		}
-		if (ImGui::CollapsingHeader("Display-view control (read only)", ImGuiTreeNodeFlags_DefaultOpen))
+		if (ImGui::CollapsingHeader("Display-view control", ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			ImGui::TextWrapped("Run: %s | Content: %llu | Host revision: %llu",
 				snapshot->m_Control.m_RunIdentity.c_str(),
@@ -151,6 +236,7 @@ namespace gglab::devtools
 				static_cast<unsigned long long>(snapshot->m_Control.m_HostViewRevision));
 			ImGui::TextWrapped("GUI edits remain in the tooling/camera layer. They enter a later tick; "
 				"pending GUI edits are not rendered observations.");
+			DrawReleaseStatus(actions, parameterPrefix);
 			DrawFrameHeading("Current frame", snapshot->m_PlannedFrame);
 			DrawConsumers(snapshot->m_PlannedFrame, parameterPrefix);
 			if (ImGui::BeginTable("ViewControlValues", 5,
@@ -189,6 +275,15 @@ namespace gglab::devtools
 					{
 						ImGui::TextUnformatted(ValueText(*entry.m_Override, desc).c_str());
 						ImGui::TextDisabled("present");
+						ImGui::PushID(id.data(), id.data() + id.size());
+						ImGui::BeginDisabled(!actions || !desc || snapshot->m_Control.m_RunIdentity.empty() ||
+							(actions && actions->GetReleaseStatus().IsPending()));
+						if (ImGui::SmallButton("Release override"))
+						{
+							GGLAB_UNUSED(actions->ReleaseOverride(snapshot->m_Control, entry.m_Id, desc->m_Type));
+						}
+						ImGui::EndDisabled();
+						ImGui::PopID();
 					}
 					else
 					{

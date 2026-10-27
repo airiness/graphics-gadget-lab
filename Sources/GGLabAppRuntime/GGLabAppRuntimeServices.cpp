@@ -37,7 +37,7 @@
 
 namespace gglab
 {
-	GGLabAppRuntime::GGLabAppRuntime() noexcept = default;
+	GGLabAppRuntime::GGLabAppRuntime() noexcept : m_ToolingViewControl(*this) {}
 
 	GGLabAppRuntime::~GGLabAppRuntime() noexcept
 	{
@@ -522,6 +522,7 @@ namespace gglab
 		if (m_ParameterControl)
 		{
 			m_ParameterControl->Finish();
+			m_ToolingViewControl.Update();
 		}
 		ReleaseContentBinding();
 		if (m_DemoManager)

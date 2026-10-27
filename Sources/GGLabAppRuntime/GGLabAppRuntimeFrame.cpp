@@ -362,6 +362,7 @@ namespace gglab
 		{
 			m_ParameterControl->OnRuntimeFailed(failure);
 			UpdateSequenceParameterEvents();
+			m_ToolingViewControl.Update();
 		}
 		if (m_FrameSequence && m_FrameSequence->GetStatus() &&
 			!m_FrameSequence->GetStatus()->m_Events.empty())
@@ -382,6 +383,7 @@ namespace gglab
 	AppRuntimeTickResult GGLabAppRuntime::Tick(AppRuntimeTickInfo tickInfo) noexcept
 	{
 		ServiceControlDeadlines();
+		m_ToolingViewControl.Update();
 		switch (m_LifecycleState)
 		{
 		case AppRuntimeLifecycleState::Suspended:
@@ -413,6 +415,7 @@ namespace gglab
 		CollectFrameCaptureResults();
 		CollectSequenceGpuTiming();
 		SyncSequenceGpuProfiling();
+		m_ToolingViewControl.Update();
 		return result;
 	}
 
@@ -530,7 +533,7 @@ namespace gglab
 		if (const auto* event = m_FrameSequence->GetDueParameterEvent())
 		{
 			std::string error;
-			const ParameterBatchOwner owner{ m_FrameSequence->GetStatus()->m_SequenceId };
+			const auto owner = ParameterBatchOwner::Sequence(m_FrameSequence->GetStatus()->m_SequenceId);
 			const auto request = m_ParameterControl->MakeAssignmentRequest(event->m_Values);
 			const auto batch = m_ParameterControl->RequestParameters(request, error, owner);
 			if (!batch)
@@ -703,7 +706,7 @@ namespace gglab
 		if (!m_FrameSequence->BeginFrame(captureFrameState, [this](const FrameCaptureGate& gate)
 			{
 				return m_ParameterControl->CoversReadinessGate(
-					ParameterBatchOwner{ m_FrameSequence->GetStatus()->m_SequenceId }, gate);
+					ParameterBatchOwner::Sequence(m_FrameSequence->GetStatus()->m_SequenceId), gate);
 			}))
 		{
 			UpdateSequenceParameterEvents();
@@ -872,6 +875,7 @@ namespace gglab
 				.m_DebugDrawFrame = &frame.m_DebugDrawFrame,
 				.m_LoadingProgress = loadingProgress ? &*loadingProgress : nullptr,
 				.m_ViewControl = viewControl ? &*viewControl : nullptr,
+				.m_ViewControlActions = &m_ToolingViewControl,
 			};
 			toolingFrame.Draw(toolingContext);
 		}

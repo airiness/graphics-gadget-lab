@@ -166,14 +166,18 @@ stamp and `hostView` in their [`control`](session-jobs.md#frame-provenance) reco
 ### GUI observations
 
 In the TAA, Ambient Occlusion and Post Processing Inspectors, **Display-view
-control (read only)** shows inherited and Host-resolved values/sources, explicit
+control** shows inherited and Host-resolved values/sources, explicit
 pins and the current planned frame after sequence/reference masks. Equal-value
 pins still mask inheritance. The Camera Inspector shows exposure observations
 only for the display camera.
 
-The previous frame has its own identity and planned/submitted/aborted outcome;
-it is not a live-state query. GUI edits stay in the tooling/camera layer and enter
-a later tick. To remove a Host override, use
+Previous-frame observations retain their own identity and outcome. GUI edits stay
+in the tooling/camera layer and enter a later tick.
+
+Use **Release override** on a Host pin to restore inheritance against the displayed
+control stamp. Feedback separates the control commit from effect status and
+reports conflicts or Busy with the blocking owner. Further releases are disabled
+while one is pending. For CLI removal, use
 [`host-view-overrides`](#guarded-exact-override-states).
 
 ### Guarded exact override states

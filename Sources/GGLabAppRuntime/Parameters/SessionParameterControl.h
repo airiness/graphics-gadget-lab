@@ -91,6 +91,8 @@ namespace gglab
 		[[nodiscard]] std::vector<ParameterBatchStatus> GetParameterBatchStatuses(
 			ParameterBatchOwner owner) const;
 		[[nodiscard]] size_t GetParameterBatchCount() const noexcept { return m_ParameterBatches.size(); }
+		// Any retained record blocks conservative external/tooling admission in AppRuntime.
+		[[nodiscard]] std::optional<ParameterBatchOwner> GetRetainedParameterOwner() const noexcept;
 		[[nodiscard]] bool HasPendingParameterBatches() const noexcept;
 		[[nodiscard]] std::optional<ParameterBatchStatus> TakeParameterBatchResult(
 			uint64_t id, ParameterBatchOwner owner = {}) noexcept;

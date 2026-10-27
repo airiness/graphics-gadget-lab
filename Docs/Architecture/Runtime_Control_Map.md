@@ -70,6 +70,11 @@ Observation leaves parameter tracking and revisions unchanged.
 expose TAA/GTAO and display-view exposure provenance and masking. The Camera
 Inspector distinguishes the inspected camera from the display view.
 
+[ToolingViewControl](../../Sources/GGLabAppRuntime/Parameters/ViewControlActions.h)
+submits single-field removals using the displayed control stamp through
+AppRuntime's admission path. Session owns receipts; AppRuntime collects its
+tooling-owned terminal results even when the panel is closed.
+
 ## Protected Lab/profile assignments
 
 `assign` carries a single-domain request with `ParameterRequest::m_ExpectedDomain`.
@@ -193,6 +198,7 @@ Anchors:
   - Sources/GGLabRuntime/Private/Graphics/EnvironmentLightingSystem.cpp::RecordSettingsWrite
   - Sources/GGLabAppRuntime/ApplicationToolingIntegration.cpp::ResolveApplicationViewSettings
   - Sources/GGLabAppRuntime/Parameters/ViewControlSnapshot.cpp::BuildViewControlSnapshot
+  - Sources/GGLabAppRuntime/Parameters/ViewControlActions.cpp::ToolingViewControl::ReleaseOverride
   - Sources/WinAppHost/DevTools/DevelopGui/ViewControlWidgets.cpp::DrawViewControlSnapshot
   - Sources/GGLabAppRuntime/GGLabAppRuntimeFrame.cpp::BuildCaptureTemporalState
   - Sources/GGLabAppRuntime/Capture/RequiredFrameState.cpp::ValidateRequiredFrameState
