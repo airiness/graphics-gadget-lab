@@ -7,7 +7,10 @@
 #include "Capture/CaptureEnvironment.h"
 #include "Capture/CaptureJobTypes.h"
 #include "Capture/CapturePlan.h"
+#include "Parameters/HostViewParameters.h"
 #include "Parameters/ParameterBatch.h"
+#include "Parameters/ParameterRequest.h"
+#include "Parameters/ViewControlActions.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
 #include "GGLabRuntime/Graphics/RenderServicesView.h"
@@ -241,6 +244,9 @@ namespace gglab
 		// Tick and Shutdown publish terminal receipts at the result-routing boundary;
 		// publication retains the original reserved slot, with no second result queue.
 		[[nodiscard]] CaptureAdmission TrySubmitCaptureJob(CapturePlan&& plan) noexcept;
+		[[nodiscard]] std::optional<std::chrono::steady_clock::time_point> GetNextControlDeadline() const noexcept;
+		void ServiceControlDeadlines(
+			std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now()) noexcept;
 		[[nodiscard]] CaptureCancelResult CancelCaptureJob(uint64_t jobId) noexcept;
 		[[nodiscard]] std::optional<CaptureJobSnapshot> GetCaptureJobSnapshot(uint64_t jobId) const noexcept;
 		[[nodiscard]] CaptureIntakeSnapshot GetCaptureIntakeSnapshot() const noexcept;
@@ -258,11 +264,16 @@ namespace gglab
 		void EnableParameterControl() noexcept;
 		// Read-only preflight before a transport enables descriptors for type checks.
 		// Submission repeats admission and then validates the complete typed batch.
-		[[nodiscard]] bool CanRequestParameterBatch(std::string& error) const noexcept;
-		[[nodiscard]] uint64_t RequestParameterBatch(
-			std::span<const LabParameterValue> values, std::string& error) noexcept;
+		[[nodiscard]] bool CanRequestParameters(std::string& error) const noexcept;
+		[[nodiscard]] uint64_t RequestParameters(const ParameterRequest& request, std::string& error) noexcept;
 		[[nodiscard]] std::optional<ParameterBatchStatus> TakeParameterBatchResult(uint64_t id) noexcept;
 		[[nodiscard]] const ParameterBatchStatus* GetExternalParameterBatchStatus() const noexcept;
+		[[nodiscard]] ViewControlActionsBase& GetViewControlActions() noexcept { return m_ToolingViewControl; }
+		// Created once with runtime services and shared by capture artifacts and session
+		// control; empty before composition or when creation failed.
+		[[nodiscard]] const std::string& GetRunIdentity() const noexcept { return m_RunIdentity; }
+		[[nodiscard]] HostViewControlStamp GetHostViewControlStamp() const;
+		[[nodiscard]] std::optional<ParameterControlStamp> GetDomainControlStamp(ParameterControlDomain domain) const;
 		// Borrowed read-only views; null before composition. Commands enter through
 		// AppRuntime so a C++ host cannot bypass admission or forge owner callbacks.
 		[[nodiscard]] const SessionParameterControl* GetParameterControl() const noexcept
@@ -287,6 +298,9 @@ namespace gglab
 		[[nodiscard]] AppRuntimeTickResult TickFrame(AppRuntimeTickInfo tickInfo) noexcept;
 		void CollectFrameCaptureResults() noexcept;
 		[[nodiscard]] bool CanAcceptSessionCommands() const noexcept;
+		friend class ToolingViewControl;
+		[[nodiscard]] uint64_t RequestParametersForOwner(const ParameterRequest& request,
+			std::string& error, ParameterBatchOwner owner) noexcept;
 		void SynchronizeContentBinding() noexcept;
 		void ReleaseContentBinding() noexcept;
 		[[nodiscard]] AppRuntimeServiceInitializeResult FailServiceInitialization(
@@ -310,6 +324,7 @@ namespace gglab
 		CaptureJobLimits m_CaptureJobLimits{};
 		CaptureHostEnvironment m_HostEnvironment{};
 		std::chrono::system_clock::time_point m_StartedAt{};
+		std::string m_RunIdentity;
 		ApplicationContentRegistration m_ContentRegistration{};
 		std::unique_ptr<RenderHost> m_RenderHost;
 		const std::thread::id m_OwnerThread = std::this_thread::get_id();
@@ -329,6 +344,7 @@ namespace gglab
 		// Declared after the capture coordinator it submits to, so it is destroyed first.
 		std::unique_ptr<FrameSequenceCoordinator> m_FrameSequence;
 		std::unique_ptr<SessionParameterControl> m_ParameterControl;
+		ToolingViewControl m_ToolingViewControl;
 		// Frozen after content update; shared by parameters and this frame's planning.
 		uint64_t m_ActiveContentIdentity = 0;
 		// Results already routed to the sequence, awaiting host publication.

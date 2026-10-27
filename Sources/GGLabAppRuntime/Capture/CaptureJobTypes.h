@@ -36,6 +36,10 @@ namespace gglab
 		IdentityExhausted,
 		IdentityUnavailable,
 		ServicesUnavailable,
+		// The plan's required frame state is malformed or names unsupported values.
+		RequiredFrameStateInvalid,
+		// The required run, content or Host view revision cannot occur in this session now.
+		RequiredFrameStateUnavailable,
 	};
 
 	// Busy/rejected admission consumes no identity, receipt or caller-owned plan.
@@ -91,6 +95,8 @@ namespace gglab
 		std::vector<CaptureProductResult> m_Products;
 		std::string m_BundleId;
 		std::filesystem::path m_ManifestPath;
+		// Machine-readable cause of a job-level failure, such as RequiredFrameStateMismatch.
+		std::string m_FailureCode;
 	};
 
 	enum class CaptureJobStage : uint8_t

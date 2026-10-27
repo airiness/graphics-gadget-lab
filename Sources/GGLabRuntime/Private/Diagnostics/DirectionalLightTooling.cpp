@@ -38,6 +38,7 @@ namespace gglab
 	void DirectionalLightTooling::SetAtmosphere(const std::optional<AtmosphereSettings>& settings) noexcept
 	{
 		m_World.m_Atmosphere = settings;
+		m_World.MarkLightingAuthoringChanged();
 	}
 
 	void DirectionalLightTooling::SetWorldSun(uint32_t id, const std::optional<WorldSunSettings>& settings) noexcept
@@ -59,6 +60,7 @@ namespace gglab
 			}
 		}
 		registry.get<components::LightComponent>(entity).m_WorldSun = settings;
+		m_World.MarkLightingAuthoringChanged();
 	}
 
 	void DirectionalLightTooling::SetDirection(uint32_t id, const Vector3& direction) noexcept
@@ -74,6 +76,7 @@ namespace gglab
 		normalized.Normalize();
 		registry.get<components::TransformComponent>(entity).m_Rotation =
 			math::RotationFromTo(Vector3::Forward, normalized);
+		m_World.MarkLightingAuthoringChanged();
 	}
 
 	void DirectionalLightTooling::SetRadiance(uint32_t id, const Color& color, float intensity) noexcept
@@ -85,6 +88,7 @@ namespace gglab
 			auto& light = registry.get<components::LightComponent>(entity);
 			light.m_Color = color;
 			light.m_Intensity = intensity;
+			m_World.MarkLightingAuthoringChanged();
 		}
 	}
 

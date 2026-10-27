@@ -69,6 +69,10 @@ namespace gglab
 			{
 				return ApplicationControlCommand::Set;
 			}
+			if (command == "assign")
+			{
+				return ApplicationControlCommand::Assign;
+			}
 			if (command == "parameter-result")
 			{
 				return ApplicationControlCommand::ParameterResult;
@@ -108,6 +112,10 @@ namespace gglab
 			if (command == "sequence-cancel")
 			{
 				return ApplicationControlCommand::SequenceCancel;
+			}
+			if (command == "host-view-overrides")
+			{
+				return ApplicationControlCommand::HostViewOverrides;
 			}
 			return std::nullopt;
 		}
@@ -1081,6 +1089,25 @@ namespace gglab
 						return error;
 					}
 				}
+				else if (key == "frameSelectionTimeoutMs")
+				{
+					if (!IsUint32(value) || value.get<uint32_t>() == 0 ||
+						value.get<uint32_t>() > MaxFrameSelectionTimeout.count() ||
+						!document.contains("requiredFrameState"))
+					{
+						return "Field 'frameSelectionTimeoutMs' requires a predicate and an integer in [1, 300000].";
+					}
+					capture.m_FrameSelectionTimeout = std::chrono::milliseconds(value.get<uint32_t>());
+				}
+				else if (key == "requiredFrameState")
+				{
+					if (std::string error =
+						ParseApplicationControlRequiredFrameState(value, capture.m_RequiredFrameState);
+						!error.empty())
+					{
+						return error;
+					}
+				}
 				else
 				{
 					return std::format("Unknown field '{}' for command '{}'.", key, graph ? "graph" : resources ? "export" : "capture");
@@ -1341,6 +1368,124 @@ namespace gglab
 			return gates;
 		}
 
+		[[nodiscard]] const char* FrameOutcomeName(FrameCaptureFrameOutcome outcome)
+		{
+			switch (outcome)
+			{
+			case FrameCaptureFrameOutcome::Planned:
+				return "planned";
+			case FrameCaptureFrameOutcome::Submitted:
+				return "submitted";
+			case FrameCaptureFrameOutcome::Aborted:
+				return "aborted";
+			}
+			return "unknown";
+		}
+
+		// The capture run identity format: 32 lowercase hexadecimal digits.
+		[[nodiscard]] bool IsRunIdentity(const Json& value)
+		{
+			if (!value.is_string())
+			{
+				return false;
+			}
+			const auto& text = value.get_ref<const std::string&>();
+			return text.size() == 32 && std::ranges::all_of(text, [](char digit)
+				{
+					return (digit >= '0' && digit <= '9') || (digit >= 'a' && digit <= 'f');
+				});
+		}
+
+		// A partial expected state rejects; its run feeds the shared run check.
+		[[nodiscard]] std::string ParseHostViewOverrideFields(const Json& fields,
+			ApplicationControlRequest& request)
+		{
+			const auto expected = fields.find("expected");
+			if (fields.size() != 5 || expected == fields.end() || !fields.contains("overrides"))
+			{
+				return "Command 'host-view-overrides' takes only 'expected' and 'overrides'.";
+			}
+			const auto isUnsigned = [&](const char* name)
+				{
+					const auto found = expected->find(name);
+					return found != expected->end() && found->is_number_unsigned();
+				};
+			if (!expected->is_object() || expected->size() != 3 || !expected->contains("runIdentity") ||
+				!IsRunIdentity(expected->at("runIdentity")) || !isUnsigned("contentIdentity") ||
+				!isUnsigned("hostViewRevision"))
+			{
+				return "Field 'expected' must hold exactly 'runIdentity' (32 lowercase hexadecimal digits) "
+					"and unsigned 'contentIdentity' and 'hostViewRevision'.";
+			}
+			request.m_ExpectedHostView = {
+				.m_RunIdentity = expected->at("runIdentity").get<std::string>(),
+				.m_ContentIdentity = expected->at("contentIdentity").get<uint64_t>(),
+				.m_HostViewRevision = expected->at("hostViewRevision").get<uint64_t>(),
+			};
+			request.m_ExpectedRunIdentity = request.m_ExpectedHostView.m_RunIdentity;
+			return ParseApplicationControlHostViewOverrides(fields["overrides"], request.m_HostViewOverrides);
+		}
+
+		[[nodiscard]] std::string ParseDomainAssignmentFields(const Json& fields, ApplicationControlRequest& request)
+		{
+			if (fields.size() != 5 || !fields.contains("expected") || !fields.contains("changes"))
+			{
+				return "Command 'assign' takes only 'expected' and 'changes'.";
+			}
+			const auto& expected = fields["expected"];
+			if (!expected.is_object() || expected.size() != 8 || !expected.contains("runIdentity") ||
+				!IsRunIdentity(expected["runIdentity"]) || !expected.contains("domain") ||
+				!expected["domain"].is_string())
+			{
+				return "Field 'expected' requires the complete Lab/profile control stamp.";
+			}
+			for (const auto* name : { "contentIdentity", "activationRevision", "labRevision",
+				"valuesRevision", "worldRevision", "environmentRevision" })
+			{
+				if (!expected.contains(name) || !expected[name].is_number_unsigned())
+				{
+					return "Control identities and revisions must be unsigned integers.";
+				}
+			}
+			const auto domain = expected["domain"].get<std::string>();
+			if (domain != "lab" && domain != "lighting-profile")
+			{
+				return "Protected Assign supports 'lab' or 'lighting-profile'.";
+			}
+			request.m_ExpectedParameterControl = {
+				.m_RunIdentity = expected["runIdentity"].get<std::string>(),
+				.m_ContentIdentity = expected["contentIdentity"].get<uint64_t>(),
+				.m_ActivationRevision = expected["activationRevision"].get<uint64_t>(),
+				.m_Domain = domain == "lab" ? ParameterControlDomain::Lab : ParameterControlDomain::LightingProfile,
+				.m_LabRevision = expected["labRevision"].get<uint64_t>(),
+				.m_ValuesRevision = expected["valuesRevision"].get<uint64_t>(),
+				.m_WorldRevision = expected["worldRevision"].get<uint64_t>(),
+				.m_EnvironmentRevision = expected["environmentRevision"].get<uint64_t>(),
+			};
+			request.m_ExpectedRunIdentity = request.m_ExpectedParameterControl.m_RunIdentity;
+			return ParseApplicationControlParameterChanges(fields["changes"], request.m_ParameterChanges);
+		}
+
+		[[nodiscard]] Json SerializeTemporalPlan(const FrameCaptureTemporalState& temporal)
+		{
+			Json consumers = Json::array();
+			for (const FrameCaptureTemporalConsumer& consumer : temporal.m_Consumers)
+			{
+				consumers.push_back({
+					{ "name", consumer.m_Name },
+					{ "requested", consumer.m_Requested },
+					{ "status", consumer.m_Status },
+					{ "disableReason", consumer.m_DisableReason },
+					});
+			}
+			return {
+				{ "requested", temporal.m_Requested },
+				{ "status", temporal.m_Status },
+				{ "disableReason", temporal.m_DisableReason },
+				{ "consumers", std::move(consumers) },
+			};
+		}
+
 		[[nodiscard]] Json SerializeTimingSummary(std::span<const double> milliseconds)
 		{
 			const FrameSequenceTimingSummary summary = SummarizeFrameSequenceTiming(milliseconds);
@@ -1476,70 +1621,97 @@ namespace gglab
 		if (!command)
 		{
 			result.m_Error = "Field 'command' must be 'status', 'capture', 'graph', 'export', 'result', 'stop', "
-				"'capture-cancel', 'watch', 'sequence', 'sequence-cancel', 'parameters', 'set' or 'parameter-result'.";
+				"'capture-cancel', 'watch', 'sequence', 'sequence-cancel', 'parameters', 'set', 'parameter-result' "
+				"'host-view-overrides' or 'assign'.";
 			return result;
 		}
 
 		ApplicationControlRequest request{ .m_Id = result.m_Id, .m_Command = *command };
+		// The shared run check is removed before each command's exact field validation.
+		std::optional<Json> withoutRun;
+		if (const auto expected = document.find("expectedRunIdentity"); expected != document.end())
+		{
+			if (!AcceptsApplicationControlExpectedRun(*command))
+			{
+				result.m_Error = std::format("Command '{}' does not accept 'expectedRunIdentity'.",
+					commandField->get<std::string>());
+				return result;
+			}
+			if (!IsRunIdentity(*expected))
+			{
+				result.m_Error = "Field 'expectedRunIdentity' must be a 32-digit lowercase hexadecimal run identity.";
+				return result;
+			}
+			request.m_ExpectedRunIdentity = expected->get<std::string>();
+			withoutRun = document;
+			withoutRun->erase("expectedRunIdentity");
+		}
+		const Json& fields = withoutRun ? *withoutRun : document;
 		std::string error;
 		switch (*command)
 		{
 		case ApplicationControlCommand::Capture:
 		case ApplicationControlCommand::Graph:
 		case ApplicationControlCommand::Export:
-			error = ParseCaptureFields(document, request);
+			error = ParseCaptureFields(fields, request);
 			break;
 		case ApplicationControlCommand::Watch:
-			error = ParseWatchFields(document, request.m_Watch);
+			error = ParseWatchFields(fields, request.m_Watch);
 			break;
 		case ApplicationControlCommand::Result:
 		case ApplicationControlCommand::CaptureCancel:
 		{
-			const auto jobId = document.find("jobId");
-			const bool consume = document.contains("consume");
-			if (jobId == document.end() || !jobId->is_number_unsigned() ||
-				jobId->get<uint64_t>() == 0 || document.size() != (consume ? 5u : 4u) ||
-				(consume && (*command != ApplicationControlCommand::Result || !document["consume"].is_boolean())))
+			const auto jobId = fields.find("jobId");
+			const bool consume = fields.contains("consume");
+			if (jobId == fields.end() || !jobId->is_number_unsigned() ||
+				jobId->get<uint64_t>() == 0 || fields.size() != (consume ? 5u : 4u) ||
+				(consume && (*command != ApplicationControlCommand::Result || !fields["consume"].is_boolean())))
 			{
 				error = "A job command takes a non-zero unsigned 'jobId'; only 'result' accepts boolean 'consume'.";
 				break;
 			}
 			request.m_JobId = jobId->get<uint64_t>();
-			request.m_Consume = document.value("consume", false);
+			request.m_Consume = fields.value("consume", false);
 			break;
 		}
 		case ApplicationControlCommand::Set:
-			if (document.size() != 4 || !document.contains("changes"))
+			if (fields.size() != 4 || !fields.contains("changes"))
 			{
 				error = "Command 'set' takes only a 'changes' array.";
 			}
 			else
 			{
-				error = ParseApplicationControlParameterChanges(document["changes"], request.m_ParameterChanges);
+				error = ParseApplicationControlParameterChanges(fields["changes"], request.m_ParameterChanges);
 			}
+			break;
+		case ApplicationControlCommand::Assign:
+			error = ParseDomainAssignmentFields(fields, request);
 			break;
 		case ApplicationControlCommand::ParameterResult:
 		{
-			const auto batch = document.find("batchId");
-			const bool consume = document.contains("consume");
-			if (batch == document.end() || !batch->is_number_unsigned() || batch->get<uint64_t>() == 0 ||
-				document.size() != (consume ? 5u : 4u) || (consume && !document["consume"].is_boolean()))
+			const auto batch = fields.find("batchId");
+			const bool consume = fields.contains("consume");
+			if (batch == fields.end() || !batch->is_number_unsigned() || batch->get<uint64_t>() == 0 ||
+				fields.size() != (consume ? 5u : 4u) || (consume && !fields["consume"].is_boolean()))
 			{
 				error = "Command 'parameter-result' takes a non-zero unsigned 'batchId' and optional boolean 'consume'.";
 				break;
 			}
 			request.m_ParameterBatchId = batch->get<uint64_t>();
-			request.m_Consume = document.value("consume", false);
+			request.m_Consume = fields.value("consume", false);
 			break;
 		}
 		case ApplicationControlCommand::Sequence:
-			error = ParseSequenceFields(document, request);
+			error = ParseSequenceFields(fields, request);
+			break;
+		case ApplicationControlCommand::HostViewOverrides:
+			error = ParseHostViewOverrideFields(fields, request);
 			break;
 		case ApplicationControlCommand::Parameters:
 		case ApplicationControlCommand::Status:
 		case ApplicationControlCommand::Stop:
 		case ApplicationControlCommand::SequenceCancel:
-			if (document.size() != 3)
+			if (fields.size() != 3)
 			{
 				error = std::format("Command '{}' takes no fields.",
 					commandField->get<std::string>());
@@ -1555,6 +1727,41 @@ namespace gglab
 		return result;
 	}
 
+	bool AcceptsApplicationControlExpectedRun(ApplicationControlCommand command) noexcept
+	{
+		return command != ApplicationControlCommand::Status &&
+			command != ApplicationControlCommand::Parameters &&
+			command != ApplicationControlCommand::HostViewOverrides &&
+			command != ApplicationControlCommand::Assign;
+	}
+
+	std::optional<std::string> CheckApplicationControlRunIdentity(
+		const ApplicationControlRequest& request, std::string_view runIdentity) noexcept
+	{
+		if (!request.m_ExpectedRunIdentity)
+		{
+			return std::nullopt;
+		}
+		if (runIdentity.empty())
+		{
+			Json response = MakeResponse(request.m_Id, false);
+			response["errorCode"] = "RunIdentityUnavailable";
+			response["error"] = "RunIdentityUnavailable: this session has no run identity, so it rejects "
+				"run-checked requests.";
+			return Dump(response);
+		}
+		if (*request.m_ExpectedRunIdentity != runIdentity)
+		{
+			Json response = MakeResponse(request.m_Id, false);
+			response["errorCode"] = "ExpectedRunChanged";
+			response["error"] = "ExpectedRunChanged: the session runs a different process than the "
+				"request's expected run identity; the request changed nothing.";
+			response["runIdentity"] = std::string(runIdentity);
+			return Dump(response);
+		}
+		return std::nullopt;
+	}
+
 	std::string SerializeApplicationControlError(uint64_t id, std::string_view error) noexcept
 	{
 		Json response = MakeResponse(id, false);
@@ -1565,12 +1772,30 @@ namespace gglab
 	std::string SerializeApplicationControlStatus(
 		uint64_t id, const ApplicationControlStatus& status) noexcept
 	{
+		const auto runtimeState = [&status]() -> std::string_view
+			{
+				switch (status.m_RuntimeState)
+				{
+				case AppRuntimeLifecycleState::Uninitialized: return "uninitialized";
+				case AppRuntimeLifecycleState::Initializing: return "initializing";
+				case AppRuntimeLifecycleState::Running: return "running";
+				case AppRuntimeLifecycleState::Suspended: return "suspended";
+				case AppRuntimeLifecycleState::ExitRequested: return "exit-requested";
+				case AppRuntimeLifecycleState::Failed: return "failed";
+				case AppRuntimeLifecycleState::ShuttingDown: return "shutting-down";
+				case AppRuntimeLifecycleState::Stopped: return "stopped";
+				}
+				return "uninitialized";
+			};
 		Json response = MakeResponse(id, true);
 		response["session"] = {
 			{ "id", status.m_SessionId },
 			{ "pid", status.m_ProcessId },
 			{ "uptimeSeconds", status.m_UptimeSeconds },
 			{ "hidden", status.m_Hidden },
+			{ "runtimeState", runtimeState() },
+			{ "lifetime", status.m_Lifetime == ApplicationSessionLifetime::Developer ? "developer" : "automation" },
+			{ "idleTimeoutSeconds", status.m_IdleTimeoutSeconds ? Json(*status.m_IdleTimeoutSeconds) : Json(nullptr) },
 			{ "width", status.m_Width },
 			{ "height", status.m_Height },
 		};
@@ -1578,6 +1803,10 @@ namespace gglab
 		response["environment"] = environment.is_object() ? environment : Json(nullptr);
 		const auto& intake = status.m_CaptureIntake;
 		response["capabilities"] = {
+			{ "sessionLifetime", {
+				{ "version", 1 },
+				{ "modes", { "automation", "developer" } },
+				{ "suspendedControl", true } } },
 			{ "labParameterControl", {
 				{ "sources", Json::array({ "lab" }) },
 				{ "effectClasses", Json::array({ "Immediate", "Deferred", "Rebuild" }) },
@@ -1607,6 +1836,13 @@ namespace gglab
 				{ "maxItems", ApplicationControlMaxParameterItems },
 				{ "mixedSources", true },
 				{ "explicitConsumption", true } } },
+			{ "protectedAssignments", {
+				{ "version", 1 },
+				{ "command", "assign" },
+				{ "domains", { "lab", "lighting-profile" } },
+				{ "mixedDomains", false },
+				{ "expected", { "runIdentity", "contentIdentity", "activationRevision", "domain", "labRevision",
+					"valuesRevision", "worldRevision", "environmentRevision" } } } },
 			{ "sequenceCaptureJobs", true },
 			{ "sequenceImmediateEvents", true },
 			{ "sequenceDeferredEvents", true },
@@ -1615,7 +1851,40 @@ namespace gglab
 			{ "sequenceTimingProducts", true },
 			{ "sequenceCancelVerdicts", true },
 			{ "gpuTimingSchema", "gglab.gpu-timing" },
-			{ "gpuTimingSchemaVersion", 1 } };
+			{ "gpuTimingSchemaVersion", 1 },
+			{ "hostViewControlState", {
+				{ "version", 1 },
+				{ "stamp", { "runIdentity", "contentIdentity", "hostViewRevision" } },
+				{ "valueSources", { "content", "tooling", "camera", "host", "sequence", "forced-reference" } },
+				{ "frameOutcomes", { "planned", "submitted", "aborted" } } } },
+			{ "runIdentityChecks", {
+				{ "version", 1 },
+				{ "field", "expectedRunIdentity" },
+				{ "commands", { "set", "parameter-result", "capture", "graph", "export", "watch", "result",
+					"capture-cancel", "sequence", "sequence-cancel", "stop" } },
+				{ "errorCodes", { "ExpectedRunChanged", "RunIdentityUnavailable" } } } },
+			{ "hostViewOverrides", {
+				{ "version", 1 },
+				{ "command", "host-view-overrides" },
+				{ "groups", { "view.taa", "view.gtao", "view.exposure" } },
+				{ "maxItems", ApplicationControlMaxParameterItems },
+				{ "expected", { "runIdentity", "contentIdentity", "hostViewRevision" } },
+				{ "errorCodes", ApplicationControlHostViewOverrideErrorCodes } } },
+			{ "requiredFrameState", {
+				{ "version", 1 },
+				{ "commands", { "capture", "graph", "export" } },
+				{ "valueGroups", { "view.taa", "view.gtao", "view.exposure" } },
+				{ "maxValues", RequiredFrameStateMaxValues },
+				{ "valueSources", { "content", "tooling", "camera", "host", "sequence", "forced-reference" } },
+				{ "temporalConsumers", { "temporal-aa", "reference", "temporal-gtao" } },
+				{ "referenceSampling", true },
+				{ "admissionReasons", { "RequiredFrameStateInvalid", "RequiredFrameStateUnavailable" } },
+				{ "failureCodes", { "RequiredFrameStateMismatch", "FrameSelectionExpired" } },
+				{ "frameSelectionTimeoutMs", {
+					{ "min", 1 },
+					{ "max", MaxFrameSelectionTimeout.count() },
+					{ "default", MaxFrameSelectionTimeout.count() } } },
+				{ "controlSchemaVersion", FrameCaptureControlSchemaVersion } } } };
 		response["capture"] = {
 			{ "limits", {
 				{ "activeJobs", intake.m_Limits.m_MaxActiveJobs },
@@ -1695,7 +1964,8 @@ namespace gglab
 			{ "revision", status.m_ParametersAvailable ? Json(status.m_ParameterRevision) : Json() },
 			{ "batch", status.m_ParameterBatch ? SerializeApplicationControlParameterBatch(*status.m_ParameterBatch) : Json() },
 			{ "lighting", SerializeApplicationControlLightingProfiles(status.m_LightingProfiles) },
-			{ "lightingProfileError", status.m_LightingProfileError } };
+			{ "lightingProfileError", status.m_LightingProfileError },
+			{ "controlState", SerializeApplicationControlHostViewStamp(status.m_HostViewControl) } };
 		response["sequence"] = status.m_Sequence ? SerializeSequence(*status.m_Sequence) : Json();
 		if (!status.m_Frame)
 		{
@@ -1722,6 +1992,10 @@ namespace gglab
 			} },
 			{ "referenceViews", frame.m_ReferenceViewIds },
 			{ "fixedDeltaTime", frame.m_FixedDeltaTime ? Json(*frame.m_FixedDeltaTime) : Json() },
+			{ "outcome", FrameOutcomeName(frame.m_Outcome) },
+			{ "controlState", SerializeApplicationControlHostViewStamp(frame.m_HostViewControl) },
+			{ "hostView", SerializeApplicationControlHostViewProjection(frame.m_HostViewProjection) },
+			{ "temporal", SerializeTemporalPlan(frame.m_Temporal) },
 		};
 		return Dump(response);
 	}
@@ -1762,6 +2036,12 @@ namespace gglab
 			break;
 		case CaptureAdmissionReason::ServicesUnavailable:
 			reason = "ServicesUnavailable";
+			break;
+		case CaptureAdmissionReason::RequiredFrameStateInvalid:
+			reason = "RequiredFrameStateInvalid";
+			break;
+		case CaptureAdmissionReason::RequiredFrameStateUnavailable:
+			reason = "RequiredFrameStateUnavailable";
 			break;
 		}
 		response["reason"] = reason;
@@ -1850,6 +2130,7 @@ namespace gglab
 		response["frameSerial"] = Json();
 		response["watch"] = Json();
 		response["failure"] = "";
+		response["failureCode"] = result.m_FailureCode.empty() ? Json() : Json(result.m_FailureCode);
 		for (const auto& product : result.m_Products)
 		{
 			Json files = Json::array();

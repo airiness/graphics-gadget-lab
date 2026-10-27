@@ -5,6 +5,8 @@
 #include "GGLabRuntime/Graphics/RenderHost.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 
+#include <limits>
+
 namespace gglab
 {
 	namespace
@@ -328,7 +330,7 @@ namespace gglab
 			return;
 		}
 
-		++m_ParameterRevision;
+		m_ParameterRevision += m_ParameterRevision != std::numeric_limits<uint64_t>::max();
 		if (impact != LabChangeImpact::Immediate)
 		{
 			const std::vector<LabParameterValue> values =
@@ -586,7 +588,7 @@ namespace gglab
 
 		m_ActiveSession = std::move(m_PendingSession);
 		++m_TemporalSessionSerial;
-		++m_ParameterRevision;
+		m_ParameterRevision += m_ParameterRevision != std::numeric_limits<uint64_t>::max();
 		if (m_PendingParameterRebuild != 0 && m_ParameterRebuild &&
 			m_ParameterRebuild->m_Generation == m_PendingParameterRebuild)
 		{
@@ -642,7 +644,7 @@ namespace gglab
 	{
 		if (m_IsEntered && m_ActiveSession && m_ActiveSession->RefreshInheritedParameters())
 		{
-			++m_ParameterRevision;
+			m_ParameterRevision += m_ParameterRevision != std::numeric_limits<uint64_t>::max();
 		}
 	}
 

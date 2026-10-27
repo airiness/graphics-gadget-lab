@@ -390,6 +390,9 @@
     <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\WorldLightingPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\ViewControlWidgets.cpp">
+      <Filter>DevTools\DevelopGui</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevToolsRuntime.cpp">
       <Filter>DevTools</Filter>
     </ClCompile>
@@ -444,6 +447,9 @@
       <Filter>Application\Control</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Control\ApplicationControlProtocol.h">
+      <Filter>Application\Control</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Control\ApplicationSessionLifetime.h">
       <Filter>Application\Control</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Demo\CoastalSceneCameraPaths.h">
@@ -745,6 +751,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\WorldLightingPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\ViewControlWidgets.h">
+      <Filter>DevTools\DevelopGui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevToolsRuntime.h">
       <Filter>DevTools</Filter>

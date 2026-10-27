@@ -4,6 +4,7 @@
 #include "AppRuntimeLog.h"
 #include "ApplicationInput.h"
 #include "ApplicationToolingIntegration.h"
+#include "Capture/CaptureBundle.h"
 #include "Capture/FrameCaptureCoordinator.h"
 #include "Capture/NonFiniteWatchCoordinator.h"
 #include "Capture/FrameSequenceCoordinator.h"
@@ -36,7 +37,7 @@
 
 namespace gglab
 {
-	GGLabAppRuntime::GGLabAppRuntime() noexcept = default;
+	GGLabAppRuntime::GGLabAppRuntime() noexcept : m_ToolingViewControl(*this) {}
 
 	GGLabAppRuntime::~GGLabAppRuntime() noexcept
 	{
@@ -76,12 +77,52 @@ namespace gglab
 		{
 			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::ServicesUnavailable };
 		}
+		if (const auto& required = plan.m_RequiredFrameState)
+		{
+			// Plan validity is reported first; then the predicate must be reachable from
+			// the live activation, so a revision above the committed one never waits forever.
+			const CaptureAdmission checked = m_FrameCapture->CheckJobAdmission(plan);
+			if (checked.m_Status != CaptureAdmissionStatus::Accepted)
+			{
+				return checked;
+			}
+			if (!m_ParameterControl || required->m_ContentIdentity != m_ParameterControl->GetContentIdentity() ||
+				required->m_MinHostViewRevision > m_ParameterControl->GetHostViewRevision())
+			{
+				return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::RequiredFrameStateUnavailable };
+			}
+		}
 		return m_FrameCapture->TrySubmit(std::move(plan));
 	}
 
 	CaptureCancelResult GGLabAppRuntime::CancelCaptureJob(uint64_t jobId) noexcept
 	{
 		return m_FrameCapture ? m_FrameCapture->CancelJob(jobId) : CaptureCancelResult::NotFound;
+	}
+
+	std::optional<std::chrono::steady_clock::time_point> GGLabAppRuntime::GetNextControlDeadline() const noexcept
+	{
+		CheckOwnerThread();
+		if (m_RenderHost)
+		{
+			m_RenderHost->CheckServiceLifecycleAccess();
+		}
+		return CanAcceptSessionCommands() && m_FrameCapture ?
+			m_FrameCapture->GetNextFrameSelectionDeadline() : std::nullopt;
+	}
+
+	void GGLabAppRuntime::ServiceControlDeadlines(std::chrono::steady_clock::time_point now) noexcept
+	{
+		CheckOwnerThread();
+		if (m_RenderHost)
+		{
+			m_RenderHost->CheckServiceLifecycleAccess();
+		}
+		if (CanAcceptSessionCommands() && m_FrameCapture)
+		{
+			m_FrameCapture->ExpireFrameSelections(now);
+			m_FrameCapture->PublishAppRuntimeJobResults();
+		}
 	}
 
 	std::optional<CaptureJobSnapshot> GGLabAppRuntime::GetCaptureJobSnapshot(uint64_t jobId) const noexcept
@@ -253,6 +294,7 @@ namespace gglab
 				AppRuntimeServiceInitializeResult::RendererInitializationFailed);
 		}
 		m_NonFiniteWatch = std::make_unique<NonFiniteWatchCoordinator>(m_RenderHost->GetFrameCaptureControl());
+		m_RunIdentity = CreateCaptureRunIdentity();
 		m_FrameCapture = std::make_unique<FrameCaptureCoordinator>(
 			FrameCaptureCoordinator::CreateInfo{
 				.m_Capture = m_RenderHost->GetFrameCaptureControl(),
@@ -265,6 +307,7 @@ namespace gglab
 					.m_Device = m_RenderHost->GetRHIContext()->GetDeviceIdentity(),
 					.m_StartedAt = m_StartedAt,
 				},
+				.m_RunIdentity = m_RunIdentity,
 			});
 		m_FrameCapture->SetAppRuntimeJobResultOwner();
 		m_FrameSequence = std::make_unique<FrameSequenceCoordinator>(*m_FrameCapture);
@@ -479,6 +522,7 @@ namespace gglab
 		if (m_ParameterControl)
 		{
 			m_ParameterControl->Finish();
+			m_ToolingViewControl.Update();
 		}
 		ReleaseContentBinding();
 		if (m_DemoManager)

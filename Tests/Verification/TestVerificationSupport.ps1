@@ -34,6 +34,110 @@ try {
     $missingStop = Stop-VerificationSession $missingSession -AllowFailure
     Check (-not $missingStop.ok -and $missingStop.session -eq $missingSession -and
         $missingStop.error -match 'not running') 'real-session-client-reports-missing-session-as-json'
+    $missingAttach = Invoke-VerificationSession attach $missingSession -AllowFailure
+    Check (-not $missingAttach.ok -and $missingAttach.error -match 'not running') 'attach-transport-failure-remains-json'
+    $conflict = Invoke-VerificationScript (Join-Path $root 'Scripts/Verification/GGLabSession.ps1') @{
+        Command='start';Session=$missingSession;SessionLifetime='developer';IdleTimeout=1 }
+    $conflictResult = $conflict.output | ConvertFrom-Json
+    Check ($conflict.exitCode -eq 1 -and -not $conflictResult.ok -and
+        $conflictResult.error -match 'cannot specify -IdleTimeout') 'developer-launch-rejects-explicit-idle-timeout'
+    # Exercise the production startup path without launching a process. A same-name
+    # replacement must never acquire created ownership or receive cleanup commands.
+    & {
+        $tokens = $null; $parseErrors = $null
+        $ast = [Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $root 'Scripts/Verification/GGLabSession.ps1'), [ref]$tokens, [ref]$parseErrors)
+        foreach ($name in @('Get-Field', 'Fail')) {
+            $definition = $ast.Find({ param($node)
+                $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name
+            }, $true)
+            . ([scriptblock]::Create($definition.Extent.Text))
+        }
+        $commandSwitch = $ast.Find({ param($node)
+            $node -is [Management.Automation.Language.SwitchStatementAst] -and
+                $node.Condition.Extent.Text -eq '$Command'
+        }, $true)
+        $startClause = @($commandSwitch.Clauses | Where-Object { $_.Item1.Value -eq 'start' })[0].Item2
+        $body = $startClause.Extent.Text.Trim()
+        $startBlock = [scriptblock]::Create($body.Substring(1, $body.Length - 2))
+        $RepositoryRoot = Join-Path $output 'startup-client'
+        $configurationDirectory = Join-Path $RepositoryRoot 'Build/Output/x64/Develop'
+        $null = New-Item -ItemType Directory -Path $configurationDirectory -Force
+        [IO.File]::WriteAllText((Join-Path $configurationDirectory 'GraphicsGadgetLab.exe'), '')
+        $SessionLifetime='automation'; $Configuration='Develop'; $Rhi='dx12'
+        $IdleTimeout=900; $StartTimeoutSeconds=5; $Lab=$null; $Demo=$null; $WindowSize=$null
+        $Visible=$false; $WatchNonFinite=$false; $Validation=$null; $LabParameters=@()
+        $NoDevTools=$false; $StateRoot=$null
+        function Test-SessionPipe { return $false }
+        function Get-SessionDirectory([string]$Id) { return Join-Path $RepositoryRoot $Id }
+        function Start-Process { return $state.process }
+        function Read-SharedText { return 'session-ready: startup-fixture' }
+        function Invoke-SessionRequest([string]$Id, [hashtable]$Request, [int]$ResponseTimeoutSeconds) {
+            $state.commands += $Request.command
+            $state.queryHadHandle = $state.process.handleRetained
+            if ($state.scenario -eq 'lost-status') { throw 'lost startup status response' }
+            if ($state.scenario -eq 'exited-during-query') { $state.process.HasExited=$true }
+            return $state.status
+        }
+        function Write-Result([hashtable]$Result, [int]$ExitCode = 0) {
+            $state.result=$Result; $state.exitCode=$ExitCode
+            throw 'StartupFixtureComplete'
+        }
+        foreach ($scenario in @('matching', 'replacement-pid', 'missing-pid', 'other-session',
+            'missing-run', 'malformed-run', 'non-string-run', 'rejected-status', 'lost-status',
+            'exited-during-query', 'cleanup-failure')) {
+            $Session = "startup-$scenario"
+            $state = @{ scenario=$scenario;commands=@();queryHadHandle=$false;result=$null;exitCode=$null
+                process=[pscustomobject]@{ Id=4242;HasExited=$false;handleRetained=$false;killed=$false
+                    cleanupFails=($scenario -eq 'cleanup-failure') }
+                status=[pscustomobject]@{ ok=$true;session=[pscustomobject]@{id=$Session;pid=4242}
+                    environment=[pscustomobject]@{process=[pscustomobject]@{runIdentity=('a'*32)}} } }
+            $state.process | Add-Member ScriptProperty Handle {
+                $this.handleRetained=$true
+                return [IntPtr]1
+            }
+            $state.process | Add-Member ScriptMethod Kill {
+                if (-not $this.handleRetained) { throw 'Cleanup lost the created process handle.' }
+                if ($this.cleanupFails) { throw 'Created process cleanup failed.' }
+                $this.killed=$true; $this.HasExited=$true
+            }
+            switch ($scenario) {
+                'replacement-pid' { $state.status.session.pid=9001 }
+                'missing-pid' { $state.status.session.PSObject.Properties.Remove('pid') }
+                'other-session' { $state.status.session.id='another-session' }
+                'missing-run' { $state.status.environment.process.runIdentity=$null }
+                'malformed-run' { $state.status.environment.process.runIdentity='NOT-A-RUN' }
+                'non-string-run' { $state.status.environment.process.runIdentity=1234 }
+                'rejected-status' { $state.status.ok=$false }
+                'cleanup-failure' { $state.status.session.pid=9001 }
+            }
+            try { . $startBlock }
+            catch { if ($_.Exception.Message -ne 'StartupFixtureComplete') { throw } }
+            $recordPath = Join-Path (Get-SessionDirectory $Session) 'session.json'
+            Check ($state.queryHadHandle -and $state.commands.Count -eq 1 -and
+                $state.commands[0] -eq 'status') "startup-$scenario-uses-created-handle-and-query-only"
+            if ($scenario -eq 'matching') {
+                $saved = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
+                Check ($state.exitCode -eq 0 -and $state.result.ok -and -not $state.process.killed -and
+                    $state.result.ownership -eq 'created' -and $state.result.pid -eq 4242 -and
+                    $state.result.runIdentity -eq ('a'*32) -and $saved.runIdentity -eq ('a'*32)) `
+                    'startup-matching-live-process-confirms-created-ownership'
+            } else {
+                Check ($state.exitCode -eq 1 -and -not $state.result.ok -and
+                    $state.result.errorCode -eq 'StartIdentityUnconfirmed' -and
+                    $null -eq $state.result.runIdentity -and -not $state.result.ContainsKey('ownership') -and
+                    $state.result.pid -eq 4242 -and -not (Test-Path -LiteralPath $recordPath)) `
+                    "startup-$scenario-grants-no-run-ownership-or-record"
+                if ($scenario -eq 'cleanup-failure') {
+                    Check (-not $state.process.killed -and $state.result.cleanupError -match
+                        'Created process cleanup failed') 'startup-cleanup-failure-retains-recovery-error'
+                } else {
+                    Check ($state.process.killed -eq ($scenario -ne 'exited-during-query')) `
+                        "startup-$scenario-cleans-up-only-live-created-process"
+                }
+            }
+        }
+    }
     # Exercise the real waiting client with deterministic transport outcomes.
     & {
         $tokens = $null; $parseErrors = $null
@@ -110,6 +214,109 @@ try {
         $taken = Wait-ParameterBatch $admission ([DateTime]::UtcNow.AddSeconds(90))
         Check ($taken.ok -and $taken.consumed -and $state.calls -eq 6) 'parameter-terminal-wait-explicitly-releases-slot'
     }
+    # The real client binds a guarded command's run to its whole wait. The fake session admits
+    # the command, then answers polling as a same-name restart whose new process reuses the
+    # handle, so an unguarded query would consume another run's result.
+    $run = '0123456789abcdef0123456789abcdef'
+    function Invoke-RestartedSessionWait([hashtable]$Options) {
+        $session = 'restarted-wait-' + [Guid]::NewGuid().ToString('N').Substring(0, 12)
+        $server = Start-Job -ArgumentList "gglab-session-$session" -ScriptBlock {
+            param([string]$PipeName)
+            $encoding = New-Object Text.UTF8Encoding($false)
+            $requests = @()
+            for ($index = 0; $index -lt 2; ++$index) {
+                $pipe = New-Object IO.Pipes.NamedPipeServerStream($PipeName, [IO.Pipes.PipeDirection]::InOut)
+                try {
+                    if (-not $pipe.WaitForConnectionAsync().Wait(30000)) { break }
+                    $reader = New-Object IO.StreamReader($pipe, $encoding, $false, 4096, $true)
+                    $request = $reader.ReadLine() | ConvertFrom-Json
+                    $requests += $request
+                    $response = if ($index -eq 0) {
+                        @{ protocol=4; id=$request.id; ok=$true; admission='Accepted'; reason='None'; jobId=1; batchId=1
+                            consumed=$false; batch=@{ batchId=1; terminal=$false; revision=$null; items=@() } }
+                    } elseif ($request.PSObject.Properties['expectedRunIdentity']) {
+                        @{ protocol=4; id=$request.id; ok=$false; errorCode='ExpectedRunChanged'
+                            runIdentity='ffffffffffffffffffffffffffffffff' }
+                    } else {
+                        @{ protocol=4; id=$request.id; ok=$true; jobId=1; batchId=1; status='completed'; consumed=$request.consume
+                            batch=@{ batchId=1; terminal=$true; revision=9; items=@() } }
+                    }
+                    $writer = New-Object IO.StreamWriter($pipe, $encoding, 4096, $true)
+                    $writer.NewLine = "`n"
+                    $writer.WriteLine(($response | ConvertTo-Json -Compress -Depth 8))
+                    $writer.Flush()
+                }
+                finally { $pipe.Dispose() }
+            }
+            ConvertTo-Json -InputObject @($requests) -Compress -Depth 8
+        }
+        try {
+            $listening = Wait-VerificationCondition -TimeoutSeconds 30 -Poll {
+                [bool]([IO.Directory]::GetFiles('\\.\pipe\') | Where-Object { $_ -ieq "\\.\pipe\gglab-session-$session" })
+            } -Until { param($ready) $ready }
+            $arguments = @{ Session=$session; TimeoutSeconds=30 }
+            foreach ($key in $Options.Keys) { $arguments[$key] = $Options[$key] }
+            $client = Invoke-VerificationScript (Join-Path $root 'Scripts/Verification/GGLabSession.ps1') $arguments
+            return @{ listening=$listening; client=$client; result=($client.output | ConvertFrom-Json)
+                requests=(ConvertFrom-Json -InputObject ([string](Receive-Job $server -Wait -AutoRemoveJob))) }
+        }
+        finally { Get-Job -Id $server.Id -ErrorAction SilentlyContinue | Remove-Job -Force }
+    }
+    $override = Invoke-RestartedSessionWait @{ Command='host-view-overrides'
+        ExpectedState="{`"runIdentity`":`"$run`",`"contentIdentity`":4,`"hostViewRevision`":2}"
+        Overrides='[{"id":"view.taa.enabled","type":"bool","present":false}]' }
+    $requests = $override.requests
+    Check ($override.listening -and $override.client.exitCode -eq 1 -and -not $override.result.ok -and
+        $override.result.errorCode -eq 'ExpectedRunChanged' -and $requests.Count -eq 2 -and
+        -not $requests[0].PSObject.Properties['expectedRunIdentity'] -and $requests[0].expected.runIdentity -eq $run -and
+        $requests[1].command -eq 'parameter-result' -and $requests[1].expectedRunIdentity -eq $run) 'host-view-override-polling-is-bound-to-the-expected-run'
+    # Protected Assign binds its result polling to the stamp's run as well.
+    $domainState = @{runIdentity=$run;contentIdentity=4;activationRevision=3;domain='lab'
+        labRevision=2;valuesRevision=5;worldRevision=7;environmentRevision=11} | ConvertTo-Json -Compress
+    $assignment = Invoke-RestartedSessionWait @{Command='assign';ExpectedState=$domainState
+        Changes='[{"id":"radius","type":"float","value":2.0}]'}
+    $requests = $assignment.requests
+    Check ($assignment.listening -and $assignment.client.exitCode -eq 1 -and -not $assignment.result.ok -and
+        $assignment.result.errorCode -eq 'ExpectedRunChanged' -and $requests.Count -eq 2 -and
+        $requests[0].command -eq 'assign' -and -not $requests[0].PSObject.Properties['expectedRunIdentity'] -and
+        $requests[0].expected.runIdentity -eq $run -and $requests[1].command -eq 'parameter-result' -and
+        $requests[1].expectedRunIdentity -eq $run) 'protected-assign-polling-is-bound-to-the-expected-run'
+
+    # A required frame state names its run too; it guards admission and the result query.
+    $predicate = Invoke-RestartedSessionWait @{ Command='capture'; OutputDirectory=(Join-Path $output 'restarted-capture')
+        RequiredFrameState="{`"runIdentity`":`"$run`",`"contentIdentity`":4,`"minHostViewRevision`":2,`"values`":[{`"id`":`"view.taa.enabled`",`"type`":`"bool`",`"value`":false}]}" }
+    $requests = $predicate.requests
+    Check ($predicate.listening -and $predicate.client.exitCode -eq 1 -and -not $predicate.result.ok -and
+        $predicate.result.errorCode -eq 'ExpectedRunChanged' -and $requests.Count -eq 2 -and
+        $requests[0].command -eq 'capture' -and $requests[0].expectedRunIdentity -eq $run -and
+        $requests[0].requiredFrameState.runIdentity -eq $run -and
+        $requests[1].command -eq 'result' -and $requests[1].expectedRunIdentity -eq $run) 'required-frame-state-polling-is-bound-to-its-run'
+    # The client adds an expected run only to commands the session checks.
+    & {
+        $tokens = $null; $parseErrors = $null
+        $ast = [Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $root 'Scripts/Verification/GGLabSession.ps1'), [ref]$tokens, [ref]$parseErrors)
+        $definition = $ast.Find({ param($node)
+            $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Add-ExpectedRunIdentity'
+        }, $true)
+        . ([scriptblock]::Create($definition.Extent.Text))
+        $commands = $ast.Find({ param($node)
+            $node -is [Management.Automation.Language.AssignmentStatementAst] -and
+                $node.Left.Extent.Text -eq '$RunCheckedCommands'
+        }, $true)
+        . ([scriptblock]::Create($commands.Extent.Text))
+        $ExpectedRunIdentity = '0123456789abcdef0123456789abcdef'
+        $set = @{ command='set' }; Add-ExpectedRunIdentity $set
+        $status = @{ command='status' }; Add-ExpectedRunIdentity $status
+        # The guarded override operation names its run in the expected control state.
+        $guarded = @{ command='host-view-overrides' }; Add-ExpectedRunIdentity $guarded
+        $ExpectedRunIdentity = ''
+        $unchecked = @{ command='stop' }; Add-ExpectedRunIdentity $unchecked
+        Check ($set.expectedRunIdentity -eq '0123456789abcdef0123456789abcdef' -and
+            -not $status.ContainsKey('expectedRunIdentity') -and -not $guarded.ContainsKey('expectedRunIdentity') -and
+            -not $unchecked.ContainsKey('expectedRunIdentity') -and
+            $RunCheckedCommands.Count -eq 11) 'client-expected-run-identity-only-on-protected-commands'
+    }
     $invalidParameter = Invoke-VerificationScript (Join-Path $root 'Scripts/Verification/GGLabSession.ps1') @{
         Command='set';Session='parameter-invalid';Changes='[]';NoWait=$true;WaitConsumed=$true }
     $invalidResult = $invalidParameter.output | ConvertFrom-Json
@@ -118,6 +325,31 @@ try {
         Command='set';Session='parameter-invalid';ChangesFile=(Join-Path $output 'missing-changes.json') }
     $missingChangesResult = $missingChanges.output | ConvertFrom-Json
     Check ($missingChanges.exitCode -eq 1 -and -not $missingChangesResult.ok) 'parameter-missing-input-file-returns-json'
+    $missingState = Invoke-VerificationScript (Join-Path $root 'Scripts/Verification/GGLabSession.ps1') @{
+        Command='host-view-overrides';Session='parameter-invalid'
+        Overrides='[{"id":"view.taa.enabled","type":"bool","present":false}]' }
+    $missingStateResult = $missingState.output | ConvertFrom-Json
+    Check ($missingState.exitCode -eq 1 -and -not $missingStateResult.ok -and
+        $missingStateResult.error -match 'ExpectedState') 'host-view-overrides-require-expected-state'
+    $stamp = '{"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":4,"hostViewRevision":2}'
+    $release = '[{"id":"view.taa.enabled","type":"bool","present":false}]'
+    foreach ($case in @(
+        @{ name='host-view-overrides-missing-overrides-file-returns-json'; pattern='missing-overrides'
+            options=@{ OverridesFile=(Join-Path $output 'missing-overrides.json'); ExpectedState=$stamp } },
+        @{ name='host-view-overrides-missing-expected-state-file-returns-json'; pattern='missing-state'
+            options=@{ Overrides=$release; ExpectedStateFile=(Join-Path $output 'missing-state.json') } },
+        @{ name='host-view-overrides-reject-malformed-expected-run'; pattern='runIdentity'
+            options=@{ Overrides=$release; ExpectedState=$stamp.ToUpperInvariant() } },
+        @{ name='host-view-overrides-reject-a-conflicting-expected-run'; pattern='differs'
+            options=@{ Overrides=$release; ExpectedState=$stamp; ExpectedRunIdentity='ffffffffffffffffffffffffffffffff' } })) {
+        $arguments = @{ Command='host-view-overrides'; Session='parameter-invalid' }
+        foreach ($key in $case.options.Keys) { $arguments[$key] = $case.options[$key] }
+        $invalid = Invoke-VerificationScript (Join-Path $root 'Scripts/Verification/GGLabSession.ps1') $arguments
+        # An uncaught script error leaves stdout empty, which parses as null.
+        $invalidResult = $invalid.output | ConvertFrom-Json
+        Check ($invalid.exitCode -eq 1 -and $null -ne $invalidResult -and -not $invalidResult.ok -and
+            $invalidResult.error -match $case.pattern) $case.name
+    }
     $standaloneRoot = Join-Path $output 'standalone'
     $firstRun = New-VerificationRunDirectory -OutputDirectory $standaloneRoot -RunId 'first'
     $secondRun = New-VerificationRunDirectory -OutputDirectory $standaloneRoot -RunId 'second'
@@ -209,10 +441,10 @@ switch ($Command) {
     Copy-Item -LiteralPath (Join-Path $root 'Scripts/Verification/VerificationSupport.psm1') -Destination $runnerTools
     [IO.File]::WriteAllText((Join-Path $runnerBin 'GraphicsGadgetLab.exe'), '')
     $leafSource = @'
-param([string]$OutputDirectory, [string]$RunDirectory, [string[]]$Configuration, [string[]]$Rhi)
+param([string]$OutputDirectory, [string]$RunDirectory, [string[]]$Configuration, [string[]]$Rhi, [string]$Python)
 Import-Module (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'Scripts/Verification/VerificationSupport.psm1')
 $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory -RunId 'leaf-run-id'
-[Console]::Out.WriteLine((@{ ok=$true; directory=$directory; configuration=$Configuration; rhi=$Rhi } | ConvertTo-Json -Compress))
+[Console]::Out.WriteLine((@{ ok=$true; directory=$directory; configuration=$Configuration; rhi=$Rhi; python=$Python } | ConvertTo-Json -Compress))
 '@
     # Keep catalog expectations and leaf fixtures together so their counts cannot drift.
     $gpuLeaves = [ordered]@{
@@ -222,8 +454,11 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
         'lab-sun-parameters' = 'TestLabSunParameters.ps1'
         'session-rebuild-parameters' = 'TestRebuildParameters.ps1'
         'session-host-parameters' = 'TestHostParameters.ps1'
+        'protected-assignments' = 'TestProtectedAssignments.ps1'
+        'taa-comparison' = 'TestTaaComparison.ps1'
         'session-parameters' = 'TestSessionParameters.ps1'
         'capture-jobs' = 'TestCaptureJobs.ps1'
+        'session-lifecycle' = 'TestSessionLifecycle.ps1'
         'capture-on-ready' = 'TestCaptureOnReady.ps1'
         'pass-profile-identity' = 'TestPassProfileIdentity.ps1'
         'graph-allocation-facts' = 'TestGraphAllocationFacts.ps1'
@@ -234,13 +469,14 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
     }
     $contractSuites = @(
         'coastal-assets', 'verification-support', 'nonfinite-sites', 'render-graph-schema',
-        'resource-export-schema', 'nonfinite-coverage-schema', 'capture-comparison',
+        'resource-export-schema', 'nonfinite-coverage-schema', 'capture-comparison', 'taa-comparison-workflow',
         'capture-bundle-schema', 'gpu-timing-schema', 'parameter-frames-schema'
     )
     foreach ($leaf in $gpuLeaves.Values) {
         [IO.File]::WriteAllText((Join-Path $runnerTests $leaf), $leafSource, (New-Object Text.UTF8Encoding($false)))
     }
-    $execution = Invoke-VerificationScript (Join-Path $runnerTests 'RunVerification.ps1') @{ Group='gpu'; OutputDirectory=(Join-Path $output 'runner-results') }
+    $execution = Invoke-VerificationScript (Join-Path $runnerTests 'RunVerification.ps1') @{
+        Group='gpu'; Python='fixture-python-path'; OutputDirectory=(Join-Path $output 'runner-results') }
     $gpuResult = $execution.output | ConvertFrom-Json
     Check ($execution.exitCode -eq 0 -and $gpuResult.ok -and
         $gpuResult.suites.Count -eq $gpuLeaves.Count -and
@@ -250,6 +486,10 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
         Check ($leafResult.directory -eq (Join-Path $suiteResult.directory 'run') -and
             $leafResult.configuration[0] -eq 'Develop' -and $leafResult.rhi.Count -eq 2) "runner-compact-$($suiteResult.name)"
     }
+    Check (($gpuResult.suites | Where-Object name -eq 'taa-comparison').steps[0].receipt.python -eq
+        'fixture-python-path') 'runner-forwards-selected-python-to-taa-workflow'
+    Check (($gpuResult.suites | Where-Object name -eq 'session-lifecycle').steps[0].receipt.python -eq
+        'fixture-python-path') 'runner-forwards-selected-python-to-session-lifecycle'
     $unused = Join-Path $output 'must-not-create'
     $list = Invoke-VerificationScript $runner @{ List=$true; OutputDirectory=$unused }
     $items = $list.output | ConvertFrom-Json

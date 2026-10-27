@@ -247,6 +247,7 @@
     <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\RenderViewPanel.cpp" />
     <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiPanelCatalog.cpp" />
     <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\CameraReferenceViewWidgets.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\ViewControlWidgets.cpp" />
     <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiMathWidgets.cpp" />
     <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiProjectionUtils.cpp" />
     <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiTextureUtils.cpp" />
@@ -330,6 +331,7 @@
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Win32Shell.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Control\ApplicationControlCaptureJobs.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Control\ApplicationControlProtocol.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Control\ApplicationSessionLifetime.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Control\ApplicationControlParameters.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\DevTools\EnumText\EnumText.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\DevTools\EnumText\EnumTextGraphics.h" />
@@ -371,6 +373,7 @@
     <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\DebugDrawPanel.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiContext.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\CameraReferenceViewWidgets.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\ViewControlWidgets.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiMathWidgets.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiStyle.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\DevelopGuiTextureUtils.h" />

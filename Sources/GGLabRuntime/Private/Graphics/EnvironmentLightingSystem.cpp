@@ -47,6 +47,7 @@ namespace gglab
 				return { LightingMutationOutcome::Unchanged, m_PreviousGeneration, m_PreviousGeneration };
 			}
 			m_Target.m_Transform->m_Rotation = m_Rotation;
+			m_World.MarkLightingAuthoringChanged();
 			if (m_Kind == WorldLightingMutationKind::Inputs)
 			{
 				m_Target.m_Light->m_WorldSun = m_Inputs.m_Sun;
@@ -54,7 +55,7 @@ namespace gglab
 				m_Owner.SetBackgroundMode(m_Inputs.m_BackgroundMode);
 			}
 			m_Owner.m_RequestedPhysicalSky = std::move(m_Source);
-			m_Owner.RequestRebake();
+			m_Owner.RequestBake();
 			m_Owner.RefreshRenderSettings();
 			return { LightingMutationOutcome::Requested, m_PreviousGeneration,
 				m_Owner.GetBakeRequestGeneration() };
@@ -121,7 +122,7 @@ namespace gglab
 					owner.RecordSettingsWrite(OverrideField::BakeConfiguration);
 					if (changed)
 					{
-						owner.RequestRebake();
+						owner.RequestBake();
 					}
 					break;
 				}
@@ -227,8 +228,15 @@ namespace gglab
 					break;
 				}
 			}
+			GGLAB_ASSERT(owner.m_WritingOverrideOwner == 0);
+			owner.m_WritingOverrideOwner = m_Id;
 			apply();
-			owner.m_OverrideOwners[index] = m_Id;
+			owner.m_WritingOverrideOwner = 0;
+			if (owner.m_OverrideOwners[index] != m_Id)
+			{
+				owner.AdvanceControlRevision();
+				owner.m_OverrideOwners[index] = m_Id;
+			}
 		}
 
 		std::weak_ptr<OverrideLifetime> m_Lifetime;
@@ -257,12 +265,29 @@ namespace gglab
 
 	void EnvironmentLightingSystem::RecordSettingsWrite(OverrideField field) noexcept
 	{
-		m_OverrideOwners[static_cast<size_t>(field)] = 0;
+		auto& owner = m_OverrideOwners[static_cast<size_t>(field)];
+		if (owner != m_WritingOverrideOwner)
+		{
+			AdvanceControlRevision();
+		}
+		owner = m_WritingOverrideOwner;
+	}
+
+	void EnvironmentLightingSystem::AdvanceControlRevision() noexcept
+	{
+		if (m_ControlRevision != std::numeric_limits<uint64_t>::max())
+		{
+			++m_ControlRevision;
+		}
 	}
 
 	void EnvironmentLightingSystem::SetSkyboxEnabled(bool enabled) noexcept
 	{
 		RecordSettingsWrite(OverrideField::Skybox);
+		if (m_Settings.m_EnableSkybox != enabled)
+		{
+			AdvanceControlRevision();
+		}
 		m_Settings.m_EnableSkybox = enabled;
 	}
 
@@ -278,9 +303,10 @@ namespace gglab
 			return;
 		}
 		m_Source = std::move(source);
+		AdvanceControlRevision();
 		if (!m_RequestedPhysicalSky)
 		{
-			RequestRebake();
+			RequestBake();
 		}
 	}
 
@@ -292,6 +318,7 @@ namespace gglab
 			const float clampedIntensity = std::max(intensity, 0.0f);
 			if (m_Settings.m_Intensity != clampedIntensity)
 			{
+				AdvanceControlRevision();
 				m_Settings.m_Intensity = clampedIntensity;
 				m_RenderResourceRegistry->MarkAllIBLPreviewsDirty();
 			}
@@ -307,6 +334,7 @@ namespace gglab
 			const float wrappedRotation = std::remainder(rotationRadians, FullRotation);
 			if (m_Settings.m_RotationRadians != wrappedRotation)
 			{
+				AdvanceControlRevision();
 				m_Settings.m_RotationRadians = wrappedRotation;
 				m_RenderResourceRegistry->MarkAllIBLPreviewsDirty();
 			}
@@ -326,7 +354,8 @@ namespace gglab
 
 		m_Settings.m_BakeConfig.m_PrefilteredSpecularSampleCount = clampedSampleCount;
 		m_Settings.m_QualityPreset = IBLQualityPreset::Custom;
-		RequestRebake();
+		AdvanceControlRevision();
+		RequestBake();
 	}
 
 	void EnvironmentLightingSystem::SetPrefilteredSpecularMaxSampleLuminance(
@@ -348,7 +377,8 @@ namespace gglab
 
 		m_Settings.m_BakeConfig.m_PrefilteredSpecularMaxSampleLuminance = clampedLuminance;
 		m_Settings.m_QualityPreset = IBLQualityPreset::Custom;
-		RequestRebake();
+		AdvanceControlRevision();
+		RequestBake();
 	}
 
 	void EnvironmentLightingSystem::SetQualityPreset(IBLQualityPreset preset) noexcept
@@ -365,10 +395,17 @@ namespace gglab
 
 		m_Settings.m_QualityPreset = preset;
 		m_Settings.m_BakeConfig = GetIBLBakeConfig(preset);
-		RequestRebake();
+		AdvanceControlRevision();
+		RequestBake();
 	}
 
 	void EnvironmentLightingSystem::RequestRebake(bool ignoreCache) noexcept
+	{
+		AdvanceControlRevision();
+		RequestBake(ignoreCache);
+	}
+
+	void EnvironmentLightingSystem::RequestBake(bool ignoreCache) noexcept
 	{
 		++m_BakeRequestGeneration;
 		m_RequestTime = std::chrono::steady_clock::now();
@@ -385,6 +422,10 @@ namespace gglab
 			mode == EnvironmentBackgroundMode::PhysicalSky)
 		{
 			RecordSettingsWrite(OverrideField::Background);
+			if (m_Settings.m_BackgroundMode != mode)
+			{
+				AdvanceControlRevision();
+			}
 			m_Settings.m_BackgroundMode = mode;
 		}
 	}
@@ -419,7 +460,7 @@ namespace gglab
 					HashWorldLightingAuthoring(requested->m_Provenance->m_Inputs);
 			}
 			m_RequestedPhysicalSky = requested;
-			RequestRebake();
+			RequestBake();
 		}
 		RefreshRenderSettings();
 	}

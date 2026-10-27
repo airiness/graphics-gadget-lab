@@ -103,7 +103,13 @@ namespace gglab
 		{
 			return false;
 		}
-		m_World.GetRegistry().destroy(static_cast<entt::entity>(target.m_EntityId));
+		const auto entity = static_cast<entt::entity>(target.m_EntityId);
+		const auto* light = m_World.GetRegistry().try_get<components::LightComponent>(entity);
+		if (light && light->m_Type == LightType::Directional)
+		{
+			m_World.MarkLightingAuthoringChanged();
+		}
+		m_World.GetRegistry().destroy(entity);
 		return true;
 	}
 
@@ -120,6 +126,11 @@ namespace gglab
 			return false;
 		}
 		registry.emplace<components::TransformComponent>(entity);
+		const auto* light = registry.try_get<components::LightComponent>(entity);
+		if (light && light->m_Type == LightType::Directional)
+		{
+			m_World.MarkLightingAuthoringChanged();
+		}
 		return true;
 	}
 
@@ -181,6 +192,12 @@ namespace gglab
 			return false;
 		}
 		*transform = value;
+		const auto* light = m_World.GetRegistry().try_get<components::LightComponent>(
+			static_cast<entt::entity>(target.m_EntityId));
+		if (light && light->m_Type == LightType::Directional)
+		{
+			m_World.MarkLightingAuthoringChanged();
+		}
 		return true;
 	}
 
@@ -205,6 +222,10 @@ namespace gglab
 		if (normalized.m_Type != light->m_Type && normalized.m_Type != LightType::Directional)
 		{
 			normalized.m_DirectionalShadowSettings.reset();
+		}
+		if (light->m_Type == LightType::Directional || normalized.m_Type == LightType::Directional)
+		{
+			m_World.MarkLightingAuthoringChanged();
 		}
 		*light = normalized;
 		return true;

@@ -15,8 +15,8 @@ and executable from the same revision (control protocol v4).
 | Need | Reference |
 | --- | --- |
 | One screenshot, settings or image comparison | [Captures and comparison](references/captures.md) |
-| Discover/set Host or Lab parameters; Immediate/Deferred/Rebuild receipts | [Session parameters](references/session-parameters.md) |
-| Job admission, result consumption or artifact provenance | [Session jobs and artifacts](references/session-jobs.md) |
+| Set Host/Lab parameters, pin or release Host overrides, inspect effects | [Session parameters](references/session-parameters.md) |
+| Capture an expected frame state, manage jobs or inspect provenance | [Session jobs and artifacts](references/session-jobs.md) |
 | Scheduled events, camera paths, references or GPU timing | [Sequences](references/sequences.md) |
 | Pass order, barriers or exact texture/buffer values | [Graph and resource exports](references/graph-and-resources.md) |
 | NaN/Inf, recovery counters or submitted-frame coverage | [Non-finite diagnostics](references/nonfinite.md) |
@@ -97,18 +97,17 @@ directory; do not combine them. Audits/overhead/baselines remain separate tools.
 
 ## Inspect and finish
 
-- Control `ok`/exit 0 is not an effect verdict. Require capture Completed +
-  Published, completed sequence publications, successful parameter receipts and
-  any requested watch claims. Use the relevant reference for async query/consumption.
+- Check the requested outcome: Completed + Published captures, completed sequence
+  publications, successful parameter effects and any requested watch claims.
+  The references define waiting and result consumption for each workflow.
 - Open PNGs with the available image-viewing tool; inspect saved metadata for
   content/camera/frame/time, readiness, settings and frozen parameters. Inspect
   `Build/Sessions/<id>/output.log` for assertions, shader/validation failures and
   lifetime/synchronization errors.
-- Compare matched inputs and inspect differences. Image, numerical and timing
-  correctness need their own evidence; a successful write, shader compile,
-  clean scan or headless test does not establish all three.
+- Compare matched inputs and inspect the images, numerical values or timings
+  relevant to the task.
 - Stop every session you started, including after failure, and inspect `exitCode`.
-  Do not link while the target executable runs. Default logs/captures remain under
-  `Build/Sessions/<id>/`; the 900-second idle timeout is not a cleanup strategy.
+  Finish the session before linking a new executable. Default logs/captures remain
+  under `Build/Sessions/<id>/`.
 - Report configuration, backend/content/view or path, inspected artifact paths,
   observed results and material gaps. Keep run-specific results out of this skill.

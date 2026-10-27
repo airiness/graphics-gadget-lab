@@ -6,6 +6,7 @@
 #include "ShaderArtifactRuntime/ShaderProgramRegistryArtifact.h"
 
 #include "GGLabFoundation/Hash/Sha256.h"
+#include "Graphics/IBLBakeScheduler.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
 #include "Graphics/RHI/DX12/Utility/DX12BindingLayoutUtils.h"
@@ -26,6 +27,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <initializer_list>
 #include <span>
 #include <thread>
 #include <utility>
@@ -915,6 +917,81 @@ namespace gglab
 			std::filesystem::remove_all(root, errorCode);
 		}
 
+		void RunIBLProducerSnapshotTests(SelfTestContext& context) noexcept
+		{
+			const auto root = std::filesystem::temp_directory_path() / "gglab-ibl-producer-snapshot-test";
+			std::error_code error;
+			std::filesystem::remove_all(root, error);
+			// Construct the fixture after startup, independently of the scheduler's snapshot.
+			const std::array programs
+			{
+				shader_programs::IBLEnvironmentVertex,
+				shader_programs::IBLEnvironmentPixel,
+				shader_programs::IBLEnvironmentMipVertex,
+				shader_programs::IBLEnvironmentMipPixel,
+				shader_programs::IBLIrradianceVertex,
+				shader_programs::IBLIrradiancePixel,
+				shader_programs::IBLPrefilteredSpecularVertex,
+				shader_programs::IBLPrefilteredSpecularPixel,
+				shader_programs::IBLBrdfLUTVertex,
+				shader_programs::IBLBrdfLUTPixel,
+				shader_programs::IBLImportanceVertex,
+				shader_programs::IBLImportancePixel,
+			};
+			std::vector<ShaderProgramRegistryEntry> entries;
+			bool written = true;
+			for (size_t index = 0; index < programs.size(); ++index)
+			{
+				const auto artifact = MakeDxilArtifact(programs[index].m_Stage, static_cast<uint8_t>(index));
+				written &= WriteArtifactFixture(root, artifact);
+				entries.push_back({ programs[index], ShaderTargetProfile::GGLabDX12, MakeRef(artifact) });
+			}
+			const auto registry = WriteRegistryFixture(root, entries);
+			context.Check(written && registry.has_value(), "IBL producer registry fixture is complete");
+			if (!written || !registry)
+			{
+				std::filesystem::remove_all(root, error);
+				return;
+			}
+			ShaderManager manager({ .m_ActiveBackend = RHIBackendType::DX12,
+				.m_ArtifactRoot = root, .m_ActiveRegistry = *registry });
+			IBLShaderArtifactIdentities identities{};
+			ShaderProgramRegistryArtifactRef captured{};
+			const bool complete = detail::CaptureIBLProducerArtifacts(manager, identities, captured);
+			context.Check(complete && captured == *registry &&
+				std::ranges::all_of(identities, &IBLStageShaderArtifactIdentity::IsValid),
+				"IBL captures twelve initialized canonical producer identities from the active registry");
+			const auto matches = [&](IBLArtifactStage stage, std::initializer_list<size_t> indices)
+				{
+					const auto& identity = identities[static_cast<size_t>(stage)];
+					size_t destination = 0;
+					return identity.m_Count == indices.size() && std::ranges::all_of(indices, [&](size_t index)
+						{
+							return identity.m_ArtifactRefs[destination++] == entries[index].m_ArtifactRef;
+						});
+				};
+			context.Check(complete && matches(IBLArtifactStage::Environment, { 0, 1, 2, 3 }) &&
+				matches(IBLArtifactStage::Irradiance, { 4, 5 }) &&
+				matches(IBLArtifactStage::PrefilteredSpecular, { 6, 7, 10, 11 }) &&
+				matches(IBLArtifactStage::BrdfLut, { 8, 9 }),
+				"IBL stage provenance retains its exact producer artifacts, including importance shaders");
+			entries.pop_back();
+			const auto incompleteRegistry = WriteRegistryFixture(root, entries);
+			if (incompleteRegistry)
+			{
+				ShaderManager incomplete({ .m_ActiveBackend = RHIBackendType::DX12,
+					.m_ArtifactRoot = root, .m_ActiveRegistry = *incompleteRegistry });
+				context.Check(!detail::CaptureIBLProducerArtifacts(incomplete, identities, captured) &&
+					!captured.IsValid() && std::ranges::none_of(identities, &IBLStageShaderArtifactIdentity::IsValid),
+					"Missing IBL producer mappings clear prior provenance instead of publishing a partial snapshot");
+			}
+			else
+			{
+				context.Check(false, "Incomplete IBL producer registry fixture is available");
+			}
+			std::filesystem::remove_all(root, error);
+		}
+
 		void RunArtifactLocalPipelineInvalidationTests(SelfTestContext& context) noexcept
 		{
 			const std::filesystem::path root = std::filesystem::temp_directory_path() /
@@ -1315,6 +1392,7 @@ namespace gglab
 		RunCompatibilityTests(context);
 		RunStoreTests(context);
 		RunArtifactOnlyShaderManagerTests(context);
+		RunIBLProducerSnapshotTests(context);
 		RunArtifactLocalPipelineInvalidationTests(context);
 		RunCounterPipelineLayoutTests(context);
 	}

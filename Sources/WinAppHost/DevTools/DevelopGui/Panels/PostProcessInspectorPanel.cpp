@@ -1,4 +1,5 @@
 #include "DevTools/DevelopGui/Panels/PostProcessInspectorPanel.h"
+#include "DevTools/DevelopGui/ViewControlWidgets.h"
 #include "DevTools/DevToolsRuntime.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
@@ -257,6 +258,7 @@ namespace gglab
 
 	void PostProcessInspectorPanel::Draw(DevelopGuiContext& context) noexcept
 	{
+		devtools::DrawViewControlSnapshot(context.m_ViewControl, context.m_ViewControlActions, "view.exposure.");
 		auto* diagnostics = context.m_Diagnostics;
 		if (!diagnostics)
 		{

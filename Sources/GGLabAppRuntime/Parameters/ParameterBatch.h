@@ -1,23 +1,44 @@
 #pragma once
 #include "Lab/LabParameter.h"
+#include "Parameters/HostViewParameters.h"
+#include "Parameters/ParameterRequest.h"
 #include "Parameters/ParameterEffectReceipt.h"
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
 namespace gglab
 {
-	// Zero is the external session client. Internal owners use their stable nonzero identity.
+	enum class ParameterBatchOwnerKind : uint8_t
+	{
+		External,
+		Sequence,
+		Tooling,
+	};
+
 	class ParameterBatchOwner final
 	{
 	public:
 		constexpr ParameterBatchOwner() noexcept = default;
-		explicit constexpr ParameterBatchOwner(uint64_t identity) noexcept : m_Identity(identity) {}
-		[[nodiscard]] bool IsExternal() const noexcept { return m_Identity == 0; }
+		[[nodiscard]] static constexpr ParameterBatchOwner Sequence(uint64_t identity) noexcept
+		{
+			return { ParameterBatchOwnerKind::Sequence, identity };
+		}
+		[[nodiscard]] static constexpr ParameterBatchOwner Tooling(uint64_t identity) noexcept
+		{
+			return { ParameterBatchOwnerKind::Tooling, identity };
+		}
+		[[nodiscard]] bool IsExternal() const noexcept { return m_Kind == ParameterBatchOwnerKind::External; }
+		[[nodiscard]] ParameterBatchOwnerKind GetKind() const noexcept { return m_Kind; }
+		[[nodiscard]] uint64_t GetIdentity() const noexcept { return m_Identity; }
 		bool operator==(const ParameterBatchOwner&) const noexcept = default;
 
 	private:
+		constexpr ParameterBatchOwner(ParameterBatchOwnerKind kind, uint64_t identity) noexcept :
+			m_Kind(kind), m_Identity(identity) {}
+		ParameterBatchOwnerKind m_Kind = ParameterBatchOwnerKind::External;
 		uint64_t m_Identity = 0;
 	};
 
@@ -39,9 +60,12 @@ namespace gglab
 		ParameterBatchState m_State = ParameterBatchState::Queued;
 		LabChangeImpact m_Impact = LabChangeImpact::Immediate;
 		// Owned admission values remain queryable before application or after session replacement.
+		// A Host view operation records each item's resolved target when it applies.
 		std::vector<LabParameterValue> m_Values;
 		std::vector<ParameterEffectSnapshot> m_Items;
 		std::string m_Failure;
+		std::optional<HostViewOverrideOperation> m_HostViewOperation;
+		std::optional<ParameterControlOperation> m_DomainOperation;
 
 		[[nodiscard]] bool IsTerminal() const noexcept
 		{

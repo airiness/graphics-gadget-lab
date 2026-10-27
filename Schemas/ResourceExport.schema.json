@@ -80,7 +80,8 @@
         "parameterRevision": {
           "type": ["integer", "null"], "minimum": 0
         },
-        "parameters": {"type": ["object", "null"]}
+        "parameters": {"type": ["object", "null"]},
+        "control": {"type": ["object", "null"]}
       }
     },
     "submission": {

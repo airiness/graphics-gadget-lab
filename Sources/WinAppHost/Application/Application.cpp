@@ -57,6 +57,7 @@ namespace gglab
 		m_CaptureOnReady(std::move(createInfo.m_CaptureOnReady)),
 		m_CaptureTimeout(createInfo.m_CaptureTimeoutSeconds),
 		m_SessionId(std::move(createInfo.m_SessionId)),
+		m_SessionLifetime(createInfo.m_SessionLifetime),
 		m_IdleTimeout(createInfo.m_IdleTimeoutSeconds),
 		m_Hidden(createInfo.m_Hidden)
 	{
@@ -339,8 +340,7 @@ namespace gglab
 
 		if (m_AppRuntime->GetLifecycleState() == AppRuntimeLifecycleState::Suspended)
 		{
-			m_PlatformHost->WaitForEvents();
-			return true;
+			return WaitWhileSuspended();
 		}
 
 		if (m_Hidden)
@@ -390,8 +390,7 @@ namespace gglab
 		}
 		if (tickResult == AppRuntimeTickResult::Suspended)
 		{
-			m_PlatformHost->WaitForEvents();
-			return true;
+			return WaitWhileSuspended();
 		}
 		if (tickResult == AppRuntimeTickResult::Fatal)
 		{
@@ -506,7 +505,8 @@ namespace gglab
 		std::wstring pipeName = L"\\\\.\\pipe\\gglab-session-";
 		pipeName.append(m_SessionId.begin(), m_SessionId.end());
 		m_ControlServer = std::make_unique<win32::NamedPipeServer>();
-		if (!m_ControlServer->Start(pipeName))
+		if (!m_ControlServer->Start(pipeName, std::chrono::seconds(5),
+			[this]() noexcept { m_PlatformHost->Wake(); }))
 		{
 			GGLAB_LOG_ERROR_ALWAYS("Session '{}' could not open its control pipe; the id may "
 				"already be in use.", m_SessionId);
@@ -545,7 +545,8 @@ namespace gglab
 
 		// Client polling counts as activity, retained receipts do not. Waiting for
 		// content that never loads must not keep an abandoned session alive.
-		if (now - m_LastControlActivity > m_IdleTimeout)
+		if (m_SessionLifetime == ApplicationSessionLifetime::Automation &&
+			now - m_LastControlActivity >= m_IdleTimeout)
 		{
 			GGLAB_LOG_INFO_ALWAYS("Session '{}' exits after {} idle seconds.", m_SessionId,
 				m_IdleTimeout.count());
@@ -554,10 +555,42 @@ namespace gglab
 		return true;
 	}
 
+	bool Application::WaitWhileSuspended() noexcept
+	{
+		m_AppRuntime->ServiceControlDeadlines();
+		std::optional<std::chrono::steady_clock::time_point> deadline;
+		if (m_ControlServer)
+		{
+			if (!UpdateControlSession())
+			{
+				return false;
+			}
+			if (m_SessionLifetime == ApplicationSessionLifetime::Automation)
+			{
+				const auto idleDeadline = m_LastControlActivity +
+					std::chrono::ceil<std::chrono::steady_clock::duration>(m_IdleTimeout);
+				deadline = deadline ? std::min(*deadline, idleDeadline) : idleDeadline;
+			}
+		}
+		if (const auto selectionDeadline = m_AppRuntime->GetNextControlDeadline())
+		{
+			deadline = deadline ? std::min(*deadline, *selectionDeadline) : *selectionDeadline;
+		}
+		m_PlatformHost->WaitForEvents(deadline);
+		return true;
+	}
+
 	void Application::HandleControlRequest(
 		const std::shared_ptr<win32::NamedPipeRequest>& pipeRequest,
 		ApplicationControlRequest&& request) noexcept
 	{
+		// Checked before any handle lookup or admission, so a stale client changes nothing.
+		if (auto rejected = CheckApplicationControlRunIdentity(request,
+			m_AppRuntime ? std::string_view(m_AppRuntime->GetRunIdentity()) : std::string_view{}))
+		{
+			pipeRequest->Respond(std::move(*rejected));
+			return;
+		}
 		const FrameSequenceCoordinator* frameSequence =
 			m_AppRuntime ? m_AppRuntime->GetFrameSequenceCoordinator() : nullptr;
 		const FrameCaptureCoordinator* frameCapture =
@@ -573,14 +606,18 @@ namespace gglab
 					std::chrono::duration<double>(std::chrono::steady_clock::now() - m_StartTime)
 					.count(),
 				.m_Hidden = m_Hidden,
+				.m_RuntimeState = m_AppRuntime->GetLifecycleState(),
+				.m_Lifetime = m_SessionLifetime,
+				.m_IdleTimeoutSeconds = m_SessionLifetime == ApplicationSessionLifetime::Automation ?
+					std::optional(m_IdleTimeout.count()) : std::nullopt,
 				.m_Width = m_WindowWidth,
 				.m_Height = m_WindowHeight,
 				.m_CaptureIntake = m_AppRuntime ? m_AppRuntime->GetCaptureIntakeSnapshot() : CaptureIntakeSnapshot{},
 				.m_SettledFrames = m_FrameCapture ? m_FrameCapture->GetSettledFrameCount() : 0,
 				.m_Frame = m_FrameCapture ? m_FrameCapture->GetLastFrameState() : nullptr,
 				.m_Sequence = frameSequence ? frameSequence->GetStatus() : nullptr,
-				.m_NonFiniteInstrumentation = m_AppRuntime && m_AppRuntime->GetFrameCaptureCoordinator()->HasNonFiniteInstrumentation(),
-				.m_NonFiniteProduction = m_AppRuntime ? m_AppRuntime->GetFrameCaptureCoordinator()->GetLatestNonFiniteProductionFrame() : nullptr,
+				.m_NonFiniteInstrumentation = frameCapture && frameCapture->HasNonFiniteInstrumentation(),
+				.m_NonFiniteProduction = frameCapture ? frameCapture->GetLatestNonFiniteProductionFrame() : nullptr,
 				.m_Watch = m_AppRuntime && m_AppRuntime->GetNonFiniteWatchCoordinator() ? &m_AppRuntime->GetNonFiniteWatchCoordinator()->GetStatus() : nullptr,
 				.m_Environment = frameCapture ? std::string_view(frameCapture->GetEnvironmentJson()) : std::string_view{},
 				.m_ParametersAvailable = parameters && parameters->IsAvailable(),
@@ -588,6 +625,7 @@ namespace gglab
 				.m_ParameterBatch = parameters ? parameters->GetParameterBatchStatus() : nullptr,
 				.m_LightingProfiles = parameters ? &parameters->GetLightingProfilePublication() : nullptr,
 				.m_LightingProfileError = parameters ? parameters->GetLightingProfileError() : std::string{},
+				.m_HostViewControl = m_AppRuntime ? m_AppRuntime->GetHostViewControlStamp() : HostViewControlStamp{},
 				}));
 			return;
 		case ApplicationControlCommand::Parameters:
@@ -597,9 +635,17 @@ namespace gglab
 			pipeRequest->Respond(SubmitApplicationControlParameters(request.m_Id,
 				request.m_ParameterChanges, m_AppRuntime.get()));
 			return;
+		case ApplicationControlCommand::Assign:
+			pipeRequest->Respond(SubmitApplicationControlParameters(request.m_Id,
+				request.m_ParameterChanges, m_AppRuntime.get(), &request.m_ExpectedParameterControl));
+			return;
 		case ApplicationControlCommand::ParameterResult:
 			pipeRequest->Respond(QueryApplicationControlParameters(request.m_Id,
 				request.m_ParameterBatchId, request.m_Consume, m_AppRuntime.get()));
+			return;
+		case ApplicationControlCommand::HostViewOverrides:
+			pipeRequest->Respond(SubmitApplicationControlHostViewOverrides(request.m_Id,
+				request.m_ExpectedHostView, request.m_HostViewOverrides, m_AppRuntime.get()));
 			return;
 		case ApplicationControlCommand::Watch:
 		{

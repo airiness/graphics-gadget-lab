@@ -34,6 +34,14 @@ camera, temporal and sequence inputs to match exactly. Static elapsed time and
 IBL publication serials may differ. Incompatible inputs fail before pixel metrics
 are reported; tolerances still need to be selected for the intended image claim.
 
+-AllowedDifferencePolicy accepts gglab.capture-comparison-policy v1 JSON with
+timeMode "static" and allowedDifferences: an explicit list of compared paths.
+Unknown/duplicate paths, wildcards and whole consumer/service arrays reject.
+Policy reporting is exact and marks each difference with expected/reason; the
+same permissions govern -RequireMatchingInputs. Consumer arrays are keyed by
+name, Host projection by id, and temporal.services must equal the consumer union.
+Use TaaComparison.policy.json for the fixed hidden TAA experiment.
+
 Prints one JSON object on stdout. The exit code is 0 when every pair was
 compared and stays within the optional tolerances and no sidecar was rejected,
 and 1 otherwise.
@@ -56,7 +64,9 @@ param(
     [double]$MaxMeanError = [double]::PositiveInfinity,
     [double]$MaxDifferingPercent = [double]::PositiveInfinity,
     # Require recorded scene/asset inputs to agree before interpreting pixel errors.
-    [switch]$RequireMatchingInputs
+    [switch]$RequireMatchingInputs,
+    # Versioned explicit field permissions for controlled experiments; no wildcards.
+    [string]$AllowedDifferencePolicy
 )
 
 $ErrorActionPreference = 'Stop'
@@ -256,6 +266,99 @@ function Get-MetadataDifferences($ReferenceMetadata, $CandidateMetadata) {
     return $differences
 }
 
+# A policy uses the same exact comparison for reporting and the strict input gate.
+# Control stamps and predicates identify the arms; only the projected view is an input.
+function Read-DifferencePolicy([string]$Path) {
+    $policy = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+    $names = @($policy.PSObject.Properties.Name | Sort-Object)
+    if (($names -join ',') -cne 'allowedDifferences,schema,schemaVersion,timeMode' -or
+        $policy.schema -cne 'gglab.capture-comparison-policy' -or $policy.schemaVersion -ne 1 -or
+        $policy.timeMode -cne 'static' -or $policy.allowedDifferences -isnot [array]) {
+        throw 'Expected capture-comparison-policy v1 with static timeMode and an allowedDifferences array.'
+    }
+    $known = @($ComparedMetadataFields | Where-Object { $_ -notin @('temporal.consumers', 'temporal.services') }) + @(
+        'temporal.consumers[name=temporal-aa]', 'temporal.consumers[name=reference]',
+        'temporal.consumers[name=temporal-gtao]', 'control.hostView[id=view.taa.enabled]')
+    $seen = @{}
+    foreach ($path in $policy.allowedDifferences) {
+        if ($path -isnot [string] -or $known -cnotcontains $path -or $seen.ContainsKey($path)) {
+            throw "Unknown, duplicate or unrestricted policy path: $path"
+        }
+        $seen[$path] = $true
+    }
+    return $policy
+}
+
+function Get-KeyedEntries($Values, [string]$Key, [string]$Path) {
+    $entries = @{}
+    foreach ($entry in @($Values)) {
+        $name = Get-Field $entry $Key
+        if (-not $name -or $entries.ContainsKey($name)) { throw "$Path has a missing or duplicate $Key." }
+        $entries[$name] = $entry
+    }
+    return ,$entries
+}
+
+function Get-PolicyInputs($Metadata) {
+    $inputs = @{}
+    foreach ($field in $ComparedMetadataFields) {
+        if ($field -notin @('temporal.consumers', 'temporal.services', 'sceneInputs')) {
+            $inputs[$field] = Get-MetadataValue $Metadata $field
+        }
+    }
+    $scene = Get-MetadataValue $Metadata 'sceneInputs'
+    if ($null -ne $scene) {
+        $scene = $scene | ConvertTo-Json -Depth 32 | ConvertFrom-Json
+        $environment = Get-Field $scene 'environment'
+        $inputs['sceneInputs.environment.activeIBLGeneration'] = Get-Field $environment 'activeIBLGeneration'
+        if ($null -ne $environment) { $environment.PSObject.Properties.Remove('activeIBLGeneration') }
+    }
+    $inputs['sceneInputs'] = $scene
+    $consumers = Get-KeyedEntries (Get-MetadataValue $Metadata 'temporal.consumers') 'name' 'temporal.consumers'
+    foreach ($name in @('temporal-aa', 'reference', 'temporal-gtao')) {
+        if (-not $consumers.ContainsKey($name)) { throw "Missing temporal consumer $name." }
+    }
+    $union = @()
+    foreach ($name in $consumers.Keys) {
+        $inputs["temporal.consumers[name=$name]"] = $consumers[$name]
+        $union += @(Get-Field $consumers[$name] 'services')
+    }
+    $union = @($union | Sort-Object -Unique)
+    $services = @(Get-MetadataValue $Metadata 'temporal.services' | Sort-Object)
+    if (-not (Test-SameValue $union $services $true)) {
+        throw 'temporal.services must equal the union of consumer services.'
+    }
+    # Consumer service lists remain exact inputs. Their checked union may differ
+    # only through the individually permitted consumer entries.
+    $control = Get-MetadataValue $Metadata 'control'
+    if ((Get-Field $control 'schemaVersion') -ne 1) { throw 'Missing control evidence v1.' }
+    $view = Get-KeyedEntries (Get-Field $control 'hostView') 'id' 'control.hostView'
+    if (-not $view.Count) { throw 'Missing Host view projection.' }
+    foreach ($id in $view.Keys) { $inputs["control.hostView[id=$id]"] = $view[$id] }
+    return ,$inputs
+}
+
+function Get-PolicyDifferences($ReferenceMetadata, $CandidateMetadata) {
+    $left = Get-PolicyInputs $ReferenceMetadata
+    $right = Get-PolicyInputs $CandidateMetadata
+    foreach ($field in @(@($left.Keys) + @($right.Keys) | Sort-Object -Unique)) {
+        if (-not (Test-SameValue $left[$field] $right[$field] $true)) {
+            $reason = if ($field -eq 'time.totalTime') { 'static-time' }
+                elseif ($field -eq 'sceneInputs.environment.activeIBLGeneration') { 'ibl-publication' }
+                elseif ($script:DifferencePolicy.allowedDifferences -ccontains $field) { 'declared' }
+                else { $null }
+            @{ field = $field; reference = $left[$field]; candidate = $right[$field]
+                expected = [bool]$reason; reason = $reason }
+        }
+    }
+}
+
+$script:DifferencePolicy = $null
+if ($AllowedDifferencePolicy) {
+    try { $script:DifferencePolicy = Read-DifferencePolicy $AllowedDifferencePolicy }
+    catch { Fail $_.Exception.Message }
+}
+
 # Reads a capture sidecar; returns the metadata, or a rejection reason.
 function Read-CaptureMetadata([string]$Path) {
     try {
@@ -341,6 +444,11 @@ function Compare-Pair([string]$Key, [string]$ReferenceImage, [string]$CandidateI
         metadataDifferences = @(Get-MetadataDifferences $ReferenceMetadata $CandidateMetadata)
     }
     $inputDifferences = @()
+    if ($script:DifferencePolicy) {
+        $pair.metadataDifferences = @()
+        try { $pair.metadataDifferences = @(Get-PolicyDifferences $ReferenceMetadata $CandidateMetadata) }
+        catch { $inputDifferences += $_.Exception.Message }
+    }
     if ($RequireMatchingInputs) {
         if ((Get-MetadataValue $ReferenceMetadata 'sceneInputs.schemaVersion') -ne 1 -or
             (Get-MetadataValue $CandidateMetadata 'sceneInputs.schemaVersion') -ne 1) {
@@ -353,21 +461,26 @@ function Compare-Pair([string]$Key, [string]$ReferenceImage, [string]$CandidateI
                 }
             }
         }
-        foreach ($field in @($ComparedMetadataFields | Where-Object { $_ -ne 'time.totalTime' })) {
-            $a = Get-MetadataValue $ReferenceMetadata $field
-            $b = Get-MetadataValue $CandidateMetadata $field
-            # Publication serials identify an IBL instance, not its lighting inputs.
-            if ($field -eq 'sceneInputs' -and $null -ne $a -and $null -ne $b) {
-                $a = $a | ConvertTo-Json -Depth 12 | ConvertFrom-Json
-                $b = $b | ConvertTo-Json -Depth 12 | ConvertFrom-Json
-                if ($null -ne (Get-Field $a 'environment')) {
-                    (Get-Field $a 'environment').PSObject.Properties.Remove('activeIBLGeneration')
+        if ($script:DifferencePolicy) {
+            $inputDifferences += @($pair.metadataDifferences | Where-Object { -not $_.expected } | ForEach-Object { $_.field })
+        }
+        else {
+            foreach ($field in @($ComparedMetadataFields | Where-Object { $_ -ne 'time.totalTime' })) {
+                $a = Get-MetadataValue $ReferenceMetadata $field
+                $b = Get-MetadataValue $CandidateMetadata $field
+                # Publication serials identify an IBL instance, not its lighting inputs.
+                if ($field -eq 'sceneInputs' -and $null -ne $a -and $null -ne $b) {
+                    $a = $a | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+                    $b = $b | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+                    if ($null -ne (Get-Field $a 'environment')) {
+                        (Get-Field $a 'environment').PSObject.Properties.Remove('activeIBLGeneration')
+                    }
+                    if ($null -ne (Get-Field $b 'environment')) {
+                        (Get-Field $b 'environment').PSObject.Properties.Remove('activeIBLGeneration')
+                    }
                 }
-                if ($null -ne (Get-Field $b 'environment')) {
-                    (Get-Field $b 'environment').PSObject.Properties.Remove('activeIBLGeneration')
-                }
+                if (-not (Test-SameValue $a $b $true)) { $inputDifferences += $field }
             }
-            if (-not (Test-SameValue $a $b $true)) { $inputDifferences += $field }
         }
     }
     $pair['inputDifferences'] = $inputDifferences

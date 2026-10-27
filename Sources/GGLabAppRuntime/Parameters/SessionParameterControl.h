@@ -1,7 +1,9 @@
 #pragma once
 #include "Parameters/ParameterBatch.h"
+#include "Parameters/ParameterRequest.h"
 #include "Parameters/ParameterSource.h"
 #include "Parameters/ParameterFrameState.h"
+#include "Parameters/HostViewParameters.h"
 #include "ApplicationToolingIntegration.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
@@ -51,12 +53,23 @@ namespace gglab
 		[[nodiscard]] const std::string& GetContentId() const noexcept { return m_ContentId; }
 		[[nodiscard]] uint64_t GetContentIdentity() const noexcept { return m_ContentSerial; }
 		[[nodiscard]] uint64_t GetParameterRevision() const noexcept { return m_ParameterRevision; }
+		[[nodiscard]] std::optional<ParameterControlStamp> GetDomainControlStamp(
+			ParameterControlDomain domain, std::string_view runIdentity) const;
+		// Advances once for each committed or discarded change to Host view override
+		// presence or value. NoChange and inherited value changes leave it unchanged.
+		[[nodiscard]] uint64_t GetHostViewRevision() const noexcept { return m_HostViewRevision; }
+		[[nodiscard]] std::span<const LabParameterValue> GetHostViewOverrides() const noexcept;
+		// Host view values as the next frame resolves them, before frame-local patches.
+		[[nodiscard]] std::vector<HostViewProjectionEntry> DescribeHostView() const;
 		[[nodiscard]] const LabParameterSet& GetHostParameters() const noexcept;
 		[[nodiscard]] const LabParameterSet* GetLabParameters() const noexcept;
 		[[nodiscard]] std::span<const WorldLightingProfile> GetLightingProfiles() const noexcept;
 		[[nodiscard]] const LightingProfilePublication& GetLightingProfilePublication() const noexcept;
 		[[nodiscard]] const std::string& GetLightingProfileError() const noexcept;
 		[[nodiscard]] bool SupportsParameterEffect(const LabParameterDesc& desc) const noexcept;
+		// Builds Assign intent from enabled source descriptors without admitting work.
+		// RequestParameters validates the complete request against the live sources.
+		[[nodiscard]] ParameterRequest MakeAssignmentRequest(std::span<const LabParameterValue> values) const;
 		// Descriptor validation without reservations, mutation or retained source borrows.
 		[[nodiscard]] bool ValidateSequenceAssignments(std::span<LabParameterValue> values,
 			const std::optional<std::vector<std::string>>& expectedEffects, std::string& error) const noexcept;
@@ -65,7 +78,9 @@ namespace gglab
 			const FrameCaptureGate& gate) const noexcept;
 		void FinishParameterBatch(uint64_t id, ParameterBatchOwner owner = {}) noexcept;
 		void FinishParameterBatches(ParameterBatchOwner owner) noexcept;
-		[[nodiscard]] uint64_t RequestParameterBatch(std::span<const LabParameterValue> values,
+		// Copies caller-owned intent. The caller verifies the run for guarded requests;
+		// Session rechecks the applicable Host/domain stamp at admission and safe commit.
+		[[nodiscard]] uint64_t RequestParameters(const ParameterRequest& request,
 			std::string& error, ParameterBatchOwner owner = {}) noexcept;
 		// Internal owners may append after application; external admission retains one result slot.
 		// Status borrows survive other records' admission/collection, until their own collection.
@@ -76,6 +91,8 @@ namespace gglab
 		[[nodiscard]] std::vector<ParameterBatchStatus> GetParameterBatchStatuses(
 			ParameterBatchOwner owner) const;
 		[[nodiscard]] size_t GetParameterBatchCount() const noexcept { return m_ParameterBatches.size(); }
+		// Any retained record blocks conservative external/tooling admission in AppRuntime.
+		[[nodiscard]] std::optional<ParameterBatchOwner> GetRetainedParameterOwner() const noexcept;
 		[[nodiscard]] bool HasPendingParameterBatches() const noexcept;
 		[[nodiscard]] std::optional<ParameterBatchStatus> TakeParameterBatchResult(
 			uint64_t id, ParameterBatchOwner owner = {}) noexcept;
@@ -98,12 +115,22 @@ namespace gglab
 		struct ParameterBatch;
 		void RefreshParameterBatchStatus(ParameterBatch& batch) noexcept;
 		void EndParameterBatch(ParameterBatch& batch, bool superseded, std::string reason) noexcept;
+		void EndHostViewOperation(ParameterBatch& batch, std::string_view conflict,
+			std::string_view reason) noexcept;
+		void EndForContentChange(ParameterBatch& batch, std::string reason) noexcept;
 		void ApplyParameterBatch(ParameterBatch& batch, uint64_t serial) noexcept;
-		[[nodiscard]] uint64_t AdmitParameterBatch(std::span<const LabParameterValue> values,
+		[[nodiscard]] bool IsAdmissionBlocked(ParameterBatchOwner owner) const noexcept;
+		[[nodiscard]] uint64_t AdmitParameterRequest(const ParameterRequest& request,
 			std::string& error, ParameterBatchOwner owner) noexcept;
+		[[nodiscard]] HostViewControlStamp MakeHostViewStamp(std::string_view runIdentity) const;
+		[[nodiscard]] bool CheckDomainControl(const ParameterControlStamp& expected, std::string& error) const;
+		void EndDomainOperation(ParameterBatch& batch, std::string error) noexcept;
 		void SupersedeOverwrittenItems(const ParameterBatch& applied) noexcept;
+		void AdvanceHostViewRevision() noexcept;
 		struct ParameterBatch
 		{
+			explicit ParameterBatch(const ParameterRequest& request) : m_Request(request) {}
+			const ParameterRequest m_Request;
 			ParameterBatchStatus m_Status;
 			ParameterBatchOwner m_Owner;
 			std::vector<ParameterEffectReceipt> m_Receipts;
@@ -122,10 +149,12 @@ namespace gglab
 			bool m_WaitingForContent = false;
 		};
 		std::unique_ptr<ParameterSourceAdapters> m_Sources;
+		WorldLightingControlBase* m_WorldLighting = nullptr;
 		DemoBase* m_Demo = nullptr;
 		LabRuntime* m_Lab = nullptr;
 		std::string m_ContentId;
 		uint64_t m_ContentSerial = 0;
+		uint64_t m_ActivationRevision = 1;
 		uint64_t m_ObservedLabRevision = 0;
 		// Heap records keep query borrows stable when another record is added/collected.
 		std::vector<std::unique_ptr<ParameterBatch>> m_ParameterBatches;
@@ -134,6 +163,8 @@ namespace gglab
 		bool m_MutatingParameterBatch = false;
 		uint64_t m_NextParameterBatchId = 1;
 		uint64_t m_ParameterRevision = 1;
+		// Maintained at the Host override write sites, independent of lazy tracking.
+		uint64_t m_HostViewRevision = 1;
 		bool m_ParameterIntakeFailed = false;
 		bool m_Enabled = false;
 		bool m_Transitioning = false;

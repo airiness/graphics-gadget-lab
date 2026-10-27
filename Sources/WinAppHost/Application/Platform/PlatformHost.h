@@ -1,7 +1,9 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 
+#include <chrono>
 #include <cstdint>
+#include <optional>
 #include <string_view>
 
 namespace gglab
@@ -47,7 +49,11 @@ namespace gglab
 
 		virtual void PumpEvents() noexcept = 0;
 		[[nodiscard]] virtual bool PollEvent(PlatformEvent& event) noexcept = 0;
-		virtual void WaitForEvents() noexcept = 0;
+		// Wake may be called from a control connection thread. Wakes remain pending
+		// until the owner waits, including a request queued just before the wait.
+		virtual void Wake() noexcept = 0;
+		virtual void WaitForEvents(
+			std::optional<std::chrono::steady_clock::time_point> deadline = {}) noexcept = 0;
 		[[nodiscard]] virtual bool IsQuitRequested() const noexcept = 0;
 
 		[[nodiscard]] virtual PlatformWindow& GetMainWindow() noexcept = 0;

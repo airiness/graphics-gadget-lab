@@ -1,8 +1,8 @@
 # Session parameters (protocol v4)
 
-Use `parameters` to discover ready active content, then submit typed changes with
-`set`. Check `status.capabilities.sessionParameterControl` and each descriptor's
-`setSupported`; discovery is not a promise that every authored field is editable.
+Use `parameters` to discover ready active content and each descriptor's supported
+operations. `set` assigns Host or Lab values; `host-view-overrides` sets exact Host
+override presence and values. Capabilities are reported by `status`.
 
 ## Discover and set
 
@@ -44,12 +44,10 @@ Each change has exactly `id`, `type`, `value`; types match the descriptor:
 | `float` | Finite number representable as float32. |
 | `vector3`, `color` | Three finite float components or four in RGBA order respectively. |
 
-Integer types reject fractional/exponent JSON numbers even when mathematically
-integral. Floats are not range-clamped. A batch has 1-128 distinct ids, each
-1-128 UTF-8 bytes. Unknown ids, invalid values/types/ranges and unsupported effects
-reject the whole batch without changing live values or revision. Complete-batch
-preparation revalidates at application; post-commit effect failures are receipt
-outcomes and do not roll back committed values or already-started GPU work.
+Integer types require integer JSON numbers; floats must fit the declared range.
+A batch has 1-128 distinct ids, each 1-128 UTF-8 bytes. Validation covers the whole
+batch and repeats at application. A rejected batch leaves live values unchanged;
+post-commit effect failures preserve the committed values and actual receipts.
 
 A batch accepts at most one bound Deferred lighting item, optionally with
 Immediate items. Rebuild may accompany supported Immediate values, but Rebuild
@@ -89,10 +87,11 @@ return `status: not-found`. Results retain admitted values and original content
 identity through failure or content replacement; process termination ends retention.
 `status.parameterControl` exposes availability, revision and the same retained batch.
 
-Timeout/polling failure preserves `batchId`; query it without resubmitting. A lost
-consuming response may already have released the slot. Lost admission reports
-`admissionUnknown`: inspect `status.parameterControl.batch` and its values before
-recovery. It is not an idempotency key; do not blindly resubmit.
+Timeout/polling failure preserves `batchId` for a later query. A lost consuming
+response may already have released the slot. `admissionUnknown` means the submit
+response was lost; inspect `status.parameterControl.batch` and its requested values
+before recovery. Use the [run identity](session-jobs.md#run-checked-requests) for
+later commands against the same process.
 
 ## Read effect receipts
 
@@ -111,24 +110,24 @@ independently of an item's effect class.
 Equal stored Deferred values are NoChange only when effective intent is unchanged
 and the matching Runtime target is already active. A still-pending target must
 await publication and consumption. Publication observed on an aborted frame is
-retained; retry supplies consumption without reapplying the operation. Never infer
-consumption from readiness, application or a predicted serial. Missing/stale
-attribution fails; a contradictory declared effect reports `EffectMismatch`.
+retained; retry supplies consumption without reapplying the operation. Consumption
+requires the matching submitted frame. Missing/stale attribution fails; a
+contradictory declared effect reports `EffectMismatch`.
 
 A committed different assignment to the same id or a newer owning-domain target
 can supersede pending effects; an unrelated revision does not. Post-build requests
 cannot relabel built frames. Failed batches close unresolved siblings while
-preserving existing evidence. Use saved [frame provenance](session-jobs.md#frame-provenance)
-to explain artifacts, rather than the session's current mutable state.
+preserving existing evidence. Saved [frame provenance](session-jobs.md#frame-provenance)
+ties these effects to captured frames.
 
 ## Host display-view overrides
 
 Defaults inherit active content plus copied tooling settings; current values also
-include committed Host overrides. Only changed Host fields become overrides;
-NoChange preserves inheritance. Precedence is content/tooling, Host overrides,
-then legacy sequence overrides. Lab values apply first and explicit Host fields
-win. Other render views retain their content settings. Exposure/pre-exposure
-resolve together without editing the authored camera.
+include committed Host overrides. With `set`, a first equal assignment preserves
+inheritance; an existing override stays present. Precedence is content/tooling,
+Host overrides, then frame-local sequence overrides. Lab values apply first and
+explicit Host fields win. Other render views retain their content settings.
+Exposure/pre-exposure resolve together without editing the authored camera.
 
 An Immediate Lab value masked by Host/tooling or normalized to another built value
 reports `Superseded` without `firstConsumed`. Inspect every item: a mixed batch may
@@ -137,17 +136,110 @@ NoChange preserve settling. Receipt `frameSerial` is the render clock;
 `frameIndex` is the simulation clock.
 
 Overrides clear on content replacement/restart except the owned Rebuild
-continuation below; there is no unset/reset verb. Legacy sequence overrides are
+continuation below. `set` cannot remove one or pin an inherited-equal value; use
+[guarded exact states](#guarded-exact-override-states). Sequence settings overrides are
 temporary and do not replace Host values. Reference sampling forces temporal AA
 and temporal GTAO inactive. Preview tap, camera input/FOV and other Immediate
 fields without frozen projections remain unavailable through `set`.
+
+### Host view control state
+
+Check `status.capabilities.hostViewControlState` before relying on these fields.
+Discovery and `status.parameterControl` report `controlState`: the process
+`runIdentity` (the same value as `environment.process.runIdentity`), the active
+`contentIdentity` and `hostViewRevision`. The revision advances once for each
+committed or discarded change to Host view override presence or value. NoChange,
+inherited content/tooling/camera changes and queries leave it unchanged.
+
+Each Host view descriptor in discovery adds `hostOverride` (`present`, plus `value`
+when present), `resolved` (`value`, `source`, `scope: display-view`) and
+`inheritedSource`. `resolved` is the next frame's value before sequence or
+reference patches. Sources are `content`, `tooling`, `camera` and `host`; a whole
+active tooling block attributes all of its fields to `tooling`.
+
+`status.frame` describes the last planned frame and may lag live control state. It
+carries that frame's own `controlState`, a `hostView` array whose `source` can also
+be `sequence` or `forced-reference`, the temporal consumer plan, and `outcome`
+(`planned`, `submitted` or `aborted`). Capture sidecars record the issued frame's
+stamp and `hostView` in their [`control`](session-jobs.md#frame-provenance) record.
+
+### GUI observations
+
+In the TAA, Ambient Occlusion and Post Processing Inspectors, **Display-view
+control** shows inherited and Host-resolved values/sources, explicit
+pins and the current planned frame after sequence/reference masks. Equal-value
+pins still mask inheritance. The Camera Inspector shows exposure observations
+only for the display camera.
+
+Previous-frame observations retain their own identity and outcome. GUI edits stay
+in the tooling/camera layer and enter a later tick.
+
+Use **Release override** on a Host pin to restore inheritance against the displayed
+control stamp. Feedback separates the control commit from effect status and
+reports conflicts or Busy with the blocking owner. Further releases are disabled
+while one is pending. For CLI removal, use
+[`host-view-overrides`](#guarded-exact-override-states).
+
+### Guarded exact override states
+
+Check `status.capabilities.hostViewOverrides` first. `host-view-overrides` sets
+exact Host view override states for `view.taa.*`, `view.gtao.*` and
+`view.exposure.*` (descriptors report `overrideOperationSupported`; Lab and
+lighting-profile ids report `false` with `overrideOperationReason`). It takes the
+complete `controlState` the request was prepared against and 1-128 distinct typed
+entries; unspecified ids stay untouched. The client uses that state's run for
+submission and result polling:
+
+```powershell
+$state = Join-Path (Get-Location) 'Build/control-state.json'
+$pin = Join-Path (Get-Location) 'Build/taa-off.json'
+$parameters = powershell -NoProfile -ExecutionPolicy Bypass -File $script parameters -Session check | ConvertFrom-Json
+[IO.File]::WriteAllText($state, ($parameters.controlState | ConvertTo-Json -Compress),
+    (New-Object Text.UTF8Encoding($false)))
+[IO.File]::WriteAllText($pin,
+    '[{"id":"view.taa.enabled","type":"bool","present":true,"value":false}]',
+    (New-Object Text.UTF8Encoding($false)))
+powershell -NoProfile -ExecutionPolicy Bypass -File $script host-view-overrides -Session check `
+    -ExpectedStateFile $state -OverridesFile $pin -WaitConsumed
+```
+
+A present entry stays pinned even when it equals the inherited value; an entry
+`{"id":...,"type":...,"present":false}` removes the override and follows the
+inheritance resolved when it applies. `-ExpectedRunIdentity` is optional and must
+agree with the state's run when supplied. The operation shares `set`'s external
+result slot and waiting options.
+
+| Before → requested | Control state | Effect item |
+| --- | --- | --- |
+| Already the requested presence and value | Unchanged; the batch is still admitted and retained | `NoChange` |
+| Absent → present at the inherited value, or present → absent at an equal inherited value | `hostViewRevision` advances | `NoChange`, no `firstConsumed` |
+| Any change of the resolved value | `hostViewRevision` advances | Immediate proof of the new value |
+
+The stamp is checked at admission and at the safe application boundary. Admission
+conflicts return `ok: false` and an `errorCode`: `ExpectedContentChanged`,
+`ExpectedHostViewRevisionMismatch` or `ExpectedRunChanged`. Content/revision conflicts
+include the live `controlState`; run conflicts report the current `runIdentity`.
+A conflict after admission ends the existing batch as `Failed`, with
+`controlCommit.conflict`. Unsupported ids/types (`HostOverrideUnsupported`), invalid
+values (`HostOverrideInvalid`) and `Busy` also reject the whole request.
+
+Results retain requested `overrides` and a `controlCommit` with `expected`,
+`before`/`after` stamps, `changed`, `changes[]` and `conflict`. The `after` stamp
+exists only after commit. Effect `values` contain the applied targets, including
+the inherited value of a removal.
+
+Restore saved presence/value states against the last committed `after` stamp.
+An intervening Host edit then conflicts; inherited edits remain in their own
+layers. Restoration covers Host intent, while a matching submitted frame verifies
+rendered state. For a structural-only change, use the frame's stamp and projection;
+its NoChange effect has no `firstConsumed`.
 
 ## Content-registered lighting profiles
 
 Discover enum integers through `parameters`. `-1` is a read-only indication of no
 registered effective match; setting it rejects the batch. Coastal Atrium registers
 `coastal.daylight`; Atmosphere Range registers `atmosphere_range.baseline` and
-`atmosphere_range.oblique` transition fixtures. Golden Hour values belong to GI P5.
+`atmosphere_range.oblique`.
 
 Profiles require a designated sun and support Physical Sky with IBL intensity 1
 and rotation 0. They change sun/atmosphere, not manual exposure;
@@ -177,6 +269,27 @@ committed Host values. Aborted target frames retain publication and retry withou
 another operation. Unrelated content switches supersede the wait; shutdown closes
 unresolved effects. Sequence events reject Rebuild.
 
+## Protected Lab/profile assignment
+
+`parameters.domainControlStates` returns complete stamps for `lab` and
+`lighting-profile`, or null when unavailable. Save the required object as a UTF-8
+JSON file and submit typed changes from that same discovery:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File $script assign -Session check `
+    -ExpectedStateFile Build/lab-control.json -ChangesFile Build/lab-changes.json -WaitConsumed
+```
+
+`assign` accepts one Lab or profile source with the same limits and wait/consume
+options as `set`. The stamp binds submission/polling to the run and is checked at
+admission and safe commit, even for would-be NoChange. Conflict responses include
+`errorCode` and `domainControlState`.
+
+`batch.domainControl` reports expected/before/after stamps, `committed` and conflicts
+separately from [effect receipts](#read-effect-receipts). Rediscover after conflicts
+or content activation; Rebuild's `after` stamp describes the source commit, not the
+target. Host exact states use `host-view-overrides`; legacy `set` remains unguarded.
+
 ## Focused verification
 
 Select suites with [RunVerification.ps1](../../../../Tests/Verification/RunVerification.ps1);
@@ -185,7 +298,8 @@ Select suites with [RunVerification.ps1](../../../../Tests/Verification/RunVerif
 | Suite | Main evidence |
 | --- | --- |
 | `session-parameters` | GTAO Immediate and texture/Physical Sky Deferred receipts, captured settings/generations and cache-publication paths. |
-| `session-host-parameters` | Demo/Lab overrides, mixed-source atomicity, settling, exposure response and result retention. |
+| `session-host-parameters` | Demo/Lab overrides, mixed-source atomicity, settling, exposure response, result retention and guarded exact states. |
+| `protected-assignments` | Lab/profile guards, stale NoChange and shared-domain conflicts; activation and submitted Immediate/Deferred/Rebuild effects. |
 | `lighting-profiles` | Profile discovery/transitions, exposure independence and requested/active identities. |
 | `lab-sun-parameters` | Authored sun elevation, profile rebasing and NoChange. |
 | `session-rebuild-parameters` | Zero/one/64-light fixtures, retained results and built scene/frame provenance. |
@@ -194,5 +308,4 @@ These suites run hidden on both RHIs by default. For lighting-only coverage,
 invoke `Tests/Verification/TestSessionParameters.ps1 -Scope lighting` directly with
 typed `-Rhi` arrays. [TestHostParameters.ps1](../../../../Tests/Verification/TestHostParameters.ps1) accepts `-StateDirectory` for
 task-owned verification caches; omit it for isolated state. Scheduled-event suites
-are listed in [Sequences](sequences.md#parameter-events). Headless fault tests
-exercise ownership/failure paths; native receipts and artifacts establish GPU effects.
+are listed in [Sequences](sequences.md#parameter-events).

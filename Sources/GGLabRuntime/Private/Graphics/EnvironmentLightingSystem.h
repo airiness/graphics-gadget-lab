@@ -83,6 +83,7 @@ namespace gglab
 			const std::optional<ResolvedWorldSun>& sun, uint64_t sunEntityKey,
 			uint64_t sessionIdentity = 0, const WorldSunSettings* authoredSun = nullptr) noexcept;
 		void SynchronizeWorldLighting(World& world, uint64_t sessionIdentity) noexcept override;
+		[[nodiscard]] uint64_t GetLightingControlRevision() const noexcept override { return m_ControlRevision; }
 		[[nodiscard]] std::unique_ptr<PreparedWorldLightingMutationBase> PrepareWorldLightingInputs(
 			World& world, uint64_t sessionIdentity, const WorldLightingInputs& inputs,
 			std::string& error) noexcept override;
@@ -120,6 +121,8 @@ namespace gglab
 			EnvironmentLightingSystem* m_Owner = nullptr;
 		};
 		void RecordSettingsWrite(OverrideField field) noexcept;
+		void AdvanceControlRevision() noexcept;
+		void RequestBake(bool ignoreCache = false) noexcept;
 		[[nodiscard]] std::unique_ptr<PreparedWorldLightingMutationBase> PrepareWorldLightingMutation(
 			World& world, uint64_t sessionIdentity, const WorldLightingInputs& inputs,
 			WorldLightingMutationKind kind, std::string& error) noexcept;
@@ -128,6 +131,8 @@ namespace gglab
 		std::array<uint64_t, static_cast<size_t>(OverrideField::Count)> m_OverrideOwners{};
 		uint64_t m_NextOverrideOwner = 1;
 		uint64_t m_ActiveOverrideOwner = 0;
+		uint64_t m_WritingOverrideOwner = 0;
+		uint64_t m_ControlRevision = 1;
 		RenderResourceRegistry* m_RenderResourceRegistry = nullptr;
 		EnvironmentTextureSource m_Source{};
 		EnvironmentLightingSettings m_Settings{};

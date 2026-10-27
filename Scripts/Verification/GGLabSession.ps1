@@ -11,11 +11,21 @@ Every command prints one JSON object on stdout and exits 0 when the command
 succeeded, or 1 with an "error" field otherwise. A capture that ran but failed
 still exits 0; inspect its "status".
 
+-ExpectedRunIdentity <id> names the process run that protected commands (set,
+parameter-result, capture, graph, export, watch, result, capture-cancel, sequence,
+sequence-cancel and stop) must reach. start reports it as "runIdentity"; status reports
+environment.process.runIdentity. A session restarted under the same name rejects them
+with errorCode ExpectedRunChanged and changes nothing.
+
 Commands:
   start    Launch a session (hidden by default) and wait until it accepts requests.
+           Confirms its run identity belongs to the live created process before
+           reporting created ownership; an unconfirmed start cleans up only that process.
+           -SessionLifetime developer disables automation idle expiry.
            -LabParameters "id=value",... sets startup Lab parameters (Debug and Develop builds).
            -Validation off|standard|gpu overrides validation (gpu: DX12 only).
-  status   Report readiness gates, settled frames, camera and pending captures.
+  attach   Inspect an existing session and return its run identity with attached ownership.
+  status   Report lifetime, runtime state, readiness, camera and pending captures.
   parameters
            List Host and active Lab descriptors, current/default values and revision.
   set      Submit -Changes/-ChangesFile as [{"id":"gtao.radius","type":"float","value":2.0}].
@@ -23,10 +33,26 @@ Commands:
            -NoWait returns admission. Terminal results are consumed unless -KeepResult.
   parameter-result
            Query -BatchId; -Consume releases its terminal receipt. Status also reports it.
+  assign   Submit typed -Changes/-ChangesFile under a complete Lab/profile
+           -ExpectedState/-ExpectedStateFile from parameters.domainControlStates.
+           Uses the same waiting/consumption options as set and binds polling to that run.
+  host-view-overrides
+           Set exact Host view override states -Overrides/-OverridesFile, as
+           [{"id":"view.taa.enabled","type":"bool","present":true,"value":false}] or
+           {"id":...,"type":...,"present":false} to remove one. -ExpectedState/-ExpectedStateFile
+           is the complete control state the request was prepared against, the controlState
+           object from parameters or status. It names the run, which also guards the result
+           polling, so -ExpectedRunIdentity is not needed. A stale state rejects with errorCode
+           ExpectedContentChanged or ExpectedHostViewRevisionMismatch and changes nothing.
+           Waiting matches set.
   capture  Submit required SameFrame products; waits and explicitly consumes the
            terminal receipt unless -NoWait or -KeepResult. -Products/-ProductsFile
            accepts typed products instead of the default single image.
            -View restores a camera reference view of the active content first.
+           -RequiredFrameState/-RequiredFrameStateFile is a JSON object the issued frame
+           must satisfy (also for graph and export); a contradicting due frame fails the job
+           with failureCode RequiredFrameStateMismatch instead of capturing it. Its run also
+           guards admission and result polling, as -ExpectedRunIdentity would.
   graph    Export the full frame graph, or discovery addresses with -Summary.
   export   Export one frame's resource group as NPY arrays and JSON metadata.
            -Targets/-TargetsFile accepts resource addresses; -IncludeGraph pairs
@@ -70,11 +96,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/Verification/GGLabSe
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('start', 'status', 'parameters', 'set', 'parameter-result', 'capture', 'graph', 'export', 'watch', 'batch', 'result', 'capture-cancel', 'sequence', 'sequence-cancel', 'stop', 'list')]
+    [ValidateSet('start', 'attach', 'status', 'parameters', 'set', 'assign', 'parameter-result', 'host-view-overrides', 'capture', 'graph', 'export', 'watch', 'batch', 'result', 'capture-cancel', 'sequence', 'sequence-cancel', 'stop', 'list')]
     [string]$Command,
 
     [ValidatePattern('^[A-Za-z0-9_-]{1,64}$')]
     [string]$Session,
+    # Process run the session must still be; status reports environment.process.runIdentity.
+    [ValidatePattern('^[0-9a-f]{32}$')]
+    [string]$ExpectedRunIdentity,
 
     # start
     [ValidateSet('dx12', 'vulkan')]
@@ -88,6 +117,8 @@ param(
     [ValidateSet('off', 'standard', 'gpu')]
     [string]$Validation,
     [double]$IdleTimeout = 900,
+    [ValidateSet('automation', 'developer')]
+    [string]$SessionLifetime = 'automation',
     [double]$FixedDeltaTime,
     [switch]$Visible,
     [switch]$NoDevTools,
@@ -117,6 +148,11 @@ param(
     [switch]$KeepResult,
     [string]$Products,
     [string]$ProductsFile,
+    # capture/graph/export: the typed frame predicate, directly or from a UTF-8 file.
+    [string]$RequiredFrameState,
+    [string]$RequiredFrameStateFile,
+    [ValidateRange(1, 300000)]
+    [int]$FrameSelectionTimeoutMs = 300000,
     # graph: only executed passes with resource-version addresses.
     [switch]$Summary,
     # export: a JSON array of resource addresses, directly or from a UTF-8 file.
@@ -138,6 +174,12 @@ param(
     [switch]$WaitConsumed,
     # parameter-result: separate from capture JobId.
     [uint64]$BatchId,
+    # host-view-overrides: exact states [{id, type, present, value}] and the expected
+    # control state {runIdentity, contentIdentity, hostViewRevision}, directly or from files.
+    [string]$Overrides,
+    [string]$OverridesFile,
+    [string]$ExpectedState,
+    [string]$ExpectedStateFile,
 
     # result / capture-cancel
     [uint64]$JobId,
@@ -166,6 +208,9 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 
 $ProtocolVersion = 4
+# Commands the session checks against expectedRunIdentity; status and parameters report the run.
+$RunCheckedCommands = @('set', 'parameter-result', 'capture', 'graph', 'export', 'watch', 'result',
+    'capture-cancel', 'sequence', 'sequence-cancel', 'stop')
 $RepositoryRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 if (-not $SessionRoot) {
     $SessionRoot = Join-Path $RepositoryRoot 'Build\Sessions'
@@ -209,10 +254,19 @@ function Test-SessionPipe([string]$Id) {
     return [bool]($pipes | Where-Object { $_ -ieq "\\.\pipe\$(Get-PipeName $Id)" })
 }
 
+# With -ExpectedRunIdentity, a restarted session rejects protected requests instead of
+# applying them to another process run.
+function Add-ExpectedRunIdentity([hashtable]$Request) {
+    if ($ExpectedRunIdentity -and $RunCheckedCommands -contains $Request['command']) {
+        $Request['expectedRunIdentity'] = $ExpectedRunIdentity
+    }
+}
+
 # Sends one request and returns the parsed response object. Transport failures
 # throw so a waiting client can retain an accepted jobId; commands report them
 # through Invoke-SessionCommand.
 function Invoke-SessionRequest([string]$Id, [hashtable]$Request, [int]$ResponseTimeoutSeconds) {
+    Add-ExpectedRunIdentity $Request
     $Request['protocol'] = $ProtocolVersion
     $Request['id'] = Get-Random -Minimum 1 -Maximum 2147483647
     $client = New-Object System.IO.Pipes.NamedPipeClientStream('.', (Get-PipeName $Id),
@@ -300,6 +354,20 @@ function New-CaptureRequest([string]$ViewId) {
     if ($ViewId) { $request['view'] = $ViewId }
     if ($Label) { $request['label'] = $Label }
     if ($Note) { $request['note'] = $Note }
+    if ($RequiredFrameState -or $RequiredFrameStateFile) {
+        try {
+            $required = Read-JsonObject $RequiredFrameState $RequiredFrameStateFile 'RequiredFrameState'
+        }
+        catch { Fail $_.Exception.Message @{ session = $Session } }
+        $script:ExpectedRunIdentity = Get-ExpectedStateRun $required 'RequiredFrameState'
+        $request['requiredFrameState'] = $required
+        if ($script:PSBoundParameters.ContainsKey('FrameSelectionTimeoutMs')) {
+            $request['frameSelectionTimeoutMs'] = $FrameSelectionTimeoutMs
+        }
+    }
+    elseif ($script:PSBoundParameters.ContainsKey('FrameSelectionTimeoutMs')) {
+        Fail '-FrameSelectionTimeoutMs requires -RequiredFrameState or -RequiredFrameStateFile.'
+    }
     return $request
 }
 
@@ -415,6 +483,28 @@ function Read-JsonArray([string]$Text, [string]$File, [string]$Name) {
     return ,([object[]]$array)
 }
 
+function Read-JsonObject([string]$Text, [string]$File, [string]$Name) {
+    if ($Text -and $File) { Fail "Use either -$Name or -${Name}File, not both." }
+    if ($File) { $Text = Get-Content -LiteralPath $File -Encoding UTF8 -Raw }
+    if (-not $Text -or -not $Text.TrimStart().StartsWith('{')) { Fail "-$Name requires a JSON object." }
+    try { return ConvertFrom-Json -InputObject $Text }
+    catch { Fail "-$Name contains invalid JSON: $($_.Exception.Message)" }
+}
+
+# An expected control state or required frame state names the run. Binding it guards every
+# later request of this command, including result polling, against a restarted session with
+# the same name.
+function Get-ExpectedStateRun($Expected, [string]$Name = 'ExpectedState') {
+    $run = Get-Field $Expected 'runIdentity'
+    if ($run -isnot [string] -or $run -cnotmatch '^[0-9a-f]{32}$') {
+        Fail "-$Name requires a 32-digit lowercase hexadecimal runIdentity." @{ session = $Session }
+    }
+    if ($ExpectedRunIdentity -and $run -ne $ExpectedRunIdentity) {
+        Fail "-ExpectedRunIdentity differs from the run in -$Name." @{ session = $Session }
+    }
+    return $run
+}
+
 function Require-Session {
     if (-not $Session) {
         Fail "Command '$Command' requires -Session."
@@ -423,6 +513,10 @@ function Require-Session {
 
 switch ($Command) {
     'start' {
+        $SessionLifetime = $SessionLifetime.ToLowerInvariant()
+        if ($SessionLifetime -eq 'developer' -and $PSBoundParameters.ContainsKey('IdleTimeout')) {
+            Fail 'Developer sessions cannot specify -IdleTimeout.'
+        }
         if (-not $Session) {
             $Session = 's' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + (Get-Random -Maximum 10000)
         }
@@ -438,8 +532,9 @@ switch ($Command) {
         $outputLog = Join-Path $sessionDirectory 'output.log'
         if (Test-Path $outputLog) { Remove-Item $outputLog -Force }
 
-        $arguments = @('--rhi', $Rhi, '--session', $Session, '--idle-timeout', "$IdleTimeout",
+        $arguments = @('--rhi', $Rhi, '--session', $Session, '--session-lifetime', $SessionLifetime,
             '--output-log', "`"$outputLog`"")
+        if ($SessionLifetime -eq 'automation') { $arguments += @('--idle-timeout', "$IdleTimeout") }
         if ($Lab) { $arguments += @('--lab', $Lab) }
         if ($Demo) { $arguments += @('--demo', $Demo) }
         if ($WindowSize) { $arguments += @('--window-size', $WindowSize) }
@@ -459,6 +554,9 @@ switch ($Command) {
         # inherits nothing; the session writes its own output log.
         $process = Start-Process -FilePath $executable -ArgumentList $arguments `
             -WorkingDirectory (Split-Path -Parent $executable) -WindowStyle Hidden -PassThru
+        # Retain the created process handle for identity checks and failure cleanup;
+        # neither cleanup nor ownership may target a replacement found by session name.
+        $null = $process.Handle
         $deadline = (Get-Date).AddSeconds($StartTimeoutSeconds)
         $ready = $false
         while ((Get-Date) -lt $deadline) {
@@ -470,7 +568,7 @@ switch ($Command) {
             Start-Sleep -Milliseconds 200
         }
         if (-not $ready) {
-            if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
+            if (-not $process.HasExited) { $process.Kill() }
             $tail = @()
             $tail = @((Read-SharedText $outputLog) -split "`r?`n" | Select-Object -Last 20)
             Fail "Session '$Session' did not become ready." @{
@@ -478,14 +576,57 @@ switch ($Command) {
                 exitCode = $(if ($process.HasExited) { $process.ExitCode } else { $null })
             }
         }
+        # Bind the queried run to the created process before granting created ownership.
+        # Readiness alone cannot exclude replacement while the status query is in flight.
+        $runIdentity = $null
+        try {
+            $status = Invoke-SessionRequest $Session @{ command = 'status' } 30
+            $identity = Get-Field $status 'session'
+            $environment = Get-Field $status 'environment'
+            $runIdentity = Get-Field (Get-Field $environment 'process') 'runIdentity'
+            if ((Get-Field $status 'ok') -ne $true -or
+                (Get-Field $identity 'id') -cne $Session -or
+                (Get-Field $identity 'pid') -ne $process.Id -or
+                $runIdentity -isnot [string] -or $runIdentity -cnotmatch '^[0-9a-f]{32}$' -or
+                $process.HasExited) {
+                throw 'Status did not confirm a valid run identity for the live created process.'
+            }
+        }
+        catch {
+            $identityError = $_.Exception.Message
+            $cleanupError = $null
+            try {
+                if (-not $process.HasExited) { $process.Kill() }
+            }
+            catch { $cleanupError = $_.Exception.Message }
+            Fail "Session '$Session' could not confirm startup ownership: $identityError" @{
+                session = $Session; pid = $process.Id; directory = $sessionDirectory
+                outputLog = $outputLog; runIdentity = $null
+                errorCode = 'StartIdentityUnconfirmed'; cleanupError = $cleanupError
+            }
+        }
         $record = @{
             session = $Session; pid = $process.Id; rhi = $Rhi; arguments = $arguments
             startedAt = (Get-Date).ToString('o'); outputLog = $outputLog
-            directory = $sessionDirectory
+            directory = $sessionDirectory; runIdentity = $runIdentity
+            ownership = 'created'; lifetime = $SessionLifetime
         }
         ($record | ConvertTo-Json -Depth 5) | Set-Content -Encoding UTF8 -Path (Join-Path $sessionDirectory 'session.json')
         $record['ok'] = $true
         Write-Result $record 0
+    }
+    'attach' {
+        Require-Session
+        $status = Invoke-SessionCommand $Session @{ command = 'status' } 30
+        if (-not $status.ok) { Complete-SessionResponse $status $Session }
+        $run = Get-Field (Get-Field (Get-Field $status 'environment') 'process') 'runIdentity'
+        if (-not $run -or ($ExpectedRunIdentity -and $ExpectedRunIdentity -cne $run)) {
+            Fail 'The attached session does not match the expected run identity.' @{ session = $Session }
+        }
+        Write-Result @{
+            ok = $true; session = $Session; ownership = 'attached'; runIdentity = $run
+            pid = $status.session.pid; lifetime = (Get-Field $status.session 'lifetime')
+        } 0
     }
     'status' {
         Require-Session
@@ -525,6 +666,54 @@ switch ($Command) {
         }
         catch {
             Fail $_.Exception.Message @{ session = $Session; batchId = $BatchId; consumptionUnknown = [bool]$Consume }
+        }
+        Complete-SessionResponse $response $Session
+    }
+    'host-view-overrides' {
+        Require-Session
+        if ($NoWait -and $WaitConsumed) { Fail '-NoWait and -WaitConsumed cannot be combined.' }
+        try {
+            $items = Read-JsonArray $Overrides $OverridesFile 'Overrides'
+            $expected = Read-JsonObject $ExpectedState $ExpectedStateFile 'ExpectedState'
+        }
+        catch { Fail $_.Exception.Message @{ session = $Session } }
+        $ExpectedRunIdentity = Get-ExpectedStateRun $expected
+        try {
+            $response = Invoke-SessionRequest $Session @{
+                command = 'host-view-overrides'; expected = $expected; overrides = $items
+            } ([Math]::Max(30, $TimeoutSeconds))
+        }
+        catch {
+            Fail "$($_.Exception.Message) Admission is unknown; inspect status before submitting again." @{
+                session = $Session; admissionUnknown = $true
+            }
+        }
+        if ($response.ok -and -not $NoWait) {
+            $response = Wait-ParameterBatch $response ([DateTime]::UtcNow.AddSeconds($TimeoutSeconds))
+        }
+        Complete-SessionResponse $response $Session
+    }
+    'assign' {
+        Require-Session
+        if ($NoWait -and $WaitConsumed) { Fail '-NoWait and -WaitConsumed cannot be combined.' }
+        try {
+            $items = Read-JsonArray $Changes $ChangesFile 'Changes'
+            $expected = Read-JsonObject $ExpectedState $ExpectedStateFile 'ExpectedState'
+        }
+        catch { Fail $_.Exception.Message @{ session = $Session } }
+        $ExpectedRunIdentity = Get-ExpectedStateRun $expected
+        try {
+            $response = Invoke-SessionRequest $Session @{
+                command = 'assign'; expected = $expected; changes = $items
+            } ([Math]::Max(30, $TimeoutSeconds))
+        }
+        catch {
+            Fail "$($_.Exception.Message) Admission is unknown; inspect status before submitting again." @{
+                session = $Session; admissionUnknown = $true
+            }
+        }
+        if ($response.ok -and -not $NoWait) {
+            $response = Wait-ParameterBatch $response ([DateTime]::UtcNow.AddSeconds($TimeoutSeconds))
         }
         Complete-SessionResponse $response $Session
     }
@@ -696,7 +885,8 @@ switch ($Command) {
         }
         $response = Invoke-SessionCommand $Session @{ command = 'stop' } 30
         $exitCode = $null
-        if ($process) {
+        # A rejected stop, such as a different run, leaves the session running.
+        if ($process -and $response.ok) {
             if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
                 Fail "Session '$Session' acknowledged stop but did not exit within $TimeoutSeconds seconds." @{ session = $Session; pid = $process.Id }
             }

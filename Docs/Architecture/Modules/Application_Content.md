@@ -1,10 +1,6 @@
 # Application Content Cards
 
-- Question: which application module owns frame orchestration and content hosting,
-  and where are its interfaces?
-- VerifiedAgainst: `96ba1316b36a31bb1a983b0cf5719b55cc4427fa`
-- Refresh triggers: a card's source owner, Public interface, lifetime, linked
-  contract or owning tests change.
+- VerifiedAgainst: `e4efde1cd33bdc37be3c1652d0f16a23e4acf060`
 
 The [module catalog](../Module_Catalog.md) lists all cards.
 
@@ -13,7 +9,9 @@ Atlas ID: atlas.application.frame-orchestration
 
 - **Source owner:** `GGLabAppRuntime`, under `Sources/GGLabAppRuntime`.
 - **Responsibility:** begin, build, validate, execute and end each frame, then send
-  host-level feedback. WinAppHost calls in through `GGLabAppRuntime::Tick`.
+  host-level feedback. WinAppHost calls in through `GGLabAppRuntime::Tick` and
+  services [control deadlines](../Runtime_Control_Map.md#session-servicing) without
+  frames through `GetNextControlDeadline` / `ServiceControlDeadlines`.
 - **Public interface:** [GGLabAppRuntime.h](../../../Sources/GGLabAppRuntime/GGLabAppRuntime.h).
 - **Implementation:** [TickFrame](../../../Sources/GGLabAppRuntime/GGLabAppRuntimeFrame.cpp)
   and [InitializeServices / Shutdown](../../../Sources/GGLabAppRuntime/GGLabAppRuntimeServices.cpp).
@@ -23,9 +21,7 @@ Atlas ID: atlas.application.frame-orchestration
 - **Boundary:** [success feedback](../Frame_Execution_Map.md#settlement-contract-failures)
   waits for Runtime settlement; [teardown](../Frame_Execution_Map.md#teardown-ownership)
   releases consumers while their borrowed services are alive.
-- **Verification:** `GGLabAppRuntimeTests` suite `gpu-fault-lifecycle`, including
-  late-enqueue feedback suppression and safe shutdown. The test project declares a
-  Private RHI include path for its fault harness.
+- **Verification:** `GGLabAppRuntimeTests`, `gpu-fault-lifecycle`.
 
 ```text
 Anchors:
@@ -51,8 +47,7 @@ Atlas ID: atlas.application.content-hosting
   retiring Demos.
 - **Boundary:** [content transitions](../Frame_Execution_Map.md#content-transitions);
   [Content retirement](../Frame_Execution_Map.md#content-retirement).
-- **Verification:** `GGLabAppRuntimeTests` suite `gpu-fault-lifecycle`, including
-  Demo retirement behind a held fence and binding release before exit.
+- **Verification:** `GGLabAppRuntimeTests`, `gpu-fault-lifecycle`.
 
 ```text
 Anchors:
@@ -83,9 +78,8 @@ Atlas ID: atlas.application.lab-runtime
   owner scope.
 - **Boundary:** Lab IDs are persisted ([AGENTS.md](../../../AGENTS.md#gpu-shader-and-lab-invariants));
   [Content retirement](../Frame_Execution_Map.md#content-retirement).
-- **Verification:** `GGLabAppRuntimeTests` suite `gpu-fault-lifecycle`, including
-  `RunLabSessionRetirementScenario` and `RunRebuildParameterScenario`; WinAppTests
-  `napa-voxel` and `app-content-registration`; `--lab` GPU runs.
+- **Verification:** `GGLabAppRuntimeTests`, `gpu-fault-lifecycle`; `WinAppTests`,
+  `napa-voxel` and `app-content-registration`.
 
 ```text
 Anchors:

@@ -277,6 +277,7 @@ namespace gglab
 
 	void DemoPlayground::CommitScene() noexcept
 	{
+		m_World.MarkLightingAuthoringChanged();
 		m_World.m_Atmosphere = m_Content == PlaygroundContent::CoastalAtrium ?
 			std::optional<AtmosphereSettings>(AtmosphereSettings{}) :
 			std::nullopt;

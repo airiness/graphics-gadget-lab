@@ -110,6 +110,8 @@ namespace gglab
 				guiContext.m_AssetControl = context.m_AssetControl;
 				guiContext.m_EnvironmentSelectionControl =
 					context.m_EnvironmentSelectionControl;
+				guiContext.m_ViewControl = context.m_ViewControl;
+				guiContext.m_ViewControlActions = context.m_ViewControlActions;
 				guiContext.m_Diagnostics = context.m_Diagnostics;
 				guiContext.m_DiagnosticsControl = context.m_DiagnosticsControl;
 				guiContext.m_EnvironmentLighting = context.m_EnvironmentLighting;

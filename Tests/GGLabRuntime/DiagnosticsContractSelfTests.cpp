@@ -939,6 +939,11 @@ namespace gglab
 			if (original)
 			{
 				const auto id = original->m_Id;
+				const auto revision = world.GetLightingControlRevision();
+				control.SetDirection(id, Vector3::UnitX);
+				control.SetDirection(id, original->m_Direction);
+				context.Check(world.GetLightingControlRevision() > revision,
+					"Directional authoring ABA advances World control identity before frame synchronization");
 				control.SetDirection(id, Vector3(0.0f, -2.0f, 0.0f));
 				control.SetRadiance(id, Color::Red, 3.0f);
 				DirectionalShadowSettings settings{};

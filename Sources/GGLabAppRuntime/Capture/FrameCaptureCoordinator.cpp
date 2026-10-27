@@ -47,6 +47,7 @@ namespace gglab
 		bool m_ViewApplied = false;
 		std::optional<uint64_t> m_ViewCameraResetSerial;
 		std::optional<FrameAttempt> m_Attempt;
+		std::optional<std::chrono::steady_clock::time_point> m_SelectionDeadline;
 
 		[[nodiscard]] uint64_t GetRuntimeGroupId() const noexcept
 		{
@@ -182,7 +183,7 @@ namespace gglab
 		m_ShutdownWriteTimeout(createInfo.m_ShutdownWriteTimeout),
 		m_Writer(std::make_unique<CaptureWriter>(createInfo.m_ImageEncoder,
 			createInfo.m_WriteOnCallingThread, createInfo.m_PublicationFileSystem)),
-		m_RunIdentity(CreateCaptureRunIdentity()),
+		m_RunIdentity(createInfo.m_RunIdentity ? *createInfo.m_RunIdentity : CreateCaptureRunIdentity()),
 		m_EnvironmentJson(SerializeCaptureEnvironment(createInfo.m_Environment, m_RunIdentity)),
 		m_JobLimits(createInfo.m_JobLimits),
 		m_JobReceipts(m_JobLimits.m_MaxReceipts)
@@ -193,6 +194,53 @@ namespace gglab
 	FrameCaptureCoordinator::~FrameCaptureCoordinator()
 	{
 		FinishWriting();
+	}
+
+	std::optional<std::chrono::steady_clock::time_point>
+		FrameCaptureCoordinator::GetNextFrameSelectionDeadline() const noexcept
+	{
+		std::optional<std::chrono::steady_clock::time_point> next;
+		for (const JobReceipt& slot : m_JobReceipts)
+		{
+			if (slot.m_Job && slot.m_Job->m_SelectionDeadline &&
+				!(m_HasOpenFrame && slot.m_Job->m_Attempt))
+			{
+				const auto deadline = *slot.m_Job->m_SelectionDeadline;
+				next = next ? std::min(*next, deadline) : deadline;
+			}
+		}
+		return next;
+	}
+
+	bool FrameCaptureCoordinator::ExpireFrameSelection(CaptureJob& job,
+		std::chrono::steady_clock::time_point now) noexcept
+	{
+		if (job.m_RemainingDeliveries == 0)
+		{
+			return true;
+		}
+		if (!job.m_SelectionDeadline || now < *job.m_SelectionDeadline ||
+			(m_HasOpenFrame && job.m_Attempt))
+		{
+			return false;
+		}
+		const auto jobId = job.m_Result.m_JobId;
+		FailPlan(job, "FrameSelectionExpired: no matching frame was submitted before the selection deadline.",
+			"FrameSelectionExpired");
+		GGLAB_LOG_INFO_ALWAYS("Frame capture job {} expired before a matching frame was submitted.", jobId);
+		return true;
+	}
+
+	void FrameCaptureCoordinator::ExpireFrameSelections(std::chrono::steady_clock::time_point now) noexcept
+	{
+		for (const JobReceipt& slot : m_JobReceipts)
+		{
+			const auto job = slot.m_Job;
+			if (job)
+			{
+				GGLAB_UNUSED(ExpireFrameSelection(*job, now));
+			}
+		}
 	}
 
 	CaptureAdmission FrameCaptureCoordinator::CheckJobAdmission(const CapturePlan& plan) const noexcept
@@ -255,6 +303,22 @@ namespace gglab
 		{
 			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::InvalidPlan };
 		}
+		if (plan.m_FrameSelectionTimeout && (!plan.m_RequiredFrameState ||
+			*plan.m_FrameSelectionTimeout < std::chrono::milliseconds(1) ||
+			*plan.m_FrameSelectionTimeout > MaxFrameSelectionTimeout))
+		{
+			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::InvalidPlan };
+		}
+		// Sequence frames are bound to a camera path, not to a required display state.
+		// Only a predicate plan pays for validation; others admit without allocating.
+		if (plan.m_RequiredFrameState)
+		{
+			std::string error;
+			if (plan.m_Sequence || !ValidateRequiredFrameState(*plan.m_RequiredFrameState, error))
+			{
+				return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::RequiredFrameStateInvalid };
+			}
+		}
 		if (m_NextJobId == 0)
 		{
 			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::IdentityExhausted };
@@ -262,6 +326,10 @@ namespace gglab
 		if (m_RunIdentity.empty())
 		{
 			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::IdentityUnavailable };
+		}
+		if (plan.m_RequiredFrameState && plan.m_RequiredFrameState->m_RunIdentity != m_RunIdentity)
+		{
+			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::RequiredFrameStateUnavailable };
 		}
 		if (m_ActiveJobs >= m_JobLimits.m_MaxActiveJobs)
 		{
@@ -281,6 +349,12 @@ namespace gglab
 		if (admission.m_Status != CaptureAdmissionStatus::Accepted)
 		{
 			return admission;
+		}
+		// An admitted plan owns a private copy of what was validated, so a caller that kept
+		// a mutable pointer can change neither the issue decision nor the recorded predicate.
+		if (plan.m_RequiredFrameState)
+		{
+			plan.m_RequiredFrameState = std::make_shared<const RequiredFrameState>(*plan.m_RequiredFrameState);
 		}
 		const auto slot = std::ranges::find(m_JobReceipts, uint64_t{ 0 }, &JobReceipt::m_JobId);
 		RemoveFinishedJobs();
@@ -506,6 +580,11 @@ namespace gglab
 		job->m_Result.m_Products.resize(plan.m_RequiredProducts.size());
 		job->m_RemainingDeliveries = GetDeliveryCount(plan);
 		job->m_Plan = std::move(plan);
+		if (job->m_Plan.m_RequiredFrameState)
+		{
+			job->m_SelectionDeadline = std::chrono::steady_clock::now() +
+				job->m_Plan.m_FrameSelectionTimeout.value_or(MaxFrameSelectionTimeout);
+		}
 		job->m_DeliveryCount = job->m_RemainingDeliveries;
 		for (size_t index = 0; index < job->m_Plan.m_RequiredProducts.size(); ++index)
 		{
@@ -690,6 +769,7 @@ namespace gglab
 
 	void FrameCaptureCoordinator::BeginFrame(FrameCaptureFrameState state) noexcept
 	{
+		ExpireFrameSelections();
 		const bool ready = state.m_Readiness.IsReady();
 		const bool historyRestarted =
 			!m_LastFrameState || !state.m_SettleKey.Continues(m_LastFrameState->m_SettleKey);
@@ -740,7 +820,7 @@ namespace gglab
 				{
 					FailPlan(job, readinessFailure);
 				}
-				else if (IsDue(job, state))
+				else if (IsDue(job, state) && !FailRequiredFrameStateMismatch(job, state))
 				{
 					const auto tap = entry.GetDiagnosticTap();
 					if (entry.GetSource() == FrameCaptureSource::Diagnostic && tap &&
@@ -784,7 +864,7 @@ namespace gglab
 				FailPlan(job, readinessFailure);
 				continue;
 			}
-			if (!IsDue(job, state))
+			if (!IsDue(job, state) || FailRequiredFrameStateMismatch(job, state))
 			{
 				continue;
 			}
@@ -984,6 +1064,7 @@ namespace gglab
 					attempt->m_FrameSerial == m_LastFrameState->m_FrameSerial)
 				{
 					attempt->m_Submitted = true;
+					entry.m_Job->m_SelectionDeadline.reset();
 					if (m_NonFiniteWatch && attempt->m_WatchCoverageId != 0)
 					{
 						m_NonFiniteWatch->TrackCoverageFrame(attempt->m_WatchCoverageId, attempt->m_FrameSerial);
@@ -997,10 +1078,24 @@ namespace gglab
 			++m_SettledFrames;
 		}
 		m_HasOpenFrame = false;
+		if (m_LastFrameState)
+		{
+			m_LastFrameState->m_Outcome = FrameCaptureFrameOutcome::Submitted;
+		}
+	}
+
+	void FrameCaptureCoordinator::OnFrameAborted() noexcept
+	{
+		m_HasOpenFrame = false;
+		if (m_LastFrameState && m_LastFrameState->m_Outcome == FrameCaptureFrameOutcome::Planned)
+		{
+			m_LastFrameState->m_Outcome = FrameCaptureFrameOutcome::Aborted;
+		}
 	}
 
 	void FrameCaptureCoordinator::Update() noexcept
 	{
+		ExpireFrameSelections();
 		if (m_NonFiniteWatch)
 		{
 			m_NonFiniteWatch->UpdateCoverage();
@@ -1026,6 +1121,7 @@ namespace gglab
 				}
 			}
 		}
+		ExpireFrameSelections();
 		PollWatchCaptures();
 		CollectWrittenJobs();
 	}
@@ -1083,8 +1179,33 @@ namespace gglab
 		{
 			return false;
 		}
-		return plan.m_Timing == FrameCaptureTiming::NextFrame ||
+		const bool due = plan.m_Timing == FrameCaptureTiming::NextFrame ||
 			(m_HistoryReady && MatchesRequiredContent(job, state) && m_SettledFrames >= plan.m_SettleFrames);
+		// A frame below the required Host view revision leaves the plan waiting.
+		return due && EvaluateRequiredFrameState(job, state).m_Verdict != RequiredFrameStateVerdict::Wait;
+	}
+
+	RequiredFrameStateEvaluation FrameCaptureCoordinator::EvaluateRequiredFrameState(
+		const CaptureJob& job, const FrameCaptureFrameState& state)
+	{
+		return job.m_Plan.m_RequiredFrameState ?
+			gglab::EvaluateRequiredFrameState(*job.m_Plan.m_RequiredFrameState, state.m_HostViewControl,
+				state.m_HostViewProjection, state.m_Temporal) :
+			RequiredFrameStateEvaluation{};
+	}
+
+	bool FrameCaptureCoordinator::FailRequiredFrameStateMismatch(
+		CaptureJob& job, const FrameCaptureFrameState& state) noexcept
+	{
+		const RequiredFrameStateEvaluation evaluation = EvaluateRequiredFrameState(job, state);
+		if (evaluation.m_Verdict != RequiredFrameStateVerdict::Mismatch)
+		{
+			return false;
+		}
+		// Decided before issue: no tap binds and no recorded GPU work needs to abort.
+		FailPlan(job, std::format("RequiredFrameStateMismatch: frame {}: {}.", state.m_FrameSerial,
+			evaluation.m_Differences), "RequiredFrameStateMismatch");
+		return true;
 	}
 
 	bool FrameCaptureCoordinator::HasFrameGraphExports(uint64_t frameSerial) const noexcept
@@ -1151,6 +1272,10 @@ namespace gglab
 	{
 		CaptureJob& job = *entry.m_Job;
 		const CapturePlan& plan = job.m_Plan;
+		if (ExpireFrameSelection(job, std::chrono::steady_clock::now()))
+		{
+			return;
+		}
 		if (!m_Capture)
 		{
 			FailPlan(job, "Frame capture is unavailable.");
@@ -1214,6 +1339,14 @@ namespace gglab
 		metadata.m_DevelopmentTools = state.m_DevelopmentTools;
 		metadata.m_Readiness = state.m_Readiness;
 		metadata.m_Temporal = state.m_Temporal;
+		if (!state.m_HostViewProjection.empty())
+		{
+			metadata.m_Control = FrameCaptureControlState{
+				.m_HostViewControl = state.m_HostViewControl,
+				.m_HostView = state.m_HostViewProjection,
+				.m_RequiredFrameState = plan.m_RequiredFrameState,
+			};
+		}
 		metadata.m_Sequence = plan.m_Sequence;
 		metadata.m_DiagnosticTap = tap ? std::string(GetFrameCaptureDiagnosticTapName(*tap)) : std::string();
 		metadata.m_CapturedAtUtc = std::format("{:%FT%TZ}",
@@ -1251,19 +1384,22 @@ namespace gglab
 		entry.m_Phase = Phase::Issued;
 	}
 
-	void FrameCaptureCoordinator::FailPlan(CaptureJob& job, std::string failure) noexcept
+	void FrameCaptureCoordinator::FailPlan(CaptureJob& job, std::string failure,
+		std::string_view failureCode) noexcept
 	{
 		if (job.m_Attempt && !job.m_Attempt->m_Submitted && job.m_DeliveryCount > 1)
 		{
 			m_AbortFrameSerial = job.m_Attempt->m_FrameSerial;
 		}
+		job.m_Result.m_FailureCode = failureCode;
 		for (ProductDelivery* member : GetDeliveries(job))
 		{
 			GGLAB_ASSERT_MSG(member->m_Phase != Phase::Encoding,
 				"Every required product and watch verdict must be ready before writing starts.");
 			if (member->m_Phase == Phase::Issued && member->m_Attempt->m_CaptureRequestId != 0)
 			{
-				m_DiscardedCaptureResults.push_back(member->m_Attempt->m_CaptureRequestId);
+				// Failed issued work keeps its reservation until Runtime returns its payload.
+				m_DrainingCaptureRequests.push_back(member->m_Attempt->m_CaptureRequestId);
 			}
 			Finish(*member, CaptureJobStatus::Failed, failure);
 		}

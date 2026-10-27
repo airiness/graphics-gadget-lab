@@ -6,6 +6,7 @@
 #include "Capture/FrameCaptureImageEncoder.h"
 #include "Capture/FrameCaptureMetadata.h"
 #include "Capture/FrameCaptureReadiness.h"
+#include "Parameters/HostViewParameters.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalHistoryTypes.h"
@@ -48,6 +49,13 @@ namespace gglab
 		}
 	};
 
+	enum class FrameCaptureFrameOutcome : uint8_t
+	{
+		Planned,
+		Submitted,
+		Aborted,
+	};
+
 	// Runtime state of the frame about to be built, supplied by the application
 	// runtime once per rendered frame.
 	struct FrameCaptureFrameState
@@ -71,6 +79,11 @@ namespace gglab
 		double m_TotalTime = 0.0;
 		bool m_DevelopmentTools = false;
 		FrameCaptureTemporalState m_Temporal{};
+		HostViewControlStamp m_HostViewControl{};
+		// Final display-view values, attributed through this frame's sequence/reference patches.
+		std::vector<HostViewProjectionEntry> m_HostViewProjection;
+		// Planned until the coordinator records submission or an abort.
+		FrameCaptureFrameOutcome m_Outcome = FrameCaptureFrameOutcome::Planned;
 	};
 
 	// A camera reference view the runtime restores for a waiting job.
@@ -108,6 +121,9 @@ namespace gglab
 			CaptureJobLimits m_JobLimits;
 			// Recorded in every bundle manifest; unknown values stay null.
 			CaptureEnvironment m_Environment;
+			// The composed process run identity, shared with session control. Empty means
+			// creation failed; standalone coordinators omit it and create their own.
+			std::optional<std::string> m_RunIdentity;
 		};
 
 		explicit FrameCaptureCoordinator(const CreateInfo& createInfo) noexcept;
@@ -121,6 +137,11 @@ namespace gglab
 		// Advisory preflight with the same validation/pressure ordering. Accepted
 		// reserves nothing and has no job ID; only TrySubmit creates an accepted job.
 		[[nodiscard]] CaptureAdmission CheckJobAdmission(const CapturePlan& plan) const noexcept;
+		[[nodiscard]] std::optional<std::chrono::steady_clock::time_point>
+			GetNextFrameSelectionDeadline() const noexcept;
+		// CPU-only expiry; an open issued attempt settles before its deadline is applied.
+		void ExpireFrameSelections(
+			std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now()) noexcept;
 		// All methods run on the AppRuntime owner thread. Receipts do not expire:
 		// consumption releases the reserved slot; polling an active/unknown job does not.
 		// Standalone use only: a composed coordinator leaves consumption to AppRuntime.
@@ -180,6 +201,8 @@ namespace gglab
 			ResourceExportFrameContext context) noexcept;
 		// Called after the frame passed to BeginFrame was submitted.
 		void OnFrameSubmitted() noexcept;
+		// Called when the frame passed to BeginFrame ends before submission.
+		void OnFrameAborted() noexcept;
 		// Collects Runtime capture results, starts encoding and publishes
 		// finished requests.
 		void Update() noexcept;
@@ -238,6 +261,11 @@ namespace gglab
 			const CaptureJob& job, const FrameCaptureFrameState& state) noexcept;
 		[[nodiscard]] bool IsDue(
 			const CaptureJob& job, const FrameCaptureFrameState& state) const noexcept;
+		[[nodiscard]] static RequiredFrameStateEvaluation EvaluateRequiredFrameState(
+			const CaptureJob& job, const FrameCaptureFrameState& state);
+		// Fails a due plan whose required frame state the frame contradicts.
+		[[nodiscard]] bool FailRequiredFrameStateMismatch(
+			CaptureJob& job, const FrameCaptureFrameState& state) noexcept;
 		[[nodiscard]] FrameCaptureAvailability GetCaptureAvailability(FrameCaptureSource source,
 			const FrameCaptureFrameState& state, uint32_t requestCount = 1) const noexcept;
 		[[nodiscard]] FrameCaptureAvailability GetCaptureAvailability(
@@ -247,7 +275,9 @@ namespace gglab
 			std::optional<PostProcessDebugTap>& diagnosticTap) noexcept;
 		void Issue(ProductDelivery& entry, const FrameCaptureFrameState& state,
 			bool preAdmitted = false) noexcept;
-		void FailPlan(CaptureJob& job, std::string failure) noexcept;
+		void FailPlan(CaptureJob& job, std::string failure, std::string_view failureCode = {}) noexcept;
+		[[nodiscard]] bool ExpireFrameSelection(CaptureJob& job,
+			std::chrono::steady_clock::time_point now) noexcept;
 		void RetryPlan(CaptureJob& job, uint64_t consumedRequestId) noexcept;
 		void HandleCaptureResult(FrameCaptureResult result) noexcept;
 		void PollWatchCaptures() noexcept;

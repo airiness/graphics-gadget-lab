@@ -6,6 +6,7 @@
 #include "Application/Platform/Windows/Win32NamedPipeServer.h"
 #include "Capture/CaptureBundle.h"
 #include "Capture/CaptureEnvironment.h"
+#include "Parameters/HostViewParameters.h"
 #include "Parameters/ParameterEffectReceipt.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 
@@ -16,6 +17,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <format>
+#include <initializer_list>
 #include <memory>
 #include <optional>
 #include <string>
@@ -463,9 +465,41 @@ namespace gglab
 			FrameCaptureFrameState frame{ .m_Backend = "vulkan", .m_DemoId = "Demo.LabHost", .m_LabId = "gglab.lab.culling",
 				.m_FrameSerial = 73, .m_FrameIndex = 42, .m_ReferenceViewIds = { "CAM_A", "CAM_B" } };
 			frame.m_Readiness.Add("lab", FrameCaptureGateState::Pending, "Warming up.");
+			frame.m_HostViewControl = { .m_RunIdentity = "0123456789abcdef0123456789abcdef",
+				.m_ContentIdentity = 481, .m_HostViewRevision = 12 };
+			frame.m_HostViewProjection = { { .m_Id = LabParameterId("view.taa.enabled"), .m_Type = LabParameterType::Bool,
+				.m_Value = false, .m_Source = HostViewValueSource::Host, .m_InheritedSource = HostViewValueSource::Tooling,
+				.m_Override = LabValue(false) } };
+			frame.m_Temporal.m_Status = "disabled";
+			frame.m_Temporal.m_DisableReason = "not-requested";
+			frame.m_Temporal.m_Consumers = { { .m_Name = "temporal-aa", .m_Status = "disabled",
+				.m_DisableReason = "not-requested" } };
+			frame.m_Outcome = FrameCaptureFrameOutcome::Submitted;
 			const auto status = Json::parse(SerializeApplicationControlStatus(4, {
 				.m_SessionId = "s1", .m_ProcessId = 99, .m_Hidden = true, .m_Width = 640, .m_Height = 360,
-				.m_CaptureIntake = { .m_ActiveJobs = 2, .m_ReservedReceipts = 3 }, .m_SettledFrames = 5, .m_Frame = &frame }));
+				.m_CaptureIntake = { .m_ActiveJobs = 2, .m_ReservedReceipts = 3 }, .m_SettledFrames = 5, .m_Frame = &frame,
+				.m_HostViewControl = { .m_ContentIdentity = 481, .m_HostViewRevision = 13 } }));
+			const auto& hostView = status["frame"]["hostView"];
+			context.Check(status["frame"]["outcome"] == "submitted" &&
+				status["frame"]["controlState"]["runIdentity"] == "0123456789abcdef0123456789abcdef" &&
+				status["frame"]["controlState"]["hostViewRevision"] == 12 &&
+				status["parameterControl"]["controlState"]["runIdentity"].is_null() &&
+				status["parameterControl"]["controlState"]["hostViewRevision"] == 13 &&
+				hostView.size() == 1 && hostView[0]["id"] == "view.taa.enabled" && hostView[0]["value"] == false &&
+				hostView[0]["source"] == "host" && hostView[0]["inheritedSource"] == "tooling" &&
+				hostView[0]["hostOverride"] == Json({ { "present", true }, { "value", false } }) &&
+				status["frame"]["temporal"]["consumers"][0]["name"] == "temporal-aa" &&
+				status["frame"]["temporal"]["status"] == "disabled",
+				"Status separates the planned frame's control stamp, attribution and outcome from live control state");
+			context.Check(status["capabilities"]["hostViewControlState"]["version"] == 1 &&
+				status["capabilities"]["hostViewControlState"]["valueSources"].size() == 6 &&
+				status["capabilities"]["hostViewControlState"]["frameOutcomes"].size() == 3,
+				"Host view control observation is advertised as an additive capability");
+			const HostViewProjectionEntry inherited{ .m_Id = LabParameterId("view.gtao.radius"),
+				.m_Type = LabParameterType::Float, .m_Value = 1.5f };
+			context.Check(SerializeApplicationControlHostViewProjection({ &inherited, 1 })[0]["hostOverride"] ==
+				Json({ { "present", false } }),
+				"An absent Host override carries no value");
 			context.Check(status["session"]["pid"] == 99 && status["frame"]["labId"] == "gglab.lab.culling" &&
 				status["frame"]["ready"] == false && status["frame"]["settledFrames"] == 5 &&
 				status["frame"]["gates"][0]["state"] == "pending" && status["frame"]["fixedDeltaTime"].is_null() &&
@@ -851,6 +885,312 @@ namespace gglab
 			context.Check(received && pendingResponse == "stopped", "Stopping answers outstanding requests with the fallback response");
 			context.Check(silentAnswered && stopTime < std::chrono::seconds(3), "A client that never reads its response cannot hold server shutdown");
 		}
+
+		void RunRunIdentityCheckTests(SelfTestContext& context) noexcept
+		{
+			constexpr std::string_view run = "0123456789abcdef0123456789abcdef";
+			const auto set = ParseApplicationControlRequest(
+				R"({"protocol":4,"id":30,"command":"set","expectedRunIdentity":"0123456789abcdef0123456789abcdef",)"
+				R"("changes":[{"id":"view.taa.enabled","type":"bool","value":false}]})");
+			const auto result = ParseApplicationControlRequest(
+				R"({"protocol":4,"id":31,"command":"result","jobId":4,"consume":true,)"
+				R"("expectedRunIdentity":"0123456789abcdef0123456789abcdef"})");
+			const auto stop = ParseApplicationControlRequest(
+				R"({"protocol":4,"id":32,"command":"stop","expectedRunIdentity":"0123456789abcdef0123456789abcdef"})");
+			context.Check(set.m_Request && set.m_Request->m_ExpectedRunIdentity == run &&
+				set.m_Request->m_ParameterChanges.size() == 1 &&
+				result.m_Request && result.m_Request->m_JobId == 4 && result.m_Request->m_Consume &&
+				result.m_Request->m_ExpectedRunIdentity == run &&
+				stop.m_Request && stop.m_Request->m_ExpectedRunIdentity == run,
+				"Protected commands accept an expected run beside their exact fields");
+			const auto legacy = ParseApplicationControlRequest(R"({"protocol":4,"id":33,"command":"stop"})");
+			context.Check(legacy.m_Request && !legacy.m_Request->m_ExpectedRunIdentity,
+				"Requests without an expected run keep their existing meaning");
+			for (const auto* invalid : {
+				R"({"protocol":4,"id":34,"command":"status","expectedRunIdentity":"0123456789abcdef0123456789abcdef"})",
+				R"({"protocol":4,"id":35,"command":"parameters","expectedRunIdentity":"0123456789abcdef0123456789abcdef"})",
+				R"({"protocol":4,"id":36,"command":"stop","expectedRunIdentity":"0123456789ABCDEF0123456789ABCDEF"})",
+				R"({"protocol":4,"id":37,"command":"stop","expectedRunIdentity":"0123456789abcdef0123456789abcde"})",
+				R"({"protocol":4,"id":38,"command":"stop","expectedRunIdentity":7})",
+				R"({"protocol":4,"id":39,"command":"stop","expectedRunIdentity":"0123456789abcdef0123456789abcdef","x":1})" })
+			{
+				context.Check(!ParseApplicationControlRequest(invalid).m_Request,
+					"Queries, malformed run identities and unknown fields reject the request");
+			}
+
+			context.Check(!CheckApplicationControlRunIdentity(*legacy.m_Request, "") &&
+				!CheckApplicationControlRunIdentity(*stop.m_Request, run),
+				"Unchecked requests and the matching run proceed");
+			const auto changed = Json::parse(*CheckApplicationControlRunIdentity(*stop.m_Request,
+				"ffffffffffffffffffffffffffffffff"));
+			context.Check(!changed["ok"] && changed["id"] == 32 && changed["errorCode"] == "ExpectedRunChanged" &&
+				changed["runIdentity"] == "ffffffffffffffffffffffffffffffff",
+				"A different run is rejected with a machine-readable code and the current run");
+			const auto unavailable = Json::parse(*CheckApplicationControlRunIdentity(*set.m_Request, ""));
+			context.Check(!unavailable["ok"] && unavailable["errorCode"] == "RunIdentityUnavailable",
+				"A session without a run identity rejects run-checked requests");
+
+			const auto status = Json::parse(SerializeApplicationControlStatus(40, {}));
+			const auto& commands = status["capabilities"]["runIdentityChecks"]["commands"];
+			context.Check(status["capabilities"]["runIdentityChecks"]["version"] == 1 && commands.size() == 11 &&
+				!AcceptsApplicationControlExpectedRun(ApplicationControlCommand::Status) &&
+				!AcceptsApplicationControlExpectedRun(ApplicationControlCommand::Parameters) &&
+				AcceptsApplicationControlExpectedRun(ApplicationControlCommand::Sequence),
+				"Run checks are advertised for every protected command");
+		}
+
+		void RunHostViewOverrideTests(SelfTestContext& context) noexcept
+		{
+			constexpr std::string_view run = "0123456789abcdef0123456789abcdef";
+			const auto request = [](std::string_view expected, std::string_view overrides)
+				{
+					return ParseApplicationControlRequest(std::format(
+						R"({{"protocol":4,"id":50,"command":"host-view-overrides","expected":{},"overrides":{}}})",
+						expected, overrides));
+				};
+			constexpr std::string_view stamp =
+				R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"hostViewRevision":12})";
+			const auto parsed = request(stamp,
+				R"([{"id":"view.taa.enabled","type":"bool","present":true,"value":false},)"
+				R"({"id":"view.gtao.radius","type":"float","present":false}])");
+			const auto* overrides = parsed.m_Request ? &parsed.m_Request->m_HostViewOverrides : nullptr;
+			context.Check(parsed.m_Request && parsed.m_Request->m_Command == ApplicationControlCommand::HostViewOverrides &&
+				parsed.m_Request->m_ExpectedHostView.m_RunIdentity == run &&
+				parsed.m_Request->m_ExpectedHostView.m_ContentIdentity == 481 &&
+				parsed.m_Request->m_ExpectedHostView.m_HostViewRevision == 12 &&
+				parsed.m_Request->m_ExpectedRunIdentity == run && overrides->size() == 2 &&
+				(*overrides)[0].m_Type == LabParameterType::Bool && (*overrides)[0].m_Value &&
+				!std::get<bool>(*(*overrides)[0].m_Value) &&
+				(*overrides)[1].m_Type == LabParameterType::Float && !(*overrides)[1].m_Value,
+				"Host view operations parse a complete stamp and typed present/absent states");
+			const auto changed = CheckApplicationControlRunIdentity(*parsed.m_Request, "ffffffffffffffffffffffffffffffff");
+			context.Check(changed && Json::parse(*changed)["errorCode"] == "ExpectedRunChanged" &&
+				!CheckApplicationControlRunIdentity(*parsed.m_Request, run),
+				"The expected stamp's run feeds the check that precedes admission");
+
+			constexpr std::string_view valid = R"([{"id":"view.gtao.radius","type":"float","present":false}])";
+			for (const auto& [expected, states] : std::initializer_list<std::pair<std::string_view, std::string_view>>{
+				{ R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481})", valid },
+				{ R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"hostViewRevision":12,"x":1})", valid },
+				{ R"({"runIdentity":"0123456789ABCDEF0123456789ABCDEF","contentIdentity":481,"hostViewRevision":12})", valid },
+				{ R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":-1,"hostViewRevision":12})", valid },
+				{ stamp, R"([])" },
+				{ stamp, R"([{"id":"view.gtao.radius","type":"float","present":false,"value":1.0}])" },
+				{ stamp, R"([{"id":"view.gtao.radius","type":"float","present":true}])" },
+				{ stamp, R"([{"id":"view.gtao.radius","type":"float","present":1}])" },
+				{ stamp, R"([{"id":"view.gtao.radius","type":"float","value":1.0}])" },
+				{ stamp, R"([{"id":"view.gtao.radius","type":"real","present":false}])" },
+				{ stamp, R"([{"id":"view.gtao.radius","type":"float","present":true,"value":"1"}])" },
+				{ stamp, R"([{"id":"view.gtao.radius","type":"float","present":false,"x":1}])" },
+				{ stamp, R"([{"id":"a","type":"bool","present":false},{"id":"a","type":"bool","present":false}])" } })
+			{
+				context.Check(!request(expected, states).m_Request,
+					"Partial stamps and malformed or ambiguous override states reject the request");
+			}
+			context.Check(!ParseApplicationControlRequest(
+				R"({"protocol":4,"id":51,"command":"host-view-overrides","expected":{"runIdentity":"0123456789abcdef0123456789abcdef",)"
+				R"("contentIdentity":481,"hostViewRevision":12},"overrides":[{"id":"a","type":"bool","present":false}],)"
+				R"("expectedRunIdentity":"0123456789abcdef0123456789abcdef"})").m_Request &&
+				!ParseApplicationControlRequest(
+					R"({"protocol":4,"id":52,"command":"host-view-overrides","overrides":[{"id":"a","type":"bool","present":false}]})").m_Request,
+				"The operation names its run only in the required stamp");
+
+			ParameterBatchStatus batch;
+			batch.m_BatchId = 7;
+			batch.m_Source = "host";
+			batch.m_HostViewOperation = HostViewOverrideOperation{
+				.m_Expected = { std::string(run), 481, 12 },
+				.m_Overrides = { { LabParameterId("view.taa.enabled"), LabParameterType::Bool, false } },
+			};
+			const Json queued = SerializeApplicationControlParameterBatch(batch);
+			context.Check(queued["overrides"].size() == 1 && queued["overrides"][0]["present"] == true &&
+				queued["overrides"][0]["value"] == false && queued["overrides"][0]["type"] == "bool" &&
+				queued["controlCommit"]["expected"]["hostViewRevision"] == 12 && queued["controlCommit"]["before"].is_null() &&
+				queued["controlCommit"]["after"].is_null() && queued["controlCommit"]["changed"].is_null() &&
+				queued["values"].empty(),
+				"A queued operation reports its requested states without fabricated commit evidence");
+			batch.m_State = ParameterBatchState::Finished;
+			batch.m_HostViewOperation->m_Before = HostViewControlStamp{ std::string(run), 481, 12 };
+			batch.m_HostViewOperation->m_After = HostViewControlStamp{ std::string(run), 481, 13 };
+			batch.m_HostViewOperation->m_Changes = { { LabParameterId("view.taa.enabled"), std::nullopt, false } };
+			const Json committed = SerializeApplicationControlParameterBatch(batch);
+			context.Check(committed["controlCommit"]["before"]["hostViewRevision"] == 12 &&
+				committed["controlCommit"]["after"]["hostViewRevision"] == 13 && committed["controlCommit"]["changed"] == true &&
+				committed["controlCommit"]["changes"][0]["before"]["present"] == false &&
+				committed["controlCommit"]["changes"][0]["after"]["value"] == false &&
+				committed["controlCommit"]["conflict"].is_null(),
+				"A committed operation reports before/after stamps and the changed override states");
+			batch.m_HostViewOperation->m_After.reset();
+			batch.m_HostViewOperation->m_Changes.clear();
+			batch.m_HostViewOperation->m_Conflict = "ExpectedHostViewRevisionMismatch";
+			batch.m_State = ParameterBatchState::Failed;
+			const Json conflict = SerializeApplicationControlParameterBatch(batch);
+			context.Check(conflict["controlCommit"]["after"].is_null() && conflict["controlCommit"]["changed"] == false &&
+				conflict["controlCommit"]["conflict"] == "ExpectedHostViewRevisionMismatch" &&
+				!SerializeApplicationControlParameterBatch(ParameterBatchStatus{}).contains("controlCommit"),
+				"A conflict applies nothing, and legacy batches carry no control-commit record");
+
+			const auto status = Json::parse(SerializeApplicationControlStatus(53, {}));
+			const auto& capability = status["capabilities"]["hostViewOverrides"];
+			const auto& checked = status["capabilities"]["runIdentityChecks"]["commands"];
+			context.Check(capability["version"] == 1 && capability["command"] == "host-view-overrides" &&
+				capability["groups"].size() == 3 && capability["maxItems"] == 128 && capability["expected"].size() == 3 &&
+				capability["errorCodes"].size() == ApplicationControlHostViewOverrideErrorCodes.size() &&
+				std::ranges::find(checked, Json("host-view-overrides")) == checked.end() &&
+				!AcceptsApplicationControlExpectedRun(ApplicationControlCommand::HostViewOverrides),
+				"The guarded operation is advertised with its stamp, limits and error codes");
+			const auto rejected = Json::parse(SubmitApplicationControlHostViewOverrides(54, {}, {}, nullptr));
+			context.Check(!rejected["ok"] && rejected["errorCode"] == "NoParameterSource" &&
+				rejected["controlState"].is_null(),
+				"Rejections carry a machine-readable code beside the error text");
+		}
+
+		void RunProtectedAssignmentTests(SelfTestContext& context) noexcept
+		{
+			const ParameterControlStamp stamp{
+				.m_RunIdentity = "0123456789abcdef0123456789abcdef", .m_ContentIdentity = 21, .m_ActivationRevision = 3,
+				.m_Domain = ParameterControlDomain::Lab, .m_LabRevision = 8, .m_ValuesRevision = 9,
+				.m_WorldRevision = 13, .m_EnvironmentRevision = 17 };
+			const Json document{
+				{ "protocol", 4 }, { "id", 57 }, { "command", "assign" },
+				{ "expected", SerializeApplicationControlDomainStamp(stamp) },
+				{ "changes", Json::array({ { { "id", "radius" }, { "type", "float" }, { "value", 2.0f } } }) } };
+			const auto parsed = ParseApplicationControlRequest(document.dump());
+			context.Check(parsed.m_Request && parsed.m_Request->m_Command == ApplicationControlCommand::Assign &&
+				parsed.m_Request->m_ExpectedParameterControl == stamp &&
+				parsed.m_Request->m_ExpectedRunIdentity == stamp.m_RunIdentity &&
+				parsed.m_Request->m_ParameterChanges.size() == 1,
+				"Protected Assign parses a complete typed domain guard and binds subsequent polling to its run");
+			for (const auto& field : { "runIdentity", "contentIdentity", "activationRevision", "domain", "labRevision",
+				"valuesRevision", "worldRevision", "environmentRevision" })
+			{
+				auto partial = document;
+				partial["expected"].erase(field);
+				context.Check(!ParseApplicationControlRequest(partial.dump()).m_Request,
+					"Partial domain control stamps reject before admission");
+			}
+			auto invalid = document;
+			invalid["expected"]["domain"] = "host";
+			context.Check(!ParseApplicationControlRequest(invalid.dump()).m_Request,
+				"Protected Assign cannot reinterpret Host view ownership");
+			invalid = document;
+			invalid["expected"]["worldRevision"] = -1;
+			context.Check(!ParseApplicationControlRequest(invalid.dump()).m_Request,
+				"Signed or fractional control revisions are not accepted as unsigned identities");
+			invalid = document;
+			invalid["expectedRunIdentity"] = stamp.m_RunIdentity;
+			context.Check(!ParseApplicationControlRequest(invalid.dump()).m_Request,
+				"The protected stamp is the single run authority for Assign");
+			if (parsed.m_Request)
+			{
+				const auto rejection = CheckApplicationControlRunIdentity(*parsed.m_Request,
+					"ffffffffffffffffffffffffffffffff");
+				context.Check(rejection && Json::parse(*rejection)["errorCode"] == "ExpectedRunChanged",
+					"A restarted session rejects protected Assign without touching process-local state");
+			}
+			ParameterBatchStatus batch;
+			batch.m_DomainOperation = ParameterControlOperation{ .m_Expected = stamp, .m_Before = stamp,
+				.m_Committed = false, .m_Conflict = "ExpectedParameterControlMismatch" };
+			const auto failed = SerializeApplicationControlParameterBatch(batch);
+			context.Check(failed["domainControl"]["committed"] == false &&
+				failed["domainControl"]["after"].is_null() &&
+				failed["domainControl"]["conflict"] == "ExpectedParameterControlMismatch" &&
+				!SerializeApplicationControlParameterBatch(ParameterBatchStatus{}).contains("domainControl"),
+				"Domain commit observations are separate from receipts and absent on legacy results");
+			const auto status = Json::parse(SerializeApplicationControlStatus(58, {}));
+			context.Check(status["capabilities"]["protectedAssignments"]["domains"].size() == 2 &&
+				status["capabilities"]["protectedAssignments"]["mixedDomains"] == false,
+				"Capabilities advertise the bounded protected domain contract");
+			const auto absent = Json::parse(SubmitApplicationControlParameters(59, {}, nullptr, &stamp));
+			context.Check(!absent["ok"] && absent["errorCode"] == "NoParameterSource" &&
+				absent["domainControlState"].is_null(),
+				"Protected rejections report an error code and current domain availability");
+		}
+
+		void RunRequiredFrameStateTests(SelfTestContext& context) noexcept
+		{
+			const auto capture = [](std::string_view command, std::string_view required)
+				{
+					return ParseApplicationControlRequest(std::format(
+						R"({{"protocol":4,"id":60,"command":"{}","requiredFrameState":{}}})", command, required));
+				};
+			constexpr std::string_view head =
+				R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"minHostViewRevision":13,)";
+			const auto parsed = capture("capture", std::format("{}{}", head,
+				R"("values":[{"id":"view.taa.enabled","type":"bool","value":false,"source":"host"},)"
+				R"({"id":"view.gtao.radius","type":"float","value":1.5}],)"
+				R"("temporalConsumers":[{"consumer":"temporal-aa","status":"disabled","disableReason":"not-requested"},)"
+				R"({"consumer":"temporal-gtao","status":"active"}],"referenceSampling":false})"));
+			const auto* required = parsed.m_Request ? parsed.m_Request->m_Capture.m_RequiredFrameState.get() : nullptr;
+			context.Check(required && required->m_RunIdentity == "0123456789abcdef0123456789abcdef" &&
+				required->m_ContentIdentity == 481 && required->m_MinHostViewRevision == 13 &&
+				required->m_Values.size() == 2 && required->m_Values[0].m_Source == HostViewValueSource::Host &&
+				!std::get<bool>(required->m_Values[0].m_Value) && !required->m_Values[1].m_Source &&
+				required->m_TemporalConsumers.size() == 2 &&
+				required->m_TemporalConsumers[0].m_DisableReason == TemporalConsumerDisableReason::NotRequested &&
+				required->m_TemporalConsumers[1].m_Status == TemporalConsumerStatus::Active &&
+				!required->m_TemporalConsumers[1].m_DisableReason && required->m_ReferenceSampling == false,
+				"A capture carries a typed required frame state with optional sources and reasons");
+			constexpr std::string_view minimal = R"("values":[{"id":"view.taa.enabled","type":"bool","value":true}]})";
+			context.Check(capture("graph", std::format("{}{}", head, minimal)).m_Request &&
+				ParseApplicationControlRequest(std::format(
+					R"({{"protocol":4,"id":61,"command":"export","targets":[{{"resource":"Color","at":"final"}}],"requiredFrameState":{}{}}})",
+					head, minimal)).m_Request,
+				"Graph and export plans accept the same predicate");
+			for (const std::string_view invalid : {
+				std::string_view(R"({"contentIdentity":481,"minHostViewRevision":13,"values":[{"id":"a","type":"bool","value":true}]})"),
+				std::string_view(R"({"runIdentity":"0123456789ABCDEF0123456789ABCDEF","contentIdentity":481,"minHostViewRevision":13,"values":[{"id":"a","type":"bool","value":true}]})"),
+				std::string_view(R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"minHostViewRevision":13,"values":[]})"),
+				std::string_view(R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"minHostViewRevision":13,"values":[{"id":"a","type":"bool","value":1}]})"),
+				std::string_view(R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"minHostViewRevision":13,"values":[{"id":"a","type":"bool","value":true,"source":"user"}]})"),
+				std::string_view(R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"minHostViewRevision":13,"values":[{"id":"a","type":"bool","value":true,"x":1}]})"),
+				std::string_view(R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"minHostViewRevision":13,"values":[{"id":"a","type":"bool","value":true}],"temporalConsumers":[{"consumer":"taa","status":"active"}]})"),
+				std::string_view(R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"minHostViewRevision":13,"values":[{"id":"a","type":"bool","value":true}],"temporalConsumers":[{"consumer":"temporal-aa","status":"on"}]})"),
+				std::string_view(R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"minHostViewRevision":13,"values":[{"id":"a","type":"bool","value":true}],"temporalConsumers":[{"consumer":"temporal-aa","status":"disabled","disableReason":"off"}]})"),
+				std::string_view(R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"minHostViewRevision":13,"values":[{"id":"a","type":"bool","value":true}],"referenceSampling":0})"),
+				std::string_view(R"({"runIdentity":"0123456789abcdef0123456789abcdef","contentIdentity":481,"minHostViewRevision":13,"values":[{"id":"a","type":"bool","value":true}],"lighting":1})") })
+			{
+				context.Check(!capture("capture", invalid).m_Request,
+					"Malformed predicates, unknown names and unknown fields reject the request");
+			}
+
+			const auto status = Json::parse(SerializeApplicationControlStatus(62, {}));
+			const auto& capability = status["capabilities"]["requiredFrameState"];
+			context.Check(capability["version"] == 1 && capability["commands"].size() == 3 &&
+				capability["maxValues"] == 128 && capability["temporalConsumers"].size() == 3 &&
+				capability["failureCodes"] == Json::array({ "RequiredFrameStateMismatch", "FrameSelectionExpired" }) &&
+				capability["frameSelectionTimeoutMs"] == Json({ { "min", 1 }, { "max", 300000 }, { "default", 300000 } }) &&
+				capability["admissionReasons"].size() == 2,
+				"Required frame state capture is advertised with its limits and outcome codes");
+			for (const std::string_view timeout : { "0", "300001", "-1", "1.5", "null", "\"100\"" })
+			{
+				context.Check(!ParseApplicationControlRequest(std::format(
+					R"({{"protocol":4,"id":62,"command":"capture","frameSelectionTimeoutMs":{},"requiredFrameState":{}{}}})",
+					timeout, head, minimal)).m_Request,
+					"Invalid selection timeout values reject before admission");
+			}
+			const auto bounded = ParseApplicationControlRequest(std::format(
+				R"({{"protocol":4,"id":62,"command":"capture","frameSelectionTimeoutMs":17,"requiredFrameState":{}{}}})",
+				head, minimal));
+			context.Check(bounded.m_Request &&
+				bounded.m_Request->m_Capture.m_FrameSelectionTimeout == std::chrono::milliseconds(17) &&
+				!ParseApplicationControlRequest(
+					R"({"protocol":4,"id":62,"command":"capture","frameSelectionTimeoutMs":17})").m_Request,
+				"Selection deadlines apply only to predicate-bound captures");
+			const auto invalid = Json::parse(SerializeApplicationControlCaptureAdmission(63,
+				{ CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::RequiredFrameStateInvalid }));
+			const auto unavailable = Json::parse(SerializeApplicationControlCaptureAdmission(64,
+				{ CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::RequiredFrameStateUnavailable }));
+			context.Check(invalid["reason"] == "RequiredFrameStateInvalid" &&
+				unavailable["reason"] == "RequiredFrameStateUnavailable" && !unavailable["ok"].get<bool>(),
+				"Predicate admission rejections name their reason");
+			CaptureJobResult result{ .m_JobId = 9, .m_Status = CaptureJobStatus::Failed };
+			const auto plain = Json::parse(SerializeApplicationControlCaptureResult(65, result, false));
+			result.m_FailureCode = "RequiredFrameStateMismatch";
+			const auto mismatched = Json::parse(SerializeApplicationControlCaptureResult(66, result, false));
+			context.Check(plain["failureCode"].is_null() && mismatched["failureCode"] == "RequiredFrameStateMismatch",
+				"A job-level failure code is reported beside the product failures");
+		}
 	}
 
 	void RunApplicationControlSelfTests(SelfTestContext& context) noexcept
@@ -858,6 +1198,10 @@ namespace gglab
 		RunParameterControlTests(context);
 		RunDeferredParameterSerializationTests(context);
 		RunParseTests(context);
+		RunRunIdentityCheckTests(context);
+		RunHostViewOverrideTests(context);
+		RunProtectedAssignmentTests(context);
+		RunRequiredFrameStateTests(context);
 		RunSerializeTests(context);
 		RunCaptureJobOwnershipTests(context);
 		RunPipeServerTests(context);

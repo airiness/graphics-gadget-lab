@@ -3,12 +3,19 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Parameters/ParameterEffectReceipt.h"
 #include "Parameters/HostViewParameters.h"
+#include "Parameters/ViewControlSnapshot.h"
+#include "Capture/FrameCaptureCoordinator.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettingsPatch.h"
 #include "GGLabTestCore/SelfTest.h"
 
+#include <algorithm>
 #include <array>
 #include <limits>
+#include <span>
 #include <string>
+#include <string_view>
 #include <utility>
+#include <variant>
 
 namespace gglab
 {
@@ -264,9 +271,183 @@ namespace gglab
 			}
 		}
 
+		void RunHostViewAttributionTests(SelfTestContext& context) noexcept
+		{
+			ResolvedViewRenderSettings view;
+			view.m_TemporalAA.m_MaxHistoryFeedback = 0.6f;
+			view.m_Lighting.m_GTAO.m_Radius = 2.0f;
+			const std::array overrides
+			{
+				LabParameterValue{ LabParameterId("view.taa.max_history_feedback"), 0.6f },
+				LabParameterValue{ LabParameterId("view.gtao.radius"), 2.0f },
+			};
+			const auto find = [](std::span<const HostViewProjectionEntry> projection, std::string_view id)
+				{
+					const auto found = std::ranges::find(projection, LabParameterId(id), &HostViewProjectionEntry::m_Id);
+					return found != projection.end() ? &*found : nullptr;
+				};
+			ViewRenderSettingsPatch sequence;
+			sequence.m_TemporalAA.m_MaxHistoryFeedback = 0.3f;
+			sequence.m_Lighting.m_GTAO.m_StepCount = 3u;
+			const auto projection = DescribeHostViewProjection(view, { .m_TemporalAA = true }, overrides,
+				{ .m_Sequence = &sequence });
+			const auto* feedback = find(projection, "view.taa.max_history_feedback");
+			const auto* taaEnabled = find(projection, "view.taa.enabled");
+			const auto* radius = find(projection, "view.gtao.radius");
+			const auto* steps = find(projection, "view.gtao.step_count");
+			const auto* ev100 = find(projection, "view.exposure.ev100");
+			context.Check(projection.size() == 25 && feedback && taaEnabled && radius && steps && ev100,
+				"The projection covers every Host view binding");
+			if (!feedback || !taaEnabled || !radius || !steps || !ev100)
+			{
+				return;
+			}
+			context.Check(taaEnabled->m_Source == HostViewValueSource::Tooling &&
+				steps->m_InheritedSource == HostViewValueSource::Content &&
+				ev100->m_Source == HostViewValueSource::Camera && !ev100->m_Override,
+				"Inherited values come from the active tooling block, content or the display camera");
+			context.Check(radius->m_Source == HostViewValueSource::Host && radius->m_Override &&
+				std::get<float>(*radius->m_Override) == 2.0f && std::get<float>(radius->m_Value) == 2.0f,
+				"A present Host override is attributed to host and reports its stored value");
+			context.Check(feedback->m_Source == HostViewValueSource::Sequence &&
+				feedback->m_InheritedSource == HostViewValueSource::Tooling && feedback->m_Override &&
+				steps->m_Source == HostViewValueSource::Sequence && !steps->m_Override,
+				"A legacy sequence patch is attributed after Host overrides, whatever the stored values");
+
+			ViewRenderSettingsPatch reference;
+			reference.m_TemporalAA.m_Enabled = false;
+			reference.m_Lighting.m_GTAO.m_TemporalAccumulation = false;
+			const auto masked = DescribeHostViewProjection(view, {}, overrides, { .m_ForcedReference = &reference });
+			const auto* maskedEnabled = find(masked, "view.taa.enabled");
+			const auto* maskedAccumulation = find(masked, "view.gtao.temporal_accumulation");
+			const auto* maskedFeedback = find(masked, "view.taa.max_history_feedback");
+			context.Check(maskedEnabled && maskedEnabled->m_Source == HostViewValueSource::ForcedReference &&
+				maskedEnabled->m_InheritedSource == HostViewValueSource::Content &&
+				maskedAccumulation && maskedAccumulation->m_Source == HostViewValueSource::ForcedReference &&
+				maskedFeedback && maskedFeedback->m_Source == HostViewValueSource::Host,
+				"Reference sampling attributes only its forced fields");
+
+			context.Check(GetHostViewValueSourceName(HostViewValueSource::Content) == "content" &&
+				GetHostViewValueSourceName(HostViewValueSource::Tooling) == "tooling" &&
+				GetHostViewValueSourceName(HostViewValueSource::Camera) == "camera" &&
+				GetHostViewValueSourceName(HostViewValueSource::Host) == "host" &&
+				GetHostViewValueSourceName(HostViewValueSource::Sequence) == "sequence" &&
+				GetHostViewValueSourceName(HostViewValueSource::ForcedReference) == "forced-reference",
+				"Value sources keep their transport names");
+		}
+
+		void RunViewControlSnapshotTests(SelfTestContext& context) noexcept
+		{
+			ApplicationViewSettingsResolution inherited;
+			inherited.m_View.m_TemporalAA.m_Enabled = true;
+			inherited.m_View.m_Lighting.m_GTAO.m_Radius = 2.0f;
+			inherited.m_View.m_Exposure.m_ManualEV100 = 12.0f;
+			inherited.m_ToolingBlocks.m_TemporalAA = true;
+			std::array overrides
+			{
+				LabParameterValue{ LabParameterId("view.taa.enabled"), true },
+				LabParameterValue{ LabParameterId("view.gtao.radius"), 1.5f },
+				LabParameterValue{ LabParameterId("view.exposure.ev100"), 14.0f },
+			};
+			auto resolved = inherited.m_View;
+			ApplyHostViewParameters(overrides, resolved, true);
+			ViewRenderSettingsPatch reference;
+			reference.m_TemporalAA.m_Enabled = false;
+			resolved.m_TemporalAA.m_Enabled = false;
+			FrameCaptureFrameState planned;
+			planned.m_FrameSerial = 42;
+			planned.m_HostViewControl = { "run", 2, 7 };
+			planned.m_SettleKey.m_Temporal.m_Identity.m_DisplayViewId = RenderViewID::DebugCamera0;
+			planned.m_HostViewProjection = DescribeHostViewProjection(resolved,
+				inherited.m_ToolingBlocks, overrides, { .m_ForcedReference = &reference });
+			planned.m_Temporal.m_Consumers = { { "temporal-aa", false, "disabled", "not-requested" } };
+			auto previous = planned;
+			previous.m_FrameSerial = 41;
+			previous.m_HostViewControl.m_ContentIdentity = 1;
+			previous.m_Outcome = FrameCaptureFrameOutcome::Aborted;
+			const auto snapshot = BuildViewControlSnapshot(inherited, overrides, planned, &previous);
+			const auto find = [](const auto& entries, std::string_view id) -> const HostViewProjectionEntry&
+				{
+					return *std::ranges::find(entries, LabParameterId(id), &HostViewProjectionEntry::m_Id);
+				};
+			context.Check(snapshot.m_Inherited.Get(LabParameterId("view.gtao.radius"), 0.0f) == 2.0f &&
+				std::get<float>(find(snapshot.m_HostView, "view.gtao.radius").m_Value) == 1.5f &&
+				std::get<float>(find(snapshot.m_HostView, "view.exposure.ev100").m_Value) == 14.0f,
+				"GUI snapshots keep inherited values separate from normalized Host-resolved values");
+			const auto& taa = find(snapshot.m_HostView, "view.taa.enabled");
+			context.Check(taa.m_Override && std::get<bool>(*taa.m_Override) &&
+				taa.m_Source == HostViewValueSource::Host && taa.m_InheritedSource == HostViewValueSource::Tooling &&
+				std::get<bool>(taa.m_Value) &&
+				find(snapshot.m_PlannedFrame.m_Values, "view.taa.enabled").m_Source == HostViewValueSource::ForcedReference &&
+				!std::get<bool>(find(snapshot.m_PlannedFrame.m_Values, "view.taa.enabled").m_Value),
+				"Equal-value pins remain explicit Host intent even when a reference masks the planned frame");
+			context.Check(snapshot.m_PlannedFrame.m_FrameSerial == 42 &&
+				snapshot.m_PlannedFrame.m_Outcome == ViewControlFrameOutcome::Planned &&
+				snapshot.m_PlannedFrame.m_DisplayViewId == RenderViewID::DebugCamera0 &&
+				snapshot.m_PreviousFrame->m_Outcome == ViewControlFrameOutcome::Aborted &&
+				snapshot.m_PreviousFrame->m_Control.m_ContentIdentity == 1 &&
+				snapshot.m_Control.m_ContentIdentity == 2,
+				"Planned and prior aborted observations preserve independent frame and content identities");
+			inherited.m_View.m_Lighting.m_GTAO.m_Radius = 9.0f;
+			overrides[0].m_Value = false;
+			planned.m_HostViewProjection.clear();
+			planned.m_Temporal.m_Consumers.clear();
+			previous.m_Outcome = FrameCaptureFrameOutcome::Submitted;
+			context.Check(snapshot.m_HostView.size() == 25 && snapshot.m_PlannedFrame.m_Values.size() == 25 &&
+				snapshot.m_PlannedFrame.m_Consumers.front().m_Status == "disabled" &&
+				snapshot.m_Inherited.Get(LabParameterId("view.gtao.radius"), 0.0f) == 2.0f &&
+				snapshot.m_PreviousFrame->m_Outcome == ViewControlFrameOutcome::Aborted,
+				"GUI observation owns its values and evidence after caller mutation or frame-state replacement");
+			const auto first = BuildViewControlSnapshot(inherited, {}, planned, nullptr);
+			context.Check(!first.m_PreviousFrame && first.m_PlannedFrame.m_Values.empty() &&
+				first.m_PlannedFrame.m_Consumers.empty(),
+				"Missing frame evidence stays unavailable rather than being filled from current intent");
+		}
+
 		ParameterEffectReceipt BeginReceipt(ParameterEffectClass effectClass) noexcept
 		{
 			return *ParameterEffectReceipt::Begin(LabParameterId("test.parameter"), effectClass, 7, 10);
+		}
+
+		void RunControlRevisionTests(SelfTestContext& context) noexcept
+		{
+			auto live = MakeParameters(context);
+			const LabParameterId radius("radius");
+			const auto revision = live.GetControlRevision();
+			auto candidate = live;
+			GGLAB_UNUSED(candidate.Set(radius, 2.0f));
+			context.Check(live.GetControlRevision() == revision && live.Get(radius, 0.0f) == 1.0f,
+				"Preparing a parameter snapshot changes no live control revision");
+			const auto saved = live;
+			GGLAB_UNUSED(live.Set(radius, 3.0f));
+			GGLAB_UNUSED(live.Set(radius, 1.0f));
+			const auto afterAba = live.GetControlRevision();
+			live = saved;
+			context.Check(afterAba > revision && live.GetControlRevision() > afterAba &&
+				live.Get(radius, 0.0f) == 1.0f,
+				"ABA and restoring an older parameter snapshot cannot rewind authored control identity");
+			std::string error;
+			const std::array equal{ LabParameterValue{ radius, 1.0f } };
+			const auto stable = live.GetControlRevision();
+			const auto noChange = live.ApplyBatch(equal, error);
+			const std::array invalid{ LabParameterValue{ radius, uint32_t(1) } };
+			context.Check(noChange && noChange->m_Changed.empty() && !live.ApplyBatch(invalid, error) &&
+				live.GetControlRevision() == stable,
+				"Strict rejection and semantic NoChange preserve the authored control revision");
+			live = std::move(candidate);
+			context.Check(live.GetControlRevision() > stable && live.Get(radius, 0.0f) == 2.0f,
+				"Moving a prepared value set into a live owner advances rather than replaces its revision");
+			LabParameterSet schema;
+			GGLAB_UNUSED(schema.Add({ .m_Id = radius, .m_Name = "Radius",
+				.m_Type = LabParameterType::Float, .m_DefaultValue = 1.0f }));
+			auto desc = schema.Find(radius)->m_Desc;
+			desc.m_Impact = LabChangeImpact::RestartSession;
+			LabParameterSet replacement;
+			GGLAB_UNUSED(replacement.Add(std::move(desc)));
+			const auto beforeSchema = schema.GetControlRevision();
+			schema = std::move(replacement);
+			context.Check(schema.GetControlRevision() > beforeSchema,
+				"Replacing declaration policy invalidates control identity even when all values are equal");
 		}
 
 		void RunReceiptTests(SelfTestContext& context) noexcept
@@ -370,6 +551,9 @@ namespace gglab
 		RunBatchTests(context);
 		RunInheritedParameterTests(context);
 		RunHostViewProjectionTests(context);
+		RunHostViewAttributionTests(context);
+		RunViewControlSnapshotTests(context);
 		RunReceiptTests(context);
+		RunControlRevisionTests(context);
 	}
 }

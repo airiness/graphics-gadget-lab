@@ -152,6 +152,7 @@ namespace gglab
 		light.m_Transform->m_Rotation = ResolveWorldLightingRotation(inputs.m_SunDirection);
 		light.m_Light->m_WorldSun = inputs.m_Sun;
 		world.m_Atmosphere = inputs.m_Atmosphere;
+		world.MarkLightingAuthoringChanged();
 		return true;
 	}
 }

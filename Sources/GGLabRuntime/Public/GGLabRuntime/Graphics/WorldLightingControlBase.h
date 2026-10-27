@@ -25,6 +25,8 @@ namespace gglab
 	{
 	public:
 		virtual ~WorldLightingControlBase() = default;
+		// Settings/lease ownership and explicit requests, excluding publication.
+		[[nodiscard]] virtual uint64_t GetLightingControlRevision() const noexcept = 0;
 		virtual void SynchronizeWorldLighting(World& world, uint64_t sessionIdentity) noexcept = 0;
 		// Read-only preparation. Settle existing authoring with Synchronize first,
 		// outside this batch's attribution boundary, never inside its commit.

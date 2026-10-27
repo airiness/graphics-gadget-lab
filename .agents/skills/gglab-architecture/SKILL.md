@@ -24,10 +24,7 @@ AppRuntime feedback and resource-retention consequences as well.
 
 When a change may affect an Atlas entry, run the helper in the
 [guide's checks](../../../Docs/Architecture/Boundary_And_Drift_Guide.md#checks) and
-review each listed entry against source and contracts. In findings and handoffs,
-mark material claims whose support is not obvious from a link with an
-[evidence label](../../../Docs/Architecture/Boundary_And_Drift_Guide.md#evidence-labels):
-`[Observed]`, `[Documented]`, `[Inferred]` or `[Unverified]`.
+review each listed entry against source and contracts.
 
 ## Expand and continue
 
@@ -37,8 +34,7 @@ public and implementation entries, relevant execution/lifetime path, governing
 rules, verification route and any unresolved question material to the task.
 Then continue the requested review or implementation under the repository rules.
 
-If a route is missing or stale, reconstruct the affected path from current source
-and contracts; refresh only reviewed entries and record deferred work in
-[pending refreshes](../../../Docs/Architecture/Boundary_And_Drift_Guide.md#pending-refreshes).
-Report material contract gaps to the subsystem owner. Use source inspection for
-orientation; select builds and GPU checks for the task's verification.
+If a route is missing or stale, reconstruct the path from current source and
+contracts, then update the affected entry. Report unresolved contract conflicts in
+the review. Use source inspection for orientation; select builds and GPU checks
+for the implementation change.

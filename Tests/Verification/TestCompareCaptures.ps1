@@ -48,9 +48,10 @@ function New-Case([string]$Name) {
 
 function Check-Comparison([string]$Name, [string]$Reference, [string]$Candidate,
     [int]$ExitCode, [int]$Compared, [int]$Rejected, [int]$Failed = 0, [int]$Unmatched = 0,
-    [switch]$RequireMatchingInputs, [string]$ExpectedInputDifference) {
+    [switch]$RequireMatchingInputs, [string]$ExpectedInputDifference, [string]$Policy) {
     $extra = @()
     if ($RequireMatchingInputs) { $extra += '-RequireMatchingInputs' }
+    if ($Policy) { $extra += @('-AllowedDifferencePolicy', $Policy) }
     $text = & powershell -NoProfile -ExecutionPolicy Bypass -File $comparisonScript `
         -Reference $Reference -Candidate $Candidate -Threshold 0 -MaxMeanError 0 -MaxDifferingPercent 0 @extra
     $actualExit = $LASTEXITCODE
@@ -167,6 +168,85 @@ try {
     Write-VerificationJson -Depth 12 $path $metadata
     Check-Comparison 'missing-diagnostic-input' "$case/off" "$case/on" 1 1 0 1 `
         -RequireMatchingInputs -ExpectedInputDifference 'diagnosticTap'
+
+    $policy = Join-Path $root 'Scripts/Verification/TaaComparison.policy.json'
+    $case = New-Case 'taa-policy'
+    foreach ($arm in @('off', 'on')) {
+        $path = "$case/$arm/capture.json"
+        $metadata = Get-Content -Raw $path | ConvertFrom-Json
+        $enabled = $arm -eq 'on'
+        $services = if ($enabled) { @('projection-jitter', 'geometry-motion') } else { @() }
+        $metadata | Add-Member -NotePropertyName sceneInputs -NotePropertyValue ([pscustomobject]@{
+            schemaVersion=1; environment=[pscustomobject]@{activeIBLGeneration=$(if ($enabled) {1} else {2});intensity=1} })
+        $metadata | Add-Member -NotePropertyName time -NotePropertyValue ([pscustomobject]@{
+            totalTime=$(if ($enabled) {1} else {2});fixedDeltaTime=0.0166667 })
+        $metadata | Add-Member -NotePropertyName temporal -NotePropertyValue ([pscustomobject]@{
+            requested=$enabled;status=$(if ($enabled) {'active'} else {'disabled'});services=$services
+            renderExtent=@(640,360);renderScale=1;consumers=@(
+                [pscustomobject]@{name='temporal-aa';requested=$enabled;status=$(if ($enabled) {'active'} else {'disabled'});services=$services},
+                [pscustomobject]@{name='reference';requested=$false;status='disabled';services=@()},
+                [pscustomobject]@{name='temporal-gtao';requested=$false;status='disabled';services=@()}) })
+        $metadata | Add-Member -NotePropertyName control -NotePropertyValue ([pscustomobject]@{
+            schemaVersion=1;hostView=@([pscustomobject]@{id='view.taa.enabled';type='bool';value=$enabled;source='host'}) })
+        Write-VerificationJson -Depth 16 $path $metadata
+    }
+    Check-Comparison 'declared-taa-differences' "$case/on" "$case/off" 0 1 0 -RequireMatchingInputs -Policy $policy
+    $report = Get-Content -Raw (Join-Path $output 'declared-taa-differences-result.json') | ConvertFrom-Json
+    if (@($report.pairs[0].metadataDifferences | Where-Object { -not $_.expected }).Count -or
+        @($report.pairs[0].metadataDifferences | Where-Object reason -eq 'static-time').Count -ne 1 -or
+        @($report.pairs[0].metadataDifferences | Where-Object reason -eq 'ibl-publication').Count -ne 1) {
+        throw 'Policy reporting must use the same declared/static-time/IBL decisions as the strict gate.'
+    }
+    $path = "$case/off/capture.json"
+    $original = Get-Content -Raw $path
+    $metadata = $original | ConvertFrom-Json
+    $metadata.temporal.consumers = @($metadata.temporal.consumers[2],$metadata.temporal.consumers[1],$metadata.temporal.consumers[0])
+    Write-VerificationJson -Depth 16 $path $metadata
+    Check-Comparison 'consumer-order-is-keyed' "$case/on" "$case/off" 0 1 0 -RequireMatchingInputs -Policy $policy
+    $metadata = $original | ConvertFrom-Json
+    $metadata.temporal.consumers[2].status = 'unavailable'
+    Write-VerificationJson -Depth 16 $path $metadata
+    Check-Comparison 'other-consumer-change-rejects' "$case/on" "$case/off" 1 1 0 1 -RequireMatchingInputs -Policy $policy
+    $metadata = $original | ConvertFrom-Json
+    $metadata.temporal.services = @('geometry-motion')
+    Write-VerificationJson -Depth 16 $path $metadata
+    Check-Comparison 'invalid-service-union-rejects' "$case/on" "$case/off" 1 1 0 1 -RequireMatchingInputs -Policy $policy
+    $metadata = $original | ConvertFrom-Json
+    $metadata.temporal.consumers[2].services = @('geometry-motion')
+    $metadata.temporal.services = @('geometry-motion')
+    Write-VerificationJson -Depth 16 $path $metadata
+    Check-Comparison 'other-consumer-services-reject' "$case/on" "$case/off" 1 1 0 1 -RequireMatchingInputs -Policy $policy
+    $metadata = $original | ConvertFrom-Json
+    $metadata.time.fixedDeltaTime += 0.00000001
+    Write-VerificationJson -Depth 16 $path $metadata
+    Check-Comparison 'policy-reporting-is-exact' "$case/on" "$case/off" 1 1 0 1 -RequireMatchingInputs -Policy $policy
+    $metadata = $original | ConvertFrom-Json
+    $metadata.temporal.renderExtent = @(320,180)
+    Write-VerificationJson -Depth 16 $path $metadata
+    Check-Comparison 'render-extent-change-rejects' "$case/on" "$case/off" 1 1 0 1 -RequireMatchingInputs -Policy $policy
+    $metadata = $original | ConvertFrom-Json
+    $metadata.temporal.consumers += $metadata.temporal.consumers[0]
+    Write-VerificationJson -Depth 16 $path $metadata
+    Check-Comparison 'duplicate-consumer-rejects' "$case/on" "$case/off" 1 1 0 1 -RequireMatchingInputs -Policy $policy
+    foreach ($badPath in @('temporal.*','temporal.consumers','temporal.services','temporal.sttaus')) {
+        $badPolicy = Get-Content -Raw $policy | ConvertFrom-Json
+        $badPolicy.allowedDifferences = @($badPath)
+        $badFile = Join-Path $case 'bad-policy.json'
+        Write-VerificationJson $badFile $badPolicy
+        $execution = Invoke-VerificationScript $comparisonScript @{
+            Reference="$case/on/capture.png";Candidate="$case/off/capture.png";AllowedDifferencePolicy=$badFile }
+        $receipt = $execution.output | ConvertFrom-Json
+        if ($execution.exitCode -ne 1 -or $receipt.ok -or $receipt.error -notmatch 'policy path') {
+            throw "Expected rejection of invalid policy path $badPath."
+        }
+        $checks += "reject-policy-$badPath"
+    }
+    $badPolicy.timeMode = 'simulation-instant'
+    Write-VerificationJson $badFile $badPolicy
+    $execution = Invoke-VerificationScript $comparisonScript @{
+        Reference="$case/on/capture.png";Candidate="$case/off/capture.png";AllowedDifferencePolicy=$badFile }
+    if ($execution.exitCode -ne 1) { throw 'Time-driven experiments require a domain time command.' }
+    $checks += 'unsupported-time-mode-rejects'
 
     $result = @{ ok = $true; checks = $checks; directory = $output }
     Write-VerificationJson -Depth 12 (Join-Path $output 'result.json') $result

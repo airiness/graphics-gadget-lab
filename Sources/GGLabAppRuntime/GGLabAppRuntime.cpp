@@ -118,7 +118,7 @@ namespace gglab
 		}
 	}
 
-	bool GGLabAppRuntime::CanRequestParameterBatch(std::string& error) const noexcept
+	bool GGLabAppRuntime::CanRequestParameters(std::string& error) const noexcept
 	{
 		error.clear();
 		if (!CanAcceptSessionCommands() || !m_ParameterControl)
@@ -144,19 +144,58 @@ namespace gglab
 		return true;
 	}
 
-	uint64_t GGLabAppRuntime::RequestParameterBatch(
-		std::span<const LabParameterValue> values, std::string& error) noexcept
+	uint64_t GGLabAppRuntime::RequestParameters(const ParameterRequest& request, std::string& error) noexcept
 	{
-		if (!CanRequestParameterBatch(error))
+		return RequestParametersForOwner(request, error, {});
+	}
+
+	uint64_t GGLabAppRuntime::RequestParametersForOwner(const ParameterRequest& request,
+		std::string& error, ParameterBatchOwner owner) noexcept
+	{
+		const auto* expectedRun = request.m_Expected ?
+			&request.m_Expected->m_RunIdentity :
+			request.m_ExpectedDomain ?
+				&request.m_ExpectedDomain->m_RunIdentity :
+				nullptr;
+		if (expectedRun)
+		{
+			if (m_RunIdentity.empty())
+			{
+				error = "RunIdentityUnavailable: this session has no run identity, so it rejects guarded requests.";
+				return 0;
+			}
+			if (*expectedRun != m_RunIdentity)
+			{
+				error = "ExpectedRunChanged: the session runs a different process than the expected run; nothing changed.";
+				return 0;
+			}
+		}
+		if (!CanRequestParameters(error))
 		{
 			return 0;
 		}
-		return m_ParameterControl->RequestParameterBatch(values, error);
+		return m_ParameterControl->RequestParameters(request, error, owner);
+	}
+
+	std::optional<ParameterControlStamp> GGLabAppRuntime::GetDomainControlStamp(ParameterControlDomain domain) const
+	{
+		return m_ParameterControl ?
+			m_ParameterControl->GetDomainControlStamp(domain, m_RunIdentity) :
+			std::nullopt;
 	}
 
 	const ParameterBatchStatus* GGLabAppRuntime::GetExternalParameterBatchStatus() const noexcept
 	{
 		return m_ParameterControl ? m_ParameterControl->GetParameterBatchStatus() : nullptr;
+	}
+
+	HostViewControlStamp GGLabAppRuntime::GetHostViewControlStamp() const
+	{
+		return {
+			.m_RunIdentity = m_RunIdentity,
+			.m_ContentIdentity = m_ParameterControl ? m_ParameterControl->GetContentIdentity() : 0,
+			.m_HostViewRevision = m_ParameterControl ? m_ParameterControl->GetHostViewRevision() : 0,
+		};
 	}
 
 	void GGLabAppRuntime::UpdateSequenceParameterEvents() noexcept
@@ -166,7 +205,7 @@ namespace gglab
 		{
 			return;
 		}
-		const ParameterBatchOwner owner{ sequence->m_SequenceId };
+		const auto owner = ParameterBatchOwner::Sequence(sequence->m_SequenceId);
 		const auto publish = [&]()
 			{
 				const auto batches = m_ParameterControl->GetParameterBatchStatuses(owner);
@@ -217,6 +256,7 @@ namespace gglab
 				std::string_view{};
 			m_ParameterControl->SynchronizeContent(m_DemoManager->GetActiveDemo(),
 				m_ActiveContentIdentity, demoId, m_DemoManager->HasPendingActiveDemo());
+			m_ToolingViewControl.Update();
 			if (m_FrameSequence)
 			{
 				m_FrameSequence->OnContentBindingChanged(m_ActiveContentIdentity);

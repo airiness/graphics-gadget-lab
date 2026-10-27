@@ -39,6 +39,8 @@ namespace gglab
 	struct LoadingProgress;
 	struct ShadowVisualizationSettings;
 	struct ViewRenderProfile;
+	struct ViewControlSnapshot;
+	class ViewControlActionsBase;
 
 	struct ApplicationToolingInputCapture
 	{
@@ -59,10 +61,19 @@ namespace gglab
 		[[nodiscard]] ViewRenderProfile ResolveProfile(const ViewRenderProfile& authored) const noexcept;
 	};
 
+	// Whole tooling blocks that replaced the authored profile's settings.
+	struct ApplicationToolingBlocks
+	{
+		bool m_TemporalAA = false;
+		bool m_GTAO = false;
+		bool m_Bloom = false;
+	};
+
 	struct ApplicationViewSettingsResolution
 	{
 		ViewRenderProfile m_Profile;
 		ResolvedViewRenderSettings m_View;
+		ApplicationToolingBlocks m_ToolingBlocks;
 	};
 
 	[[nodiscard]] ApplicationViewSettingsResolution ResolveApplicationViewSettings(
@@ -99,6 +110,9 @@ namespace gglab
 		DebugDrawChannelControlBase* m_DebugDrawChannelControl = nullptr;
 		const DebugDrawFrameView* m_DebugDrawFrame = nullptr;
 		const LoadingProgress* m_LoadingProgress = nullptr;
+		// Owned CPU observation borrowed for Draw only; never a mutable control surface.
+		const ViewControlSnapshot* m_ViewControl = nullptr;
+		ViewControlActionsBase* m_ViewControlActions = nullptr;
 	};
 
 	enum class ApplicationToolingFrameEndReason : uint8_t

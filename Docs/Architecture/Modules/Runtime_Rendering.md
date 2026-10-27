@@ -1,10 +1,6 @@
 # Runtime Rendering Cards
 
-- Question: which Runtime module owns each rendering responsibility, and where are
-  its interfaces?
 - VerifiedAgainst: `e8d08f13710eb206ea757292293cd327cebdc510`
-- Refresh triggers: a card's source owner, Public interface, lifetime, linked
-  contract or owning tests change.
 
 The [module catalog](../Module_Catalog.md) lists all cards.
 
@@ -54,10 +50,8 @@ Atlas ID: atlas.runtime.render-pipeline
 - **Lifetime:** a Lab session owns its pipeline through `LabSessionBase`. The Forward+
   recipe owns its Runtime passes and the scene extension it was created with.
 - **Boundary:** [pass ownership](../Runtime_Boundaries_Map.md#pass-ownership); the
-  scene extension is the current post-TAA entry, and `TemporalAA.h` records why it
-  cannot join temporal integration yet.
-- **Verification:** `GGLabRuntimeTests` suite `rendering-contracts`, including the
-  scene and overlay extension contract tests and the Forward+ contract tests.
+  scene extension runs after temporal integration.
+- **Verification:** `GGLabRuntimeTests`, `rendering-contracts`.
 
 ```text
 Anchors:
@@ -72,7 +66,7 @@ ReviewPaths:
 Atlas ID: atlas.runtime.render-pass-authoring
 
 - **Source owner:** `GGLabRuntime` owns the Public authoring seams and the Runtime
-  passes under `Private/Graphics/RenderPass/`; Lab passes belong to WinApp.
+  passes under `Private/Graphics/RenderPass/`; Lab passes belong to WinAppHost.
 - **Responsibility:** add declared graph work for one stage, keep prepared pipelines
   and any per-pass state.
 - **Public interface:** [RenderPassBase.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderPass/RenderPassBase.h)
@@ -89,9 +83,8 @@ Atlas ID: atlas.runtime.render-pass-authoring
   [imported resource ownership](../Runtime_Boundaries_Map.md#imported-resource-ownership).
   Records that only Runtime passes exchange, such as `RGForwardPlusResources`, stay
   Private.
-- **Verification:** `GGLabRuntimeTests` suite `rendering-contracts`, including the
-  render graph access, Forward+ and GTAO history tests and the Napa voxel graph
-  fixture; `WinAppTests --suite napa-voxel`; GPU runs with the
+- **Verification:** `GGLabRuntimeTests`, `rendering-contracts`; `WinAppTests`,
+  `napa-voxel`; GPU checks use the
   [frame-capture skill](../../../.agents/skills/gglab-frame-capture/SKILL.md).
 
 ```text
@@ -154,11 +147,8 @@ Atlas ID: atlas.runtime.shader-consumption
   [build records](../../../Sources/Tools/ShaderCompiler/GGLabRuntimeShaderBuild.cpp)
   and Lab demand in `LabRegistration::m_ShaderPrograms`
   ([LabCatalog.h](../../../Sources/GGLabAppRuntime/Lab/LabCatalog.h)).
-- **Boundary:** shader production, artifact publication and activation are outside
-  this card.
-- **Verification:** `GGLabRuntimeTests` suite `shader-artifact-runtime`; WinApp
-  `WinAppTests --suite app-content-registration` for Lab demand; `GGLabShaderToolchainTests`
-  checks the build-record catalog count when records change.
+- **Verification:** `GGLabRuntimeTests`, `shader-artifact-runtime`;
+  `WinAppTests`, `app-content-registration`; `ShaderToolchainTests`.
 
 ```text
 Anchors:
@@ -173,8 +163,7 @@ ReviewPaths:
 ## RHI submission and resource retirement
 Atlas ID: atlas.runtime.rhi-submission
 
-- **Source owner:** `GGLabRuntime`; neutral RHI plus Private DX12 and Vulkan
-  backends. Vulkan sources compile only when `GGLAB_ENABLE_VULKAN != 0`.
+- **Source owner:** `GGLabRuntime`; neutral RHI plus Private DX12 and Vulkan backends.
 - **Responsibility:** native submit, present and abort; upload retention; checked
   completion.
 - **Public interface:** [RHIContext.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RHI/RHIContext.h),

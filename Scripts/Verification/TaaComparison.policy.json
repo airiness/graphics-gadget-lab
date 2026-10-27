@@ -1,0 +1,16 @@
+{
+    "schema": "gglab.capture-comparison-policy",
+    "schemaVersion": 1,
+    "timeMode": "static",
+    "allowedDifferences": [
+        "temporal.requested",
+        "temporal.status",
+        "temporal.disableReason",
+        "temporal.consumers[name=temporal-aa]",
+        "temporal.jitterIndex",
+        "temporal.jitterSequenceLength",
+        "temporal.jitterPixels",
+        "temporal.textureLodBias",
+        "control.hostView[id=view.taa.enabled]"
+    ]
+}

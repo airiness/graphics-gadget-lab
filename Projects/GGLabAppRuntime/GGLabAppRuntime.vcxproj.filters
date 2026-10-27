@@ -48,6 +48,9 @@
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\NonFiniteWatchCoordinator.cpp">
       <Filter>Capture</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\RequiredFrameState.cpp">
+      <Filter>Capture</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\ResourceExportWriter.cpp">
       <Filter>Capture</Filter>
     </ClCompile>
@@ -106,6 +109,12 @@
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\SessionParameterControl.cpp">
       <Filter>Parameters</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\ViewControlActions.cpp">
+      <Filter>Parameters</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\ViewControlSnapshot.cpp">
+      <Filter>Parameters</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\RuntimePaths.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -154,6 +163,9 @@
       <Filter>Capture</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\NonFiniteWatchCoordinator.h">
+      <Filter>Capture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\RequiredFrameState.h">
       <Filter>Capture</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\ResourceExportWriter.h">
@@ -215,6 +227,9 @@
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterFrameState.h">
       <Filter>Parameters</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterRequest.h">
+      <Filter>Parameters</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterSource.h">
       <Filter>Parameters</Filter>
     </ClInclude>
@@ -222,6 +237,12 @@
       <Filter>Parameters</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\SessionParameterControl.h">
+      <Filter>Parameters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ViewControlActions.h">
+      <Filter>Parameters</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ViewControlSnapshot.h">
       <Filter>Parameters</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\RuntimePaths.h" />

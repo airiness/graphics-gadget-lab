@@ -3,18 +3,44 @@
 #include "Capture/FrameCaptureReadiness.h"
 #include "Demo/DemoBase.h"
 #include "Lab/LabRuntime.h"
+#include "GGLabRuntime/Core/World.h"
+#include "GGLabRuntime/Graphics/WorldLightingControlBase.h"
 #include "GGLabRuntime/Graphics/RenderSceneTypes.h"
 
 #include <algorithm>
+#include <format>
 #include <limits>
+#include <string_view>
 #include <utility>
 
 namespace gglab
 {
+	namespace
+	{
+		[[nodiscard]] bool SameOverrides(std::span<const LabParameterValue> a,
+			std::span<const LabParameterValue> b) noexcept
+		{
+			return a.size() == b.size() && std::ranges::all_of(a, [&](const LabParameterValue& value)
+				{
+					const auto found = std::ranges::find(b, value.m_Id, &LabParameterValue::m_Id);
+					return found != b.end() && LabValuesEqual(found->m_Value, value.m_Value);
+				});
+		}
+
+		[[nodiscard]] std::optional<LabValue> FindOverride(std::span<const LabParameterValue> overrides,
+			const LabParameterId& id) noexcept
+		{
+			const auto found = std::ranges::find(overrides, id, &LabParameterValue::m_Id);
+			return found != overrides.end() ? std::optional(found->m_Value) : std::nullopt;
+		}
+
+	}
+
 	SessionParameterControl::SessionParameterControl(RenderEnvironmentAccess& environment,
 		WorldLightingControlBase* worldLighting,
 		std::function<std::optional<ApplicationViewSettingsResolution>(DemoBase&)> viewResolver) noexcept :
-		m_Sources(std::make_unique<ParameterSourceAdapters>(environment, worldLighting, std::move(viewResolver)))
+		m_Sources(std::make_unique<ParameterSourceAdapters>(environment, worldLighting, std::move(viewResolver))),
+		m_WorldLighting(worldLighting)
 	{
 	}
 
@@ -27,6 +53,10 @@ namespace gglab
 		GGLAB_ASSERT_MSG(!demo || serial != 0, "Bound content requires its owner's frame identity.");
 		if (demo != m_Demo || serial != m_ContentSerial)
 		{
+			if (m_ActivationRevision != std::numeric_limits<uint64_t>::max())
+			{
+				++m_ActivationRevision;
+			}
 			bool continuing = false;
 			// Release source reservations while their previous content owner is alive.
 			for (auto& batch : m_ParameterBatches)
@@ -44,10 +74,15 @@ namespace gglab
 				}
 				else
 				{
-					EndParameterBatch(*batch, true, "The content changed before the parameter frame.");
+					EndForContentChange(*batch, "The content changed before the parameter frame.");
 				}
 			}
+			const bool discardsHostView = !continuing && !GetHostViewOverrides().empty();
 			m_Sources->Bind(demo, demo ? demo->GetParameterLabRuntime() : nullptr, serial, continuing);
+			if (discardsHostView)
+			{
+				AdvanceHostViewRevision();
+			}
 			if (!continuing && m_Enabled && m_Demo &&
 				m_ParameterRevision != std::numeric_limits<uint64_t>::max())
 			{
@@ -115,6 +150,30 @@ namespace gglab
 		}
 		const auto progress = m_Demo->GetActiveLoadingProgress();
 		return !progress || progress->IsReady();
+	}
+
+	std::span<const LabParameterValue> SessionParameterControl::GetHostViewOverrides() const noexcept
+	{
+		return m_Sources->m_View.GetOverrides();
+	}
+
+	std::vector<HostViewProjectionEntry> SessionParameterControl::DescribeHostView() const
+	{
+		const auto resolution = m_Sources->m_View.Resolve();
+		return resolution ?
+			DescribeHostViewProjection(resolution->m_View, resolution->m_ToolingBlocks, GetHostViewOverrides()) :
+			std::vector<HostViewProjectionEntry>{};
+	}
+
+	void SessionParameterControl::AdvanceHostViewRevision() noexcept
+	{
+		// Admission and application stop at the last value, so no revision is reused.
+		GGLAB_ASSERT_MSG(m_HostViewRevision != std::numeric_limits<uint64_t>::max(),
+			"Host view revision capacity is exhausted.");
+		if (m_HostViewRevision != std::numeric_limits<uint64_t>::max())
+		{
+			++m_HostViewRevision;
+		}
 	}
 
 	const LabParameterSet& SessionParameterControl::GetHostParameters() const noexcept
@@ -333,85 +392,273 @@ namespace gglab
 		return false;
 	}
 
-	uint64_t SessionParameterControl::RequestParameterBatch(std::span<const LabParameterValue> values,
-		std::string& error, ParameterBatchOwner owner) noexcept
+	bool SessionParameterControl::IsAdmissionBlocked(ParameterBatchOwner owner) const noexcept
 	{
-		error.clear();
-		if (m_MutatingParameterBatch || m_QueuedParameterBatch ||
+		return m_MutatingParameterBatch || m_QueuedParameterBatch ||
 			m_ParameterBatches.size() >= SessionParameterMaxBatches ||
 			std::ranges::any_of(m_ParameterBatches, [&](const auto& batch)
 			{
 				return owner.IsExternal() || batch->m_Owner != owner;
-			}))
+			});
+	}
+
+	uint64_t SessionParameterControl::RequestParameters(const ParameterRequest& request,
+		std::string& error, ParameterBatchOwner owner) noexcept
+	{
+		error.clear();
+		if (IsAdmissionBlocked(owner))
 		{
 			error = "Busy: an application, another owner or retained result capacity blocks admission.";
 			return 0;
 		}
 		m_MutatingParameterBatch = true;
-		const auto id = AdmitParameterBatch(values, error, owner);
+		Enable();
+		const auto id = AdmitParameterRequest(request, error, owner);
 		m_MutatingParameterBatch = false;
 		return id;
 	}
 
-	uint64_t SessionParameterControl::AdmitParameterBatch(
-		std::span<const LabParameterValue> values, std::string& error, ParameterBatchOwner owner) noexcept
+	ParameterRequest SessionParameterControl::MakeAssignmentRequest(
+		std::span<const LabParameterValue> values) const
 	{
-		Enable();
-		error.clear();
-		if (!IsAvailable() || values.empty() || values.size() > SessionParameterMaxItems)
+		ParameterRequest request;
+		request.m_Entries.reserve(values.size());
+		for (const auto& value : values)
 		{
-			error = "A parameter batch requires ready active content and 1-128 items.";
+			const auto* parameter = Find(value.m_Id);
+			request.m_Entries.push_back({ value.m_Id,
+				parameter ? parameter->m_Desc.m_Type : LabParameterType::Bool,
+				ParameterOperation::Assign, value.m_Value });
+		}
+		return request;
+	}
+
+	std::optional<ParameterControlStamp> SessionParameterControl::GetDomainControlStamp(
+		ParameterControlDomain domain, std::string_view runIdentity) const
+	{
+		if (!IsAvailable() || !m_WorldLighting || !m_Enabled ||
+			(domain != ParameterControlDomain::Lab && domain != ParameterControlDomain::LightingProfile))
+		{
+			return std::nullopt;
+		}
+		ParameterControlStamp stamp{
+			.m_RunIdentity = std::string(runIdentity),
+			.m_ContentIdentity = m_ContentSerial,
+			.m_ActivationRevision = m_ActivationRevision,
+			.m_Domain = domain,
+			.m_WorldRevision = m_Demo->GetWorld().GetLightingControlRevision(),
+			.m_EnvironmentRevision = m_WorldLighting->GetLightingControlRevision() };
+		if (domain == ParameterControlDomain::Lab)
+		{
+			const auto* parameters = GetLabParameters();
+			if (!m_Lab || !parameters)
+			{
+				return std::nullopt;
+			}
+			stamp.m_LabRevision = m_Lab->GetParameterRevision();
+			stamp.m_ValuesRevision = parameters->GetControlRevision();
+		}
+		else if (GetLightingProfiles().empty())
+		{
+			return std::nullopt;
+		}
+		return stamp;
+	}
+
+	bool SessionParameterControl::CheckDomainControl(
+		const ParameterControlStamp& expected, std::string& error) const
+	{
+		if (expected.m_ContentIdentity != m_ContentSerial ||
+			expected.m_ActivationRevision != m_ActivationRevision)
+		{
+			error = "ExpectedContentChanged: the protected assignment belongs to another activation.";
+			return false;
+		}
+		const auto current = GetDomainControlStamp(expected.m_Domain, expected.m_RunIdentity);
+		if (!current)
+		{
+			error = "ParameterDomainUnavailable: the protected domain is unavailable.";
+			return false;
+		}
+		constexpr auto last = std::numeric_limits<uint64_t>::max();
+		if (current->m_ActivationRevision == last ||
+			current->m_LabRevision == last || current->m_ValuesRevision == last ||
+			current->m_WorldRevision == last || current->m_EnvironmentRevision == last)
+		{
+			error = "ParameterControlExhausted: the protected domain has exhausted revision capacity.";
+			return false;
+		}
+		if (*current != expected)
+		{
+			error = "ExpectedParameterControlMismatch: authored domain intent changed; nothing committed.";
+			return false;
+		}
+		return true;
+	}
+
+	uint64_t SessionParameterControl::AdmitParameterRequest(const ParameterRequest& request,
+		std::string& error, ParameterBatchOwner owner) noexcept
+	{
+		const bool exact = request.m_Expected.has_value();
+		if (request.m_ExpectedDomain &&
+			(exact || !CheckDomainControl(*request.m_ExpectedDomain, error)))
+		{
+			if (exact)
+			{
+				error = "ParameterRequestInvalid: Host exact states cannot include a Lab/profile guard.";
+			}
 			return 0;
 		}
-		if (m_NextParameterBatchId == 0 || m_ParameterRevision == std::numeric_limits<uint64_t>::max())
+		if (!IsAvailable() || (exact && !m_Sources->m_View.HasDisplayView()))
+		{
+			error = exact ?
+				"NoParameterSource: ready active content with a display view is required." :
+				"A parameter batch requires ready active content and 1-128 items.";
+			return 0;
+		}
+		if (request.m_Entries.empty() || request.m_Entries.size() > SessionParameterMaxItems)
+		{
+			error = exact ?
+				"HostOverrideInvalid: a Host view operation takes 1-128 entries." :
+				"A parameter batch requires ready active content and 1-128 items.";
+			return 0;
+		}
+		if (m_NextParameterBatchId == 0 || m_ParameterRevision == std::numeric_limits<uint64_t>::max() ||
+			m_HostViewRevision == std::numeric_limits<uint64_t>::max())
 		{
 			error = "Parameter transaction identity capacity is exhausted.";
 			return 0;
 		}
-		if (!ValidateParameterBatch(values, error))
+		if (exact)
 		{
-			return 0;
+			// Preserve conflict precedence over entry validation, including would-be NoChange.
+			if (request.m_Expected->m_ContentIdentity != m_ContentSerial)
+			{
+				error = "ExpectedContentChanged: the active content is not the expected activation; nothing changed.";
+				return 0;
+			}
+			if (request.m_Expected->m_HostViewRevision != m_HostViewRevision)
+			{
+				error = "ExpectedHostViewRevisionMismatch: Host view overrides changed after the expected revision; "
+					"nothing changed.";
+				return 0;
+			}
+		}
+		std::vector<LabParameterValue> values;
+		std::vector<HostViewOverrideState> overrides;
+		for (size_t index = 0; index < request.m_Entries.size(); ++index)
+		{
+			const auto& entry = request.m_Entries[index];
+			if (request.m_ExpectedDomain)
+			{
+				const auto* required = request.m_ExpectedDomain->m_Domain == ParameterControlDomain::Lab ?
+					static_cast<const ParameterSourceBase*>(&m_Sources->m_Lab) :
+					static_cast<const ParameterSourceBase*>(&m_Sources->m_Profiles);
+				if (m_Sources->Find(entry.m_Id) != required || entry.m_Operation != ParameterOperation::Assign)
+				{
+					error = "ParameterDomainUnsupported: protected Assign requires one Lab or lighting-profile source.";
+					return 0;
+				}
+			}
+			const bool assign = entry.m_Operation == ParameterOperation::Assign;
+			const bool pin = entry.m_Operation == ParameterOperation::Pin;
+			const bool remove = entry.m_Operation == ParameterOperation::RemoveOverride;
+			if ((!assign && !pin && !remove) || assign == exact ||
+				entry.m_Value.has_value() == remove)
+			{
+				error = "ParameterRequestInvalid: use unguarded Assign values or guarded Host Pin/removal entries.";
+				return 0;
+			}
+			if (exact)
+			{
+				if (std::ranges::any_of(std::span(request.m_Entries).first(index),
+					[&](const auto& previous) { return previous.m_Id == entry.m_Id; }))
+				{
+					error = "HostOverrideInvalid: Host view override ids must be distinct.";
+					return 0;
+				}
+				const auto* parameter = m_Sources->Find(entry.m_Id) == &m_Sources->m_View ?
+					m_Sources->m_View.GetParameters()->Find(entry.m_Id) :
+					nullptr;
+				if (!parameter || parameter->m_Desc.m_Type != entry.m_Type)
+				{
+					error = std::format("HostOverrideUnsupported: '{}' is not a Host view parameter of the "
+						"requested type; Lab parameters and environment.profile use set.", entry.m_Id.GetName());
+					return 0;
+				}
+				overrides.push_back({ entry.m_Id, entry.m_Type, entry.m_Value });
+			}
+			if (entry.m_Value)
+			{
+				values.push_back({ entry.m_Id, *entry.m_Value });
+			}
+		}
+		if (exact)
+		{
+			LabParameterSet candidate = *m_Sources->m_View.GetParameters();
+			if (!values.empty() && !candidate.ApplyBatch(values, error))
+			{
+				error = "HostOverrideInvalid: " + error;
+				return 0;
+			}
+		}
+		else
+		{
+			if (!ValidateParameterBatch(values, error))
+			{
+				return 0;
+			}
+			for (const auto& entry : request.m_Entries)
+			{
+				if (Find(entry.m_Id)->m_Desc.m_Type != entry.m_Type)
+				{
+					error = "ParameterRequestInvalid: the declared Assign type differs from its owning descriptor.";
+					return 0;
+				}
+			}
 		}
 		std::vector<ParameterSourceBase*> bindings;
 		bool hasHost = false;
 		bool hasLab = false;
-		for (const auto& value : values)
+		for (const auto& entry : request.m_Entries)
 		{
-			auto* source = m_Sources->Find(value.m_Id);
+			auto* source = m_Sources->Find(entry.m_Id);
 			bindings.push_back(source);
 			hasHost |= source->IsHost();
 			hasLab |= !source->IsHost();
 		}
 		const uint64_t id = m_NextParameterBatchId;
 		std::vector<ParameterSourceBase*> reserved;
-		reserved.reserve(m_Sources->Ordered().size());
-		for (auto* source : m_Sources->Ordered())
+		if (!exact)
 		{
-			std::vector<LabParameterValue> group;
-			for (size_t index = 0; index < values.size(); ++index)
+			for (auto* source : m_Sources->Ordered())
 			{
-				if (bindings[index] == source)
+				std::vector<LabParameterValue> group;
+				for (size_t index = 0; index < values.size(); ++index)
 				{
-					group.push_back(values[index]);
+					if (bindings[index] == source)
+					{
+						group.push_back(values[index]);
+					}
 				}
-			}
-			if (group.empty())
-			{
-				continue;
-			}
-			if (!source->Reserve(id, group, error))
-			{
-				// Failure does not transfer a source's existing reservation to us.
-				for (auto* acquired : reserved)
+				if (group.empty())
 				{
-					acquired->Cancel(id);
+					continue;
 				}
-				return 0;
+				if (!source->Reserve(id, group, error))
+				{
+					// Failure does not transfer a source's existing reservation to us.
+					for (auto* acquired : reserved)
+					{
+						acquired->Cancel(id);
+					}
+					return 0;
+				}
+				reserved.push_back(source);
 			}
-			reserved.push_back(source);
 		}
 		++m_NextParameterBatchId;
-		m_ParameterBatches.push_back(std::make_unique<ParameterBatch>());
+		m_ParameterBatches.push_back(std::make_unique<ParameterBatch>(request));
 		auto& batch = *m_ParameterBatches.back();
 		batch.m_Owner = owner;
 		m_QueuedParameterBatch = id;
@@ -419,9 +666,32 @@ namespace gglab
 		batch.m_Status.m_ContentId = m_ContentId;
 		batch.m_Status.m_Source = hasHost ? (hasLab ? "mixed" : "host") : "lab";
 		batch.m_Session = m_ContentSerial;
-		batch.m_Status.m_Values.assign(values.begin(), values.end());
+		if (request.m_ExpectedDomain)
+		{
+			batch.m_Status.m_DomainOperation = ParameterControlOperation{ .m_Expected = *request.m_ExpectedDomain };
+		}
+		if (exact)
+		{
+			batch.m_Status.m_HostViewOperation = HostViewOverrideOperation{
+				.m_Expected = *request.m_Expected,
+				.m_Overrides = std::move(overrides),
+			};
+		}
+		else
+		{
+			batch.m_Status.m_Values = std::move(values);
+		}
 		batch.m_Bindings = std::move(bindings);
 		return id;
+	}
+
+	HostViewControlStamp SessionParameterControl::MakeHostViewStamp(std::string_view runIdentity) const
+	{
+		return {
+			.m_RunIdentity = std::string(runIdentity),
+			.m_ContentIdentity = m_ContentSerial,
+			.m_HostViewRevision = m_HostViewRevision,
+		};
 	}
 
 	const ParameterBatchStatus* SessionParameterControl::GetParameterBatchStatus() const noexcept
@@ -453,6 +723,11 @@ namespace gglab
 			}
 		}
 		return result;
+	}
+
+	std::optional<ParameterBatchOwner> SessionParameterControl::GetRetainedParameterOwner() const noexcept
+	{
+		return m_ParameterBatches.empty() ? std::nullopt : std::optional(m_ParameterBatches.front()->m_Owner);
 	}
 
 	bool SessionParameterControl::HasPendingParameterBatches() const noexcept
@@ -576,6 +851,38 @@ namespace gglab
 		RefreshParameterBatchStatus(batch);
 	}
 
+	void SessionParameterControl::EndHostViewOperation(ParameterBatch& batch,
+		std::string_view conflict, std::string_view reason) noexcept
+	{
+		GGLAB_ASSERT(batch.m_Status.m_HostViewOperation && batch.m_Receipts.empty());
+		batch.m_Status.m_HostViewOperation->m_Conflict = conflict;
+		EndParameterBatch(batch, false, std::format("{}: {}", conflict, reason));
+	}
+
+	void SessionParameterControl::EndForContentChange(ParameterBatch& batch, std::string reason) noexcept
+	{
+		if (batch.m_Request.m_ExpectedDomain && batch.m_Receipts.empty() && !batch.m_Status.IsTerminal())
+		{
+			EndDomainOperation(batch, "ExpectedContentChanged: content changed before protected assignment committed.");
+			return;
+		}
+		// An unapplied operation was prepared against the replaced activation.
+		if (batch.m_Request.m_Expected && batch.m_Receipts.empty() && !batch.m_Status.IsTerminal())
+		{
+			EndHostViewOperation(batch, "ExpectedContentChanged",
+				"the content changed before the operation applied; nothing changed.");
+			return;
+		}
+		EndParameterBatch(batch, true, std::move(reason));
+	}
+
+	void SessionParameterControl::EndDomainOperation(ParameterBatch& batch, std::string error) noexcept
+	{
+		GGLAB_ASSERT(batch.m_Status.m_DomainOperation && batch.m_Receipts.empty());
+		batch.m_Status.m_DomainOperation->m_Conflict = error.substr(0, error.find(':'));
+		EndParameterBatch(batch, false, std::move(error));
+	}
+
 	void SessionParameterControl::OnRuntimeFailed(std::string_view reason) noexcept
 	{
 		m_ParameterIntakeFailed = true;
@@ -612,7 +919,12 @@ namespace gglab
 			EndParameterBatch(*batch, false, "The runtime shut down before parameter consumption.");
 		}
 		m_ParameterIntakeFailed = true;
+		const bool discardsHostView = !GetHostViewOverrides().empty();
 		m_Sources->Bind(nullptr, nullptr, 0);
+		if (discardsHostView)
+		{
+			AdvanceHostViewRevision();
+		}
 		m_Demo = nullptr;
 		m_Lab = nullptr;
 	}
@@ -640,7 +952,7 @@ namespace gglab
 				batch->m_FrameSerial = serial;
 				if (batch->m_Session != m_ContentSerial)
 				{
-					EndParameterBatch(*batch, true, "The content changed before parameter application.");
+					EndForContentChange(*batch, "The content changed before parameter application.");
 				}
 			}
 		}
@@ -657,7 +969,8 @@ namespace gglab
 	void SessionParameterControl::ApplyParameterBatch(ParameterBatch& batch, uint64_t serial) noexcept
 	{
 		m_Sources->m_Domain.BeginApplication(batch.m_Domain);
-		if (!IsAvailable() || m_ParameterRevision == std::numeric_limits<uint64_t>::max())
+		if (!IsAvailable() || m_ParameterRevision == std::numeric_limits<uint64_t>::max() ||
+			m_HostViewRevision == std::numeric_limits<uint64_t>::max())
 		{
 			EndParameterBatch(batch, false, "The content is unavailable at the safe parameter boundary.");
 			return;
@@ -667,6 +980,38 @@ namespace gglab
 			EndParameterBatch(batch, false, "ParameterPreparationFailed: the display view is unavailable.");
 			return;
 		}
+		const auto& request = batch.m_Request;
+		if (request.m_ExpectedDomain)
+		{
+			auto& control = *batch.m_Status.m_DomainOperation;
+			control.m_Before = GetDomainControlStamp(request.m_ExpectedDomain->m_Domain,
+				request.m_ExpectedDomain->m_RunIdentity);
+			std::string conflict;
+			if (!CheckDomainControl(*request.m_ExpectedDomain, conflict))
+			{
+				EndDomainOperation(batch, std::move(conflict));
+				return;
+			}
+		}
+		const auto& expected = request.m_Expected;
+		auto& operation = batch.m_Status.m_HostViewOperation;
+		if (expected)
+		{
+			// The stamp is checked again where it applies; a stale operation applies nothing.
+			operation->m_Before = MakeHostViewStamp(expected->m_RunIdentity);
+			if (expected->m_ContentIdentity != m_ContentSerial)
+			{
+				EndHostViewOperation(batch, "ExpectedContentChanged",
+					"the active content is not the expected activation; nothing changed.");
+				return;
+			}
+			if (expected->m_HostViewRevision != m_HostViewRevision)
+			{
+				EndHostViewOperation(batch, "ExpectedHostViewRevisionMismatch",
+					"Host view overrides changed after the expected revision; nothing changed.");
+				return;
+			}
+		}
 		struct SourcePlan
 		{
 			ParameterSourceBase* m_Source = nullptr;
@@ -675,11 +1020,12 @@ namespace gglab
 		std::vector<SourcePlan> plans;
 		plans.reserve(m_Sources->Ordered().size());
 		size_t deferredItems = 0;
-		for (size_t index = 0; index < batch.m_Status.m_Values.size(); ++index)
+		for (size_t index = 0; index < batch.m_Bindings.size(); ++index)
 		{
-			const auto& value = batch.m_Status.m_Values[index];
-			const auto* current = Find(value.m_Id);
-			if (!current || batch.m_Bindings[index] != m_Sources->Find(value.m_Id) ||
+			const auto& id = batch.m_Request.m_Entries[index].m_Id;
+			const auto* current = Find(id);
+			if (!current || current->m_Desc.m_Type != request.m_Entries[index].m_Type ||
+				batch.m_Bindings[index] != m_Sources->Find(id) ||
 				!SupportsParameterEffect(current->m_Desc))
 			{
 				EndParameterBatch(batch, false, "ParameterPreparationFailed: a source or supported effect changed.");
@@ -694,38 +1040,59 @@ namespace gglab
 		}
 		std::string error;
 		bool changed = false;
-		// Prepare every owning source before consuming reservations or mutating state.
-		for (auto* source : m_Sources->Ordered())
+		std::vector<LabParameterValue> targets;
+		if (expected)
 		{
-			std::vector<LabParameterValue> values;
-			for (size_t index = 0; index < batch.m_Status.m_Values.size(); ++index)
+			std::vector<HostViewOverrideState> overrides;
+			for (const auto& entry : request.m_Entries)
 			{
-				if (batch.m_Bindings[index] == source)
-				{
-					values.push_back(batch.m_Status.m_Values[index]);
-				}
+				overrides.push_back({ entry.m_Id, entry.m_Type, entry.m_Value });
 			}
-			if (values.empty())
-			{
-				continue;
-			}
-			auto prepared = source->Prepare(batch.m_Status.m_BatchId, values, error);
+			auto prepared = m_Sources->m_View.PrepareOverrides(overrides, targets, error);
 			if (!prepared)
 			{
 				EndParameterBatch(batch, false, std::move(error));
 				return;
 			}
-			changed |= prepared->HasChanges();
-			plans.push_back({ source, std::move(prepared) });
+			changed = prepared->HasChanges();
+			plans.push_back({ &m_Sources->m_View, std::move(prepared) });
+		}
+		else
+		{
+			// Prepare every owning source before consuming reservations or mutating state.
+			for (auto* source : m_Sources->Ordered())
+			{
+				std::vector<LabParameterValue> values;
+				for (size_t index = 0; index < request.m_Entries.size(); ++index)
+				{
+					if (batch.m_Bindings[index] == source)
+					{
+						values.push_back({ request.m_Entries[index].m_Id, *request.m_Entries[index].m_Value });
+					}
+				}
+				if (values.empty())
+				{
+					continue;
+				}
+				auto prepared = source->Prepare(batch.m_Status.m_BatchId, values, error);
+				if (!prepared)
+				{
+					EndParameterBatch(batch, false, std::move(error));
+					return;
+				}
+				changed |= prepared->HasChanges();
+				plans.push_back({ source, std::move(prepared) });
+			}
 		}
 		const uint64_t revision = m_ParameterRevision + (changed ? 1 : 0);
 		std::vector<ParameterEffectReceipt> receipts;
-		receipts.reserve(batch.m_Status.m_Values.size());
-		std::vector<bool> noChange(batch.m_Status.m_Values.size(), false);
-		for (const auto& value : batch.m_Status.m_Values)
+		receipts.reserve(batch.m_Bindings.size());
+		std::vector<bool> noChange(batch.m_Bindings.size(), false);
+		for (size_t index = 0; index < batch.m_Bindings.size(); ++index)
 		{
-			auto receipt = ParameterEffectReceipt::Begin(value.m_Id,
-				GetParameterEffectClass(Find(value.m_Id)->m_Desc), revision, serial);
+			const auto& id = batch.m_Request.m_Entries[index].m_Id;
+			auto receipt = ParameterEffectReceipt::Begin(id,
+				GetParameterEffectClass(Find(id)->m_Desc), revision, serial);
 			if (!receipt)
 			{
 				EndParameterBatch(batch, false, "ParameterPreparationFailed: receipt identity is unavailable.");
@@ -734,13 +1101,32 @@ namespace gglab
 			receipts.push_back(std::move(*receipt));
 		}
 
+		const std::vector<LabParameterValue> hostViewBefore(
+			GetHostViewOverrides().begin(), GetHostViewOverrides().end());
+		if (request.m_ExpectedDomain && !CheckDomainControl(*request.m_ExpectedDomain, error))
+		{
+			EndDomainOperation(batch, std::move(error));
+			return;
+		}
 		// No callbacks or rejection in this region. Install every source and the
 		// unique receipt owner before allowing any content handler to observe state.
 		for (auto& plan : plans)
 		{
 			plan.m_Prepared->Commit();
 		}
+		if (expected)
+		{
+			// Items prove the resolved targets, including inheritance resolved for removals.
+			batch.m_Status.m_Values = std::move(targets);
+		}
 		m_QueuedParameterBatch = 0;
+		if (batch.m_Status.m_DomainOperation)
+		{
+			batch.m_Status.m_DomainOperation->m_Committed = true;
+		}
+		const auto committedControl = request.m_ExpectedDomain ?
+			GetDomainControlStamp(request.m_ExpectedDomain->m_Domain, request.m_ExpectedDomain->m_RunIdentity) :
+			std::nullopt;
 		m_Sources->PublishHostParameters();
 		m_ParameterRevision = revision;
 		m_ObservedLabRevision = m_Lab ? m_Lab->GetParameterRevision() : 0;
@@ -761,8 +1147,33 @@ namespace gglab
 			GGLAB_ASSERT_MSG(changed || !plan.m_Prepared->HasChanges(),
 				"Inherited values cannot change during an all-NoChange batch without an owning source effect.");
 		}
+		// Finalization has removed newly introduced equal overrides, so this compares
+		// the committed override set rather than the requested values.
+		if (!SameOverrides(hostViewBefore, GetHostViewOverrides()))
+		{
+			AdvanceHostViewRevision();
+		}
+		if (expected)
+		{
+			operation->m_After = MakeHostViewStamp(expected->m_RunIdentity);
+			for (const auto& state : request.m_Entries)
+			{
+				auto before = FindOverride(hostViewBefore, state.m_Id);
+				auto after = FindOverride(GetHostViewOverrides(), state.m_Id);
+				if (before.has_value() != after.has_value() || (before && !LabValuesEqual(*before, *after)))
+				{
+					operation->m_Changes.push_back({ state.m_Id, std::move(before), std::move(after) });
+				}
+			}
+		}
 		RefreshSources();
 		m_ParameterRevision = revision;
+		if (request.m_ExpectedDomain)
+		{
+			const auto current = GetDomainControlStamp(
+				request.m_ExpectedDomain->m_Domain, request.m_ExpectedDomain->m_RunIdentity);
+			batch.m_Status.m_DomainOperation->m_After = current ? current : committedControl;
+		}
 		m_Sources->m_Domain.CompleteEffects(batch.m_Domain);
 		for (size_t index = 0; index < batch.m_Receipts.size(); ++index)
 		{

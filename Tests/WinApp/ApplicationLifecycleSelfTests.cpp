@@ -4,14 +4,63 @@
 #include "Application/Content/DesktopApplicationContent.h"
 #include "Application/Platform/PlatformHost.h"
 #include "Application/Platform/PlatformWindow.h"
+#include "Application/Control/ApplicationControlCaptureJobs.h"
+#include "Application/Platform/Windows/Win32NamedPipeServer.h"
+#include "Application/Platform/Windows/Win32PlatformHost.h"
+#include "GGLabAppRuntime.h"
 
+#include <nlohmann/json.hpp>
+
+#include <algorithm>
+#include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <filesystem>
+#include <format>
+#include <initializer_list>
 #include <memory>
+#include <mutex>
+#include <optional>
+#include <string>
+#include <thread>
 #include <utility>
+
+#include <windows.h>
 
 namespace gglab
 {
+	struct ApplicationLifecycleTestAccess
+	{
+		static bool StartSuspended(Application& application) noexcept
+		{
+			application.m_AppRuntime = std::make_unique<GGLabAppRuntime>();
+			if (application.m_AppRuntime->Initialize({
+				.m_Config = application.m_RuntimeConfig,
+				.m_Paths = application.m_RuntimePaths }) != AppRuntimeInitializeResult::Succeeded)
+			{
+				return false;
+			}
+			application.m_PlatformHostInitializationAttempted = true;
+			if (!application.m_PlatformHost->Initialize({}))
+			{
+				return false;
+			}
+			application.m_StartTime = std::chrono::steady_clock::now();
+			if (!application.StartControlSession())
+			{
+				return false;
+			}
+			application.m_LifecycleState = Application::LifecycleState::Running;
+			application.HandlePlatformEvent({ .m_Type = PlatformEventType::Suspended });
+			return application.m_AppRuntime->GetLifecycleState() == AppRuntimeLifecycleState::Suspended;
+		}
+
+		static void Resume(Application& application) noexcept
+		{
+			application.HandlePlatformEvent({ .m_Type = PlatformEventType::Resumed });
+		}
+	};
+
 	namespace
 	{
 		struct HostLifetimeProbe
@@ -51,7 +100,8 @@ namespace gglab
 			{
 				return false;
 			}
-			void WaitForEvents() noexcept override {}
+			void Wake() noexcept override {}
+			void WaitForEvents(std::optional<std::chrono::steady_clock::time_point>) noexcept override {}
 			[[nodiscard]] bool IsQuitRequested() const noexcept override
 			{
 				return false;
@@ -65,6 +115,80 @@ namespace gglab
 			std::shared_ptr<HostLifetimeProbe> m_Probe;
 			FakePlatformWindow m_Window;
 		};
+
+		class SuspendedPlatformHost final : public PlatformHost
+		{
+		public:
+			bool Initialize(const PlatformWindowCreateInfo&) noexcept override { return true; }
+			void Finalize() noexcept override {}
+			void PumpEvents() noexcept override {}
+			bool PollEvent(PlatformEvent&) noexcept override { return false; }
+			bool IsQuitRequested() const noexcept override
+			{
+				return std::chrono::steady_clock::now() >= m_TestDeadline;
+			}
+			PlatformWindow& GetMainWindow() noexcept override { return m_Window; }
+			void Wake() noexcept override
+			{
+				std::scoped_lock lock(m_Mutex);
+				m_WakePending = true;
+				m_Condition.notify_one();
+			}
+			void WaitForEvents(std::optional<std::chrono::steady_clock::time_point> deadline) noexcept override
+			{
+				std::unique_lock lock(m_Mutex);
+				m_Condition.wait_until(lock, std::min(deadline.value_or(m_TestDeadline), m_TestDeadline),
+					[this]() { return m_WakePending; });
+				m_WakePending = false;
+			}
+
+		private:
+			FakePlatformWindow m_Window;
+			std::mutex m_Mutex;
+			std::condition_variable m_Condition;
+			bool m_WakePending = false;
+			std::chrono::steady_clock::time_point m_TestDeadline =
+				std::chrono::steady_clock::now() + std::chrono::seconds(3);
+		};
+
+		std::string RequestSession(const std::wstring& pipeName, std::string_view command) noexcept
+		{
+			HANDLE pipe = INVALID_HANDLE_VALUE;
+			const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+			while (pipe == INVALID_HANDLE_VALUE && std::chrono::steady_clock::now() < deadline)
+			{
+				pipe = CreateFileW(pipeName.c_str(), GENERIC_READ | GENERIC_WRITE,
+					0, nullptr, OPEN_EXISTING, 0, nullptr);
+				if (pipe == INVALID_HANDLE_VALUE)
+				{
+					WaitNamedPipeW(pipeName.c_str(), 50);
+					std::this_thread::sleep_for(std::chrono::milliseconds(1));
+				}
+			}
+			if (pipe == INVALID_HANDLE_VALUE)
+			{
+				return {};
+			}
+			const std::string request = std::format(
+				R"({{"protocol":4,"id":1,"command":"{}"{}}})", command,
+				command == "capture-cancel" || command == "result" ? ",\"jobId\":1" : "") + '\n';
+			DWORD bytes = 0;
+			std::string response;
+			if (WriteFile(pipe, request.data(), static_cast<DWORD>(request.size()), &bytes, nullptr))
+			{
+				char buffer[4096];
+				while (ReadFile(pipe, buffer, sizeof(buffer), &bytes, nullptr) && bytes)
+				{
+					response.append(buffer, bytes);
+					if (response.find('\n') != std::string::npos)
+					{
+						break;
+					}
+				}
+			}
+			CloseHandle(pipe);
+			return response;
+		}
 
 		Application::CreateInfo MakeCreateInfo(std::unique_ptr<PlatformHost> host) noexcept
 		{
@@ -90,10 +214,153 @@ namespace gglab
 				.m_ContentRegistration = CreateDesktopApplicationContent(),
 			};
 		}
+
+		void RunSuspendedSessionTests(SelfTestContext& context) noexcept
+		{
+			using Json = nlohmann::json;
+			auto info = MakeCreateInfo(std::make_unique<SuspendedPlatformHost>());
+			info.m_SessionId = std::format("suspended-{}-{}", GetCurrentProcessId(),
+				std::chrono::steady_clock::now().time_since_epoch().count());
+			info.m_IdleTimeoutSeconds = 2.0;
+			const std::wstring pipeName = L"\\\\.\\pipe\\gglab-session-" +
+				std::wstring(info.m_SessionId.begin(), info.m_SessionId.end());
+			Application application(std::move(info));
+			const bool started = ApplicationLifecycleTestAccess::StartSuspended(application);
+			context.Check(started, "A host-injected Suspended event holds the session without GPU services");
+			if (!started)
+			{
+				return;
+			}
+			Json status, cancelled, sequence, result, stopped;
+			std::thread client([&]()
+				{
+					status = Json::parse(RequestSession(pipeName, "status"), nullptr, false);
+					cancelled = Json::parse(RequestSession(pipeName, "capture-cancel"), nullptr, false);
+					sequence = Json::parse(RequestSession(pipeName, "sequence-cancel"), nullptr, false);
+					result = Json::parse(RequestSession(pipeName, "result"), nullptr, false);
+					stopped = Json::parse(RequestSession(pipeName, "stop"), nullptr, false);
+				});
+			const auto began = std::chrono::steady_clock::now();
+			application.Run();
+			application.Shutdown();
+			client.join();
+			context.Check(status.is_object() && status.value("ok", false) &&
+				status["session"]["runtimeState"] == "suspended" && status["frame"].is_null(),
+				"Suspended status answers with its lifecycle state without a rendered frame");
+			context.Check(cancelled.is_object() && cancelled["cancellation"] == "NotFound" &&
+				sequence.is_object() && result.is_object(),
+				"Cancellation and result queries remain responsive while suspended");
+			context.Check(stopped.is_object() && stopped.value("ok", false) &&
+				application.GetLifecycleState() == Application::LifecycleState::Stopped &&
+				std::chrono::steady_clock::now() - began < std::chrono::seconds(2),
+				"A suspended stop wakes the owner and completes normal shutdown within a bounded time");
+
+			auto idleInfo = MakeCreateInfo(std::make_unique<SuspendedPlatformHost>());
+			idleInfo.m_SessionId = std::format("idle-{}", GetCurrentProcessId());
+			idleInfo.m_IdleTimeoutSeconds = 0.04;
+			Application idle(std::move(idleInfo));
+			const bool idleStarted = ApplicationLifecycleTestAccess::StartSuspended(idle);
+			context.Check(idleStarted, "The idle-expiry fixture starts suspended");
+			if (idleStarted)
+			{
+				const auto idleBegan = std::chrono::steady_clock::now();
+				idle.Run();
+				const auto elapsed = std::chrono::steady_clock::now() - idleBegan;
+				idle.Shutdown();
+				context.Check(elapsed >= std::chrono::milliseconds(30) && elapsed < std::chrono::seconds(1),
+					"An abandoned suspended automation session wakes at its idle deadline without pipe traffic");
+			}
+
+			auto developerInfo = MakeCreateInfo(std::make_unique<SuspendedPlatformHost>());
+			developerInfo.m_SessionId = std::format("developer-{}", GetCurrentProcessId());
+			developerInfo.m_SessionLifetime = ApplicationSessionLifetime::Developer;
+			developerInfo.m_IdleTimeoutSeconds = 0.04;
+			const auto developerPipe = L"\\\\.\\pipe\\gglab-session-" +
+				std::wstring(developerInfo.m_SessionId.begin(), developerInfo.m_SessionId.end());
+			Application developer(std::move(developerInfo));
+			const bool developerStarted = ApplicationLifecycleTestAccess::StartSuspended(developer);
+			context.Check(developerStarted, "The developer-lifetime fixture starts suspended");
+			if (developerStarted)
+			{
+				Json developerStatus;
+				std::thread attached([&]()
+					{
+						std::this_thread::sleep_for(std::chrono::milliseconds(120));
+						developerStatus = Json::parse(RequestSession(developerPipe, "status"), nullptr, false);
+						GGLAB_UNUSED(RequestSession(developerPipe, "stop"));
+					});
+				developer.Run();
+				developer.Shutdown();
+				attached.join();
+				context.Check(developerStatus.is_object() && developerStatus.value("ok", false) &&
+					developerStatus["session"]["lifetime"] == "developer" &&
+					developerStatus["session"]["idleTimeoutSeconds"].is_null() &&
+					developerStatus["session"]["runtimeState"] == "suspended",
+					"Developer lifetime survives silence beyond the automation idle timeout and reports no idle expiry");
+			}
+		}
+
+		void RunRunningSessionLifetimeTests(SelfTestContext& context) noexcept
+		{
+			for (const auto lifetime : { ApplicationSessionLifetime::Automation,
+				ApplicationSessionLifetime::Developer })
+			{
+				auto host = std::make_unique<SuspendedPlatformHost>();
+				const auto* platform = host.get();
+				auto info = MakeCreateInfo(std::move(host));
+				info.m_SessionId = std::format("running-{}-{}", GetCurrentProcessId(),
+					lifetime == ApplicationSessionLifetime::Developer);
+				info.m_SessionLifetime = lifetime;
+				info.m_IdleTimeoutSeconds = 0.04;
+				info.m_Hidden = true;
+				Application application(std::move(info));
+				const bool started = ApplicationLifecycleTestAccess::StartSuspended(application);
+				context.Check(started, "The running-lifetime fixture starts without GPU services");
+				if (started)
+				{
+					ApplicationLifecycleTestAccess::Resume(application);
+					application.Run();
+					context.Check(platform->IsQuitRequested() ==
+						(lifetime == ApplicationSessionLifetime::Developer),
+						"Without IPC, running automation idle-exits while developer lifetime awaits the host quit");
+				}
+				application.Shutdown();
+			}
+		}
+
+		void RunPlatformWakeTests(SelfTestContext& context) noexcept
+		{
+			Win32PlatformHost host(GetModuleHandleW(nullptr));
+			const bool initialized = host.Initialize({
+				.m_Title = L"PlatformWakeSelfTest", .m_Width = 64, .m_Height = 64, .m_Hidden = true });
+			context.Check(initialized, "A hidden platform window supports control wakes without an RHI");
+			if (initialized)
+			{
+				host.PumpEvents();
+				host.Wake();
+				const auto began = std::chrono::steady_clock::now();
+				host.WaitForEvents(began + std::chrono::seconds(1));
+				context.Check(std::chrono::steady_clock::now() - began < std::chrono::milliseconds(200),
+					"A request wake queued before the native wait is not lost");
+				host.PumpEvents();
+				const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(30);
+				do
+				{
+					host.WaitForEvents(deadline);
+					host.PumpEvents();
+				} while (std::chrono::steady_clock::now() < deadline);
+				context.Check(std::chrono::steady_clock::now() < deadline + std::chrono::milliseconds(200),
+					"The native event wait wakes for an absolute control deadline without a window message");
+			}
+			host.Finalize();
+		}
 	}
 
 	void RunApplicationLifecycleSelfTests(SelfTestContext& context) noexcept
 	{
+		RunPlatformWakeTests(context);
+		RunSuspendedSessionTests(context);
+		RunRunningSessionLifetimeTests(context);
 		{
 			Application application(MakeCreateInfo(nullptr));
 			context.Check(

@@ -4,6 +4,13 @@ Use this workflow when the owner requests a visible launch or is already using
 the app. In an ordinary/F5 launch, open DevTools **Application > Frame Capture**;
 no session connection is required. `--no-devtools` removes the panel.
 
+For a developer-owned F5 session, set the debugger arguments to
+`--session dev --session-lifetime developer`. Connect with
+`GGLabSession.ps1 attach -Session dev`; retain its `runIdentity` for later
+commands. Attachment does not own the process. Developer lifetime has no idle
+exit; ordinary session launches retain automation idle expiry. Minimized sessions
+answer control requests, cancellation and stop without rendering frames.
+
 - **Capture (F9)** submits the selected Scene/Composited image as one job with
   a final bundle manifest, PNG and metadata. Busy/rejected admission has no job
   ID or history record; the panel, notification and log report the reason.

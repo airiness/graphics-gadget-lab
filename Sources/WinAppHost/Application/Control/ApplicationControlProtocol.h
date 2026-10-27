@@ -1,9 +1,12 @@
 #pragma once
 #include "Application/Control/ApplicationControlParameters.h"
+#include "Application/Control/ApplicationSessionLifetime.h"
 #include "Capture/CaptureJobTypes.h"
 #include "Capture/CapturePlan.h"
 #include "Capture/FrameSequenceCoordinator.h"
 #include "Capture/NonFiniteWatchCoordinator.h"
+#include "Parameters/HostViewParameters.h"
+#include "GGLabAppRuntime.h"
 
 #include <cstdint>
 #include <memory>
@@ -36,6 +39,9 @@ namespace gglab
 		Sequence,
 		// Cancels the active sequence.
 		SequenceCancel,
+		// Sets exact Host view override states, guarded by the expected control state.
+		HostViewOverrides,
+		Assign,
 	};
 
 	struct ApplicationControlRequest
@@ -54,6 +60,13 @@ namespace gglab
 		std::vector<ApplicationControlParameterChange> m_ParameterChanges;
 		// Separate namespace from capture job ids; only terminal results can be consumed.
 		uint64_t m_ParameterBatchId = 0;
+		// HostViewOverrides: the complete expected control state and exact override states.
+		HostViewControlStamp m_ExpectedHostView;
+		std::vector<HostViewOverrideState> m_HostViewOverrides;
+		ParameterControlStamp m_ExpectedParameterControl;
+		// Protected commands only: the process run this request was prepared against.
+		// HostViewOverrides and Assign take it from their required expected control state.
+		std::optional<std::string> m_ExpectedRunIdentity;
 	};
 
 	struct ApplicationControlParseResult
@@ -66,6 +79,13 @@ namespace gglab
 
 	[[nodiscard]] ApplicationControlParseResult ParseApplicationControlRequest(
 		std::string_view line) noexcept;
+	// Commands that accept the optional 'expectedRunIdentity' field: every command except the
+	// status/parameters queries and host-view-overrides/assign, whose expected state names the run.
+	[[nodiscard]] bool AcceptsApplicationControlExpectedRun(ApplicationControlCommand command) noexcept;
+	// An error response when a run-checked request names another process run, or when
+	// this run has no identity; empty when the request may touch process-local state.
+	[[nodiscard]] std::optional<std::string> CheckApplicationControlRunIdentity(
+		const ApplicationControlRequest& request, std::string_view runIdentity) noexcept;
 
 	struct ApplicationControlStatus
 	{
@@ -73,6 +93,9 @@ namespace gglab
 		uint32_t m_ProcessId = 0;
 		double m_UptimeSeconds = 0.0;
 		bool m_Hidden = false;
+		AppRuntimeLifecycleState m_RuntimeState = AppRuntimeLifecycleState::Uninitialized;
+		ApplicationSessionLifetime m_Lifetime = ApplicationSessionLifetime::Automation;
+		std::optional<double> m_IdleTimeoutSeconds = 900.0;
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
 		CaptureIntakeSnapshot m_CaptureIntake;
@@ -91,6 +114,8 @@ namespace gglab
 		const ParameterBatchStatus* m_ParameterBatch = nullptr;
 		const LightingProfilePublication* m_LightingProfiles = nullptr;
 		std::string m_LightingProfileError;
+		// Live control state; the frame carries the stamp it was planned with.
+		HostViewControlStamp m_HostViewControl;
 	};
 
 	// Response serializers. Every response carries the protocol version, the
