@@ -1,5 +1,8 @@
 #include "Application/Platform/Windows/Win32PlatformHost.h"
 
+#include <algorithm>
+#include <chrono>
+
 namespace gglab
 {
 	Win32PlatformHost::Win32PlatformHost(HINSTANCE instance) noexcept :
@@ -15,6 +18,11 @@ namespace gglab
 		}
 
 		m_QuitRequested = false;
+		m_WakeEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+		if (!m_WakeEvent)
+		{
+			return false;
+		}
 		m_IsInitialized = m_MainWindow.Initialize(createInfo);
 		return m_IsInitialized;
 	}
@@ -25,6 +33,11 @@ namespace gglab
 		{
 			m_MainWindow.Finalize();
 			m_IsInitialized = false;
+		}
+		if (m_WakeEvent)
+		{
+			CloseHandle(m_WakeEvent);
+			m_WakeEvent = nullptr;
 		}
 	}
 
@@ -49,8 +62,21 @@ namespace gglab
 		return m_MainWindow.PollEvent(event);
 	}
 
-	void Win32PlatformHost::WaitForEvents() noexcept
+	void Win32PlatformHost::Wake() noexcept
 	{
-		WaitMessage();
+		SetEvent(m_WakeEvent);
+	}
+
+	void Win32PlatformHost::WaitForEvents(
+		std::optional<std::chrono::steady_clock::time_point> deadline) noexcept
+	{
+		DWORD timeout = INFINITE;
+		if (deadline)
+		{
+			const auto remaining = std::chrono::ceil<std::chrono::milliseconds>(
+				*deadline - std::chrono::steady_clock::now());
+			timeout = static_cast<DWORD>(std::clamp<int64_t>(remaining.count(), 0, INFINITE - 1));
+		}
+		MsgWaitForMultipleObjectsEx(1, &m_WakeEvent, timeout, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
 	}
 }

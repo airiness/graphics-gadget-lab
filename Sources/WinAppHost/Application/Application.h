@@ -86,6 +86,7 @@ namespace gglab
 		uint32_t GetWindowHeight() const noexcept { return m_WindowHeight; }
 
 	private:
+		friend struct ApplicationLifecycleTestAccess;
 		[[nodiscard]] bool FailInitialization() noexcept;
 		bool Tick() noexcept;
 		// Paces hidden frames, which present to no visible surface.
@@ -95,6 +96,7 @@ namespace gglab
 		[[nodiscard]] bool StartControlSession() noexcept;
 		// Answers control requests; returns false when the session should end.
 		[[nodiscard]] bool UpdateControlSession() noexcept;
+		[[nodiscard]] bool WaitWhileSuspended() noexcept;
 		void HandleControlRequest(const std::shared_ptr<win32::NamedPipeRequest>& pipeRequest,
 			ApplicationControlRequest&& request) noexcept;
 

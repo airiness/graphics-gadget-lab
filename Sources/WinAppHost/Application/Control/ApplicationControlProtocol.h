@@ -5,6 +5,7 @@
 #include "Capture/FrameSequenceCoordinator.h"
 #include "Capture/NonFiniteWatchCoordinator.h"
 #include "Parameters/HostViewParameters.h"
+#include "GGLabAppRuntime.h"
 
 #include <cstdint>
 #include <memory>
@@ -91,6 +92,7 @@ namespace gglab
 		uint32_t m_ProcessId = 0;
 		double m_UptimeSeconds = 0.0;
 		bool m_Hidden = false;
+		AppRuntimeLifecycleState m_RuntimeState = AppRuntimeLifecycleState::Uninitialized;
 		uint32_t m_Width = 0;
 		uint32_t m_Height = 0;
 		CaptureIntakeSnapshot m_CaptureIntake;

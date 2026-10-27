@@ -23,6 +23,14 @@ These owners are declared in the [AppRuntime](../../Projects/GGLabAppRuntime/GGL
 [WinAppHost](../../Projects/WinAppHost/WinAppHost.vcxproj) and
 [Runtime](../../Projects/GGLabRuntime/GGLabRuntime.vcxproj) projects.
 
+## Session servicing
+
+The Host pipe server wakes the platform owner when a request is queued. While
+AppRuntime is Suspended, Application answers control requests and evaluates the
+automation idle deadline without ticking a frame. The platform wait observes
+both window events and the next control deadline. `status.session.runtimeState`
+reports the live AppRuntime lifecycle state. Stop follows normal shutdown.
+
 ## Host override writers
 
 `SessionParameterControl` owns the Host override set through its private

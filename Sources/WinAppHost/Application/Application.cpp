@@ -339,8 +339,7 @@ namespace gglab
 
 		if (m_AppRuntime->GetLifecycleState() == AppRuntimeLifecycleState::Suspended)
 		{
-			m_PlatformHost->WaitForEvents();
-			return true;
+			return WaitWhileSuspended();
 		}
 
 		if (m_Hidden)
@@ -390,8 +389,7 @@ namespace gglab
 		}
 		if (tickResult == AppRuntimeTickResult::Suspended)
 		{
-			m_PlatformHost->WaitForEvents();
-			return true;
+			return WaitWhileSuspended();
 		}
 		if (tickResult == AppRuntimeTickResult::Fatal)
 		{
@@ -506,7 +504,8 @@ namespace gglab
 		std::wstring pipeName = L"\\\\.\\pipe\\gglab-session-";
 		pipeName.append(m_SessionId.begin(), m_SessionId.end());
 		m_ControlServer = std::make_unique<win32::NamedPipeServer>();
-		if (!m_ControlServer->Start(pipeName))
+		if (!m_ControlServer->Start(pipeName, std::chrono::seconds(5),
+			[this]() noexcept { m_PlatformHost->Wake(); }))
 		{
 			GGLAB_LOG_ERROR_ALWAYS("Session '{}' could not open its control pipe; the id may "
 				"already be in use.", m_SessionId);
@@ -545,12 +544,28 @@ namespace gglab
 
 		// Client polling counts as activity, retained receipts do not. Waiting for
 		// content that never loads must not keep an abandoned session alive.
-		if (now - m_LastControlActivity > m_IdleTimeout)
+		if (now - m_LastControlActivity >= m_IdleTimeout)
 		{
 			GGLAB_LOG_INFO_ALWAYS("Session '{}' exits after {} idle seconds.", m_SessionId,
 				m_IdleTimeout.count());
 			return false;
 		}
+		return true;
+	}
+
+	bool Application::WaitWhileSuspended() noexcept
+	{
+		std::optional<std::chrono::steady_clock::time_point> deadline;
+		if (m_ControlServer)
+		{
+			if (!UpdateControlSession())
+			{
+				return false;
+			}
+			deadline = m_LastControlActivity +
+				std::chrono::ceil<std::chrono::steady_clock::duration>(m_IdleTimeout);
+		}
+		m_PlatformHost->WaitForEvents(deadline);
 		return true;
 	}
 
@@ -580,14 +595,15 @@ namespace gglab
 					std::chrono::duration<double>(std::chrono::steady_clock::now() - m_StartTime)
 					.count(),
 				.m_Hidden = m_Hidden,
+				.m_RuntimeState = m_AppRuntime->GetLifecycleState(),
 				.m_Width = m_WindowWidth,
 				.m_Height = m_WindowHeight,
 				.m_CaptureIntake = m_AppRuntime ? m_AppRuntime->GetCaptureIntakeSnapshot() : CaptureIntakeSnapshot{},
 				.m_SettledFrames = m_FrameCapture ? m_FrameCapture->GetSettledFrameCount() : 0,
 				.m_Frame = m_FrameCapture ? m_FrameCapture->GetLastFrameState() : nullptr,
 				.m_Sequence = frameSequence ? frameSequence->GetStatus() : nullptr,
-				.m_NonFiniteInstrumentation = m_AppRuntime && m_AppRuntime->GetFrameCaptureCoordinator()->HasNonFiniteInstrumentation(),
-				.m_NonFiniteProduction = m_AppRuntime ? m_AppRuntime->GetFrameCaptureCoordinator()->GetLatestNonFiniteProductionFrame() : nullptr,
+				.m_NonFiniteInstrumentation = frameCapture && frameCapture->HasNonFiniteInstrumentation(),
+				.m_NonFiniteProduction = frameCapture ? frameCapture->GetLatestNonFiniteProductionFrame() : nullptr,
 				.m_Watch = m_AppRuntime && m_AppRuntime->GetNonFiniteWatchCoordinator() ? &m_AppRuntime->GetNonFiniteWatchCoordinator()->GetStatus() : nullptr,
 				.m_Environment = frameCapture ? std::string_view(frameCapture->GetEnvironmentJson()) : std::string_view{},
 				.m_ParametersAvailable = parameters && parameters->IsAvailable(),

@@ -17,13 +17,16 @@ namespace gglab
 
 		void PumpEvents() noexcept override;
 		[[nodiscard]] bool PollEvent(PlatformEvent& event) noexcept override;
-		void WaitForEvents() noexcept override;
+		void Wake() noexcept override;
+		void WaitForEvents(
+			std::optional<std::chrono::steady_clock::time_point> deadline = {}) noexcept override;
 		[[nodiscard]] bool IsQuitRequested() const noexcept override { return m_QuitRequested; }
 
 		[[nodiscard]] PlatformWindow& GetMainWindow() noexcept override { return m_MainWindow; }
 
 	private:
 		Win32Window m_MainWindow;
+		HANDLE m_WakeEvent = nullptr;
 		bool m_IsInitialized = false;
 		bool m_QuitRequested = false;
 	};

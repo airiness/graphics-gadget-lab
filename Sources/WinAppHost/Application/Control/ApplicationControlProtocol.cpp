@@ -1762,12 +1762,28 @@ namespace gglab
 	std::string SerializeApplicationControlStatus(
 		uint64_t id, const ApplicationControlStatus& status) noexcept
 	{
+		const auto runtimeState = [&status]() -> std::string_view
+			{
+				switch (status.m_RuntimeState)
+				{
+				case AppRuntimeLifecycleState::Uninitialized: return "uninitialized";
+				case AppRuntimeLifecycleState::Initializing: return "initializing";
+				case AppRuntimeLifecycleState::Running: return "running";
+				case AppRuntimeLifecycleState::Suspended: return "suspended";
+				case AppRuntimeLifecycleState::ExitRequested: return "exit-requested";
+				case AppRuntimeLifecycleState::Failed: return "failed";
+				case AppRuntimeLifecycleState::ShuttingDown: return "shutting-down";
+				case AppRuntimeLifecycleState::Stopped: return "stopped";
+				}
+				return "uninitialized";
+			};
 		Json response = MakeResponse(id, true);
 		response["session"] = {
 			{ "id", status.m_SessionId },
 			{ "pid", status.m_ProcessId },
 			{ "uptimeSeconds", status.m_UptimeSeconds },
 			{ "hidden", status.m_Hidden },
+			{ "runtimeState", runtimeState() },
 			{ "width", status.m_Width },
 			{ "height", status.m_Height },
 		};

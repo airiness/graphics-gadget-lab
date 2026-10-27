@@ -131,13 +131,15 @@ namespace gglab::win32
 	}
 
 	bool NamedPipeServer::Start(
-		std::wstring_view pipeName, std::chrono::milliseconds clientCloseTimeout) noexcept
+		std::wstring_view pipeName, std::chrono::milliseconds clientCloseTimeout,
+		std::function<void()> requestReady) noexcept
 	{
 		if (m_StopEvent)
 		{
 			return false;
 		}
 		m_PipeName = pipeName;
+		m_RequestReady = std::move(requestReady);
 		m_ClientCloseTimeout = clientCloseTimeout;
 		m_StopEvent = ::CreateEventW(nullptr, TRUE, FALSE, nullptr);
 		if (!m_StopEvent)
@@ -196,6 +198,7 @@ namespace gglab::win32
 		}
 		::CloseHandle(m_StopEvent);
 		m_StopEvent = nullptr;
+		m_RequestReady = {};
 	}
 
 	std::vector<std::shared_ptr<NamedPipeRequest>> NamedPipeServer::Poll() noexcept
@@ -343,6 +346,10 @@ namespace gglab::win32
 			std::scoped_lock lock(m_Mutex);
 			m_Pending.push_back(request);
 			m_Outstanding.push_back(request);
+		}
+		if (m_RequestReady)
+		{
+			m_RequestReady();
 		}
 		std::optional<std::string> response = request->WaitForResponse(m_StopEvent);
 		if (response)
