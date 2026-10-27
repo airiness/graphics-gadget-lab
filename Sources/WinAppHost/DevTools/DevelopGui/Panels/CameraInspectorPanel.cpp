@@ -1,4 +1,6 @@
 #include "DevTools/DevelopGui/Panels/CameraInspectorPanel.h"
+#include "DevTools/DevelopGui/ViewControlWidgets.h"
+#include "Parameters/ViewControlSnapshot.h"
 #include "DevTools/DevelopGui/CameraReferenceViewWidgets.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
@@ -331,6 +333,16 @@ namespace gglab
 		camChanged |= ImGui::DragFloat("Far", &state.m_FarZ, 1.0f, 0.1f, 100000.0f);
 
 		ImGui::SeparatorText("Camera Exposure");
+		if (!context.m_ViewControl ||
+			camera.m_RenderViewId == context.m_ViewControl->m_PlannedFrame.m_DisplayViewId)
+		{
+			devtools::DrawViewControlSnapshot(context.m_ViewControl, "view.exposure.");
+		}
+		else
+		{
+			ImGui::TextWrapped("This camera is not the display view. Host exposure overrides apply "
+				"only to the display view; inspect its control state in Post Processing.");
+		}
 		camChanged |= ImGui::SliderFloat("Manual EV100", &state.m_ManualEV100,
 			-16.0f, 24.0f, "%.2f EV", ImGuiSliderFlags_AlwaysClamp);
 		camChanged |= ImGui::SliderFloat("Compensation (EV)", &state.m_ExposureCompensationEV,
@@ -342,7 +354,7 @@ namespace gglab
 		}
 		const ResolvedExposureSettings exposure = ResolveManualExposureSettings(
 			state.m_ManualEV100, state.m_ExposureCompensationEV);
-		ImGui::Text("Effective EV100: %.2f | Exposure Scale: %.4fx",
+		ImGui::Text("Camera draft EV100: %.2f | Exposure Scale: %.4fx",
 			exposure.m_EffectiveEV100, exposure.m_ExposureScale);
 		if (ImGui::Button("Reset Exposure"))
 		{

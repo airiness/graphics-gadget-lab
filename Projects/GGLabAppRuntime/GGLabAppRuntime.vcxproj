@@ -118,6 +118,7 @@
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Lab\LabParameter.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterEffectReceipt.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\HostViewParameters.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\ViewControlSnapshot.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\HostViewParameterSource.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\LabParameterSource.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\LightingProfileParameterSource.cpp" />
@@ -169,6 +170,7 @@
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterFrameState.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterEffectReceipt.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\HostViewParameters.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ViewControlSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\SessionParameterControl.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\ParameterSource.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Parameters\LightingParameterDomain.h" />

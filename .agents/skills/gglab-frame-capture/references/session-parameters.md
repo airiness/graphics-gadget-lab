@@ -163,6 +163,26 @@ be `sequence` or `forced-reference`, the temporal consumer plan, and `outcome`
 (`planned`, `submitted` or `aborted`). Capture sidecars record the issued frame's
 stamp and `hostView` in their [`control`](session-jobs.md#frame-provenance) record.
 
+### GUI observations
+
+The TAA, Ambient Occlusion and Post Processing Inspectors expose a read-only
+**Display-view control** section. It separates inherited values/sources, exact
+Host override presence/value, Host-resolved values and the current planned frame
+after sequence/reference masks. Equal-value pins still mask inheritance.
+The Camera Inspector shows this exposure observation only for the display camera;
+other cameras keep their independent authored exposure.
+
+The previous frame carries its own serial, outcome and run/content/revision.
+Planned/aborted is not submitted-frame evidence; aborted does not certify that no
+GPU work ran. Submitted does not prove GPU completion or pass execution.
+Temporal consumer state is separate from an enabled setting.
+Pending GUI edits enter a later tick and do not change either frozen observation.
+Missing evidence is shown as unavailable. These observations do not enable lazy
+parameter tracking or change capture settling.
+
+GUI edits still use the tooling/camera layer. Host override release is not yet a
+GUI action; use `host-view-overrides` below when removal is required.
+
 ### Guarded exact override states
 
 Check `status.capabilities.hostViewOverrides` first. `host-view-overrides` sets

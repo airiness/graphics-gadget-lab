@@ -1,6 +1,7 @@
 #include "GGLabAppRuntime.h"
 #include "Parameters/HostViewParameters.h"
 #include "Parameters/SessionParameterControl.h"
+#include "Parameters/ViewControlSnapshot.h"
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettingsPatch.h"
 
@@ -709,6 +710,12 @@ namespace gglab
 			toolingFrame.Complete();
 			return AppRuntimeTickResult::Continue;
 		}
+		// Freeze the previous outcome before BeginFrame replaces it with this plan.
+		// Observation must not enable parameter tracking or reset capture settling.
+		const std::optional<ViewControlSnapshot> viewControl = toolingFrame.IsOpen() ?
+			std::optional(BuildViewControlSnapshot(inheritedView, m_ParameterControl->GetHostViewOverrides(),
+				captureFrameState, m_FrameCapture->GetLastFrameState())) :
+			std::nullopt;
 		m_FrameCapture->BeginFrame(std::move(captureFrameState));
 		RenderFrameBuildResult frame;
 		{
@@ -864,6 +871,7 @@ namespace gglab
 				.m_DebugDrawChannelControl = m_DebugDrawService->GetChannelControl(),
 				.m_DebugDrawFrame = &frame.m_DebugDrawFrame,
 				.m_LoadingProgress = loadingProgress ? &*loadingProgress : nullptr,
+				.m_ViewControl = viewControl ? &*viewControl : nullptr,
 			};
 			toolingFrame.Draw(toolingContext);
 		}

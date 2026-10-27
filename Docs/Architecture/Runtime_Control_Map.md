@@ -57,6 +57,24 @@ GUI settings have separate storage in `DevToolsRuntime`; AppRuntime snapshots
 active tooling blocks once per tick. Sequence settings patch frame-local values.
 The Deferred `environment.profile` source and Lab authoring affect inherited values.
 
+### GUI observation
+
+AppRuntime builds an owned [ViewControlSnapshot](../../Sources/GGLabAppRuntime/Parameters/ViewControlSnapshot.h)
+before replacing the capture coordinator's previous frame. The tooling frame
+context lends it read-only for Draw. It carries inherited values, Host-resolved
+values before masks, the current planned frame and the previous frame's own
+outcome, control identity, values and temporal consumers. Observation does not
+enable parameter tracking or advance revisions.
+
+[View control widgets](../../Sources/WinAppHost/DevTools/DevelopGui/ViewControlWidgets.cpp)
+show TAA/GTAO and display-view exposure provenance, equal-value pins and
+Host/sequence/reference masking. The Camera Inspector distinguishes the inspected
+camera from the display view. Pending GUI edits enter a later tick; a planned or
+aborted frame is not submitted evidence, and submission is not GPU completion or
+pass-execution proof. Aborted does not certify that no GPU work ran. Missing
+observations remain unavailable. Host override release is not a GUI action yet;
+existing tooling/camera write paths remain unchanged.
+
 ## Protected Lab/profile assignments
 
 `assign` carries a single-domain request with `ParameterRequest::m_ExpectedDomain`.
@@ -179,6 +197,8 @@ Anchors:
   - Sources/GGLabRuntime/Public/GGLabRuntime/Core/World.h::MarkLightingAuthoringChanged
   - Sources/GGLabRuntime/Private/Graphics/EnvironmentLightingSystem.cpp::RecordSettingsWrite
   - Sources/GGLabAppRuntime/ApplicationToolingIntegration.cpp::ResolveApplicationViewSettings
+  - Sources/GGLabAppRuntime/Parameters/ViewControlSnapshot.cpp::BuildViewControlSnapshot
+  - Sources/WinAppHost/DevTools/DevelopGui/ViewControlWidgets.cpp::DrawViewControlSnapshot
   - Sources/GGLabAppRuntime/GGLabAppRuntimeFrame.cpp::BuildCaptureTemporalState
   - Sources/GGLabAppRuntime/Capture/RequiredFrameState.cpp::ValidateRequiredFrameState
   - Sources/GGLabAppRuntime/Capture/FrameCaptureCoordinator.cpp::FailRequiredFrameStateMismatch
@@ -204,6 +224,13 @@ ReviewPaths:
   - Sources/GGLabAppRuntime/Capture/FrameSequenceCoordinator.*
   - Sources/GGLabAppRuntime/Capture/CaptureBundle.cpp
   - Sources/GGLabAppRuntime/ApplicationToolingIntegration.*
+  - Sources/WinAppHost/DevTools/DevelopGui/DevelopGuiApplicationTooling.cpp
+  - Sources/WinAppHost/DevTools/DevelopGui/DevelopGuiContext.h
+  - Sources/WinAppHost/DevTools/DevelopGui/Panels/TemporalAAInspectorPanel.cpp
+  - Sources/WinAppHost/DevTools/DevelopGui/Panels/GTAOInspectorPanel.cpp
+  - Sources/WinAppHost/DevTools/DevelopGui/Panels/PostProcessInspectorPanel.cpp
+  - Sources/WinAppHost/DevTools/DevelopGui/Panels/CameraInspectorPanel.cpp
+  - Sources/WinAppHost/DevTools/DevelopGui/ViewControlWidgets.*
   - Sources/GGLabAppRuntime/GGLabAppRuntime*.cpp
   - Sources/GGLabRuntime/Private/Graphics/ViewRenderSettings*.cpp
   - Sources/GGLabRuntime/Private/Graphics/RenderFrameBuilder.cpp

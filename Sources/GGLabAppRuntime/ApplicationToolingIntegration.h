@@ -39,6 +39,7 @@ namespace gglab
 	struct LoadingProgress;
 	struct ShadowVisualizationSettings;
 	struct ViewRenderProfile;
+	struct ViewControlSnapshot;
 
 	struct ApplicationToolingInputCapture
 	{
@@ -108,6 +109,8 @@ namespace gglab
 		DebugDrawChannelControlBase* m_DebugDrawChannelControl = nullptr;
 		const DebugDrawFrameView* m_DebugDrawFrame = nullptr;
 		const LoadingProgress* m_LoadingProgress = nullptr;
+		// Owned CPU observation borrowed for Draw only; never a mutable control surface.
+		const ViewControlSnapshot* m_ViewControl = nullptr;
 	};
 
 	enum class ApplicationToolingFrameEndReason : uint8_t

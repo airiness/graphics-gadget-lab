@@ -1,4 +1,5 @@
 #include "DevTools/DevelopGui/Panels/GTAOInspectorPanel.h"
+#include "DevTools/DevelopGui/ViewControlWidgets.h"
 
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
@@ -358,6 +359,7 @@ namespace gglab
 
 	void GTAOInspectorPanel::Draw(DevelopGuiContext& context) noexcept
 	{
+		devtools::DrawViewControlSnapshot(context.m_ViewControl, "view.gtao.");
 		if (!context.m_Diagnostics)
 		{
 			ImGui::TextDisabled("GTAO diagnostics are unavailable.");
@@ -370,7 +372,7 @@ namespace gglab
 			return;
 		}
 
-		ImGui::Text("Status: %s | Settings: %s", GetStatusName(snapshot->m_Status),
+		ImGui::Text("Status: %s | Tooling block: %s", GetStatusName(snapshot->m_Status),
 			snapshot->m_OverrideActive ? "DevTools override" : "Active profile");
 		if (snapshot->m_UsesFinalAOFormatFallback)
 		{

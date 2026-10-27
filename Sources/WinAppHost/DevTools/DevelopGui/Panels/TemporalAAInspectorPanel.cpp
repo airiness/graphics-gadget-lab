@@ -1,4 +1,5 @@
 #include "DevTools/DevelopGui/Panels/TemporalAAInspectorPanel.h"
+#include "DevTools/DevelopGui/ViewControlWidgets.h"
 
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
@@ -319,6 +320,7 @@ namespace gglab
 
 	void TemporalAAInspectorPanel::Draw(DevelopGuiContext& context) noexcept
 	{
+		devtools::DrawViewControlSnapshot(context.m_ViewControl, "view.taa.");
 		if (!context.m_Diagnostics)
 		{
 			ImGui::TextDisabled("Temporal AA diagnostics are unavailable.");

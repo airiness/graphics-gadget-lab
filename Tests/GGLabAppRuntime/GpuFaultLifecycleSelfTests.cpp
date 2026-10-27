@@ -13,6 +13,7 @@
 #include "Parameters/HostViewParameters.h"
 #include "Parameters/ParameterRequest.h"
 #include "Parameters/SessionParameterControl.h"
+#include "Parameters/ViewControlSnapshot.h"
 #include "Parameters/ParameterSourceAdapters.h"
 #include "Lab/LabRuntime.h"
 #include "GGLabFoundation/Hash/Sha256.h"
@@ -2886,6 +2887,8 @@ namespace gglab
 		public:
 			std::function<void()> m_OnShutdown;
 			ApplicationToolingFrameSettings m_Settings;
+			bool m_Open = false;
+			std::optional<ViewControlSnapshot> m_ViewControl;
 			mutable uint32_t m_Captures = 0;
 			void PrepareForShutdown() noexcept override
 			{
@@ -2900,8 +2903,11 @@ namespace gglab
 				++m_Captures;
 				return m_Settings;
 			}
-			bool BeginFrame() noexcept override { return false; }
-			void Draw(const ApplicationToolingFrameContext&) noexcept override {}
+			bool BeginFrame() noexcept override { return m_Open; }
+			void Draw(const ApplicationToolingFrameContext& context) noexcept override
+			{
+				m_ViewControl = context.m_ViewControl ? std::optional(*context.m_ViewControl) : std::nullopt;
+			}
 			void EndFrame(ApplicationToolingFrameEndReason) noexcept override {}
 			RenderPipelineOverlayExtensionBase* GetOverlayExtension() noexcept override { return nullptr; }
 		};
@@ -3037,6 +3043,7 @@ namespace gglab
 					GGLAB_ASSERT_MSG(found != projection.end(), "Every Host view binding is projected.");
 					return *found;
 				};
+			tooling.m_Open = true;
 			GGLAB_UNUSED(tick());
 			const auto& control = *runtime.GetParameterControl();
 			const auto& capture = *runtime.GetFrameCaptureCoordinator();
@@ -3054,6 +3061,21 @@ namespace gglab
 				find(frame->m_HostViewProjection, "view.gtao.radius").m_Source == HostViewValueSource::Content &&
 				find(frame->m_HostViewProjection, "view.exposure.ev100").m_Source == HostViewValueSource::Camera,
 				"Frames record the Host view stamp and layer attribution while parameter tracking stays lazy");
+			checks.Check(tooling.m_ViewControl && !control.IsEnabled() &&
+				tooling.m_ViewControl->m_PlannedFrame.m_Outcome == ViewControlFrameOutcome::Planned &&
+				tooling.m_ViewControl->m_PlannedFrame.m_FrameSerial == frame->m_FrameSerial &&
+				tooling.m_ViewControl->m_Control.m_HostViewRevision == initial &&
+				find(tooling.m_ViewControl->m_HostView, "view.taa.enabled").m_Source == HostViewValueSource::Tooling,
+				"An open tooling frame receives an immutable planned observation without enabling parameter tracking");
+			const auto observationRevision = control.GetParameterRevision();
+			const auto previousSerial = frame->m_FrameSerial;
+			GGLAB_UNUSED(tick());
+			checks.Check(tooling.m_ViewControl->m_PreviousFrame &&
+				tooling.m_ViewControl->m_PreviousFrame->m_FrameSerial == previousSerial &&
+				tooling.m_ViewControl->m_PreviousFrame->m_Outcome == ViewControlFrameOutcome::Submitted &&
+				tooling.m_ViewControl->m_PlannedFrame.m_FrameSerial > previousSerial &&
+				control.GetParameterRevision() == observationRevision && !control.IsEnabled(),
+				"Draw distinguishes the previous submitted frame from the current plan without advancing revisions");
 
 			runtime.EnableParameterControl();
 			const auto discovered = control.DescribeHostView();
@@ -3100,6 +3122,10 @@ namespace gglab
 			GGLAB_UNUSED(tick());
 			checks.Check(capture.GetLastFrameState()->m_Outcome == FrameCaptureFrameOutcome::Aborted,
 				"A frame that ends before submission reports an aborted outcome");
+			GGLAB_UNUSED(tick());
+			checks.Check(tooling.m_ViewControl->m_PreviousFrame &&
+				tooling.m_ViewControl->m_PreviousFrame->m_Outcome == ViewControlFrameOutcome::Aborted,
+				"A skipped frame remains aborted in the next GUI observation rather than being labeled submitted");
 
 			const auto restart = [&]()
 				{
@@ -3114,6 +3140,10 @@ namespace gglab
 			checks.Check(control.GetContentIdentity() != content && control.GetHostViewOverrides().empty() &&
 				control.GetHostViewRevision() == initial + 2,
 				"A content activation that discards Host overrides advances the revision once");
+			checks.Check(tooling.m_ViewControl->m_PreviousFrame &&
+				tooling.m_ViewControl->m_PreviousFrame->m_Control.m_ContentIdentity == content &&
+				tooling.m_ViewControl->m_Control.m_ContentIdentity == control.GetContentIdentity(),
+				"Content replacement preserves the previous frame's own identity instead of relabeling its evidence");
 			restart();
 			checks.Check(control.GetHostViewRevision() == initial + 2,
 				"A content activation without Host overrides keeps the revision");
