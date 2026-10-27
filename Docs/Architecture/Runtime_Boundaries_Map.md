@@ -1,16 +1,11 @@
 # Runtime Boundaries and Render Pass Composition
 Atlas ID: atlas.runtime.composition-boundaries
 
-- Question: where does a new render pass belong, and through which seams does it
-  reach the frame?
 - VerifiedAgainst: `e8d08f13710eb206ea757292293cd327cebdc510`
-- Refresh triggers: pipeline composition entries, the temporal boundary, Public or
-  Private record placement, import and retention rules, or program demand
-  registration change.
 
-This map covers how passes are composed into a frame's RenderGraph. What happens
-after the graph is built is in the [frame execution map](Frame_Execution_Map.md);
-module facts are in the cards listed in the [module catalog](Module_Catalog.md).
+Pipelines compose passes into a frame's RenderGraph. The
+[frame map](Frame_Execution_Map.md) covers execution and settlement; the
+[module catalog](Module_Catalog.md) links interfaces and implementations.
 
 ## Composition
 
@@ -19,9 +14,9 @@ Arrows are calls during graph construction; labels name the Public seam.
 ```mermaid
 flowchart TD
     App[AppRuntime TickFrame] -->|RenderPipelineBase| Recipe[Forward+ recipe: Runtime Private]
-    App -->|RenderPipelineBase| LabPipeline[Lab-owned pipeline: WinApp]
+    App -->|RenderPipelineBase| LabPipeline[Lab-owned pipeline: WinAppHost]
     Recipe --> RuntimePasses[Runtime passes: Runtime Private]
-    Recipe -->|scene extension, post-TAA| Extension[Lab scene extension: WinApp]
+    Recipe -->|scene extension, post-TAA| Extension[Lab scene extension: WinAppHost]
     RuntimePasses --> Graph[RenderGraph builder: Public]
     Extension --> Graph
     LabPipeline --> Graph
@@ -54,19 +49,17 @@ A Runtime pass is a stage of a Runtime recipe:
 
 ## Lab-owned composition
 
-A Lab composes graph work through Public seams only. Two routes exist today:
+A Lab composes graph work through two Public seams:
 
 | Route | Position | Example |
 | --- | --- | --- |
-| Forward+ scene extension, passed as `RenderPipelineForwardPlusCreateInfo::m_SceneExtension` | The current post-TAA entry: called once after the temporal boundary and before transparent shading, writing display color and depth | `NapaVoxelLabSession` → `NapaVoxelRenderExtension` → `NapaVoxelRenderPass` |
+| Forward+ scene extension, passed as `RenderPipelineForwardPlusCreateInfo::m_SceneExtension` | After the temporal boundary and before transparent shading, writing display color and depth | `NapaVoxelLabSession` → `NapaVoxelRenderExtension` → `NapaVoxelRenderPass` |
 | Lab-owned pipeline, a `RenderPipelineBase` installed with `SetRenderPipeline` | The Lab owns the whole graph topology; no Runtime recipe stage runs | `RenderGraphComputeLabSession` |
 
-`RenderPassBase` is optional on both routes; the compute Lab declares its passes
-inline. Neither route can insert a pass between Runtime recipe stages, and a scene
-extension cannot take part in temporal integration yet. The overlay extension that
-runs after post-processing belongs to tooling and is not a Lab route. Lab work
-follows the same declaration, retention and commit rules as Runtime passes and
-registers its programs with the Lab.
+`RenderPassBase` is optional; the compute Lab declares passes inline. The
+post-processing overlay belongs to tooling. Lab work follows the same graph
+declaration, retention and commit rules as Runtime passes and registers its programs
+with the Lab.
 
 ## Program consumption
 
@@ -79,8 +72,6 @@ A pass that uses a new shader program:
    Lab programs in its `LabRegistration::m_ShaderPrograms`.
 4. Loads it through `RenderServices::m_ShaderPrograms` and resolves pipelines through
    `RenderServices::m_PipelineResolver`.
-
-Shader production and artifact publication are outside this map.
 
 ```text
 Anchors:
@@ -99,27 +90,24 @@ ReviewPaths:
 ## Contracts
 Atlas ID: atlas.runtime.composition-contracts
 
-The two rules below cover pass ownership and the lifetime of resources shared with a
-graph. They detail the [ownership](../../AGENTS.md#ownership-and-dependency-boundaries)
-and [RenderGraph](../../AGENTS.md#gpu-shader-and-lab-invariants) rules in AGENTS.md;
-keep both consistent when either changes. Per-interface rules stay in
+Pass and resource ownership follow the
+[dependency](../../AGENTS.md#ownership-and-dependency-boundaries) and
+[RenderGraph](../../AGENTS.md#gpu-shader-and-lab-invariants) rules. Interface contracts are in
 [RenderGraph.h](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderGraph/RenderGraph.h)
 and the pipeline headers.
 
 ### Pass ownership
 
-Decide a pass's owner from what its composition, resources and lifetime require, not
-from whether it could be reused:
+A pass's owner follows its composition, resources and lifetime:
 
 - It is Runtime-owned when the production recipe requires it or must place it, for
   example before the temporal boundary or between Runtime passes; when it reads or
   publishes a Private record that Runtime passes exchange; or when it requires
   participation in a Runtime-owned settlement transaction, such as temporal history.
-- Otherwise it can be Lab-owned and composed through a Public seam. Reuse across Labs
-  does not by itself make a pass Runtime-owned.
-- WinApp never depends on Runtime Private. A Lab that needs a Private record or a
-  position the recipe does not offer asks for a Runtime change: a Runtime pass, a new
-  Public record or a reviewed new seam.
+- Otherwise it can be Lab-owned and composed through a Public seam, including reuse
+  across Labs.
+- WinAppHost consumes Runtime Public interfaces. A Lab that needs an internal recipe
+  position or Private record requires a Runtime pass, a Public record or a new seam.
 
 ### Imported resource ownership
 

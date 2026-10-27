@@ -1,14 +1,9 @@
 # Repository Ownership and Build Map
 Atlas ID: atlas.repository.projects
 
-- Question: which project owns a source file, what does it build against, and
-  where may a consumer include its interfaces?
 - VerifiedAgainst: `48f6226ef04ad528a744f3ae11933469a64b1627`
-- Refresh triggers: solution/project membership, references, imports, include
-  visibility or build-profile conditions change.
 
-The [Atlas overview](README.md) follows a frame. This map follows the eighteen
-first-party projects in [the solution](../../GraphicsGadgetLab.sln). RenderGraph,
+This map follows the projects in [the solution](../../GraphicsGadgetLab.sln). RenderGraph,
 RHI and the native backends are subsystems of `GGLabRuntime`; concrete Labs and
 DevTools belong to `WinAppHost`. Instance ownership is described separately in the
 [frame and content map](Frame_Execution_Map.md).
@@ -43,10 +38,6 @@ The source roots below locate those items.
 inside that test project's intermediate directory. Vendored DirectXTex is a
 separate solution project under `Externals/Vender`, outside this first-party set.
 
-`WinAppTests` owns its runner and cases. It links the host library and selects
-suites with `--suite`; structural checks launch the actual product's
-`--inspect-runtime` entry. Product targets have no test-framework dependency.
-
 ## Declared project references
 
 `A → B` means A declares a `ProjectReference` to B. This selected diagram shows
@@ -69,9 +60,8 @@ flowchart TD
     ShaderToolchainTests -. build compiler .-> ShaderCompiler
 ```
 
-These declarations cover Debug, Develop and Release on x64. Library-reference
-metadata is inherited/omitted except for the explicit values listed after the
-table; this is a declared graph, not an MSBuild-evaluated dependency closure.
+The table lists declared references for Debug, Develop and Release on x64, with
+conditional references and link behavior noted below.
 
 | Declaring project | Library references | Tool/build-order references |
 | --- | --- | --- |
@@ -95,9 +85,6 @@ table; this is a declared graph, not an MSBuild-evaluated dependency closure.
 | `GGLabVulkanQualification` | `GGLabFoundation`, `GGLabRuntime`, `GGLabTestCore`; `ShaderArtifactRuntime` [V], `ShaderToolchainCore` [V] | — |
 
 - **[V]:** the reference has condition `'$(GGLAB_ENABLE_VULKAN)'!='0'`.
-- **Explicit link metadata:** `LinkLibraryDependencies=true` on WinApp/WinAppTests → Runtime,
-  Runtime → DirectXTex, ShaderCompiler → ToolchainCore, and qualification → Runtime
-  and ToolchainCore. The last edge retains [V].
 - **Host library:** every WinAppHost reference has `LinkLibraryDependencies=false`.
   Its archive contains owned objects; the executables link its library dependencies.
 - **Compiler tool:** ToolchainTests → ShaderCompiler has
@@ -109,8 +96,7 @@ table; this is a declared graph, not an MSBuild-evaluated dependency closure.
 
 ## Build profiles and imports
 
-Read conditions with the declaring project and its imports. The relevant profile
-changes are:
+Shared properties and project imports define these build profiles:
 
 | Input | Declared effect and evidence |
 | --- | --- |
@@ -118,13 +104,7 @@ changes are:
 | `GGLAB_ENABLE_VULKAN` | Defaults to 1 in [VulkanImport.props](../../PropertySheets/VulkanImport.props). `!=0` enables SDK inputs, Runtime/WinAppHost Vulkan sources, the host presentation test and the two [V] references. Qualification's Shader-directory/DXC imports and target also require `!=0` |
 | `GGLAB_ARTIFACT_ONLY_RUNTIME` | [WinAppBuildProfile.props](../../PropertySheets/WinAppBuildProfile.props) isolates normal/artifact-only outputs and intermediates for all three Windows host targets. `!=1` includes development Shader startup/process sources and tests; WinApp also retains its conditional Shader/asset deployment imports |
 | `GGLAB_USE_PCH` | WinAppHost owns the PCH and disables it for `=0`; both executables use no PCH. The shared host profile separates no-PCH intermediates within each normal/artifact-only profile |
-| DXC integration | [DxcImport.props](../../PropertySheets/DxcImport.props) and [DxcImport.targets](../../PropertySheets/DxcImport.targets) are paired early/late imports in ToolchainCore, ShaderCompiler, ToolchainTests, integration tests, AppRuntime tests and qualification; qualification retains [V]. Their package imports preserve `Exists(...)` and package checks. WinApp has no DXC import |
-
-The [asset](../../PropertySheets/LinkAssetDirectory.targets) and
-[Shader](../../PropertySheets/LinkShaderDirectory.targets) directory targets also
-check Windows and application-project conditions in their bodies. SDK, package
-and user imports retain their own conditions in the project files; the table
-does not resolve machine-local property values.
+| DXC integration | [DxcImport.props](../../PropertySheets/DxcImport.props) and [DxcImport.targets](../../PropertySheets/DxcImport.targets) serve ToolchainCore, ShaderCompiler, ToolchainTests, integration tests, AppRuntime tests and qualification; qualification retains [V]. WinApp has no DXC import |
 
 ## Public consumption and privileged access
 
@@ -149,20 +129,14 @@ The project include-directory declarations distinguish these cases:
 | `ShaderToolchainCore`, `ShaderCompiler`, `ShaderToolchainTests` | ShaderToolchain/artifact interfaces, without Runtime/RHI implementation access |
 | `GGLabFoundationTests`, `NapaVoxelCoreTests` | The respective library's Public root; Foundation probes use [the generated-header target](../../Projects/GGLabFoundationTests/GGLabFoundationHeaderSelfContainment.targets) |
 
-An include path gives visibility, not source ownership. Runtime implementations
-remain compiled by Runtime; the privileged consumers own their test or
-qualification sources. Module cards describe the supported
+Module cards describe the supported
 [public rendering seam](Modules/Runtime_Rendering.md#render-host-and-settlement)
 and [application interfaces](Modules/Application_Content.md).
 
 ## Review and verification
 
-Compare represented membership and references with the project items, including
-per-item metadata and conditions, then follow the imports for the changed profile.
-Run the [boundary checks](Boundary_And_Drift_Guide.md#checks) for ownership/include
-rules and review map freshness separately with the
-[local refresh procedure](Boundary_And_Drift_Guide.md#refresh-one-affected-entry).
-Executable test commands are in the [CI workflow](../../.github/workflows/build.yml);
+The [maintenance guide](Boundary_And_Drift_Guide.md#checks) lists ownership and map
+checks. Build/test commands are in the [CI workflow](../../.github/workflows/build.yml);
 scripted suites are listed by
 [RunVerification.ps1](../../Tests/Verification/RunVerification.ps1) `-List`.
 

@@ -1,17 +1,11 @@
 # Frame Execution and Settlement
 Atlas ID: atlas.runtime.frame-execution
 
-- Question: what happens to recorded GPU work and dependent CPU state when a frame
-  does not complete successfully?
 - VerifiedAgainst: `fbb5f36a71fbeacb1350ad68458f04e6c3a3b8cd`
-- Refresh triggers: begin/end outcomes, early-return cleanup, participant order,
-  submission feedback, borrowing or GPU-dependent retirement changes.
 
-This map follows the shared AppRuntime frame path and Runtime settlement on DX12 and
-Vulkan, then how content is replaced between frames
-([content transitions](#content-transitions)); the [overview](README.md) gives the
-project layers. Module facts for these paths are in the cards listed in the
-[module catalog](Module_Catalog.md).
+AppRuntime builds frames and coordinates content; Runtime records, submits and
+settles them on DX12 or Vulkan. The [overview](README.md) shows project layers;
+the [module catalog](Module_Catalog.md) links interfaces and implementations.
 
 ## One successful frame
 
@@ -77,23 +71,15 @@ aborted inside EndFrame instead.
 | Settlement | Meaning and retention |
 | --- | --- |
 | `Submitted` | EndFrame completed the frame transaction. Its fence orders the frame's work; it does not mean the GPU has finished |
-| `Failed` | EndFrame returned Fatal. Work may have executed fully, partly or not at all, so capture fails and temporal history is invalidated. A valid fence still retains resources; an absent fence means no work is outstanding, not that nothing ran |
+| `Failed` | EndFrame returned Fatal. Work may have executed fully, partly or not at all. Capture fails and temporal history is invalidated. A returned fence retains resources; an absent fence certifies no outstanding work |
 | `Discarded` | Renderer took its abort path and the recorded commands never execute. Capture requests that did not name this frame are requeued. Graph resources retire on the abort fence, or on the last submitted fence when the abort submitted nothing |
 | `CompletionUnknown` | Neither path could verify completion. Renderer is poisoned, no further frame begins, and GPU-visible owners stay retained without ordinary graph retirement |
 
-Three backend details affect these outcomes:
-
-- A submission can succeed and presentation still fail. DX12 can fail Present;
-  Vulkan can fail presentation or closing the frame's descriptor arena. These
-  frames are Failed with a real fence.
-- A backend can also abort inside its own EndFrame after a recording or
-  upload-publication failure. The result still comes back through EndFrame, so the
-  frame settles as Failed although its commands never ran: the outcome follows the
-  Renderer path, not GPU execution.
-- Abort does not execute the recorded commands, but the native abort can still
-  submit work, for example to signal retirement or release an acquired swapchain
-  image. Vulkan's abort may need a fence or a checked idle wait, so an abort can
-  also end in CompletionUnknown.
+Presentation or descriptor-arena closure can fail after submission, producing
+Failed with a real fence. An EndFrame Fatal result remains Failed even when the
+backend aborted its commands.
+Native abort may submit retirement or swapchain-release work, so its completion
+can require a fence or checked idle wait and can remain unknown.
 
 AppRuntime decides separately whether to keep running:
 
@@ -103,9 +89,6 @@ AppRuntime decides separately whether to keep running:
 | Early return after validation or graph compilation failure | Discarded | Stops |
 | EndFrame returns Completed | Submitted | Sends submitted feedback |
 | EndFrame returns Fatal | Failed, CompletionUnknown, Discarded (unrecorded frame) or Submitted ([late enqueue](#settlement-contract-failures)) | Stops without feedback |
-
-When refreshing this map, recheck three easily missed paths first: the late-enqueue
-exception, both native abort paths and unverified teardown.
 
 ```text
 Anchors:
@@ -121,16 +104,11 @@ ReviewPaths:
 ## Content transitions
 Atlas ID: atlas.application.content-transitions
 
-- Question: what happens to a Demo or Lab session, and to what it owns, when content
-  is switched, rebuilt or shut down?
 - VerifiedAgainst: `fbb5f36a71fbeacb1350ad68458f04e6c3a3b8cd`
-- Refresh triggers: transition requests or safe points, preparation, activation,
-  retirement, parameter impacts or shutdown order change.
 
-AppRuntime hosts content at two levels: `DemoManager` switches Demos, and the
-`LabRuntime` inside the Lab host Demo switches Lab sessions. Both replace content
-the same way; the [Content retirement](#content-retirement) rule says how long each
-state keeps what it owns. Arrows are state changes.
+`DemoManager` switches Demos; `LabRuntime` inside the Lab host Demo switches Lab
+sessions. Both use the following states and the
+[content retirement](#content-retirement) rule.
 
 ```mermaid
 stateDiagram-v2
@@ -164,13 +142,11 @@ Inside a Lab session:
 | Parameter with `RebuildScene`, `RecreatePipeline` or `RestartSession` impact | A new pending session; never in place |
 | `Immediate` parameter | In place, through `ApplyImmediateParameters` and the session's `ViewRenderProfile` |
 
-A Lab tunes a Runtime pass through its `ViewRenderProfile`, which resolves into
-per-view settings each frame, as `GTAOLabSession` does for GTAO. Strict parameter
-batches and their receipts are coordinated by
-[SessionParameterControl](../../Sources/GGLabAppRuntime/Parameters/SessionParameterControl.h).
-Napa shows session-owned GPU work: `OnFrameSubmitted` records the last-use graphics
-fence, and `Update` polls completion to retire replaced mesh sets. Preparation
-uploads go through the asset upload scheduler.
+A Lab tunes Runtime passes through its per-view `ViewRenderProfile`.
+[SessionParameterControl](../../Sources/GGLabAppRuntime/Parameters/SessionParameterControl.h)
+coordinates parameter batches and receipts. Napa's session-owned mesh sets record
+their last-use fence in `OnFrameSubmitted` and retire through completion polling;
+preparation uploads belong to the asset upload scheduler.
 
 ```text
 Anchors:
@@ -187,10 +163,8 @@ ReviewPaths:
 ## Contracts
 Atlas ID: atlas.runtime.frame-contracts
 
-The rules below cover cross-participant coordination that no single interface
-owns. They detail the GPU and lifetime rules in
-[AGENTS.md](../../AGENTS.md#gpu-shader-and-lab-invariants); keep both consistent
-when either changes. Per-interface rules stay in
+These cross-participant rules accompany
+[AGENTS.md](../../AGENTS.md#gpu-shader-and-lab-invariants). Interface contracts are in
 [RGDeferredCommit.h](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderGraph/RGDeferredCommit.h),
 [RHIContext.h](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RHI/RHIContext.h),
 [RHIDevice.h](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RHI/RHIDevice.h)
@@ -208,17 +182,13 @@ Each frame derives one private outcome from the Renderer path and the RHI result
 | Discarded | Live/bake atmosphere → IBL scheduler → last submitted fence → temporal transaction → graph retirement → Runtime capture |
 | CompletionUnknown | Poison → fail/retain Runtime capture → retain live/bake atmosphere → abort IBL scheduling → abort/invalidate temporal state; no ordinary graph retirement |
 
-These are the implementation's baseline orders, also stated in comments inside
-`Renderer::SettleFrame`; change the table and those comments together. One
-placement has a recorded reason: on the abort path, capture releases its
-unsubmitted taps last, after the RHI abort has recorded the frame's resource uses.
-Review ownership and fence dependencies before changing or unifying participant order.
+On the abort path, capture releases unsubmitted taps after the RHI abort has
+recorded the frame's resource uses.
 
 Plain CPU deferred commits run only for Submitted: once each, in enqueue order,
 after every participant. Every other outcome discards them, and so does
-frame-lifetime cleanup. This keeps recorded work from publishing CPU state before
-its submission is accepted, while GPU-dependent owners are still retained when the
-transaction fails. Passes must not reproduce this policy.
+frame-lifetime cleanup. Renderer owns this publication boundary; GPU-dependent
+owners follow the outcome's retention rules.
 
 ### Settlement contract failures
 
@@ -232,13 +202,10 @@ is rejected and marks the list failed. The outcome depends on when it arrives:
 | After the RHI accepted the submission, before the commits start | Settled as Submitted | Discarded | Fatal with the real submitted fence |
 | While the commits run | Settled as Submitted | The original batch runs once | Fatal with the real submitted fence |
 
-After an accepted submission nothing is rolled back or settled again. A failure
-seen before the commits start cancels them; once they start, the original batch
-completes rather than publishing only part of it. In both post-submission rows the
-layers disagree: Runtime participants settled as Submitted, yet EndFrame returns
-Fatal, so AppRuntime stops without sending submitted feedback. An enqueue after
-EndFrame returns is outside this contract, because `RGExecuteContext` must not be
-retained beyond execution.
+After accepted submission, Runtime participants keep their Submitted settlement.
+A failure before CPU commits start cancels the batch; once started, the original
+batch finishes once. EndFrame returns Fatal and AppRuntime stops without submitted
+feedback. `RGExecuteContext` is execution-scoped.
 
 ### Teardown ownership
 
@@ -275,8 +242,6 @@ ReviewPaths:
 Atlas ID: atlas.application.content-retirement
 
 - VerifiedAgainst: `fbb5f36a71fbeacb1350ad68458f04e6c3a3b8cd`
-- Refresh triggers: retirement fences, pending-content release, session-owned GPU
-  work or failure handling change.
 
 Content is a Demo or a Lab session together with what it owns: its World, cameras,
 pipeline, asset interests and fence-dependent work.
