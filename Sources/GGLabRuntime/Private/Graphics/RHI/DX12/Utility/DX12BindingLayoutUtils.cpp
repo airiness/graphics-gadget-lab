@@ -47,6 +47,7 @@ namespace gglab
 		[[nodiscard]] bool CanUseRootDescriptor(const RHIBindingSlotDesc& slot) noexcept
 		{
 			return slot.m_Count == 1 && (slot.m_Type == RHIBindingType::ConstantBuffer ||
+				slot.m_Type == RHIBindingType::AccelerationStructure ||
 				slot.m_Type == RHIBindingType::ReadOnlyStorageBuffer ||
 				slot.m_Type == RHIBindingType::ReadWriteStorageBuffer);
 		}
@@ -94,10 +95,12 @@ namespace gglab
 		}
 		for (uint32_t index = 0; index < rhiDesc.m_SlotCount; ++index)
 		{
-			if (rhiDesc.m_Slots[index].m_Type == RHIBindingType::AccelerationStructure)
+			const auto& slot = rhiDesc.m_Slots[index];
+			if (slot.m_Type == RHIBindingType::AccelerationStructure &&
+				(slot.m_Count != 1 || slot.m_Space != 0 || slot.m_SizeInBytes != 0 ||
+					slot.m_BufferBindingMode != RHIBufferBindingMode::Fixed))
 			{
-				// Device enablement does not establish AS resource or command-binding support.
-				outDesc.m_Error = DX12BindingLayoutError::AccelerationStructureBindingsUnavailable;
+				outDesc.m_Error = DX12BindingLayoutError::InvalidAccelerationStructureBinding;
 				return;
 			}
 		}
@@ -142,6 +145,7 @@ namespace gglab
 						slot.m_Binding, slot.m_Space, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, visibility);
 					break;
 				case RHIBindingType::ReadOnlyStorageBuffer:
+				case RHIBindingType::AccelerationStructure:
 					rootParameter.InitAsShaderResourceView(
 						slot.m_Binding, slot.m_Space, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, visibility);
 					break;

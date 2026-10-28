@@ -21,6 +21,16 @@ namespace gglab
 	class PipelineCache;
 	struct RHIPipelineSystemSnapshot;
 
+	struct DX12PipelineIdentity
+	{
+		DX12PipelineState* m_PipelineState = nullptr;
+		DX12RootSignature* m_RootSignature = nullptr;
+		RHIBindingLayoutHandle m_BindingLayout{};
+		bool m_IsCompute = false;
+
+		[[nodiscard]] bool operator==(const DX12PipelineIdentity&) const noexcept = default;
+	};
+
 	class DX12PipelineSystem final : public RHIPipelineSystem
 	{
 	public:
@@ -44,6 +54,8 @@ namespace gglab
 		void Clear() noexcept override;
 
 		std::optional<uint32_t> GetStorageBufferParameterIndex(RHIPipelineHandle pipeline, uint32_t binding, uint32_t space) const noexcept;
+		[[nodiscard]] bool IsAccelerationStructureParameter(
+			RHIPipelineHandle pipeline, uint32_t parameterIndex) const noexcept;
 		bool ResolveGraphicsPipeline(RHIPipelineHandle pipeline,
 			DX12PipelineState*& outPipelineState,
 			DX12RootSignature*& outRootSignature,
@@ -73,6 +85,13 @@ namespace gglab
 			ShaderHash128 m_HullShaderHash{};
 			ShaderHash128 m_GeometryShaderHash{};
 			ShaderHash128 m_ComputeShaderHash{};
+
+			[[nodiscard]] DX12PipelineIdentity GetIdentity() const noexcept
+			{
+				return { m_PipelineState, m_RootSignature,
+					m_Type == PipelineType::Graphics ? m_GraphicsDesc.m_BindingLayout : m_ComputeDesc.m_BindingLayout,
+					m_Type == PipelineType::Compute };
+			}
 		};
 
 		struct BindingLayoutBinding
@@ -80,6 +99,7 @@ namespace gglab
 			RHIBindingLayoutHandle m_Handle{};
 			DX12RootSignature* m_RootSignature = nullptr;
 			std::string m_DebugName;
+			uint64_t m_NativeRootSignatureIndex = UINT64_MAX;
 			std::array<RHIBindingSlotDesc, RHIBindingLayoutDesc::MaxSlots> m_Slots{};
 			std::array<std::string, RHIBindingLayoutDesc::MaxSlots> m_SlotDebugNames{};
 			uint32_t m_SlotCount = 0;
@@ -87,6 +107,7 @@ namespace gglab
 		};
 
 		DX12RootSignature* ResolveBindingLayout(RHIBindingLayoutHandle layout) const noexcept;
+		uint64_t GetNativeRootSignatureIndex(RHIBindingLayoutHandle layout) const noexcept;
 		RHIPipelineHandle RegisterGraphicsPipeline(const PipelineBinding& binding,
 			const RHIGraphicsPipelineCreateInfo& createInfo) noexcept;
 		RHIPipelineHandle RegisterComputePipeline(const PipelineBinding& binding,

@@ -191,6 +191,8 @@ ReviewPaths:
   - Sources/GGLabRuntime/Private/Graphics/RHI/Vulkan/VulkanContext.cpp
   - Sources/GGLabRuntime/Private/Graphics/Resource/TransientResourcePool.cpp
   - Sources/GGLabRuntime/Private/Graphics/RHI/RHIAccelerationStructure.cpp
+  - Sources/GGLabRuntime/Private/Graphics/RHI/DX12/DX12AccelerationStructureManager.cpp
+  - Sources/GGLabRuntime/Private/Graphics/RHI/Vulkan/VulkanAccelerationStructureManager.cpp
   - Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RHI/RHIAccelerationStructure.h
   - Tests/GGLabRuntime/RayQueryContractSelfTests.cpp
 ```

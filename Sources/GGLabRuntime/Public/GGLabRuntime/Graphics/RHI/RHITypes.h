@@ -94,10 +94,12 @@ namespace gglab
 		Copy = 1ull << 7,
 		Resolve = 1ull << 8,
 		Present = 1ull << 9,
+		AccelerationStructureBuild = 1ull << 10,
 		AllGraphics =
 		DrawIndirect | IndexInput | VertexShader | PixelShader | RenderTarget | DepthStencil,
 		AllShaders = VertexShader | PixelShader | ComputeShader,
-		All = AllGraphics | ComputeShader | Copy | Resolve | Present,
+		// All command stages supported by the device, including optional AS builds.
+		All = AllGraphics | ComputeShader | Copy | Resolve | Present | AccelerationStructureBuild,
 	};
 	GGLAB_ENUM_FLAGS(RHIStage);
 
@@ -117,6 +119,8 @@ namespace gglab
 		ConstantBuffer = 1ull << 10,
 		IndirectArgument = 1ull << 11,
 		Present = 1ull << 12,
+		AccelerationStructureRead = 1ull << 13,
+		AccelerationStructureWrite = 1ull << 14,
 	};
 	GGLAB_ENUM_FLAGS(RHIAccess);
 

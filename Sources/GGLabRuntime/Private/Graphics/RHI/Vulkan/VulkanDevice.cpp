@@ -1,4 +1,5 @@
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
+#include "Graphics/RHI/Vulkan/VulkanAccelerationStructureManager.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/RHI/Vulkan/VulkanResultClassification.h"
 #include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
@@ -701,6 +702,7 @@ namespace gglab
 		// this device only borrows).
 		if (m_MemAllocator != VK_NULL_HANDLE)
 		{
+			m_AccelerationStructures.reset();
 			m_ResourceManager.Finalize();
 			m_DescriptorManager.Finalize();
 			vmaDestroyAllocator(m_MemAllocator);

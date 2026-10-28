@@ -108,10 +108,11 @@ namespace gglab
 		for (uint32_t slotIndex = 0; slotIndex < desc.m_SlotCount; ++slotIndex)
 		{
 			const RHIBindingSlotDesc& slot = desc.m_Slots[slotIndex];
-			if (slot.m_Type == RHIBindingType::AccelerationStructure)
+			if (slot.m_Type == RHIBindingType::AccelerationStructure &&
+				(slot.m_Count != 1 || slot.m_Space != 0 || slot.m_SizeInBytes != 0 ||
+					slot.m_BufferBindingMode != RHIBufferBindingMode::Fixed))
 			{
-				// Keep logical capability enablement separate from AS resource/binding support.
-				plan.m_Error = VulkanBindingLayoutError::AccelerationStructureBindingsUnavailable;
+				plan.m_Error = VulkanBindingLayoutError::InvalidAccelerationStructureBinding;
 				return plan;
 			}
 			if (slot.m_Type == RHIBindingType::Unknown)
@@ -315,6 +316,18 @@ namespace gglab
 	RHIBindingLayoutHandle VulkanPipelineSystem::CreateBindingLayout(
 		const RHIBindingLayoutDesc& desc) noexcept
 	{
+		if (desc.m_SlotCount > RHIBindingLayoutDesc::MaxSlots)
+		{
+			return {};
+		}
+		for (uint32_t index = 0; index < desc.m_SlotCount; ++index)
+		{
+			if (desc.m_Slots[index].m_Type == RHIBindingType::AccelerationStructure &&
+				!m_Device->GetRayQueryCapabilities().m_Enabled)
+			{
+				return {};
+			}
+		}
 		if (!m_Device->RequireOwnerThread("VulkanPipelineSystem::CreateBindingLayout"))
 		{
 			return {};

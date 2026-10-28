@@ -4,6 +4,9 @@
 #include "GGLabRuntime/Graphics/RHI/RHIAccelerationStructure.h"
 #include "Graphics/RHI/DX12/Utility/DX12BindingLayoutUtils.h"
 #include "Graphics/RHI/DX12/DX12RayQuerySupport.h"
+#include "Graphics/RHI/DX12/DX12PipelineSystem.h"
+#include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
+#include "Graphics/RHI/AccelerationStructureStore.h"
 #if GGLAB_ENABLE_VULKAN
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
 #include "Graphics/RHI/Vulkan/VulkanRayQuerySupport.h"
@@ -21,6 +24,31 @@ namespace gglab
 {
 	namespace
 	{
+		void RunDX12PipelineIdentityTests(SelfTestContext& context) noexcept
+		{
+			for (const bool compute : { false, true })
+			{
+				const DX12PipelineIdentity identity{
+					.m_BindingLayout = { 0, 1 }, .m_IsCompute = compute };
+				auto other = identity;
+				other.m_BindingLayout = { 1, 1 };
+				context.Check(identity != other,
+					"Pipeline identity distinguishes logical layouts even with equal native identities");
+				other.m_BindingLayout = { 0, 2 };
+				context.Check(identity != other,
+					"Pipeline identity retains the binding-layout generation");
+				other = identity;
+				other.m_IsCompute = !compute;
+				context.Check(identity != other,
+					"Pipeline identity distinguishes graphics and compute bindings");
+			}
+			context.Check(Test(RHIStage::All, RHIStage::AccelerationStructureBuild) &&
+				ToD3D12BarrierSync(RHIStage::All) == D3D12_BARRIER_SYNC_ALL &&
+				ToD3D12BarrierSync(RHIStage::AccelerationStructureBuild) ==
+					D3D12_BARRIER_SYNC_BUILD_RAYTRACING_ACCELERATION_STRUCTURE,
+				"All includes AS builds while DX12 retains explicit and universal synchronization scopes");
+		}
+
 		constexpr RHIASBuildLimits Limits{
 			.m_MaxPrimitiveCount = 1024,
 			.m_MaxInstanceCount = 1024,
@@ -390,10 +418,13 @@ namespace gglab
 			const auto desc = composed.m_Layout->BuildRHIDesc("Ray query contract");
 			DX12BindingLayoutBuildResult dx12{};
 			BuildDX12RootSignatureDesc(desc, dx12);
-			context.Check(!dx12.IsValid() &&
-				dx12.m_Error == DX12BindingLayoutError::AccelerationStructureBindingsUnavailable &&
-				dx12.m_RootParameterCount == 0,
-				"DX12 rejects native TLAS layouts before interpreting them as ordinary SRVs");
+			context.Check(dx12.IsValid() && std::ranges::any_of(
+				std::span(dx12.m_RootParameters.data(), dx12.m_RootParameterCount), [](const auto& parameter)
+				{
+					return parameter.ParameterType == D3D12_ROOT_PARAMETER_TYPE_SRV &&
+						parameter.Descriptor.ShaderRegister == 8 && parameter.Descriptor.RegisterSpace == 0;
+				}),
+				"DX12 lowers checked fixed TLAS slots as root SRVs");
 			RHIBindingLayoutDesc oversized{};
 			oversized.m_SlotCount = RHIBindingLayoutDesc::MaxSlots + 1;
 			BuildDX12RootSignatureDesc(oversized, dx12);
@@ -401,15 +432,40 @@ namespace gglab
 				"Native layout preflight cannot scan beyond the fixed slot array");
 #if GGLAB_ENABLE_VULKAN
 			const auto vulkan = BuildVulkanBindingLayoutPlan(desc, 16 * 1024);
-			context.Check(!vulkan.IsValid() &&
-				vulkan.m_Error == VulkanBindingLayoutError::AccelerationStructureBindingsUnavailable,
-				"Vulkan rejects TLAS layouts until AS resources and command bindings are implemented");
+			context.Check(vulkan.IsValid() && std::ranges::any_of(
+				std::span(vulkan.m_Set0Bindings.data(), vulkan.m_Set0BindingCount), [](const auto& binding)
+				{
+					return binding.m_BindingType == RHIBindingType::AccelerationStructure &&
+						binding.m_DescriptorType == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+				}), "Vulkan keeps fixed TLAS descriptors distinct from storage-buffer descriptors");
 #endif
 		}
 	}
 
 	void RunRayQueryContractSelfTests(SelfTestContext& context) noexcept
 	{
+		RunDX12PipelineIdentityTests(context);
+		RHIAccelerationStructureStore store;
+		auto bottom = std::make_shared<RHIAccelerationStructureBackingBase>();
+		std::weak_ptr<RHIAccelerationStructureBackingBase> weakBottom = bottom;
+		const auto bottomHandle = store.Insert(bottom);
+		auto top = std::make_shared<RHIAccelerationStructureBackingBase>();
+		top->m_Type = RHIAccelerationStructureType::TopLevel;
+		top->m_BottomLevels.push_back(bottom);
+		const auto topHandle = store.Insert(top);
+		bottom.reset();
+		context.Check(store.Destroy(bottomHandle) && !store.Resolve(bottomHandle) && !weakBottom.expired(),
+			"TLAS backing retains its BLAS after logical handle destruction");
+		const auto replacement = store.Insert(std::make_shared<RHIAccelerationStructureBackingBase>());
+		context.Check(replacement.Index() == bottomHandle.Index() && replacement.Generation() != bottomHandle.Generation() &&
+			!store.Resolve(bottomHandle) && !store.Destroy(bottomHandle),
+			"AS slot reuse cannot resolve or destroy a replacement through the old generation");
+		auto recorded = store.Resolve(topHandle);
+		top.reset();
+		context.Check(store.Destroy(topHandle) && !weakBottom.expired(),
+			"A recording lease retains the TLAS and its transitive native BLAS dependencies");
+		recorded.reset();
+		context.Check(weakBottom.expired(), "The last recording or submission lease releases retired AS backing");
 		static_assert(!std::is_convertible_v<RHIAccelerationStructureHandle, RHIBufferHandle>);
 		static_assert(!std::is_convertible_v<RHIBufferHandle, RHIAccelerationStructureHandle>);
 		RunCapabilityTests(context);

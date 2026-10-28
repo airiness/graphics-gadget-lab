@@ -70,12 +70,16 @@ namespace gglab
 	{
 		constexpr uint32_t SetsPerPool = 256;
 		constexpr uint32_t DescriptorsPerPool = SetsPerPool * RHIBindingLayoutDesc::MaxSlots;
-		const std::array sizes
+		std::vector<VkDescriptorPoolSize> sizes
 		{
 			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, DescriptorsPerPool },
 			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, DescriptorsPerPool },
 			VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, DescriptorsPerPool },
 		};
+		if (m_Device->GetRayQueryCapabilities().m_Enabled)
+		{
+			sizes.push_back({ VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, DescriptorsPerPool });
+		}
 		const VkDescriptorPoolCreateInfo info{
 			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
 			.maxSets = SetsPerPool,
@@ -294,8 +298,25 @@ namespace gglab
 		}
 
 		const VulkanBindingLayoutPlan& plan = bindingLayout.GetPlan();
+		for (uint32_t index = 0; index < plan.m_Set0BindingCount; ++index)
+		{
+			const auto& required = plan.m_Set0Bindings[index];
+			if (required.m_BindingType == RHIBindingType::AccelerationStructure &&
+				std::ranges::none_of(bufferBindings, [&required](const VulkanSet0BufferBinding& binding)
+					{
+						return binding.m_LogicalParameterIndex == required.m_LogicalParameterIndex &&
+							binding.m_DescriptorType == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR &&
+							binding.m_AccelerationStructure != VK_NULL_HANDLE;
+					}))
+			{
+				GGLAB_LOG_GRAPHICS_ERROR("Vulkan rejected a descriptor snapshot with an unbound TLAS.");
+				return VK_NULL_HANDLE;
+			}
+		}
 		std::vector<VkDescriptorBufferInfo> bufferInfos;
 		std::vector<VkWriteDescriptorSet> writes;
+		std::vector<VkWriteDescriptorSetAccelerationStructureKHR> accelerationWrites;
+		accelerationWrites.reserve(bufferBindings.size());
 		bufferInfos.reserve(bufferBindings.size());
 		writes.reserve(bufferBindings.size());
 		for (const VulkanSet0BufferBinding& source : bufferBindings)
@@ -309,11 +330,26 @@ namespace gglab
 				});
 			if (binding == bindings.end() ||
 				binding->m_DescriptorType != source.m_DescriptorType ||
-				source.m_Buffer == VK_NULL_HANDLE || source.m_Range == 0)
+				(source.m_DescriptorType == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR ?
+					source.m_AccelerationStructure == VK_NULL_HANDLE :
+					source.m_Buffer == VK_NULL_HANDLE || source.m_Range == 0))
 			{
 				GGLAB_LOG_GRAPHICS_ERROR(
 					"Vulkan set-0 snapshot rejected an invalid fixed-buffer binding.");
 				return VK_NULL_HANDLE;
+			}
+			if (source.m_DescriptorType == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR)
+			{
+				accelerationWrites.push_back({ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
+					nullptr, 1, &source.m_AccelerationStructure });
+				VkWriteDescriptorSet write{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+				write.pNext = &accelerationWrites.back();
+				write.dstSet = descriptorSet;
+				write.dstBinding = binding->m_Binding;
+				write.descriptorCount = 1;
+				write.descriptorType = binding->m_DescriptorType;
+				writes.push_back(write);
+				continue;
 			}
 			bufferInfos.push_back({
 				.buffer = source.m_Buffer,

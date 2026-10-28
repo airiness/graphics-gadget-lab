@@ -20,9 +20,17 @@ namespace gglab
 
 	D3D12_RESOURCE_FLAGS ToD3D12ResourceFlags(RHIBufferUsage usage) noexcept
 	{
-		return Test(usage, RHIBufferUsage::UnorderedAccess) ?
-			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS :
-			D3D12_RESOURCE_FLAG_NONE;
+		D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE;
+		if (Test(usage, RHIBufferUsage::UnorderedAccess | RHIBufferUsage::AccelerationStructureScratch |
+			RHIBufferUsage::AccelerationStructureStorage))
+		{
+			flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+		}
+		if (Test(usage, RHIBufferUsage::AccelerationStructureStorage))
+		{
+			flags |= D3D12_RESOURCE_FLAG_RAYTRACING_ACCELERATION_STRUCTURE;
+		}
+		return flags;
 	}
 
 	std::optional<D3D12_CLEAR_VALUE> ToD3D12ClearValue(

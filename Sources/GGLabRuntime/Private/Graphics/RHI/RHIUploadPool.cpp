@@ -23,6 +23,14 @@ namespace gglab
 
 	RHIUploadPool::~RHIUploadPool() noexcept
 	{
+		ReclaimCompleted();
+		if (!m_RetainedResources.empty())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR_ALWAYS(
+				"Submission backing retained without verified completion at upload-pool teardown.");
+			// Preserve native objects as well as their allocations on an unverified teardown.
+			GGLAB_UNUSED(new std::vector<RetainedResources>(std::move(m_RetainedResources)));
+		}
 		size_t leakedPageCount = 0;
 		for (const auto& page : m_Pages)
 		{
@@ -54,6 +62,11 @@ namespace gglab
 
 	void RHIUploadPool::ReclaimCompleted() noexcept
 	{
+		std::erase_if(m_RetainedResources, [this](const RetainedResources& resources)
+			{
+				return !resources.m_Quarantined &&
+					m_Device->IsFencePointCompleted(resources.m_Fence);
+			});
 		for (auto& page : m_Pages)
 		{
 			if (page.m_Fence.IsValid() && m_Device->IsFencePointCompleted(page.m_Fence))
@@ -75,6 +88,7 @@ namespace gglab
 
 	void RHIUploadPool::ReleaseQuarantinedPages() noexcept
 	{
+		m_RetainedResources.clear();
 		for (auto& page : m_Pages)
 		{
 			page.m_Quarantined = false;
@@ -391,6 +405,10 @@ namespace gglab
 			page.m_Fence = fence;
 			page.m_Leased = false;
 		}
+		if (!m_RetainedResources.empty())
+		{
+			m_Pool->m_RetainedResources.push_back({ std::move(m_RetainedResources), fence, false });
+		}
 		m_State = State::Submitted;
 		++m_Pool->m_Statistics.m_SubmittedBatchCount;
 		FinishStatistics();
@@ -410,6 +428,10 @@ namespace gglab
 			auto& page = m_Pool->m_Pages[lease.m_PageIndex];
 			page.m_Quarantined = true;
 			page.m_Leased = false;
+		}
+		if (!m_RetainedResources.empty())
+		{
+			m_Pool->m_RetainedResources.push_back({ std::move(m_RetainedResources), {}, true });
 		}
 		m_State = State::Quarantined;
 		++m_Pool->m_Statistics.m_SubmittedBatchCount;
@@ -441,8 +463,20 @@ namespace gglab
 		{
 			m_Pool->m_Pages[lease.m_PageIndex].m_Leased = false;
 		}
+		m_RetainedResources.clear();
 		m_State = State::Cancelled;
 		++m_Pool->m_Statistics.m_CancelledBatchCount;
 		FinishStatistics();
+	}
+
+	bool RHIUploadBatch::RetainForSubmission(std::shared_ptr<void> resource) noexcept
+	{
+		if (!resource || !AcceptsUploadOnCurrentThread())
+		{
+			Fail();
+			return false;
+		}
+		m_RetainedResources.push_back(std::move(resource));
+		return true;
 	}
 }

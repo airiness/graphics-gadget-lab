@@ -789,6 +789,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Diagnostics\DX12SnapshotProviders.cpp">
       <Filter>Private\Graphics\RHI\DX12\Diagnostics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12AccelerationStructureManager.cpp">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Buffer.cpp">
       <Filter>Private\Graphics\RHI\DX12</Filter>
     </ClCompile>
@@ -905,6 +908,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\Diagnostics\VulkanSnapshotProviders.cpp">
       <Filter>Private\Graphics\RHI\Vulkan\Diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanAccelerationStructureManager.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanAdapter.cpp">
       <Filter>Private\Graphics\RHI\Vulkan</Filter>
@@ -1451,6 +1457,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Resource\RenderResourceRegistry.h">
       <Filter>Private\Graphics\Resource</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\AccelerationStructureStore.h">
+      <Filter>Private\Graphics\RHI</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Cache\DX12DescriptorCache.h">
       <Filter>Private\Graphics\RHI\DX12\Cache</Filter>
     </ClInclude>
@@ -1498,6 +1507,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Diagnostics\DX12SnapshotProviders.h">
       <Filter>Private\Graphics\RHI\DX12\Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12AccelerationStructureManager.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Buffer.h">
       <Filter>Private\Graphics\RHI\DX12</Filter>
@@ -1612,6 +1624,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\Diagnostics\VulkanSnapshotProviders.h">
       <Filter>Private\Graphics\RHI\Vulkan\Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanAccelerationStructureManager.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanAdapter.h">
       <Filter>Private\Graphics\RHI\Vulkan</Filter>

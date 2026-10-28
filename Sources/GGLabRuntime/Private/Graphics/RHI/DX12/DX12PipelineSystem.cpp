@@ -1,4 +1,5 @@
 #include "Graphics/RHI/DX12/DX12PipelineSystem.h"
+#include "Graphics/RHI/DX12/DX12Device.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/RHI/DX12/Cache/DX12PSOCache.h"
@@ -17,6 +18,37 @@
 
 namespace gglab
 {
+	bool DX12PipelineSystem::IsAccelerationStructureParameter(
+		RHIPipelineHandle pipeline, uint32_t parameterIndex) const noexcept
+	{
+		std::shared_lock lock(m_Mutex);
+		if (!pipeline.IsValid() || pipeline.Generation() != m_PipelineGeneration || pipeline.Index() >= m_Pipelines.size())
+		{
+			return false;
+		}
+		const auto& entry = m_Pipelines[pipeline.Index()];
+		const auto layout = entry.m_Type == PipelineType::Graphics ?
+			entry.m_GraphicsDesc.m_BindingLayout : entry.m_ComputeDesc.m_BindingLayout;
+		if (!layout.IsValid() || layout.Generation() != m_BindingLayoutGeneration || layout.Index() >= m_BindingLayouts.size())
+		{
+			return false;
+		}
+		const auto& desc = m_BindingLayouts[layout.Index()];
+		uint32_t parameter = 0;
+		for (uint32_t index = 0; index < desc.m_SlotCount; ++index)
+		{
+			const auto& slot = desc.m_Slots[index];
+			if (slot.m_Type == RHIBindingType::Unknown || IsBindlessBindingType(slot.m_Type))
+			{
+				continue;
+			}
+			if (parameter++ == parameterIndex)
+			{
+				return slot.m_Type == RHIBindingType::AccelerationStructure && slot.m_Count == 1;
+			}
+		}
+		return false;
+	}
 	namespace
 	{
 		D3D12_SHADER_BYTECODE ToDX12Bytecode(const ShaderBytecode& bytecode) noexcept
@@ -55,26 +87,35 @@ namespace gglab
 	RHIBindingLayoutHandle DX12PipelineSystem::CreateBindingLayout(
 		const RHIBindingLayoutDesc& desc) noexcept
 	{
+		if (desc.m_SlotCount > RHIBindingLayoutDesc::MaxSlots)
+		{
+			return {};
+		}
+		for (uint32_t index = 0; index < desc.m_SlotCount; ++index)
+		{
+			if (desc.m_Slots[index].m_Type == RHIBindingType::AccelerationStructure &&
+				!m_Device->GetRayQueryCapabilities().m_Enabled)
+			{
+				return {};
+			}
+		}
 		const RootSignatureHandle rootSignature = m_RootSignatureCache->GetOrCreate(desc);
 		if (!rootSignature.IsValid())
 		{
 			return {};
 		}
-		const RHIBindingLayoutHandle handle(
-			static_cast<RHIBindingLayoutHandle::IndexType>(rootSignature.m_Id.Value()),
-			m_BindingLayoutGeneration);
 		DX12RootSignature* nativeRootSignature =
 			m_RootSignatureCache->GetDX12RootSignature(rootSignature.m_Id);
+		RHIBindingLayoutHandle handle;
 		{
 			std::unique_lock lock(m_Mutex);
-			if (m_BindingLayouts.size() <= handle.Index())
-			{
-				m_BindingLayouts.resize(static_cast<size_t>(handle.Index()) + 1);
-			}
-			auto& binding = m_BindingLayouts[handle.Index()];
-			binding = {};
+			// Logical AS and ordinary SRV layouts may share a native root signature.
+			// Their identities and typed binding contracts must remain distinct.
+			handle = { static_cast<uint32_t>(m_BindingLayouts.size()), m_BindingLayoutGeneration };
+			auto& binding = m_BindingLayouts.emplace_back();
 			binding.m_Handle = handle;
 			binding.m_RootSignature = nativeRootSignature;
+			binding.m_NativeRootSignatureIndex = rootSignature.m_Id.Value();
 			binding.m_DebugName = desc.m_DebugName ? desc.m_DebugName : "";
 			binding.m_SlotCount = std::min(desc.m_SlotCount, RHIBindingLayoutDesc::MaxSlots);
 			binding.m_Registered = true;
@@ -113,7 +154,7 @@ namespace gglab
 		}
 
 		const RootSignatureHandle nativeRoot{
-			.m_Id = RootSignatureID{ createInfo.m_Desc.m_BindingLayout.Index() },
+			.m_Id = RootSignatureID{ GetNativeRootSignatureIndex(createInfo.m_Desc.m_BindingLayout) },
 			.m_RootSignature = rootSignature->Get(),
 		};
 		DX12GraphicsPipelineShaderInputs shaders{};
@@ -147,7 +188,7 @@ namespace gglab
 		}
 
 		ComputePipelineDesc desc{};
-		desc.m_RootSignatureId = RootSignatureID{ createInfo.m_Desc.m_BindingLayout.Index() };
+		desc.m_RootSignatureId = RootSignatureID{ GetNativeRootSignatureIndex(createInfo.m_Desc.m_BindingLayout) };
 		desc.m_RootSignature = rootSignature->Get();
 		desc.m_ComputeShader = ToDX12Bytecode(createInfo.m_ComputeShader);
 		const ComputePSOKey key = desc.MakeKey(ToDX12ShaderHash(createInfo.m_ComputeShader));
@@ -266,11 +307,19 @@ namespace gglab
 	DX12RootSignature* DX12PipelineSystem::ResolveBindingLayout(
 		RHIBindingLayoutHandle layout) const noexcept
 	{
-		if (!layout.IsValid() || layout.Generation() != m_BindingLayoutGeneration)
+		std::shared_lock lock(m_Mutex);
+		if (!layout.IsValid() || layout.Generation() != m_BindingLayoutGeneration || layout.Index() >= m_BindingLayouts.size())
 		{
 			return nullptr;
 		}
-		return m_RootSignatureCache->GetDX12RootSignature(RootSignatureID{ layout.Index() });
+		return m_BindingLayouts[layout.Index()].m_RootSignature;
+	}
+
+	uint64_t DX12PipelineSystem::GetNativeRootSignatureIndex(RHIBindingLayoutHandle layout) const noexcept
+	{
+		std::shared_lock lock(m_Mutex);
+		return layout.IsValid() && layout.Generation() == m_BindingLayoutGeneration && layout.Index() < m_BindingLayouts.size() ?
+			m_BindingLayouts[layout.Index()].m_NativeRootSignatureIndex : UINT64_MAX;
 	}
 
 	RHIPipelineHandle DX12PipelineSystem::RegisterGraphicsPipeline(
@@ -311,12 +360,12 @@ namespace gglab
 			return {};
 		}
 		std::unique_lock lock(m_Mutex);
+		const DX12PipelineIdentity identity = binding.GetIdentity();
 		for (uint32_t index = 0; index < m_Pipelines.size(); ++index)
 		{
 			const auto& existing = m_Pipelines[index];
-			if (existing.m_PipelineState == binding.m_PipelineState &&
-				existing.m_RootSignature == binding.m_RootSignature &&
-				existing.m_Type == binding.m_Type)
+			// Native PSOs may alias; the logical pipeline must retain its typed layout.
+			if (existing.GetIdentity() == identity)
 			{
 				return RHIPipelineHandle(index, m_PipelineGeneration);
 			}

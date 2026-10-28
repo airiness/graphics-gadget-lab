@@ -1,4 +1,5 @@
 #include "Graphics/RHI/DX12/DX12Device.h"
+#include "Graphics/RHI/DX12/DX12AccelerationStructureManager.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Platform/Win/HResult.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
@@ -119,6 +120,7 @@ namespace gglab
 
 		RetireCompletedRHIResources();
 		SetDescriptorManager(nullptr);
+		m_AccelerationStructures.reset();
 		m_ResourceManager.Finalize();
 
 		m_MemAllocator.Reset();

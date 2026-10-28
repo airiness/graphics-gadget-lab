@@ -15,6 +15,7 @@
 
 namespace gglab
 {
+	class VulkanAccelerationStructureManager;
 	class VulkanTimelineFence;
 
 	struct VulkanQueueSelection final
@@ -222,6 +223,15 @@ namespace gglab
 		RHISamplerHandle CreateSampler(const RHISamplerDesc& desc) noexcept override;
 		void DestroyTexture(RHITextureHandle texture) noexcept override;
 		void DestroyBuffer(RHIBufferHandle buffer) noexcept override;
+		[[nodiscard]] std::optional<RHIASBuildSizes> QueryAccelerationStructureBuildSizes(
+			const RHIASBuildInputs& inputs) noexcept override;
+		[[nodiscard]] RHIAccelerationStructureHandle CreateAccelerationStructure(
+			const RHIAccelerationStructureDesc& desc) noexcept override;
+		void DestroyAccelerationStructure(RHIAccelerationStructureHandle handle) noexcept override;
+		VulkanAccelerationStructureManager& GetAccelerationStructureManager() noexcept;
+		bool IsAlive(RHIAccelerationStructureHandle handle) const noexcept override;
+		RHIAllocationFacts QueryAccelerationStructureAllocationFacts(
+			RHIAccelerationStructureHandle handle) const noexcept override;
 		void DestroyTextureView(RHITextureViewHandle view) noexcept override;
 		void DestroyBufferView(RHIBufferViewHandle view) noexcept override;
 		void DestroySampler(RHISamplerHandle sampler) noexcept override;
@@ -318,5 +328,6 @@ namespace gglab
 		VmaAllocator m_MemAllocator = VK_NULL_HANDLE;
 		VulkanDescriptorManager m_DescriptorManager;
 		VulkanResourceManager m_ResourceManager;
+		std::unique_ptr<VulkanAccelerationStructureManager> m_AccelerationStructures;
 	};
 }

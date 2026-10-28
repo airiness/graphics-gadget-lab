@@ -26,7 +26,7 @@ namespace gglab
 		InvalidDescriptorCount,
 		InvalidInlineConstantSize,
 		DuplicateNativeBinding,
-		AccelerationStructureBindingsUnavailable,
+		InvalidAccelerationStructureBinding,
 	};
 
 	struct VulkanSet0BindingPlan

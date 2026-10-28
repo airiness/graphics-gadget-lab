@@ -106,6 +106,15 @@ namespace gglab
 		GGLAB_ASSERT_MSG(
 			m_Device->GetMemAllocator() != nullptr, "DX12 memory allocator is not initialized.");
 
+		if ((Test(desc.m_Usage, RHIBufferUsage::AccelerationStructureInput |
+			RHIBufferUsage::AccelerationStructureStorage | RHIBufferUsage::AccelerationStructureScratch) &&
+			!m_Device->GetRayQueryCapabilities().m_Enabled) ||
+			(Test(desc.m_Usage, RHIBufferUsage::AccelerationStructureStorage | RHIBufferUsage::AccelerationStructureScratch) &&
+				desc.m_MemoryUsage != RHIMemoryUsage::GpuOnly))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("DX12 rejected buffer usages whose AS capability or memory contract is unavailable.");
+			return {};
+		}
 		if (desc.m_SizeInBytes == 0)
 		{
 			++m_Diagnostics.m_CreateFailureCount;

@@ -87,6 +87,11 @@ namespace gglab
 			DX12CommandList* commandList) noexcept;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12GraphicsCommandContext);
 		~DX12GraphicsCommandContext() override = default;
+		void TrackAccelerationStructureUse(RHIAccelerationStructureHandle handle) noexcept override;
+		bool BuildAccelerationStructure(RHIAccelerationStructureHandle destination,
+			const RHIASBuildInputs& inputs, const RHIASBufferRange& scratch) noexcept override;
+		void AccelerationStructureBarrier(RHIAccelerationStructureHandle handle,
+			RHIResourceState before, RHIResourceState after) noexcept override;
 
 		RHICommandContextHandle GetHandle() const noexcept override
 		{
@@ -213,6 +218,13 @@ namespace gglab
 			DX12PipelineSystem* pipelineSystem) noexcept;
 		GGLAB_DELETE_COPYABLE_DEFAULT_MOVABLE(DX12ComputeCommandContext);
 		~DX12ComputeCommandContext() override = default;
+		void TrackAccelerationStructureUse(RHIAccelerationStructureHandle handle) noexcept override;
+		bool BuildAccelerationStructure(RHIAccelerationStructureHandle destination,
+			const RHIASBuildInputs& inputs, const RHIASBufferRange& scratch) noexcept override;
+		void AccelerationStructureBarrier(RHIAccelerationStructureHandle handle,
+			RHIResourceState before, RHIResourceState after) noexcept override;
+		bool SetAccelerationStructure(uint32_t parameterIndex,
+			RHIAccelerationStructureHandle handle) noexcept override;
 
 		RHICommandContextHandle GetHandle() const noexcept override
 		{
@@ -303,6 +315,8 @@ namespace gglab
 
 	private:
 		std::unique_ptr<DX12CommandContext> m_OwnedBackend;
+		uint32_t m_RequiredAccelerationStructures = 0;
+		uint32_t m_BoundAccelerationStructures = 0;
 		DX12CommandContext* m_Backend = nullptr;
 		DX12PipelineSystem* m_PipelineSystem = nullptr;
 		DX12RootSignature* m_CurrentRootSignature = nullptr;

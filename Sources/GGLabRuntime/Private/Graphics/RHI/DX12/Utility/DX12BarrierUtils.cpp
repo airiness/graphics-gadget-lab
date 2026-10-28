@@ -106,6 +106,10 @@ namespace gglab
 		}
 
 		D3D12_BARRIER_SYNC sync = D3D12_BARRIER_SYNC_NONE;
+		if (Test(stages, RHIStage::AccelerationStructureBuild))
+		{
+			sync |= D3D12_BARRIER_SYNC_BUILD_RAYTRACING_ACCELERATION_STRUCTURE;
+		}
 		if (Test(stages, RHIStage::DrawIndirect))
 		{
 			sync |= D3D12_BARRIER_SYNC_EXECUTE_INDIRECT;
@@ -157,6 +161,14 @@ namespace gglab
 		}
 
 		D3D12_BARRIER_ACCESS barrierAccess = D3D12_BARRIER_ACCESS_COMMON;
+		if (Test(access, RHIAccess::AccelerationStructureRead))
+		{
+			barrierAccess |= D3D12_BARRIER_ACCESS_RAYTRACING_ACCELERATION_STRUCTURE_READ;
+		}
+		if (Test(access, RHIAccess::AccelerationStructureWrite))
+		{
+			barrierAccess |= D3D12_BARRIER_ACCESS_RAYTRACING_ACCELERATION_STRUCTURE_WRITE;
+		}
 		if (Test(access, RHIAccess::ShaderResource))
 		{
 			barrierAccess |= D3D12_BARRIER_ACCESS_SHADER_RESOURCE;

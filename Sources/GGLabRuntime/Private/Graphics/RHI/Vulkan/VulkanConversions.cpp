@@ -163,6 +163,7 @@ namespace gglab
 			return VulkanShaderRegisterClass::ConstantBuffer;
 		case RHIBindingType::ReadOnlyStorageBuffer:
 		case RHIBindingType::SampledTexture:
+		case RHIBindingType::AccelerationStructure:
 			return VulkanShaderRegisterClass::ShaderResource;
 		case RHIBindingType::ReadWriteStorageBuffer:
 		case RHIBindingType::StorageTexture:
@@ -178,6 +179,8 @@ namespace gglab
 	{
 		switch (type)
 		{
+		case RHIBindingType::AccelerationStructure:
+			return VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
 		case RHIBindingType::ConstantBuffer:
 			return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		case RHIBindingType::ReadOnlyStorageBuffer:

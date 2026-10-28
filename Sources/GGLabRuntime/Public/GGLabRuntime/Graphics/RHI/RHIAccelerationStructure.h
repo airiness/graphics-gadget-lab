@@ -136,6 +136,15 @@ namespace gglab
 		uint64_t m_ScratchSizeInBytes = 0;
 	};
 
+	struct RHIAccelerationStructureDesc
+	{
+		// A TLAS retains one immutable BLAS set. Replacing that set requires a new
+		// TLAS; full builds may change transforms while preserving those references.
+		RHIAccelerationStructureType m_Type = RHIAccelerationStructureType::BottomLevel;
+		uint64_t m_SizeInBytes = 0;
+		const char* m_DebugName = nullptr;
+	};
+
 	enum class RHIASValidationError : uint8_t
 	{
 		None,

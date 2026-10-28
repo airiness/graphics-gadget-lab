@@ -2505,6 +2505,57 @@ namespace gglab
 
 		void RunUploadStorageContractTests(SelfTestContext& context) noexcept
 		{
+			for (uint32_t scenario = 0; scenario < 4; ++scenario)
+			{
+				RecordingDevice retentionDevice;
+				retentionDevice.m_UseControlledFenceCompletion = true;
+				RHIUploadPool retentionPool(retentionDevice);
+				auto retainedBatch = retentionPool.BeginBatch();
+				RHIUploadWriter retentionWriter;
+				retainedBatch->Attach(retentionWriter);
+				auto nativeBacking = std::make_shared<uint32_t>(73);
+				std::weak_ptr<uint32_t> weakBacking = nativeBacking;
+				context.Check(retentionWriter.RetainForSubmission(nativeBacking),
+					"A recording batch pins native backing before any stream can be submitted");
+				nativeBacking.reset();
+				retainedBatch->Detach(retentionWriter);
+				if (scenario == 0)
+				{
+					retainedBatch->Cancel();
+					context.Check(weakBacking.expired(), "Cancellation without accepted work releases native backing immediately");
+					continue;
+				}
+				context.Check(retainedBatch->Publish(), "Submission backing does not require an upload-page allocation");
+				retainedBatch->RecordAcceptedSubmission();
+				if (scenario == 1)
+				{
+					context.Check(retainedBatch->Submitted({ { 0, 1 }, 7 }), "Fenced backing joins the complete submission point");
+					retainedBatch.reset();
+					retentionDevice.m_CompletedFenceValue = 6;
+					retentionPool.ReclaimCompleted();
+					context.Check(!weakBacking.expired(), "Native backing survives batch destruction and an earlier fence value");
+					retentionDevice.m_CompletedFenceValue = 7;
+					retentionPool.ReclaimCompleted();
+					context.Check(weakBacking.expired(), "Verified completion releases the submission's native backing");
+				}
+				else
+				{
+					retainedBatch->SubmittedWithoutCompletionFence();
+					retainedBatch.reset();
+					retentionDevice.m_UseControlledFenceCompletion = false;
+					retentionPool.ReclaimCompleted();
+					context.Check(!weakBacking.expired(), "Completion-unknown backing cannot be reclaimed by unrelated completed fences");
+					if (scenario == 2)
+					{
+						retentionPool.ReleaseQuarantinedAfterVerifiedIdle();
+					}
+					else
+					{
+						retentionPool.ReleaseQuarantinedAfterDeviceLoss();
+					}
+					context.Check(weakBacking.expired(), "Verified idle or confirmed device loss ends native-backing quarantine");
+				}
+			}
 			RecordingDevice device;
 			device.m_PassConstantsEnabled = true;
 			device.m_UseControlledFenceCompletion = true;

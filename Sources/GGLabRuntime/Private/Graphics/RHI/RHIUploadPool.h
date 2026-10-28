@@ -70,6 +70,13 @@ namespace gglab
 		std::thread::id m_OwnerThread = std::this_thread::get_id();
 		RHIUploadConfig m_Config{};
 		std::vector<Page> m_Pages;
+		struct RetainedResources
+		{
+			std::vector<std::shared_ptr<void>> m_Resources;
+			RHIFencePoint m_Fence{};
+			bool m_Quarantined = false;
+		};
+		std::vector<RetainedResources> m_RetainedResources;
 		uint64_t m_CapacityInBytes = 0;
 		RHIUploadStatistics m_Statistics{};
 	};
@@ -92,6 +99,7 @@ namespace gglab
 			std::span<const std::byte> bytes, uint32_t strideInBytes) noexcept;
 		// Freezes allocation and flushes all leased writes before queue submission.
 		[[nodiscard]] bool Publish() noexcept;
+		[[nodiscard]] bool RetainForSubmission(std::shared_ptr<void> resource) noexcept;
 		// Called once the native submit of a stream that may read the batch was issued.
 		// From then on the batch can no longer be cancelled.
 		void RecordAcceptedSubmission() noexcept { m_HasAcceptedSubmission = true; }
@@ -137,6 +145,7 @@ namespace gglab
 		RHIUploadPool* m_Pool = nullptr;
 		RHIUploadWriter* m_Writer = nullptr;
 		std::vector<PageLease> m_Leases;
+		std::vector<std::shared_ptr<void>> m_RetainedResources;
 		RHIUploadBatchStatistics m_Statistics{};
 		RHIUploadBatchId m_Id = 0;
 		State m_State = State::Recording;

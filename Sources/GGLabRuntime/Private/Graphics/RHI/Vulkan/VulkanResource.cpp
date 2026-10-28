@@ -78,8 +78,8 @@ namespace gglab
 		VmaAllocationInfo allocationInfoStorage{};
 		// The create call uses the caller's description so its pNext chain
 		// stays intact for the call.
-		const VkResult createResult = vmaCreateBuffer(m_Allocator, &createInfo.m_CreateInfo,
-			&allocationCreateInfo, &m_Buffer, &m_Allocation, &allocationInfoStorage);
+		const VkResult createResult = vmaCreateBufferWithAlignment(m_Allocator, &createInfo.m_CreateInfo,
+			&allocationCreateInfo, createInfo.m_MinimumAlignment, &m_Buffer, &m_Allocation, &allocationInfoStorage);
 		if (createResult != VK_SUCCESS)
 		{
 			GGLAB_LOG_GRAPHICS_ERROR(

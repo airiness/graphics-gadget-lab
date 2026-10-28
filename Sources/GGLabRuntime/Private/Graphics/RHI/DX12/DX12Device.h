@@ -17,6 +17,7 @@
 
 namespace gglab
 {
+	class DX12AccelerationStructureManager;
 	class DX12QueueSystem;
 	class DX12DescriptorManager;
 	class DX12DescriptorFreeListAllocator;
@@ -107,6 +108,15 @@ namespace gglab
 
 		void DestroyTexture(RHITextureHandle texture) noexcept override;
 		void DestroyBuffer(RHIBufferHandle buffer) noexcept override;
+		[[nodiscard]] std::optional<RHIASBuildSizes> QueryAccelerationStructureBuildSizes(
+			const RHIASBuildInputs& inputs) noexcept override;
+		[[nodiscard]] RHIAccelerationStructureHandle CreateAccelerationStructure(
+			const RHIAccelerationStructureDesc& desc) noexcept override;
+		void DestroyAccelerationStructure(RHIAccelerationStructureHandle handle) noexcept override;
+		DX12AccelerationStructureManager& GetAccelerationStructureManager() noexcept;
+		bool IsAlive(RHIAccelerationStructureHandle handle) const noexcept override;
+		RHIAllocationFacts QueryAccelerationStructureAllocationFacts(
+			RHIAccelerationStructureHandle handle) const noexcept override;
 		void DestroyTextureView(RHITextureViewHandle view) noexcept override;
 		void DestroyBufferView(RHIBufferViewHandle view) noexcept override;
 		void DestroySampler(RHISamplerHandle sampler) noexcept override;
@@ -199,6 +209,7 @@ namespace gglab
 		RHIDeviceIdentity m_DeviceIdentity;
 
 		DX12ResourceManager m_ResourceManager;
+		std::unique_ptr<DX12AccelerationStructureManager> m_AccelerationStructures;
 		DX12QueueSystem* m_QueueSystem = nullptr;
 		DX12DescriptorManager* m_DescriptorManager = nullptr;
 		std::unique_ptr<DX12DescriptorCache> m_DescriptorCache;
