@@ -53,10 +53,11 @@ function Test-IsExcludedPath {
     return $false
 }
 
-function Test-IsBytePinnedGeneratedFixture {
+function Test-IsBytePinnedFixture {
     param(
         [string]$Path,
-        [string]$FixtureDirectory
+        [string]$FixtureDirectory,
+        [string]$NativeGICaptureDirectory
     )
 
     # Imported ShaderGraphCore emissions are byte-pinned fixtures. Their
@@ -65,7 +66,7 @@ function Test-IsBytePinnedGeneratedFixture {
     $fullPath = [System.IO.Path]::GetFullPath($Path)
     $directory = [System.IO.Path]::GetDirectoryName($fullPath)
 
-    return [System.IO.Path]::GetExtension($fullPath).Equals(
+    $isGeneratedShader = [System.IO.Path]::GetExtension($fullPath).Equals(
         ".hlsli",
         [System.StringComparison]::OrdinalIgnoreCase
     ) -and [string]::Equals(
@@ -73,6 +74,18 @@ function Test-IsBytePinnedGeneratedFixture {
         $FixtureDirectory,
         [System.StringComparison]::OrdinalIgnoreCase
     )
+
+    # Native capture logs and bundle manifests retain their recorded mixed/LF bytes.
+    # Sidecars, indexes and authored documentation keep the normal text policy.
+    $captureParent = [System.IO.Path]::GetDirectoryName($directory)
+    $name = [System.IO.Path]::GetFileName($fullPath)
+    $isNativeCapture = [string]::Equals(
+        $captureParent, $NativeGICaptureDirectory,
+        [System.StringComparison]::OrdinalIgnoreCase
+    ) -and ($name.Equals('output.txt', [System.StringComparison]::OrdinalIgnoreCase) -or
+        $name.EndsWith('.capture-bundle.json', [System.StringComparison]::OrdinalIgnoreCase))
+
+    return $isGeneratedShader -or $isNativeCapture
 }
 
 function Convert-BytesToUtf8WithoutBomCRLF {
@@ -145,6 +158,9 @@ $Root = [System.IO.Path]::GetFullPath($Root)
 $bytePinnedGeneratedFixtureDirectory = [System.IO.Path]::GetFullPath(
     (Join-Path $Root "Shaders\Tests\Generated")
 )
+$bytePinnedNativeGICaptureDirectory = [System.IO.Path]::GetFullPath(
+    (Join-Path $Root "Assets\Media\GGLabCoastalRetreat\GI\Daylight")
+)
 
 Write-Host "Root: $Root"
 Write-Host "Mode: " -NoNewline
@@ -160,7 +176,8 @@ $files = Get-ChildItem -Path $Root -Recurse -File |
         ($TargetExtensions -contains $_.Extension.ToLowerInvariant() -or
             $TargetFileNames -contains $_.Name.ToLowerInvariant()) -and
         -not (Test-IsExcludedPath $_.FullName) -and
-        -not (Test-IsBytePinnedGeneratedFixture $_.FullName $bytePinnedGeneratedFixtureDirectory)
+        -not (Test-IsBytePinnedFixture $_.FullName $bytePinnedGeneratedFixtureDirectory `
+            $bytePinnedNativeGICaptureDirectory)
     }
 
 $total = 0

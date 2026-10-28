@@ -28,6 +28,7 @@ $catalog = @(
         @{ path = 'Scripts/Verification/ValidateGIInputs.py'; arguments = @('--self-test') },
         @{ path = 'Scripts/Verification/ValidateGIInputs.py'; arguments = @() }) },
     @{ name = 'verification-support'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/TestVerificationSupport.ps1' }) },
+    @{ name = 'source-normalization'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/TestSourceNormalization.ps1' }) },
     @{ name = 'nonfinite-sites'; group = 'contracts'; steps = @(
         @{ path = 'Scripts/GenerateNonFiniteSites.py'; arguments = @('--check') },
         @{ path = 'Scripts/ValidateNonFiniteSites.py'; arguments = @('--self-test') },
