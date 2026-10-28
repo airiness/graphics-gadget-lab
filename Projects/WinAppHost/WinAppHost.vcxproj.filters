@@ -198,6 +198,9 @@
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\PostProcessLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\RayQueryLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\RenderGraphComputeLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
@@ -528,6 +531,9 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\PostProcessLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\RayQueryLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\RenderGraphComputeLabSession.h">

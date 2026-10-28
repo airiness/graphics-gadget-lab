@@ -149,6 +149,12 @@ namespace gglab::shader_programs
 		"gglab.shader.nonfinite-scan", "compute.buffer", ShaderStage::Compute };
 	inline const ShaderProgramRef RenderGraphComputeWrite{
 		"gglab.shader.render-graph-compute", "compute.write", ShaderStage::Compute };
+	inline const ShaderProgramRef RayQueryCompute{
+		"gglab.shader.ray-query", "compute.trace", ShaderStage::Compute };
+	inline const ShaderProgramRef RayQueryVertex{
+		"gglab.shader.ray-query", "vertex.preview", ShaderStage::Vertex };
+	inline const ShaderProgramRef RayQueryPixel{
+		"gglab.shader.ray-query", "pixel.preview", ShaderStage::Pixel };
 	inline const ShaderProgramRef RenderGraphComputeReadWrite{
 		"gglab.shader.render-graph-compute", "compute.read-write", ShaderStage::Compute };
 	inline const ShaderProgramRef RenderGraphComputeNonFiniteProbe{

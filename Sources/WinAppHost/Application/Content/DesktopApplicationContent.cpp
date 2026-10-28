@@ -14,6 +14,7 @@
 #include "Application/Lab/Sessions/NapaVoxelLabSession.h"
 #include "Application/Lab/Sessions/PostProcessLabSession.h"
 #include "Application/Lab/Sessions/RenderGraphComputeLabSession.h"
+#include "Application/Lab/Sessions/RayQueryLabSession.h"
 #include "Application/Lab/Sessions/SampleableDepthLabSession.h"
 #include "Application/Lab/Sessions/SurfaceProbeLabSession.h"
 #include "Application/Lab/Sessions/TemporalAALabSession.h"
@@ -84,6 +85,9 @@ namespace gglab
 			},
 		};
 		registration.m_Labs = {
+			{ RayQueryLabSession::GetDescriptor(), &RayQueryLabSession::Create,
+				{ shader_programs::RayQueryCompute, shader_programs::RayQueryVertex, shader_programs::RayQueryPixel,
+					shader_programs::NonFiniteScanClearCompute } },
 			{ CullingLabSession::GetDescriptor(), &CullingLabSession::Create },
 			{ MiniPBRGridLabSession::GetDescriptor(), &MiniPBRGridLabSession::Create },
 			{ TextureContractLabSession::GetDescriptor(), &TextureContractLabSession::Create },

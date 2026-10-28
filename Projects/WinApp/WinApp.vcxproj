@@ -251,6 +251,7 @@
     <FxCompile Include="..\..\Shaders\Passes\PassNonFiniteScan.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassPhysicalSky.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassPostProcessPreview.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassRayQuery.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassRenderGraphComputeSmoke.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassShadowMapPreview.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassSkybox.hlsl" />
