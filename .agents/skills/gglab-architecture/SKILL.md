@@ -26,6 +26,15 @@ When a change may affect an Atlas entry, run the helper in the
 [guide's checks](../../../Docs/Architecture/Boundary_And_Drift_Guide.md#checks) and
 review each listed entry against source and contracts.
 
+## Maintain the Atlas
+
+Keep Atlas edits to necessary repository-local navigation and durable architecture:
+ownership, Public interfaces, implementation entries, governing contracts and test
+routes. A review trigger alone does not require a documentation change when the
+existing entry remains accurate. Keep implementation progress, construction
+history, detailed test coverage/results, benchmarks and optional design rationale
+outside the Atlas. Test names and source routes may stay in the Atlas.
+
 ## Expand and continue
 
 Read an adjacent module only to resolve a concrete ownership, lifetime,
