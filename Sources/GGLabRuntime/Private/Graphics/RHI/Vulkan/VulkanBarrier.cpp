@@ -83,6 +83,11 @@ namespace gglab
 	VkAccessFlags2 ToVulkanAccessFlags(RHIAccess access) noexcept
 	{
 		VkAccessFlags2 result = VK_ACCESS_2_NONE;
+		if (Test(access, RHIAccess::AccelerationStructureScratch))
+		{
+			result |= VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR |
+				VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+		}
 		if (Test(access, RHIAccess::AccelerationStructureRead))
 		{
 			result |= VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR;
@@ -223,18 +228,8 @@ namespace gglab
 			return std::nullopt;
 		}
 
-		const auto accessFor = [](RHIResourceState state)
-			{
-				if (state.m_Stages == RHIStage::AccelerationStructureBuild &&
-					state.m_Access == RHIAccess::UnorderedAccess)
-				{
-					return VkAccessFlags2{ VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR |
-						VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR };
-				}
-				return ToVulkanAccessFlags(state.m_Access);
-			};
-		const VkAccessFlags2 sourceAccess = accessFor(barrier.m_Before);
-		const VkAccessFlags2 destinationAccess = accessFor(barrier.m_After);
+		const VkAccessFlags2 sourceAccess = ToVulkanAccessFlags(barrier.m_Before.m_Access);
+		const VkAccessFlags2 destinationAccess = ToVulkanAccessFlags(barrier.m_After.m_Access);
 		return VkBufferMemoryBarrier2{
 			.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2,
 			.srcStageMask = IncludeInputAssemblyStages(

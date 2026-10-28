@@ -2,6 +2,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
 #include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
 #include "GGLabRuntime/Graphics/RHI/RHIAccelerationStructure.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGResourceUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12BindingLayoutUtils.h"
 #include "Graphics/RHI/DX12/DX12RayQuerySupport.h"
 #include "Graphics/RHI/DX12/DX12PipelineSystem.h"
@@ -310,6 +311,15 @@ namespace gglab
 			context.Check(ValidateRHIASScratch(scratch, buffer, sizes, Limits).m_Error ==
 				RHIASValidationError::InvalidMemoryUsage,
 				"Batch upload storage cannot be repurposed as GPU-written scratch");
+			for (const auto stages : { RHIStage::AccelerationStructureBuild, RHIStage::All,
+				RHIStage::AccelerationStructureBuild | RHIStage::ComputeShader })
+			{
+				const auto state = ToRHIResourceState(RGBufferAccess::AccelerationStructureScratch, stages);
+				context.Check(state.m_Access == RHIAccess::AccelerationStructureScratch &&
+					HasUavAccess(state) &&
+					ToD3D12BarrierAccess(state.m_Access) == D3D12_BARRIER_ACCESS_UNORDERED_ACCESS,
+					"DX12 scratch keeps ordered storage semantics and native UAV access for every stage scope");
+			}
 		}
 
 		void RunBindingTests(SelfTestContext& context) noexcept

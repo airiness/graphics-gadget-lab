@@ -121,6 +121,7 @@ namespace gglab
 		Present = 1ull << 12,
 		AccelerationStructureRead = 1ull << 13,
 		AccelerationStructureWrite = 1ull << 14,
+		AccelerationStructureScratch = 1ull << 15,
 	};
 	GGLAB_ENUM_FLAGS(RHIAccess);
 

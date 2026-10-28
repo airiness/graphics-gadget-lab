@@ -185,7 +185,7 @@ namespace gglab
 		{
 			barrierAccess |= D3D12_BARRIER_ACCESS_DEPTH_STENCIL_WRITE;
 		}
-		if (Test(access, RHIAccess::UnorderedAccess))
+		if (Test(access, RHIAccess::UnorderedAccess | RHIAccess::AccelerationStructureScratch))
 		{
 			barrierAccess |= D3D12_BARRIER_ACCESS_UNORDERED_ACCESS;
 		}

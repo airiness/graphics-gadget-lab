@@ -1607,7 +1607,7 @@ namespace gglab
 				"DrawIndirect,AccelerationStructureBuild,IndexInput,VertexShader,PixelShader,ComputeShader,RenderTarget,DepthStencil,Copy,Resolve,Present");
 			CheckGraphEnumIds<RHITextureAspect>(context, "Color,Depth,Stencil");
 			CheckGraphEnumIds<RHIAccess>(context,
-				"Common,ShaderResource,RenderTarget,DepthStencilRead,DepthStencilWrite,UnorderedAccess,AccelerationStructureRead,AccelerationStructureWrite,CopySource,CopyDest,VertexBuffer,IndexBuffer,ConstantBuffer,IndirectArgument,Present");
+				"Common,ShaderResource,RenderTarget,DepthStencilRead,DepthStencilWrite,UnorderedAccess,AccelerationStructureRead,AccelerationStructureWrite,AccelerationStructureScratch,CopySource,CopyDest,VertexBuffer,IndexBuffer,ConstantBuffer,IndirectArgument,Present");
 			CheckGraphEnumIds<RHILayout>(context,
 				"Unknown,Common,ShaderResource,RenderTarget,DepthStencilRead,DepthStencilWrite,UnorderedAccess,CopySource,CopyDest,Present,Undefined");
 			context.Check(diagnostics::RGFlagsId(RHIStage::VertexShader | RHIStage::PixelShader) ==

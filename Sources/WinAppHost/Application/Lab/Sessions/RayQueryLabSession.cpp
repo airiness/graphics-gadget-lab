@@ -398,7 +398,12 @@ namespace gglab
 								GGLAB_UNUSED(builder.Read(resources.m_Bottom, RGAccelerationStructureAccess::BuildRead));
 								builder.WriteInPlace(resources.m_Top, RGAccelerationStructureAccess::BuildWrite);
 							}
-							builder.WriteInPlace(resources.m_Scratch[index], RGBufferAccess::AccelerationStructureScratch);
+							// Exercise scratch semantics with universal and mixed stage scopes.
+							const auto scratchStages = index == 0 ?
+								RHIStage::All :
+								RHIStage::AccelerationStructureBuild | RHIStage::ComputeShader;
+							builder.WriteInPlace(resources.m_Scratch[index],
+								RGBufferAccess::AccelerationStructureScratch, scratchStages);
 						},
 						[this, index](RGExecuteContext& context, EmptyData&)
 						{

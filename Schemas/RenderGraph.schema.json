@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gglab.render-graph",
-  "title": "GGLab render graph frame export v1-v7",
+  "title": "GGLab render graph frame export v1-v8",
   "type": "object",
   "required": ["schema", "schemaVersion", "mode", "frameSerial", "frame", "submission", "observation", "compile"],
   "properties": {
     "schema": { "const": "gglab.render-graph" },
-    "schemaVersion": { "enum": [1, 2, 3, 4, 5, 6, 7] },
+    "schemaVersion": { "enum": [1, 2, 3, 4, 5, 6, 7, 8] },
     "mode": { "enum": ["full", "summary"] },
     "frameSerial": { "type": "integer", "minimum": 1 },
     "frame": {
@@ -115,6 +115,28 @@
     }
   },
   "allOf": [
+    {
+      "if": { "properties": { "schemaVersion": { "maximum": 7 } } },
+      "then": {
+        "properties": {
+          "compile": {
+            "properties": {
+              "resources": { "items": { "properties": {
+                "initialState": { "$ref": "#/$defs/legacyState" },
+                "finalState": { "$ref": "#/$defs/legacyState" }
+              } } },
+              "passes": { "items": { "properties": {
+                "preBarriers": { "items": { "$ref": "#/$defs/legacyBarrier" } },
+                "postBarriers": { "items": { "$ref": "#/$defs/legacyBarrier" } }
+              } } }
+            }
+          },
+          "execution": { "properties": {
+            "resolvedBarriers": { "items": { "$ref": "#/$defs/legacyBarrier" } }
+          } }
+        }
+      }
+    },
     {"if": {"properties": {"schemaVersion": {"maximum": 6}}}, "then": {"properties": {"compile": {"properties": {"resources": {"items": {"properties": {"type": {"enum": ["Texture", "Buffer"]}}}}, "versions": {"items": {"properties": {"type": {"enum": ["Texture", "Buffer"]}}}}}}}}},
     {
       "if": { "properties": { "mode": { "const": "full" } } },
@@ -139,7 +161,7 @@
     {"if": {"properties": {"schemaVersion": {"const": 3}}}, "then": {"properties": {"observation": {"properties": {"nonFiniteWatch": {"const": true}}}, "execution": {"properties": {"observationNodes": {"contains": {"properties": {"kind": {"const": "NonFiniteScan"}}}, "items": {"properties": {"kind": {"enum": ["ResourceExport", "NonFiniteScan"]}}}}}}}}},
     {"if": {"properties": {"schemaVersion": {"const": 4}}}, "then": {"properties": {"observation": {"properties": {"nonFiniteWatch": {"const": true}}}, "execution": {"properties": {"observationNodes": {"contains": {"properties": {"kind": {"const": "ProductionCounters"}}}}}}}}},
     {
-      "if": { "properties": { "schemaVersion": { "enum": [5, 6, 7] } } },
+      "if": { "properties": { "schemaVersion": { "minimum": 5 } } },
       "then": {
         "properties": { "observation": { "required": ["nodeKinds"] } },
         "allOf": [{
@@ -154,9 +176,21 @@
         }]
       }
     },
-    {"if": {"anyOf": [{"properties": {"schemaVersion": {"const": 6}}}, {"properties": {"schemaVersion": {"const": 7}, "frame": {"properties": {"parameterRevision": {"type": "integer"}}}}}]}, "then": {"properties": {"frame": {"required": ["parameters"], "properties": {"parameters": {"type": "object"}, "parameterRevision": {"type": "integer"}}}}}, "else": {"properties": {"frame": {"properties": {"parameterRevision": {"type": "null"}, "parameters": {"type": "null"}}}}}}
+    {"if": {"anyOf": [{"properties": {"schemaVersion": {"const": 6}}}, {"properties": {"schemaVersion": {"minimum": 7}, "frame": {"properties": {"parameterRevision": {"type": "integer"}}}}}]}, "then": {"properties": {"frame": {"required": ["parameters"], "properties": {"parameters": {"type": "object"}, "parameterRevision": {"type": "integer"}}}}}, "else": {"properties": {"frame": {"properties": {"parameterRevision": {"type": "null"}, "parameters": {"type": "null"}}}}}}
   ],
   "$defs": {
+    "legacyState": {
+      "properties": {
+        "access": { "not": { "pattern": "AccelerationStructureScratch" } },
+        "accessBits": { "maximum": 32767 }
+      }
+    },
+    "legacyBarrier": {
+      "properties": {
+        "before": { "$ref": "#/$defs/legacyState" },
+        "after": { "$ref": "#/$defs/legacyState" }
+      }
+    },
     "unavailable": { "type": "object", "required": ["status", "reason"], "properties": { "status": { "const": "unavailable" }, "reason": { "type": "string", "minLength": 1 } } },
     "bytes": { "type": "integer", "minimum": 0 },
     "nullableBytes": { "type": ["integer", "null"], "minimum": 0 },
@@ -222,7 +256,7 @@
       "properties": {
         "stages": { "type": "string", "pattern": "^(None|DrawIndirect|IndexInput|VertexShader|PixelShader|ComputeShader|RenderTarget|DepthStencil|Copy|Resolve|Present|AccelerationStructureBuild)( \\| (DrawIndirect|IndexInput|VertexShader|PixelShader|ComputeShader|RenderTarget|DepthStencil|Copy|Resolve|Present|AccelerationStructureBuild))*$" },
         "stageBits": { "type": "integer", "minimum": 0 },
-        "access": { "type": "string", "pattern": "^(None|Common|ShaderResource|RenderTarget|DepthStencilRead|DepthStencilWrite|UnorderedAccess|CopySource|CopyDest|VertexBuffer|IndexBuffer|ConstantBuffer|IndirectArgument|Present|AccelerationStructureRead|AccelerationStructureWrite)( \\| (Common|ShaderResource|RenderTarget|DepthStencilRead|DepthStencilWrite|UnorderedAccess|CopySource|CopyDest|VertexBuffer|IndexBuffer|ConstantBuffer|IndirectArgument|Present|AccelerationStructureRead|AccelerationStructureWrite))*$" },
+        "access": { "type": "string", "pattern": "^(None|Common|ShaderResource|RenderTarget|DepthStencilRead|DepthStencilWrite|UnorderedAccess|CopySource|CopyDest|VertexBuffer|IndexBuffer|ConstantBuffer|IndirectArgument|Present|AccelerationStructureRead|AccelerationStructureWrite|AccelerationStructureScratch)( \\| (Common|ShaderResource|RenderTarget|DepthStencilRead|DepthStencilWrite|UnorderedAccess|CopySource|CopyDest|VertexBuffer|IndexBuffer|ConstantBuffer|IndirectArgument|Present|AccelerationStructureRead|AccelerationStructureWrite|AccelerationStructureScratch))*$" },
         "accessBits": { "type": "integer", "minimum": 0 },
         "layout": { "enum": ["Unknown", "Common", "ShaderResource", "RenderTarget", "DepthStencilRead", "DepthStencilWrite", "UnorderedAccess", "CopySource", "CopyDest", "Present", "Undefined"] }
       }

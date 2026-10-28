@@ -471,7 +471,13 @@ namespace gglab
 
 	bool RHIUploadBatch::RetainForSubmission(std::shared_ptr<void> resource) noexcept
 	{
-		if (!resource || !AcceptsUploadOnCurrentThread())
+		if (!AcceptsUploadOnCurrentThread())
+		{
+			return false;
+		}
+		// Publication seals the native leases together with the upload writes. A late
+		// lease must not bypass the fence-owned list already transferred by submission.
+		if (m_State != State::Recording || m_Failed || !resource)
 		{
 			Fail();
 			return false;

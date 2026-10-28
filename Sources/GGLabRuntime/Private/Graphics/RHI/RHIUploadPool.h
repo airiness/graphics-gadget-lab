@@ -99,6 +99,7 @@ namespace gglab
 			std::span<const std::byte> bytes, uint32_t strideInBytes) noexcept;
 		// Freezes allocation and flushes all leased writes before queue submission.
 		[[nodiscard]] bool Publish() noexcept;
+		// Recording-only native leases. Off-owner rejection does not mutate batch state.
 		[[nodiscard]] bool RetainForSubmission(std::shared_ptr<void> resource) noexcept;
 		// Called once the native submit of a stream that may read the batch was issued.
 		// From then on the batch can no longer be cancelled.

@@ -2504,6 +2504,77 @@ namespace gglab
 				"Data uploads require an explicit recording scope outside the RenderGraph too");
 		}
 
+		void RunSubmissionRetentionContractTests(SelfTestContext& context) noexcept
+		{
+			for (uint32_t scenario = 0; scenario < 5; ++scenario)
+			{
+				RecordingDevice device;
+				device.m_UseControlledFenceCompletion = true;
+				RHIUploadPool pool(device);
+				auto batch = pool.BeginBatch();
+				auto original = std::make_shared<uint32_t>(73);
+				std::weak_ptr<uint32_t> originalWeak = original;
+				context.Check(batch->RetainForSubmission(std::move(original)),
+					"A recording batch accepts native backing before publication");
+				if (scenario < 3)
+				{
+					context.Check(batch->Publish(), "Native retention publication succeeds before a late-lease probe");
+					if (scenario == 1)
+					{
+						batch->RecordAcceptedSubmission();
+						context.Check(batch->Submitted({ { 0, 1 }, 7 }),
+							"A submitted retention probe transfers its original backing to the fence owner");
+					}
+					else if (scenario == 2)
+					{
+						batch->RecordAcceptedSubmission();
+						batch->SubmittedWithoutCompletionFence();
+					}
+				}
+				else if (scenario == 3)
+				{
+					batch->Cancel();
+				}
+				else
+				{
+					batch->Fail();
+				}
+				auto late = std::make_shared<uint32_t>(91);
+				std::weak_ptr<uint32_t> lateWeak = late;
+				context.Check(!batch->RetainForSubmission(std::move(late)) &&
+					lateWeak.expired() && batch->HasFailed(),
+					"Published, submitted, quarantined, cancelled and failed batches reject new native leases");
+				context.Check(originalWeak.expired() == (scenario == 3),
+					"Rejecting a late lease preserves the original backing's existing retention state");
+				if (scenario == 1)
+				{
+					batch.reset();
+					pool.ReclaimCompleted();
+					context.Check(!originalWeak.expired(),
+						"Late-lease rejection does not release submitted backing before its fence");
+					device.m_CompletedFenceValue = 7;
+					pool.ReclaimCompleted();
+				}
+				else if (scenario == 2)
+				{
+					batch.reset();
+					pool.ReleaseQuarantinedAfterVerifiedIdle();
+				}
+				else if (scenario != 3)
+				{
+					batch->Cancel();
+				}
+				context.Check(originalWeak.expired(),
+					"The original backing still releases through cancellation, completion or verified idle");
+			}
+			RecordingDevice device;
+			RHIUploadPool pool(device);
+			auto batch = pool.BeginBatch();
+			context.Check(!batch->RetainForSubmission({}) && batch->HasFailed(),
+				"A null owner-thread native lease fails the recording");
+			batch->Cancel();
+		}
+
 		void RunUploadStorageContractTests(SelfTestContext& context) noexcept
 		{
 			for (uint32_t scenario = 0; scenario < 4; ++scenario)
@@ -2868,10 +2939,16 @@ namespace gglab
 			const std::array<uint32_t, 4> payload{ 1, 2, 3, 4 };
 			RHIConstantBufferBinding foreignConstants{};
 			RHIReadOnlyBufferBinding foreignStructured{};
+			RecordingGraphicsCommandContext graphics;
+			graphics.BeginRecordingScope(writer);
+			auto foreignBacking = std::make_shared<uint32_t>(73);
+			std::weak_ptr<uint32_t> foreignWeak = foreignBacking;
+			bool foreignRetained = true;
 			std::thread foreign([&]()
 				{
 					foreignConstants = uploads.UploadConstants(payload);
 					foreignStructured = uploads.UploadStructured(std::span<const uint32_t>(payload));
+					foreignRetained = graphics.RetainForSubmission(std::move(foreignBacking));
 				});
 			foreign.join();
 			// A foreign thread is rejected without touching batch state; only the encoder that
@@ -2879,9 +2956,16 @@ namespace gglab
 			context.Check(!foreignConstants.IsValid() && !foreignStructured.IsValid() &&
 				!batch->HasFailed() && batch->GetPageCount() == 0 && pool.GetPageCount() == 0,
 				"Off-owner uploads return invalid bindings without touching the batch");
+			context.Check(!foreignRetained && foreignWeak.expired() &&
+				!graphics.HasRecordingError() && !batch->HasFailed(),
+				"Off-owner native retention rejects without mutating the batch or encoder");
+			context.Check(graphics.RetainForSubmission(std::make_shared<uint32_t>(91)) &&
+				!graphics.HasRecordingError(),
+				"The owner encoder still retains native backing after a rejected foreign call");
 			const RHIConstantBufferBinding owned = uploads.UploadConstants(payload);
 			context.Check(owned.IsValid() && writer.Owns(owned) && !batch->HasFailed(),
 				"The owner thread still uploads into a batch after a rejected foreign upload");
+			graphics.EndRecordingScope();
 			batch->Detach(writer);
 			batch->Cancel();
 		}
@@ -3303,6 +3387,7 @@ namespace gglab
 			RGAccelerationStructureId bottom;
 			RGAccelerationStructureId top;
 			RGAccelerationStructureId unused;
+			RGBufferId scratch;
 			graph.AddPass<Data>("AS.Setup", [&](RenderGraph::RGBuilder& builder, Data&)
 				{
 					bottom = builder.Import<RGAccelerationStructureResource>("AS.Bottom", { 1, 1 },
@@ -3312,18 +3397,25 @@ namespace gglab
 						RGAccelerationStructureAccess::QueryRead, RGContentValidity::Undefined);
 					unused = builder.Import<RGAccelerationStructureResource>("AS.Unused", { 3, 1 },
 						{ .m_SizeInBytes = 4096 }, RGAccelerationStructureAccess::QueryRead, RGContentValidity::Undefined);
+					scratch = builder.CreateBuffer("AS.Scratch", { .m_SizeInBytes = 1024 });
 				});
 			graph.AddPass<Data>("AS.FirstBuild", [&](RenderGraph::RGBuilder& builder, Data&)
 				{
 					builder.SideEffect();
 					builder.WriteInPlace(bottom, RGAccelerationStructureAccess::BuildWrite);
+					builder.WriteInPlace(scratch, RGBufferAccess::AccelerationStructureScratch);
 				});
 			graph.AddPass<Data>("AS.FinalBuild", [&](RenderGraph::RGBuilder& builder, Data&)
-					{ builder.WriteInPlace(bottom, RGAccelerationStructureAccess::BuildWrite); });
+				{
+					builder.WriteInPlace(bottom, RGAccelerationStructureAccess::BuildWrite);
+					builder.WriteInPlace(scratch, RGBufferAccess::AccelerationStructureScratch, RHIStage::All);
+				});
 			graph.AddPass<Data>("AS.TopBuild", [&](RenderGraph::RGBuilder& builder, Data&)
 				{
 					GGLAB_UNUSED(builder.Read(bottom, RGAccelerationStructureAccess::BuildRead));
 					builder.WriteInPlace(top, RGAccelerationStructureAccess::BuildWrite);
+					builder.WriteInPlace(scratch, RGBufferAccess::AccelerationStructureScratch,
+						RHIStage::AccelerationStructureBuild | RHIStage::ComputeShader);
 				});
 			graph.AddPass<Data>("AS.Query", [&](RenderGraph::RGBuilder& builder, Data&)
 				{
@@ -3346,6 +3438,15 @@ namespace gglab
 					{
 						return barrier.m_Kind == RGBarrierKind::AccelerationStructure;
 					}), "Consecutive live AS writers receive an explicit ordered AS memory barrier");
+				for (const uint32_t passIndex : { 2u, 3u })
+				{
+					context.Check(std::ranges::any_of(passes[passIndex].m_PreBarriers, [](const auto& barrier)
+						{
+							return barrier.m_Kind == RGBarrierKind::Uav &&
+								barrier.m_Before.m_Access == RHIAccess::AccelerationStructureScratch &&
+								barrier.m_After.m_Access == RHIAccess::AccelerationStructureScratch;
+						}), "Scratch writes keep their explicit access and ordered hazard across stage changes");
+				}
 				context.Check(std::ranges::any_of(passes[3].m_PreBarriers, [](const auto& barrier)
 					{
 						return barrier.m_Before.m_Access == RHIAccess::AccelerationStructureWrite &&
@@ -13795,6 +13896,7 @@ namespace gglab
 		RunPassParameterContractTests(context);
 		RunUploadWriterContractTests(context);
 		RunUploadStorageContractTests(context);
+		RunSubmissionRetentionContractTests(context);
 		RunUploadBudgetTests(context);
 		RunUploadTeardownContractTests(context);
 		RunUploadOwnerThreadContractTests(context);

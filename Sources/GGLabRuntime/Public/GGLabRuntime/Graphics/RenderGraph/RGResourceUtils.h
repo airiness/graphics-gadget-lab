@@ -24,7 +24,8 @@ namespace gglab
 
 	constexpr inline bool HasUavAccess(const RHIResourceState& state) noexcept
 	{
-		return Test(state.m_Access, RHIAccess::UnorderedAccess | RHIAccess::AccelerationStructureWrite);
+		return Test(state.m_Access, RHIAccess::UnorderedAccess |
+			RHIAccess::AccelerationStructureWrite | RHIAccess::AccelerationStructureScratch);
 	}
 
 	constexpr inline bool NeedsRHIResourceTransition(
@@ -226,7 +227,7 @@ namespace gglab
 		case RGBufferAccess::AccelerationStructureInput:
 			return { RHIStage::AccelerationStructureBuild, RHIAccess::ShaderResource, RHILayout::Common };
 		case RGBufferAccess::AccelerationStructureScratch:
-			return { RHIStage::AccelerationStructureBuild, RHIAccess::UnorderedAccess, RHILayout::Common };
+			return { RHIStage::AccelerationStructureBuild, RHIAccess::AccelerationStructureScratch, RHILayout::Common };
 		case RGBufferAccess::None:
 			return CommonRHIResourceState();
 		case RGBufferAccess::Vertex:

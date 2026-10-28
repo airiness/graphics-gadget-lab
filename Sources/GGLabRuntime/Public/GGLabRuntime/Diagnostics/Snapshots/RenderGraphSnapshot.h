@@ -182,7 +182,7 @@ namespace gglab
 	};
 
 	// Every variant shares one content version; observation node kinds are listed explicitly.
-	inline constexpr uint32_t RenderGraphExportSchemaVersion = 7;
+	inline constexpr uint32_t RenderGraphExportSchemaVersion = 8;
 
 	// Versioned graph data; AppRuntime embeds its common frame metadata and submission identity.
 	[[nodiscard]] std::string SerializeRenderGraphSnapshot(

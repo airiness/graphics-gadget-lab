@@ -214,12 +214,14 @@ namespace gglab
 		void RejectRecording() noexcept { FailRecording(); }
 		[[nodiscard]] bool RetainForSubmission(std::shared_ptr<void> resource) noexcept
 		{
-			if (!m_UploadWriter || !m_UploadWriter->RetainForSubmission(std::move(resource)))
+			if (!m_UploadWriter)
 			{
 				FailRecording();
 				return false;
 			}
-			return true;
+			// The writer poisons invalid owner-thread calls. Foreign-thread rejection
+			// must not mutate either the shared batch or this encoder's recording state.
+			return m_UploadWriter->RetainForSubmission(std::move(resource));
 		}
 		[[nodiscard]] virtual bool BuildAccelerationStructure(RHIAccelerationStructureHandle,
 			const RHIASBuildInputs&, const RHIASBufferRange&) noexcept

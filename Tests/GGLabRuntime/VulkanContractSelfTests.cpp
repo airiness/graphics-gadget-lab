@@ -7,6 +7,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHITextureValidation.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGResourceUtils.h"
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 #include "Graphics/RHI/Vulkan/VulkanBarrier.h"
 #include "Graphics/RHI/Vulkan/VulkanCommandContext.h"
@@ -497,6 +498,25 @@ namespace gglab
 				buildBarrier->dstStageMask == VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR &&
 				buildBarrier->dstAccessMask == VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR,
 				"All-to-build barriers retain AS write availability for a later TLAS build");
+			for (const auto stages : { RHIStage::AccelerationStructureBuild, RHIStage::All,
+				RHIStage::AccelerationStructureBuild | RHIStage::ComputeShader })
+			{
+				const auto scratch = ToRHIResourceState(RGBufferAccess::AccelerationStructureScratch, stages);
+				const auto scratchBarrier = BuildVulkanBufferBarrier({ {}, scratch, scratch }, buffer);
+				constexpr auto scratchAccess = VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR |
+					VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+				context.Check(scratchBarrier && scratch.m_Access == RHIAccess::AccelerationStructureScratch &&
+					scratchBarrier->srcStageMask == ToVulkanPipelineStages(stages) &&
+					scratchBarrier->dstStageMask == ToVulkanPipelineStages(stages) &&
+					scratchBarrier->srcAccessMask == scratchAccess && scratchBarrier->dstAccessMask == scratchAccess,
+					"Vulkan scratch barriers preserve AS read/write access for explicit, All and mixed stages");
+				const RHIResourceState storage{ stages, RHIAccess::UnorderedAccess, RHILayout::Common };
+				const auto storageBarrier = BuildVulkanBufferBarrier({ {}, storage, storage }, buffer);
+				constexpr auto storageAccess = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+				context.Check(storageBarrier && storageBarrier->srcAccessMask == storageAccess &&
+					storageBarrier->dstAccessMask == storageAccess,
+					"Ordinary storage access is never reinterpreted as AS scratch from its stage mask");
+			}
 			constexpr RHIResourceState graphicsStorageState{
 				.m_Stages = RHIStage::PixelShader,
 				.m_Access = RHIAccess::UnorderedAccess,

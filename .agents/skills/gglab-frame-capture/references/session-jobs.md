@@ -124,7 +124,7 @@ python Scripts/Verification/ValidateCaptureBundles.py $result.manifest
 | --- | --- |
 | `gglab.capture-bundle` | v3; readers retain v1/v2. |
 | Image JSON sidecar | v1, with nested `parameters` v1 and `control` v1. |
-| `gglab.render-graph` | v7 adds typed AS resources; readers retain v1-v6. Parameter provenance is optional in v7 and required in v6. |
+| `gglab.render-graph` | v8 preserves explicit AS scratch access; readers retain v1-v7, including v7 typed AS resources. Parameter provenance is optional since v7 and required in v6. |
 | `gglab.resource-export` | v3; readers retain v1/v2 without parameter provenance. |
 | `gglab.parameter-frames`, `gglab.gpu-timing` | v1 sequence-range products; see [Sequences](sequences.md#published-range-artifacts). |
 

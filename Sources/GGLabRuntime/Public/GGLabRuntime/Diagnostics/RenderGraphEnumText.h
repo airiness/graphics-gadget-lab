@@ -180,6 +180,7 @@ namespace gglab::diagnostics
 			EnumTextEntry{ RHIAccess::UnorderedAccess, "UnorderedAccess", "UnorderedAccess" },
 			EnumTextEntry{ RHIAccess::AccelerationStructureRead, "AccelerationStructureRead", "AS Read" },
 			EnumTextEntry{ RHIAccess::AccelerationStructureWrite, "AccelerationStructureWrite", "AS Write" },
+			EnumTextEntry{ RHIAccess::AccelerationStructureScratch, "AccelerationStructureScratch", "AS Scratch" },
 			EnumTextEntry{ RHIAccess::CopySource, "CopySource", "CopySource" },
 			EnumTextEntry{ RHIAccess::CopyDest, "CopyDest", "CopyDest" },
 			EnumTextEntry{ RHIAccess::VertexBuffer, "VertexBuffer", "VertexBuffer" },
