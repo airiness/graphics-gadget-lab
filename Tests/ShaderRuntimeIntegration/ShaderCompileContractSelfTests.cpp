@@ -403,8 +403,8 @@ namespace gglab
 
 		void RunShaderBindingABITests(SelfTestContext& context) noexcept
 		{
-			context.Check(GGLabVulkanShaderRuntimeABI.m_Revision == 1,
-				"Vulkan shader binding ABI revision is fixed at 1");
+			context.Check(GGLabVulkanShaderRuntimeABI.m_Revision == 2,
+				"Vulkan shader binding ABI revision 2 includes fixed acceleration-structure descriptors");
 
 			struct FixedRegisterClassCase
 			{
@@ -507,6 +507,44 @@ namespace gglab
 				mutableInfo.pMutableDescriptorTypeLists[1].descriptorTypeCount == 0;
 			context.Check(resourceListContainsOnlyImages,
 				"Vulkan global layout allows only sampled and storage images in the resource heap");
+		}
+
+		void RunAccelerationStructureReflectionTests(SelfTestContext& context) noexcept
+		{
+			const auto root = std::filesystem::temp_directory_path() /
+				std::format("GGLabASReflection-{}", GetCurrentProcessId());
+			ScopedTestDirectory cleanup(root);
+			std::filesystem::create_directories(root);
+			for (uint32_t scenario = 0; scenario < 3; ++scenario)
+			{
+				const std::string declaration = scenario == 1 ?
+					"Scene : register(t0, space2);" : scenario == 2 ?
+					"Scene[2] : register(t0);" : "Scene : register(t0);";
+				const std::string source = "RaytracingAccelerationStructure " + declaration +
+					"\nRWStructuredBuffer<uint> Output : register(u0);\n"
+					"[numthreads(1,1,1)] void CSMain() { RayDesc ray; ray.Origin=float3(0,0,-2); "
+					"ray.Direction=float3(0,0,1); ray.TMin=0.01f; ray.TMax=100; "
+					"RayQuery<RAY_FLAG_FORCE_OPAQUE> query; query.TraceRayInline(" +
+					(scenario == 2 ? "Scene[1]" : "Scene") +
+					",0,255,ray); while(query.Proceed()) {} Output[0]=query.CommittedStatus(); }\n";
+				const auto path = root / std::format("case{}.hlsl", scenario);
+				{
+					std::ofstream stream(path, std::ios::binary);
+					stream.write(source.data(), static_cast<std::streamsize>(source.size()));
+				}
+				for (const bool spirv : { false, true })
+				{
+					ShaderCompiler compiler(root, root / (spirv ? "spirv" : "dxil"));
+					ShaderDesc request{ .m_SourcePath = path.filename(), .m_Stage = ShaderStage::Compute, .m_Entry = L"CSMain" };
+					request.m_Target = spirv ? MakeVulkan13CompileTarget(request.m_Stage) : MakeDX12CompileTarget(request.m_Stage);
+					const auto result = compiler.Compile(request);
+					context.Check(scenario == 0 ? result.IsSuccess() :
+						result.m_Diagnostics.m_Status == ShaderCompileStatus::CompileFailed &&
+						result.m_Diagnostics.m_Message.find(L"reflection") != std::wstring::npos,
+						scenario == 0 ? "DXIL and SPIR-V reflection accept a scalar fixed TLAS" :
+						"DXIL and SPIR-V reflection reject AS register spaces and descriptor arrays outside the fixed contract");
+				}
+			}
 		}
 
 		void RunCoordinatePolicyTests(SelfTestContext& context) noexcept
@@ -950,7 +988,7 @@ namespace gglab
 				metadata.find("\"targetProfile\":\"gglab-vulkan13\"") != std::string::npos &&
 				metadata.find("\"binaryFormat\":\"spirv\"") != std::string::npos &&
 				metadata.find("\"spirvTargetEnvironment\":\"vulkan1.3\"") != std::string::npos &&
-				metadata.find("\"bindingAbiRevision\":1") != std::string::npos &&
+				metadata.find("\"bindingAbiRevision\":2") != std::string::npos &&
 				metadata.find("\"shaderModel\":\"6_7\"") != std::string::npos &&
 				metadata.find("\"hlslVersion\":\"2021\"") != std::string::npos &&
 				metadata.find("\"compileFlags\":") != std::string::npos &&
@@ -965,12 +1003,12 @@ namespace gglab
 				metadata.find("\"contentDigest\":\"") != std::string::npos &&
 				metadata.find("\"dependencyPhysicalPaths\":[") != std::string::npos,
 				"Cache record carries the complete portable manifest (profile, target semantics, logical identities, dependency provenance) plus explicit local validation state");
-			const bool metadataChanged = ReplaceMetadataValue(spirVRecordPath, "\"bindingAbiRevision\":1", "\"bindingAbiRevision\":999");
+			const bool metadataChanged = ReplaceMetadataValue(spirVRecordPath, "\"bindingAbiRevision\":2", "\"bindingAbiRevision\":999");
 			const ShaderCompileResult rejectedCacheArtifact = compiler.CompileOrLoad(spirVRecipe);
 			const std::optional<ShaderArtifactCacheRecord> repairedReadBack = ReadShaderArtifactCacheRecord(spirVRecordPath);
 			context.Check(metadataChanged, "Shader cache metadata tamper is applied");
 			context.Check(repairedReadBack.has_value() &&
-				repairedReadBack->m_Manifest.m_BindingABIRevision == 1,
+				repairedReadBack->m_Manifest.m_BindingABIRevision == GGLabVulkanShaderRuntimeABI.m_Revision,
 				"Rejected tampered entry is rebuilt and republished with the supported ABI revision");
 			context.Check(metadataChanged && rejectedCacheArtifact.IsSuccess() &&
 				!rejectedCacheArtifact.m_FromCache,
@@ -3326,6 +3364,7 @@ namespace gglab
 		RunShadowReceiverPlaneSamplingTests(context);
 		RunShaderCompileContractTests(context);
 		RunShaderBindingABITests(context);
+		RunAccelerationStructureReflectionTests(context);
 		RunCoordinatePolicyTests(context);
 		RunBinaryReadOnceTests(context);
 		RunCacheRecordSerializationTests(context);

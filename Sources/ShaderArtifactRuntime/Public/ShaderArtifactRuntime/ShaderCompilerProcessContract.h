@@ -19,5 +19,5 @@ namespace gglab
 	// change emitted binaries without changing the normalized recipe or DXC
 	// identity. It participates in both BuildKey derivation and the external
 	// compiler handshake.
-	inline constexpr uint32_t ShaderCompilePolicyRevision = 1;
+	inline constexpr uint32_t ShaderCompilePolicyRevision = 2;
 }
