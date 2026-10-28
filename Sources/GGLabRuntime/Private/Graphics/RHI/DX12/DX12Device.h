@@ -35,6 +35,7 @@ namespace gglab
 			bool m_MeshShaderSupported = false;
 			bool m_TearingSupported = false;
 			bool m_EnhancedBarriers = false;
+			RHIRayQueryCapabilities m_RayQueryCapabilities{};
 			RHIShaderWaveCapabilities m_ShaderWaveCapabilities{};
 			D3D_FEATURE_LEVEL m_MaxFeatureLevel = D3D_FEATURE_LEVEL_12_0;
 			D3D_SHADER_MODEL m_HighestShaderModel = D3D_SHADER_MODEL_6_0;
@@ -53,6 +54,10 @@ namespace gglab
 		~DX12Device();
 
 		void Initialize(const CreateInfo& createInfo = {}) noexcept;
+		[[nodiscard]] RHIRayQueryCapabilities GetRayQueryCapabilities() const noexcept override
+		{
+			return m_FeatureSupport.m_RayQueryCapabilities;
+		}
 		void Finalize() noexcept;
 
 		ID3D12Device10* Get() const noexcept { return m_D3D12Device.Get(); }

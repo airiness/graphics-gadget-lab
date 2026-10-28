@@ -4,6 +4,7 @@
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/RHI/DX12/DX12QueueSystem.h"
+#include "Graphics/RHI/DX12/DX12RayQuerySupport.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
 #include "Graphics/RHI/DX12/Cache/DX12DescriptorCache.h"
@@ -127,6 +128,7 @@ namespace gglab
 		m_AdapterCompatibilityIdentity.clear();
 		m_AdapterName.clear();
 		m_DeviceIdentity = {};
+		m_FeatureSupport.m_RayQueryCapabilities = {};
 		m_DxgiFactory.Reset();
 
 		m_IsInitialized = false;
@@ -836,9 +838,21 @@ namespace gglab
 		CD3DX12FeatureSupport featureSupport;
 		featureSupport.Init(m_D3D12Device.Get());
 
-		// RatTracing support
+		// Legacy ray-tracing support includes tier 1.0; inline queries require 1.1.
 		m_FeatureSupport.m_RayTracingSupported =
 			featureSupport.RaytracingTier() != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
+		m_FeatureSupport.m_RayQueryCapabilities = EvaluateDX12RayQuerySupport(
+			featureSupport.RaytracingTier(), featureSupport.HighestShaderModel());
+		// DX12 exposes the supported set on the created device without an opt-in feature chain.
+		m_FeatureSupport.m_RayQueryCapabilities.m_Enabled =
+			m_FeatureSupport.m_RayQueryCapabilities.m_Supported;
+		const auto& rayQuery = m_FeatureSupport.m_RayQueryCapabilities;
+		GGLAB_LOG_GRAPHICS_INFO_ALWAYS("DX12 ray queries: supported={}, enabled={}, reason={}, "
+			"scratchAlignment={}, maxPrimitives={}, maxInstances={}",
+			rayQuery.m_Supported, rayQuery.m_Enabled,
+			GetRHIRayQueryUnavailableReasonName(rayQuery.m_UnavailableReason),
+			rayQuery.m_BuildLimits.m_ScratchAlignmentInBytes,
+			rayQuery.m_BuildLimits.m_MaxPrimitiveCount, rayQuery.m_BuildLimits.m_MaxInstanceCount);
 
 		// MeshShader support
 		m_FeatureSupport.m_MeshShaderSupported =

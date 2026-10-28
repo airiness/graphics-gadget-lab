@@ -4,6 +4,7 @@
 #include <array>
 #include <cstdint>
 #include <span>
+#include <string_view>
 #include <variant>
 
 namespace gglab
@@ -26,6 +27,54 @@ namespace gglab
 		uint64_t m_MaxInstanceCount = 0;
 		uint64_t m_ScratchAlignmentInBytes = 0;
 	};
+
+	enum class RHIRayQueryUnavailableReason : uint8_t
+	{
+		None,
+		BackendUnavailable,
+		RequiredExtensionsUnavailable,
+		AccelerationStructureUnavailable,
+		InlineQueryUnavailable,
+		DeviceAddressUnavailable,
+		ShaderModelUnavailable,
+		BuildLimitsUnavailable,
+	};
+
+	// Device capability only. Prepared/Active are session and recipe state; enabling
+	// a supported device does not allocate AS storage or schedule GI work.
+	struct RHIRayQueryCapabilities
+	{
+		bool m_Supported = false;
+		bool m_Enabled = false;
+		RHIRayQueryUnavailableReason m_UnavailableReason =
+			RHIRayQueryUnavailableReason::BackendUnavailable;
+		RHIASBuildLimits m_BuildLimits{};
+	};
+
+	[[nodiscard]] constexpr std::string_view GetRHIRayQueryUnavailableReasonName(
+		RHIRayQueryUnavailableReason reason) noexcept
+	{
+		switch (reason)
+		{
+		case RHIRayQueryUnavailableReason::None:
+			return "none";
+		case RHIRayQueryUnavailableReason::BackendUnavailable:
+			return "backend unavailable";
+		case RHIRayQueryUnavailableReason::RequiredExtensionsUnavailable:
+			return "required extensions unavailable";
+		case RHIRayQueryUnavailableReason::AccelerationStructureUnavailable:
+			return "acceleration structures unavailable";
+		case RHIRayQueryUnavailableReason::InlineQueryUnavailable:
+			return "inline ray queries unavailable";
+		case RHIRayQueryUnavailableReason::DeviceAddressUnavailable:
+			return "buffer device addresses unavailable";
+		case RHIRayQueryUnavailableReason::ShaderModelUnavailable:
+			return "required shader model unavailable";
+		case RHIRayQueryUnavailableReason::BuildLimitsUnavailable:
+			return "required AS build limits unavailable";
+		}
+		return "unknown";
+	}
 
 	struct RHIASBufferRange
 	{

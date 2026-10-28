@@ -22,7 +22,7 @@ namespace gglab
 	{
 		None,
 		TooManySlots,
-		RayQueryUnavailable,
+		AccelerationStructureBindingsUnavailable,
 	};
 
 	struct DX12BindingLayoutBuildResult

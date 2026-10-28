@@ -96,8 +96,8 @@ namespace gglab
 		{
 			if (rhiDesc.m_Slots[index].m_Type == RHIBindingType::AccelerationStructure)
 			{
-				// Never reinterpret a TLAS as an ordinary SRV before native RT enablement.
-				outDesc.m_Error = DX12BindingLayoutError::RayQueryUnavailable;
+				// Device enablement does not establish AS resource or command-binding support.
+				outDesc.m_Error = DX12BindingLayoutError::AccelerationStructureBindingsUnavailable;
 				return;
 			}
 		}

@@ -1,4 +1,5 @@
 #pragma once
+#include "GGLabRuntime/Graphics/RHI/RHIAccelerationStructure.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
 #include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
@@ -32,6 +33,10 @@ namespace gglab
 	public:
 		virtual ~RHIDevice() = default;
 		[[nodiscard]] virtual bool SupportsPixelStorageAtomics() const noexcept { return false; }
+		[[nodiscard]] virtual RHIRayQueryCapabilities GetRayQueryCapabilities() const noexcept
+		{
+			return {};
+		}
 
 		virtual RHIBackendType GetBackendType() const noexcept = 0;
 		// Stable across process launches and changes when the adapter or driver

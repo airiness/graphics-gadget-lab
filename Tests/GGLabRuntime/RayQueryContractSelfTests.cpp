@@ -3,8 +3,10 @@
 #include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
 #include "GGLabRuntime/Graphics/RHI/RHIAccelerationStructure.h"
 #include "Graphics/RHI/DX12/Utility/DX12BindingLayoutUtils.h"
+#include "Graphics/RHI/DX12/DX12RayQuerySupport.h"
 #if GGLAB_ENABLE_VULKAN
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
+#include "Graphics/RHI/Vulkan/VulkanRayQuerySupport.h"
 #endif
 
 #include <algorithm>
@@ -35,6 +37,103 @@ namespace gglab
 				.m_Indices = { RHIBufferHandle{ 1, 1 }, 12, 12 },
 				.m_IndexCount = 3,
 			};
+		}
+
+		void RunCapabilityTests(SelfTestContext& context) noexcept
+		{
+			const RHIRayQueryCapabilities absent{};
+			context.Check(!absent.m_Supported && !absent.m_Enabled &&
+				absent.m_UnavailableReason == RHIRayQueryUnavailableReason::BackendUnavailable,
+				"An unimplemented device does not claim ray-query support or enablement");
+			const auto tier10 = EvaluateDX12RayQuerySupport(
+				D3D12_RAYTRACING_TIER_1_0, D3D_SHADER_MODEL_6_6);
+			context.Check(!tier10.m_Supported && !tier10.m_Enabled &&
+				tier10.m_UnavailableReason == RHIRayQueryUnavailableReason::InlineQueryUnavailable,
+				"DXR tier 1.0 is not sufficient for inline ray queries");
+			const auto shader64 = EvaluateDX12RayQuerySupport(
+				D3D12_RAYTRACING_TIER_1_1, D3D_SHADER_MODEL_6_4);
+			context.Check(!shader64.m_Supported &&
+				shader64.m_UnavailableReason == RHIRayQueryUnavailableReason::ShaderModelUnavailable,
+				"DX12 reports the missing shader-model requirement independently of the RT tier");
+			const auto dx12 = EvaluateDX12RayQuerySupport(
+				D3D12_RAYTRACING_TIER_1_1, D3D_SHADER_MODEL_6_6);
+			context.Check(dx12.m_Supported && !dx12.m_Enabled &&
+				dx12.m_UnavailableReason == RHIRayQueryUnavailableReason::None &&
+				dx12.m_BuildLimits.m_MaxPrimitiveCount != 0 &&
+				dx12.m_BuildLimits.m_MaxInstanceCount != 0 &&
+				dx12.m_BuildLimits.m_ScratchAlignmentInBytes == 256,
+				"DX12 support exposes build limits without claiming that a device has been created");
+#if GGLAB_ENABLE_VULKAN
+			const VulkanRayQueryAvailability complete{
+				.m_AccelerationStructureExtension = true,
+				.m_RayQueryExtension = true,
+				.m_DeferredHostOperationsExtension = true,
+				.m_AccelerationStructure = true,
+				.m_RayQuery = true,
+				.m_BufferDeviceAddress = true,
+				.m_BuildLimits = Limits,
+				.m_MaxGeometryCount = 1,
+				.m_MaxDescriptorSetAccelerationStructures = 1,
+				.m_MaxPerStageDescriptorAccelerationStructures = 1,
+			};
+			const auto supported = EvaluateVulkanRayQuerySupport(complete);
+			context.Check(supported.m_Supported && !supported.m_Enabled &&
+				supported.m_BuildLimits.m_ScratchAlignmentInBytes == Limits.m_ScratchAlignmentInBytes,
+				"A complete Vulkan set is supported; only successful device creation may enable it");
+			struct MissingFeature
+			{
+				bool VulkanRayQueryAvailability::* m_Member;
+				RHIRayQueryUnavailableReason m_Reason;
+			};
+			constexpr std::array cases
+			{
+				MissingFeature{ &VulkanRayQueryAvailability::m_AccelerationStructureExtension, RHIRayQueryUnavailableReason::RequiredExtensionsUnavailable },
+				MissingFeature{ &VulkanRayQueryAvailability::m_RayQueryExtension, RHIRayQueryUnavailableReason::RequiredExtensionsUnavailable },
+				MissingFeature{ &VulkanRayQueryAvailability::m_DeferredHostOperationsExtension, RHIRayQueryUnavailableReason::RequiredExtensionsUnavailable },
+				MissingFeature{ &VulkanRayQueryAvailability::m_AccelerationStructure, RHIRayQueryUnavailableReason::AccelerationStructureUnavailable },
+				MissingFeature{ &VulkanRayQueryAvailability::m_RayQuery, RHIRayQueryUnavailableReason::InlineQueryUnavailable },
+				MissingFeature{ &VulkanRayQueryAvailability::m_BufferDeviceAddress, RHIRayQueryUnavailableReason::DeviceAddressUnavailable },
+			};
+			for (const auto& missing : cases)
+			{
+				auto available = complete;
+				available.*missing.m_Member = false;
+				const auto result = EvaluateVulkanRayQuerySupport(available);
+				context.Check(!result.m_Supported && !result.m_Enabled &&
+					result.m_UnavailableReason == missing.m_Reason &&
+					result.m_BuildLimits.m_MaxPrimitiveCount == 0,
+					"Partial Vulkan feature sets report their missing prerequisite without partial enablement");
+			}
+			for (uint32_t field = 0; field < 6; ++field)
+			{
+				auto available = complete;
+				switch (field)
+				{
+				case 0:
+					available.m_BuildLimits.m_MaxPrimitiveCount = 0;
+					break;
+				case 1:
+					available.m_BuildLimits.m_MaxInstanceCount = 0;
+					break;
+				case 2:
+					available.m_BuildLimits.m_ScratchAlignmentInBytes = 3;
+					break;
+				case 3:
+					available.m_MaxGeometryCount = 0;
+					break;
+				case 4:
+					available.m_MaxDescriptorSetAccelerationStructures = 0;
+					break;
+				default:
+					available.m_MaxPerStageDescriptorAccelerationStructures = 0;
+					break;
+				}
+				const auto result = EvaluateVulkanRayQuerySupport(available);
+				context.Check(!result.m_Supported && !result.m_Enabled &&
+					result.m_UnavailableReason == RHIRayQueryUnavailableReason::BuildLimitsUnavailable,
+					"Missing build or fixed-descriptor limits cannot produce a supported Vulkan RT set");
+			}
+#endif
 		}
 
 		void RunTriangleTests(SelfTestContext& context) noexcept
@@ -291,7 +390,8 @@ namespace gglab
 			const auto desc = composed.m_Layout->BuildRHIDesc("Ray query contract");
 			DX12BindingLayoutBuildResult dx12{};
 			BuildDX12RootSignatureDesc(desc, dx12);
-			context.Check(!dx12.IsValid() && dx12.m_Error == DX12BindingLayoutError::RayQueryUnavailable &&
+			context.Check(!dx12.IsValid() &&
+				dx12.m_Error == DX12BindingLayoutError::AccelerationStructureBindingsUnavailable &&
 				dx12.m_RootParameterCount == 0,
 				"DX12 rejects native TLAS layouts before interpreting them as ordinary SRVs");
 			RHIBindingLayoutDesc oversized{};
@@ -302,8 +402,8 @@ namespace gglab
 #if GGLAB_ENABLE_VULKAN
 			const auto vulkan = BuildVulkanBindingLayoutPlan(desc, 16 * 1024);
 			context.Check(!vulkan.IsValid() &&
-				vulkan.m_Error == VulkanBindingLayoutError::RayQueryUnavailable,
-				"Vulkan rejects TLAS layouts until native features and descriptors are enabled");
+				vulkan.m_Error == VulkanBindingLayoutError::AccelerationStructureBindingsUnavailable,
+				"Vulkan rejects TLAS layouts until AS resources and command bindings are implemented");
 #endif
 		}
 	}
@@ -312,6 +412,7 @@ namespace gglab
 	{
 		static_assert(!std::is_convertible_v<RHIAccelerationStructureHandle, RHIBufferHandle>);
 		static_assert(!std::is_convertible_v<RHIBufferHandle, RHIAccelerationStructureHandle>);
+		RunCapabilityTests(context);
 		RunTriangleTests(context);
 		RunInstanceTests(context);
 		RunScratchTests(context);

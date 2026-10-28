@@ -1541,6 +1541,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12QueueSystem.h">
       <Filter>Private\Graphics\RHI\DX12</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12RayQuerySupport.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Resource.h">
       <Filter>Private\Graphics\RHI\DX12</Filter>
     </ClInclude>
@@ -1662,6 +1665,9 @@
       <Filter>Private\Graphics\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanPipelineSystem.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanRayQuerySupport.h">
       <Filter>Private\Graphics\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanResource.h">

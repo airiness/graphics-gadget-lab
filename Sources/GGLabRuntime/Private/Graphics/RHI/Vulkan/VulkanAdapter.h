@@ -1,4 +1,5 @@
 #pragma once
+#include "Graphics/RHI/Vulkan/VulkanRayQuerySupport.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 #include "Graphics/RHI/Vulkan/VulkanDeviceProfile.h"
 
@@ -80,6 +81,7 @@ namespace gglab
 		std::vector<std::string> m_MissingRequiredDeviceExtensions;
 
 		VulkanDeviceProfileCapabilities m_ProfileCapabilities{};
+		VulkanRayQueryAvailability m_RayQueryAvailability{};
 		VulkanDescriptorCapacityLimits m_DescriptorLimits{};
 		VulkanDescriptorCapacityAvailability m_DescriptorCapacityAvailability{};
 		// Hardware availability of cube-array image views (optional core

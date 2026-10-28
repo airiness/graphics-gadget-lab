@@ -433,6 +433,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanCoordinatePolicy.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanDeviceProfile.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanRayQuerySupport.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanShaderBindingABI.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanUtility.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanInstance.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
@@ -472,6 +473,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorAllocatorBase.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorRingAllocator.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Device.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12RayQuerySupport.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12HResult.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12QueueSystem.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Context.h" />

@@ -170,7 +170,7 @@ Atlas ID: atlas.runtime.rhi-submission
   [RHIDevice.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RHI/RHIDevice.h)
   and [RHIFence.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RHI/RHIFence.h).
   [RHIAccelerationStructure.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RHI/RHIAccelerationStructure.h)
-  defines AS inputs.
+  defines AS inputs and ray-query capability records.
 - **Implementation:** [submission resolution](../../../Sources/GGLabRuntime/Private/Graphics/RHI/RHIFrameSubmission.cpp),
   [DX12](../../../Sources/GGLabRuntime/Private/Graphics/RHI/DX12/DX12Context.cpp),
   [Vulkan](../../../Sources/GGLabRuntime/Private/Graphics/RHI/Vulkan/VulkanContext.cpp)

@@ -110,8 +110,8 @@ namespace gglab
 			const RHIBindingSlotDesc& slot = desc.m_Slots[slotIndex];
 			if (slot.m_Type == RHIBindingType::AccelerationStructure)
 			{
-				// Device feature enablement and fixed AS descriptors land together.
-				plan.m_Error = VulkanBindingLayoutError::RayQueryUnavailable;
+				// Keep logical capability enablement separate from AS resource/binding support.
+				plan.m_Error = VulkanBindingLayoutError::AccelerationStructureBindingsUnavailable;
 				return plan;
 			}
 			if (slot.m_Type == RHIBindingType::Unknown)
