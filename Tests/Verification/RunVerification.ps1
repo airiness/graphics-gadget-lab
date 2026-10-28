@@ -24,6 +24,9 @@ $catalog = @(
     @{ name = 'coastal-assets'; group = 'contracts'; steps = @(
         @{ path = 'Scripts/Verification/ValidateAssetBundle.py'; arguments = @('--self-test') },
         @{ path = 'Scripts/Verification/ValidateAssetBundle.py'; arguments = @() }) },
+    @{ name = 'gi-inputs'; group = 'contracts'; steps = @(
+        @{ path = 'Scripts/Verification/ValidateGIInputs.py'; arguments = @('--self-test') },
+        @{ path = 'Scripts/Verification/ValidateGIInputs.py'; arguments = @() }) },
     @{ name = 'verification-support'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/TestVerificationSupport.ps1' }) },
     @{ name = 'nonfinite-sites'; group = 'contracts'; steps = @(
         @{ path = 'Scripts/GenerateNonFiniteSites.py'; arguments = @('--check') },

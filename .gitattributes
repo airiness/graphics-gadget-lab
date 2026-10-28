@@ -40,3 +40,7 @@ Shaders/Tests/Generated/*.hlsli text eol=lf
 *.glb    binary
 *.gltf   text eol=lf
 *.blend  binary
+
+# Native GI capture products retain recorded byte identities.
+Assets/Media/GGLabCoastalRetreat/GI/Daylight/*/output.txt -text whitespace=trailing-space,space-before-tab,cr-at-eol
+Assets/Media/GGLabCoastalRetreat/GI/Daylight/*/*.capture-bundle.json text eol=lf

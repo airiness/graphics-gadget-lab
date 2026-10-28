@@ -1,0 +1,190 @@
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan instance created (validation=enabled).
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan surface created.
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0] Inserted device layer "VK_LAYER_KHRONOS_validation" (C:\VulkanSDK\1.3.296.0\Bin\.\VkLayer_khronos_validation.dll)
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0] Inserted device layer "VK_LAYER_NV_present" (C:\WINDOWS\System32\DriverStore\FileRepository\nvmdui.inf_amd64_53ee4fe56316dba0\.\nvoglv64.dll)
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0] Inserted device layer "VK_LAYER_NV_optimus" (C:\WINDOWS\System32\DriverStore\FileRepository\nvmdui.inf_amd64_53ee4fe56316dba0\.\nvoglv64.dll)
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0] vkCreateDevice layer callstack setup to:
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]    <Application>
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]      ||
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]    <Loader>
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]      ||
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]    VK_LAYER_NV_optimus
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Type: Implicit
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Enabled By: Implicit Layer
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]                Disable Env Var:  DISABLE_LAYER_NV_OPTIMUS_1
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Manifest: C:\WINDOWS\System32\DriverStore\FileRepository\nvmdui.inf_amd64_53ee4fe56316dba0\nv-vk64.json
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Library:  C:\WINDOWS\System32\DriverStore\FileRepository\nvmdui.inf_amd64_53ee4fe56316dba0\.\nvoglv64.dll
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]      ||
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]    VK_LAYER_NV_present
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Type: Implicit
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Enabled By: Implicit Layer
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]                Disable Env Var:  DISABLE_LAYER_NV_GR2608_1
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Manifest: C:\WINDOWS\System32\DriverStore\FileRepository\nvmdui.inf_amd64_53ee4fe56316dba0\nv-vk64.json
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Library:  C:\WINDOWS\System32\DriverStore\FileRepository\nvmdui.inf_amd64_53ee4fe56316dba0\.\nvoglv64.dll
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]      ||
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]    VK_LAYER_KHRONOS_validation
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Type: Explicit
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Enabled By: By the Application
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Manifest: C:\VulkanSDK\1.3.296.0\Bin\VkLayer_khronos_validation.json
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Library:  C:\VulkanSDK\1.3.296.0\Bin\.\VkLayer_khronos_validation.dll
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]      ||
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]    <Device>
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]        Using "Intel(R) UHD Graphics 770" with driver: "C:\WINDOWS\System32\DriverStore\FileRepository\iigd_dch.inf_amd64_7dec88a1950b9616\.\igvk64.dll"
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0] Inserted device layer "VK_LAYER_KHRONOS_validation" (C:\VulkanSDK\1.3.296.0\Bin\.\VkLayer_khronos_validation.dll)
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0] Inserted device layer "VK_LAYER_NV_present" (C:\WINDOWS\System32\DriverStore\FileRepository\nvmdui.inf_amd64_53ee4fe56316dba0\.\nvoglv64.dll)
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0] Inserted device layer "VK_LAYER_NV_optimus" (C:\WINDOWS\System32\DriverStore\FileRepository\nvmdui.inf_amd64_53ee4fe56316dba0\.\nvoglv64.dll)
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0] vkCreateDevice layer callstack setup to:
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]    <Application>
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]      ||
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]    <Loader>
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]      ||
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]    VK_LAYER_NV_optimus
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Type: Implicit
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Enabled By: Implicit Layer
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]                Disable Env Var:  DISABLE_LAYER_NV_OPTIMUS_1
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Manifest: C:\WINDOWS\System32\DriverStore\FileRepository\nvmdui.inf_amd64_53ee4fe56316dba0\nv-vk64.json
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Library:  C:\WINDOWS\System32\DriverStore\FileRepository\nvmdui.inf_amd64_53ee4fe56316dba0\.\nvoglv64.dll
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]      ||
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]    VK_LAYER_NV_present
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Type: Implicit
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Enabled By: Implicit Layer
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]                Disable Env Var:  DISABLE_LAYER_NV_GR2608_1
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Manifest: C:\WINDOWS\System32\DriverStore\FileRepository\nvmdui.inf_amd64_53ee4fe56316dba0\nv-vk64.json
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Library:  C:\WINDOWS\System32\DriverStore\FileRepository\nvmdui.inf_amd64_53ee4fe56316dba0\.\nvoglv64.dll
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]      ||
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]    VK_LAYER_KHRONOS_validation
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Type: Explicit
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Enabled By: By the Application
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Manifest: C:\VulkanSDK\1.3.296.0\Bin\VkLayer_khronos_validation.json
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Library:  C:\VulkanSDK\1.3.296.0\Bin\.\VkLayer_khronos_validation.dll
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]      ||
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]    <Device>
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]        Using "NVIDIA GeForce RTX 3060" with driver: "C:\WINDOWS\System32\DriverStore\FileRepository\nvmdui.inf_amd64_53ee4fe56316dba0\.\nvoglv64.dll"
+[01:44:01] [info] [PID 35488] [GRAPHICS] [0] Intel(R) UHD Graphics 770 (integrated)
+[01:44:01] [info] [PID 35488] [GRAPHICS]     vendor=0x8086 device=0xa780 API 1.4.323 / driver 0x00195bb0 driver=Intel Corporation (101.7088)
+[01:44:01] [info] [PID 35488] [GRAPHICS]     uuid=868080a7040000000002000000000000 driverUuid=33322e302e3130312e37303838000000
+[01:44:01] [info] [PID 35488] [GRAPHICS]     graphicsPresentQueue=yes (family 0, queues 1)
+[01:44:01] [info] [PID 35488] [GRAPHICS]     descriptor capacity available: resources=1048576, samplers=1048576, combined=1048576
+[01:44:01] [info] [PID 35488] [GRAPHICS]     globalSet1LayoutSupport=supported requiredFormatFeatures=yes
+[01:44:01] [info] [PID 35488] [GRAPHICS]     conditional features: imageCubeArray=yes samplerMirrorClampToEdge=yes fillModeNonSolid=yes depthClamp=yes depthBiasClamp=yes independentBlend=yes
+[01:44:01] [info] [PID 35488] [GRAPHICS]     format VK_FORMAT_126 (sampleable depth and shadow map) supported=yes
+[01:44:01] [info] [PID 35488] [GRAPHICS]     format VK_FORMAT_97 (HDR scene color and bloom) supported=yes
+[01:44:01] [info] [PID 35488] [GRAPHICS]     format VK_FORMAT_37 (preview and auxiliary targets) supported=yes
+[01:44:01] [info] [PID 35488] [GRAPHICS]     format VK_FORMAT_44 (swapchain backbuffer) supported=yes
+[01:44:01] [info] [PID 35488] [GRAPHICS]     format VK_FORMAT_9 (GTAO AO (preferred)) supported=yes
+[01:44:01] [info] [PID 35488] [GRAPHICS]     format VK_FORMAT_76 (GTAO AO (fallback)) supported=yes
+[01:44:01] [info] [PID 35488] [GRAPHICS]     PROFILE: ACCEPTED
+[01:44:01] [info] [PID 35488] [GRAPHICS] [1] NVIDIA GeForce RTX 3060 (discrete)
+[01:44:01] [info] [PID 35488] [GRAPHICS]     vendor=0x10de device=0x2504 API 1.4.303 / driver 0x9044c000 driver=NVIDIA (577.19)
+[01:44:01] [info] [PID 35488] [GRAPHICS]     uuid=18b9c71a164e2c971590b88d840f7049 driverUuid=09fe01db1e4359f6b491c67c1a90a3ce
+[01:44:01] [info] [PID 35488] [GRAPHICS]     graphicsPresentQueue=yes (family 0, queues 16)
+[01:44:01] [info] [PID 35488] [GRAPHICS]     descriptor capacity available: resources=1048576, samplers=1048576, combined=4294967295
+[01:44:01] [info] [PID 35488] [GRAPHICS]     globalSet1LayoutSupport=supported requiredFormatFeatures=yes
+[01:44:01] [info] [PID 35488] [GRAPHICS]     conditional features: imageCubeArray=yes samplerMirrorClampToEdge=yes fillModeNonSolid=yes depthClamp=yes depthBiasClamp=yes independentBlend=yes
+[01:44:01] [info] [PID 35488] [GRAPHICS]     format VK_FORMAT_126 (sampleable depth and shadow map) supported=yes
+[01:44:01] [info] [PID 35488] [GRAPHICS]     format VK_FORMAT_97 (HDR scene color and bloom) supported=yes
+[01:44:01] [info] [PID 35488] [GRAPHICS]     format VK_FORMAT_37 (preview and auxiliary targets) supported=yes
+[01:44:01] [info] [PID 35488] [GRAPHICS]     format VK_FORMAT_44 (swapchain backbuffer) supported=yes
+[01:44:01] [info] [PID 35488] [GRAPHICS]     format VK_FORMAT_9 (GTAO AO (preferred)) supported=yes
+[01:44:01] [info] [PID 35488] [GRAPHICS]     format VK_FORMAT_76 (GTAO AO (fallback)) supported=yes
+[01:44:01] [info] [PID 35488] [GRAPHICS]     PROFILE: ACCEPTED
+[01:44:01] [info] [PID 35488] [GRAPHICS] Selected adapter: NVIDIA GeForce RTX 3060 (discrete) vendor=0x10de device=0x2504
+[01:44:01] [info] [PID 35488] [GRAPHICS]   queue family 0 (16 queues)
+[01:44:01] [info] [PID 35488] [GRAPHICS]   selected queues: graphics=0, transfer=1 (separate)
+[01:44:01] [info] [PID 35488] [GRAPHICS]   enabled device extensions: VK_KHR_swapchain, VK_EXT_mutable_descriptor_type
+[01:44:01] [info] [PID 35488] [GRAPHICS]   features: dynamicRendering=yes, synchronization2=yes, timelineSemaphore=yes, scalarBlockLayout=yes, samplerAnisotropy=yes, shaderStorageImageExtendedFormats=yes, mutableDescriptorType=yes
+[01:44:01] [info] [PID 35488] [GRAPHICS]   descriptor indexing: runtimeDescriptorArray=yes, partiallyBound=yes, updateUnusedWhilePending=yes, sampledImageUAB=yes, storageImageUAB=yes, sampledNonUniform=yes, storageNonUniform=yes
+[01:44:01] [info] [PID 35488] [GRAPHICS]   descriptor capacity required=65536/2048 available=1048576/1048576 selected=65536/2048
+[01:44:01] [info] [PID 35488] [GRAPHICS]   global set-1 layout support: yes
+[01:44:01] [info] [PID 35488] [GRAPHICS]   required format features: yes
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0] Inserted device layer "VK_LAYER_KHRONOS_validation" (C:\VulkanSDK\1.3.296.0\Bin\.\VkLayer_khronos_validation.dll)
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0] Inserted device layer "VK_LAYER_NV_present" (C:\WINDOWS\System32\DriverStore\FileRepository\nvmdui.inf_amd64_53ee4fe56316dba0\.\nvoglv64.dll)
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0] Inserted device layer "VK_LAYER_NV_optimus" (C:\WINDOWS\System32\DriverStore\FileRepository\nvmdui.inf_amd64_53ee4fe56316dba0\.\nvoglv64.dll)
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0] vkCreateDevice layer callstack setup to:
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]    <Application>
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]      ||
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]    <Loader>
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]      ||
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]    VK_LAYER_NV_optimus
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Type: Implicit
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Enabled By: Implicit Layer
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]                Disable Env Var:  DISABLE_LAYER_NV_OPTIMUS_1
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Manifest: C:\WINDOWS\System32\DriverStore\FileRepository\nvmdui.inf_amd64_53ee4fe56316dba0\nv-vk64.json
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Library:  C:\WINDOWS\System32\DriverStore\FileRepository\nvmdui.inf_amd64_53ee4fe56316dba0\.\nvoglv64.dll
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]      ||
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]    VK_LAYER_NV_present
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Type: Implicit
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Enabled By: Implicit Layer
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]                Disable Env Var:  DISABLE_LAYER_NV_GR2608_1
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Manifest: C:\WINDOWS\System32\DriverStore\FileRepository\nvmdui.inf_amd64_53ee4fe56316dba0\nv-vk64.json
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Library:  C:\WINDOWS\System32\DriverStore\FileRepository\nvmdui.inf_amd64_53ee4fe56316dba0\.\nvoglv64.dll
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]      ||
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]    VK_LAYER_KHRONOS_validation
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Type: Explicit
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Enabled By: By the Application
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Manifest: C:\VulkanSDK\1.3.296.0\Bin\VkLayer_khronos_validation.json
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]            Library:  C:\VulkanSDK\1.3.296.0\Bin\.\VkLayer_khronos_validation.dll
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]      ||
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]    <Device>
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan validation [info] [general] [Loader Message #0]        Using "NVIDIA GeForce RTX 3060" with driver: "C:\WINDOWS\System32\DriverStore\FileRepository\nvmdui.inf_amd64_53ee4fe56316dba0\.\nvoglv64.dll"
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan device created on adapter [1] 'NVIDIA GeForce RTX 3060'.
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan RHI context initialized on 'NVIDIA GeForce RTX 3060'.
+[01:44:01] [info] [PID 35488] [GRAPHICS] EnvironmentAssetController: loading environment candidate 'E:\RSProjs\gglab\Assets\Textures\Skybox\golden_gate_hills_2k.hdr' (selection 1).
+[01:44:01] [info] [PID 35488] [APPLICATION] Startup configuration: demo='Demo.Playground.CoastalAtrium', lab='gglab.lab.culling', mouse_mode='absolute'.
+[01:44:01] [info] [PID 35488] [APPLICATION] Runtime paths: assets='E:\RSProjs\gglab\Build\Output\x64\Develop\Assets', shader_artifacts='E:\RSProjs\gglab\Build\Validation\GIG0\NoPix-c77aa38e39\vulkan\State\ShaderArtifacts', ibl_ddc='E:\RSProjs\gglab\Build\Validation\GIG0\NoPix-c77aa38e39\vulkan\State\DerivedDataCache\IBL', texture_ddc='E:\RSProjs\gglab\Build\Validation\GIG0\NoPix-c77aa38e39\vulkan\State\DerivedDataCache\Texture'.
+[01:44:01] [info] [PID 35488] [APPLICATION] Optional application tooling omitted by host composition.
+[01:44:01] [info] [PID 35488] [APPLICATION] Session 'gi-g0-vulkan-eaaf76cf' accepts control requests (protocol 4).
+session-ready: gi-g0-vulkan-eaaf76cf
+[01:44:01] [info] [PID 35488] [GRAPHICS] Async artifact preload published 50 shaders (queueMs=2.52, cpuMs=33.91).
+[01:44:01] [warning] [PID 35488] [GRAPHICS] TextureLoader sanitized HDR 'E:\RSProjs\gglab\Assets\Textures\Skybox\golden_gate_hills_2k.hdr' for FP16 storage: maxFiniteChannel=97536, nonFiniteChannels=0, negativeChannels=0, clampedChannels=16, clamp=65000.
+[01:44:01] [info] [PID 35488] [GRAPHICS] Vulkan completed its first production submit/present frame transaction.
+[01:44:01] [info] [PID 35488] [GRAPHICS] IBL stage cache lookup generation 1 completed (cpuHits=0, ddcHits=0, misses=4, queueMs=0.01, cpuMs=1.18).
+[01:44:01] [info] [PID 35488] [GRAPHICS] Texture 8 derived data resolved (cache=miss, key=08bb80ff65c54fed).
+[01:44:01] [info] [PID 35488] [GRAPHICS] Texture 64 derived data resolved (cache=miss, key=9176a61a188dd6c4).
+[01:44:01] [info] [PID 35488] [GRAPHICS] Async texture 64 queued for upload admission (queueMs=0.01, cpuMs=101.29).
+[01:44:01] [info] [PID 35488] [GRAPHICS] Async texture 8 queued for upload admission (queueMs=0.01, cpuMs=85.35).
+[01:44:01] [info] [PID 35488] [GRAPHICS] Texture 64 GPU upload completed in 15.46 ms.
+[01:44:01] [info] [PID 35488] [GRAPHICS] EnvironmentAssetController: committed HDR environment 'E:\RSProjs\gglab\Assets\Textures\Skybox\golden_gate_hills_2k.hdr'.
+[01:44:01] [info] [PID 35488] [GRAPHICS] Texture 8 GPU upload completed in 15.34 ms.
+[01:44:01] [info] [PID 35488] [GRAPHICS] IBL stage cache lookup generation 2 completed (cpuHits=0, ddcHits=0, misses=4, queueMs=0.06, cpuMs=1.97).
+[01:44:01] [info] [PID 35488] [GRAPHICS] IBL bake generation 2 published atomically (cacheStages=0, gpuStages=4, gpuMs=0.000, source=HDR Texture, publicationMs=119.0).
+[01:44:02] [info] [PID 35488] [GRAPHICS] Texture 9 derived data resolved (cache=miss, key=0b9331b13c594bb1).
+[01:44:02] [info] [PID 35488] [GRAPHICS] Async texture 9 queued for upload admission (queueMs=0.01, cpuMs=1053.25).
+[01:44:02] [info] [PID 35488] [GRAPHICS] Texture 9 GPU upload completed in 21.40 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Model texture artifacts resolved (textures=26, ddcHits=0).
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 65 GPU upload completed in 17.53 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 66 GPU upload completed in 16.04 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 67 GPU upload completed in 17.38 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 68 GPU upload completed in 16.98 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 69 GPU upload completed in 17.19 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 70 GPU upload completed in 16.76 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 71 GPU upload completed in 15.35 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 72 GPU upload completed in 17.40 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 73 GPU upload completed in 17.19 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 74 GPU upload completed in 15.93 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 75 GPU upload completed in 17.46 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 76 GPU upload completed in 18.44 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 77 GPU upload completed in 15.11 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 78 GPU upload completed in 16.70 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 79 GPU upload completed in 17.52 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 80 GPU upload completed in 17.04 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 81 GPU upload completed in 14.53 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 82 GPU upload completed in 16.95 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 83 GPU upload completed in 17.34 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 84 GPU upload completed in 16.84 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 85 GPU upload completed in 15.92 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 86 GPU upload completed in 17.61 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 87 GPU upload completed in 16.88 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 88 GPU upload completed in 16.06 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 89 GPU upload completed in 17.64 ms.
+[01:44:03] [info] [PID 35488] [GRAPHICS] Texture 90 GPU upload completed in 14.65 ms.
+[01:44:04] [info] [PID 35488] [APPLICATION] Activated demo 'Demo.Playground.CoastalAtrium'.
+[01:44:04] [warning] [PID 35488] [GRAPHICS] Vulkan validation [warning] [performance] [WARNING-Shader-OutputNotConsumed #-937765618] Validation Performance Warning: [ WARNING-Shader-OutputNotConsumed ] Object 0: handle = 0x1c750b00000003a6, name = Vulkan.GraphicsPipeline.VS, type = VK_OBJECT_TYPE_SHADER_MODULE; Object 1: handle = 0xd9de6a00000003a7, name = Vulkan.GraphicsPipeline.PS, type = VK_OBJECT_TYPE_SHADER_MODULE; | MessageID = 0xc81ad50e | vkCreateGraphicsPipelines(): pCreateInfos[0] (SPIR-V Interface) VK_SHADER_STAGE_VERTEX_BIT declared to output location 8 Component 0 but is not an Input declared by VK_SHADER_STAGE_FRAGMENT_BIT.
+[01:44:04] [warning] [PID 35488] [GRAPHICS] Vulkan validation [warning] [performance] [WARNING-Shader-OutputNotConsumed #-937765618] Validation Performance Warning: [ WARNING-Shader-OutputNotConsumed ] Object 0: handle = 0x1c750b00000003a6, name = Vulkan.GraphicsPipeline.VS, type = VK_OBJECT_TYPE_SHADER_MODULE; Object 1: handle = 0xd9de6a00000003a7, name = Vulkan.GraphicsPipeline.PS, type = VK_OBJECT_TYPE_SHADER_MODULE; | MessageID = 0xc81ad50e | vkCreateGraphicsPipelines(): pCreateInfos[0] (SPIR-V Interface) VK_SHADER_STAGE_VERTEX_BIT declared to output location 5 Component 0 but is not an Input declared by VK_SHADER_STAGE_FRAGMENT_BIT.
+[01:44:04] [info] [PID 35488] [GRAPHICS] Async model 8 published incrementally (instances=506, textureUploads=26, meshUploads=60, queueMs=0.01, cpuMs=1618.52).
+[01:44:05] [info] [PID 35488] [GRAPHICS] IBL bake generation 3 published atomically (cacheStages=0, gpuStages=4, gpuMs=43.432, source=Physical Sky, publicationMs=272.0).
+[01:44:16] [info] [PID 35488] [APPLICATION] Session 'gi-g0-vulkan-eaaf76cf' is stopping on request.
+[01:44:16] [info] [PID 35488] [GRAPHICS] AssetManager terminal shutdown prepared; texture GPU resources released at fence 847.
+[01:44:16] [info] [PID 35488] [GRAPHICS] Upload statistics: per-batch high-water leased=262144 B, pages=4, reserved=204608 B; pool pages=8, capacity=524288 B; batches submitted=847, cancelled=0; failures oversized=0, batch-bytes=0, pool-bytes=0, page-count=0, creation=0, mapping=0, publication=0.
+[01:44:16] [info] [PID 35488] [GRAPHICS] Vulkan set-0 descriptor statistics: submitted frames=847, snapshots high-water=18; last submitted frame snapshots=16, binds=2288, reused=2272.
+[01:44:16] [info] [PID 35488] [GRAPHICS] Vulkan native binding layouts retained at teardown: 8.
