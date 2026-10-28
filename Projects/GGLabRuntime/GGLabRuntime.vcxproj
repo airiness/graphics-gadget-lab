@@ -155,6 +155,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12TransferContext.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIResource.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHITextureValidation.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIAccelerationStructure.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIContext.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIUpload.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIUploadPool.cpp" />
@@ -427,6 +428,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIFormat.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITexture.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITextureValidation.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIAccelerationStructure.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITextureViewDescUtils.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanCoordinatePolicy.h" />

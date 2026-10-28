@@ -169,6 +169,8 @@ Atlas ID: atlas.runtime.rhi-submission
 - **Public interface:** [RHIContext.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RHI/RHIContext.h),
   [RHIDevice.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RHI/RHIDevice.h)
   and [RHIFence.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RHI/RHIFence.h).
+  [RHIAccelerationStructure.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RHI/RHIAccelerationStructure.h)
+  defines AS inputs.
 - **Implementation:** [submission resolution](../../../Sources/GGLabRuntime/Private/Graphics/RHI/RHIFrameSubmission.cpp),
   [DX12](../../../Sources/GGLabRuntime/Private/Graphics/RHI/DX12/DX12Context.cpp),
   [Vulkan](../../../Sources/GGLabRuntime/Private/Graphics/RHI/Vulkan/VulkanContext.cpp)
@@ -177,8 +179,8 @@ Atlas ID: atlas.runtime.rhi-submission
   keep accepted work until its completion permits release.
 - **Boundary:** [teardown ownership](../Frame_Execution_Map.md#teardown-ownership)
   coordinates consumers; native fence and device-loss policy stay in the backends.
-- **Verification:** Runtime submission contracts and AppRuntime's simulated fault
-  harness.
+- **Verification:** Runtime submission contracts, `ray-query-contracts`, and
+  AppRuntime's simulated fault harness.
 
 ```text
 Anchors:
@@ -188,4 +190,7 @@ ReviewPaths:
   - Sources/GGLabRuntime/Private/Graphics/RHI/DX12/DX12Context.cpp
   - Sources/GGLabRuntime/Private/Graphics/RHI/Vulkan/VulkanContext.cpp
   - Sources/GGLabRuntime/Private/Graphics/Resource/TransientResourcePool.cpp
+  - Sources/GGLabRuntime/Private/Graphics/RHI/RHIAccelerationStructure.cpp
+  - Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RHI/RHIAccelerationStructure.h
+  - Tests/GGLabRuntime/RayQueryContractSelfTests.cpp
 ```

@@ -15,6 +15,7 @@
     <ClCompile Include="..\..\Tests\GGLabRuntime\LayoutContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\NonFiniteWatchSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\PublicationAccountingSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\RayQueryContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\RenderingContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\RenderServicesViewSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\RGObjectArenaSelfTests.cpp" />
@@ -35,6 +36,7 @@
     <ClInclude Include="..\..\Tests\GGLabRuntime\LayoutContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\NonFiniteWatchSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\PublicationAccountingSelfTests.h" />
+    <ClInclude Include="..\..\Tests\GGLabRuntime\RayQueryContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\RenderingContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\RenderServicesViewSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\RGObjectArenaSelfTests.h" />

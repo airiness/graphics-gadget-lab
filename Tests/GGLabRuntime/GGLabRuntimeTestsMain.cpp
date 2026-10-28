@@ -12,6 +12,7 @@
 #include "GGLabFoundation/Logging/Log.h"
 #include "GGLabTestCore/SelfTest.h"
 #include "PublicationAccountingSelfTests.h"
+#include "RayQueryContractSelfTests.h"
 #include "RenderingContractSelfTests.h"
 #include "RGObjectArenaSelfTests.h"
 #include "RenderServicesViewSelfTests.h"
@@ -77,6 +78,10 @@ namespace
 		gglab::SelfTestSuiteDesc{
 			.m_Id = "shader-artifact-runtime",
 			.m_Run = &gglab::RunShaderArtifactRuntimeSelfTests,
+		},
+		gglab::SelfTestSuiteDesc{
+			.m_Id = "ray-query-contracts",
+			.m_Run = &gglab::RunRayQueryContractSelfTests,
 		},
 		gglab::SelfTestSuiteDesc{
 			.m_Id = "rendering-contracts",

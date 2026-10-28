@@ -26,6 +26,7 @@ namespace gglab
 		InvalidDescriptorCount,
 		InvalidInlineConstantSize,
 		DuplicateNativeBinding,
+		RayQueryUnavailable,
 	};
 
 	struct VulkanSet0BindingPlan

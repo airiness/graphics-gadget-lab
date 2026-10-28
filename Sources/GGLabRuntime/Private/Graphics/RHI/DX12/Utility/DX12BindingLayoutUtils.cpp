@@ -87,6 +87,20 @@ namespace gglab
 		const RHIBindingLayoutDesc& rhiDesc, DX12BindingLayoutBuildResult& outDesc) noexcept
 	{
 		outDesc = {};
+		if (rhiDesc.m_SlotCount > RHIBindingLayoutDesc::MaxSlots)
+		{
+			outDesc.m_Error = DX12BindingLayoutError::TooManySlots;
+			return;
+		}
+		for (uint32_t index = 0; index < rhiDesc.m_SlotCount; ++index)
+		{
+			if (rhiDesc.m_Slots[index].m_Type == RHIBindingType::AccelerationStructure)
+			{
+				// Never reinterpret a TLAS as an ordinary SRV before native RT enablement.
+				outDesc.m_Error = DX12BindingLayoutError::RayQueryUnavailable;
+				return;
+			}
+		}
 
 		D3D12_ROOT_SIGNATURE_FLAGS flags =
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;

@@ -876,6 +876,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.cpp">
       <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIAccelerationStructure.cpp">
+      <Filter>Private\Graphics\RHI</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIContext.cpp">
       <Filter>Private\Graphics\RHI</Filter>
     </ClCompile>
@@ -2278,6 +2281,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\DX12\DX12ResourceLifecycleTools.h">
       <Filter>Public\GGLabRuntime\Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIAccelerationStructure.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIBindingLayout.h">
       <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>

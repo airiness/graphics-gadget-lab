@@ -108,6 +108,12 @@ namespace gglab
 		for (uint32_t slotIndex = 0; slotIndex < desc.m_SlotCount; ++slotIndex)
 		{
 			const RHIBindingSlotDesc& slot = desc.m_Slots[slotIndex];
+			if (slot.m_Type == RHIBindingType::AccelerationStructure)
+			{
+				// Device feature enablement and fixed AS descriptors land together.
+				plan.m_Error = VulkanBindingLayoutError::RayQueryUnavailable;
+				return plan;
+			}
 			if (slot.m_Type == RHIBindingType::Unknown)
 			{
 				plan.m_Error = VulkanBindingLayoutError::UnknownBindingType;

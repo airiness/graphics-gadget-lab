@@ -20,6 +20,7 @@ namespace gglab
 		InlineConstants,
 		BindlessResourceTable,
 		BindlessSamplerTable,
+		AccelerationStructure,
 	};
 
 	[[nodiscard]] constexpr bool IsBindlessBindingType(RHIBindingType type) noexcept
