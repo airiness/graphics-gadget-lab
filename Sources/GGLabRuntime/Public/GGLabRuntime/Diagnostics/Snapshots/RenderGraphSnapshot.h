@@ -6,6 +6,7 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RGObjectArena.h"
 #include "GGLabRuntime/Graphics/Resource/TransientResourceTypes.h"
 #include "GGLabRuntime/Graphics/RHI/RHIResource.h"
+#include "GGLabRuntime/Graphics/RHI/RHIAccelerationStructure.h"
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 #include "GGLabRuntime/Graphics/RHI/RHITypes.h"
 
@@ -99,6 +100,7 @@ namespace gglab
 		// Descriptor-only discovery capability. This UI diagnostic is not serialized
 		// in the persisted graph schema; the capture frame validates the full address.
 		RGObservationFailure m_ResourceExportSupport = RGObservationFailure::UnsupportedResource;
+		RHIAccelerationStructureType m_AccelerationStructureType = RHIAccelerationStructureType::BottomLevel;
 	};
 
 	struct RGSnapshotResourceNodeInfo
@@ -180,7 +182,7 @@ namespace gglab
 	};
 
 	// Every variant shares one content version; observation node kinds are listed explicitly.
-	inline constexpr uint32_t RenderGraphExportSchemaVersion = 5;
+	inline constexpr uint32_t RenderGraphExportSchemaVersion = 7;
 
 	// Versioned graph data; AppRuntime embeds its common frame metadata and submission identity.
 	[[nodiscard]] std::string SerializeRenderGraphSnapshot(

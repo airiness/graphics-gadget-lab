@@ -13,12 +13,27 @@ namespace gglab::devtools
 	template <> struct EnumTextTraits<RGBarrierReason> : diagnostics::RGEnumTextTraits<RGBarrierReason> {};
 	template <> struct EnumTextTraits<RGTextureAccess> : diagnostics::RGEnumTextTraits<RGTextureAccess> {};
 	template <> struct EnumTextTraits<RGBufferAccess> : diagnostics::RGEnumTextTraits<RGBufferAccess> {};
+	template <> struct EnumTextTraits<RGAccelerationStructureAccess> : diagnostics::RGEnumTextTraits<RGAccelerationStructureAccess> {};
 	template <> struct EnumTextTraits<RHITextureUsage> : diagnostics::RGEnumTextTraits<RHITextureUsage> {};
 	template <> struct EnumTextTraits<RHIBufferUsage> : diagnostics::RGEnumTextTraits<RHIBufferUsage> {};
 	template <> struct EnumTextTraits<RHIStage> : diagnostics::RGEnumTextTraits<RHIStage> {};
 	template <> struct EnumTextTraits<RHITextureAspect> : diagnostics::RGEnumTextTraits<RHITextureAspect> {};
 	template <> struct EnumTextTraits<RHIAccess> : diagnostics::RGEnumTextTraits<RHIAccess> {};
 	template <> struct EnumTextTraits<RHILayout> : diagnostics::RGEnumTextTraits<RHILayout> {};
+
+	[[nodiscard]] inline std::string RenderGraphAccessText(uint64_t value, RGResourceType resourceType)
+	{
+		switch (resourceType)
+		{
+		case RGResourceType::RGTexture:
+			return EnumText(static_cast<RGTextureAccess>(value));
+		case RGResourceType::RGBuffer:
+			return EnumText(static_cast<RGBufferAccess>(value));
+		case RGResourceType::RGAccelerationStructure:
+			return EnumText(static_cast<RGAccelerationStructureAccess>(value));
+		}
+		return "Unknown";
+	}
 
 	[[nodiscard]] inline std::string BarrierStateText(const RHIResourceState& state)
 	{

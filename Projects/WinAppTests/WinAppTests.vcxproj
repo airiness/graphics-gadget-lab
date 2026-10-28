@@ -156,6 +156,7 @@
     <ClCompile Include="..\..\Tests\WinApp\ApplicationLifecycleSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\DevelopGuiVulkanPresentationContractSelfTests.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Tests\WinApp\DevToolsViewProfileSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\RenderGraphDiagnosticsSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\TemporalAALabDiagnosticsSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\TemporalAALabGpuTimingSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\DevelopmentShaderBuildProcessClientSelfTests.cpp" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />
@@ -181,6 +182,7 @@
     <ClInclude Include="..\..\Tests\WinApp\ApplicationLifecycleSelfTests.h" />
     <ClInclude Include="..\..\Tests\WinApp\DevelopGuiVulkanPresentationContractSelfTests.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Tests\WinApp\DevToolsViewProfileSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\RenderGraphDiagnosticsSelfTests.h" />
     <ClInclude Include="..\..\Tests\WinApp\TemporalAALabDiagnosticsSelfTests.h" />
     <ClInclude Include="..\..\Tests\WinApp\TemporalAALabGpuTimingSelfTests.h" />
     <ClInclude Include="..\..\Tests\WinApp\DevelopmentShaderBuildProcessClientSelfTests.h" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'" />

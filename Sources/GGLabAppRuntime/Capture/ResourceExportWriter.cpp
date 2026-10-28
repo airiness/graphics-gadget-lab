@@ -219,7 +219,7 @@ namespace gglab
 		const ResourceExportSubmission& submission, bool summary, bool resourceExportActive)
 	{
 		Json root = Json::parse(SerializeRenderGraphSnapshot(snapshot, summary));
-		if (metadata.m_Parameters)
+		if (metadata.m_Parameters && root["schemaVersion"].get<uint32_t>() < 6)
 		{
 			root["schemaVersion"] = 6;
 		}

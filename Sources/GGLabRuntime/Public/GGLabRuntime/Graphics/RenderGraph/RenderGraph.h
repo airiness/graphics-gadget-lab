@@ -62,6 +62,7 @@ namespace gglab
 		RHITextureViewHandle GetViewHandle(RGTextureViewId viewId) const noexcept;
 		RHIDescriptorHandle GetViewDescriptor(RGTextureViewId viewId) const noexcept;
 		RHIBufferHandle GetBufferHandle(RGBufferId bufferId) const noexcept;
+		RHIAccelerationStructureHandle GetAccelerationStructureHandle(RGAccelerationStructureId id) const noexcept;
 		// Resolves the texture of a declared access for copy commands; shader
 		// access goes through views.
 		RHITextureHandle GetTextureHandle(RGTextureId textureId) const noexcept;
@@ -1162,7 +1163,10 @@ namespace gglab
 			compiledDesc.m_Usage = static_cast<RHIBufferUsage>(usageBits);
 			m_PhysicalAllocation = pool->AcquireBuffer(compiledDesc, m_NameId.Name());
 		}
-		m_Devirtualized = m_PhysicalAllocation.IsValid();
+		if constexpr (!std::is_same_v<RESOURCE, RGAccelerationStructureResource>)
+		{
+			m_Devirtualized = m_PhysicalAllocation.IsValid();
+		}
 		GGLAB_ASSERT_MSG(m_Devirtualized, "Failed to acquire a transient physical resource.");
 	}
 
@@ -1189,7 +1193,10 @@ namespace gglab
 		{
 			retireBuffers.push_back(std::move(m_PhysicalAllocation));
 		}
-		m_PhysicalAllocation.Reset();
+		if constexpr (!std::is_same_v<RESOURCE, RGAccelerationStructureResource>)
+		{
+			m_PhysicalAllocation.Reset();
+		}
 		m_Devirtualized = false;
 	}
 }

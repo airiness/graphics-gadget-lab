@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gglab.render-graph",
-  "title": "GGLab render graph frame export v1/v2/v3/v4/v5",
+  "title": "GGLab render graph frame export v1-v7",
   "type": "object",
   "required": ["schema", "schemaVersion", "mode", "frameSerial", "frame", "submission", "observation", "compile"],
   "properties": {
     "schema": { "const": "gglab.render-graph" },
-    "schemaVersion": { "enum": [1, 2, 3, 4, 5, 6] },
+    "schemaVersion": { "enum": [1, 2, 3, 4, 5, 6, 7] },
     "mode": { "enum": ["full", "summary"] },
     "frameSerial": { "type": "integer", "minimum": 1 },
     "frame": {
@@ -115,6 +115,7 @@
     }
   },
   "allOf": [
+    {"if": {"properties": {"schemaVersion": {"maximum": 6}}}, "then": {"properties": {"compile": {"properties": {"resources": {"items": {"properties": {"type": {"enum": ["Texture", "Buffer"]}}}}, "versions": {"items": {"properties": {"type": {"enum": ["Texture", "Buffer"]}}}}}}}}},
     {
       "if": { "properties": { "mode": { "const": "full" } } },
       "then": {
@@ -138,7 +139,7 @@
     {"if": {"properties": {"schemaVersion": {"const": 3}}}, "then": {"properties": {"observation": {"properties": {"nonFiniteWatch": {"const": true}}}, "execution": {"properties": {"observationNodes": {"contains": {"properties": {"kind": {"const": "NonFiniteScan"}}}, "items": {"properties": {"kind": {"enum": ["ResourceExport", "NonFiniteScan"]}}}}}}}}},
     {"if": {"properties": {"schemaVersion": {"const": 4}}}, "then": {"properties": {"observation": {"properties": {"nonFiniteWatch": {"const": true}}}, "execution": {"properties": {"observationNodes": {"contains": {"properties": {"kind": {"const": "ProductionCounters"}}}}}}}}},
     {
-      "if": { "properties": { "schemaVersion": { "enum": [5, 6] } } },
+      "if": { "properties": { "schemaVersion": { "enum": [5, 6, 7] } } },
       "then": {
         "properties": { "observation": { "required": ["nodeKinds"] } },
         "allOf": [{
@@ -153,7 +154,7 @@
         }]
       }
     },
-    {"if": {"properties": {"schemaVersion": {"const": 6}}}, "then": {"properties": {"frame": {"required": ["parameters"], "properties": {"parameters": {"type": "object"}, "parameterRevision": {"type": "integer"}}}}}, "else": {"properties": {"frame": {"properties": {"parameterRevision": {"type": "null"}, "parameters": {"type": "null"}}}}}}
+    {"if": {"anyOf": [{"properties": {"schemaVersion": {"const": 6}}}, {"properties": {"schemaVersion": {"const": 7}, "frame": {"properties": {"parameterRevision": {"type": "integer"}}}}}]}, "then": {"properties": {"frame": {"required": ["parameters"], "properties": {"parameters": {"type": "object"}, "parameterRevision": {"type": "integer"}}}}}, "else": {"properties": {"frame": {"properties": {"parameterRevision": {"type": "null"}, "parameters": {"type": "null"}}}}}}
   ],
   "$defs": {
     "unavailable": { "type": "object", "required": ["status", "reason"], "properties": { "status": { "const": "unavailable" }, "reason": { "type": "string", "minLength": 1 } } },
@@ -202,7 +203,7 @@
       "additionalProperties": false
     },
     "physical": { "type": ["object", "null"], "required": ["index", "generation"], "properties": { "index": { "type": "integer", "minimum": 0 }, "generation": { "type": "integer", "minimum": 0 } } },
-    "resourceType": { "enum": ["Texture", "Buffer"] },
+    "resourceType": { "enum": ["Texture", "Buffer", "AccelerationStructure"] },
     "rangeCount": { "oneOf": [{ "type": "integer", "minimum": 0, "maximum": 4294967294 }, { "const": "remaining" }] },
     "subresources": {
       "type": ["object", "null"],
@@ -219,9 +220,9 @@
       "type": "object",
       "required": ["stages", "stageBits", "access", "accessBits", "layout"],
       "properties": {
-        "stages": { "type": "string", "pattern": "^(None|DrawIndirect|IndexInput|VertexShader|PixelShader|ComputeShader|RenderTarget|DepthStencil|Copy|Resolve|Present)( \\| (DrawIndirect|IndexInput|VertexShader|PixelShader|ComputeShader|RenderTarget|DepthStencil|Copy|Resolve|Present))*$" },
+        "stages": { "type": "string", "pattern": "^(None|DrawIndirect|IndexInput|VertexShader|PixelShader|ComputeShader|RenderTarget|DepthStencil|Copy|Resolve|Present|AccelerationStructureBuild)( \\| (DrawIndirect|IndexInput|VertexShader|PixelShader|ComputeShader|RenderTarget|DepthStencil|Copy|Resolve|Present|AccelerationStructureBuild))*$" },
         "stageBits": { "type": "integer", "minimum": 0 },
-        "access": { "type": "string", "pattern": "^(None|Common|ShaderResource|RenderTarget|DepthStencilRead|DepthStencilWrite|UnorderedAccess|CopySource|CopyDest|VertexBuffer|IndexBuffer|ConstantBuffer|IndirectArgument|Present)( \\| (Common|ShaderResource|RenderTarget|DepthStencilRead|DepthStencilWrite|UnorderedAccess|CopySource|CopyDest|VertexBuffer|IndexBuffer|ConstantBuffer|IndirectArgument|Present))*$" },
+        "access": { "type": "string", "pattern": "^(None|Common|ShaderResource|RenderTarget|DepthStencilRead|DepthStencilWrite|UnorderedAccess|CopySource|CopyDest|VertexBuffer|IndexBuffer|ConstantBuffer|IndirectArgument|Present|AccelerationStructureRead|AccelerationStructureWrite)( \\| (Common|ShaderResource|RenderTarget|DepthStencilRead|DepthStencilWrite|UnorderedAccess|CopySource|CopyDest|VertexBuffer|IndexBuffer|ConstantBuffer|IndirectArgument|Present|AccelerationStructureRead|AccelerationStructureWrite))*$" },
         "accessBits": { "type": "integer", "minimum": 0 },
         "layout": { "enum": ["Unknown", "Common", "ShaderResource", "RenderTarget", "DepthStencilRead", "DepthStencilWrite", "UnorderedAccess", "CopySource", "CopyDest", "Present", "Undefined"] }
       }
@@ -249,7 +250,7 @@
         {
           "if": { "properties": { "type": { "const": "Texture" } } },
           "then": { "properties": { "access": { "enum": ["None", "Sample", "RenderTarget", "DepthStencilWrite", "DepthStencilRead", "StorageRead", "StorageWrite", "StorageReadWrite", "CopySource", "CopyDest", "Present"] } } },
-          "else": { "properties": { "access": { "enum": ["None", "Vertex", "Index", "Constant", "StructuredRead", "StorageRead", "StorageWrite", "StorageReadWrite", "CopySource", "CopyDest", "IndirectArgument"] } } }
+          "else": { "if": { "properties": { "type": { "const": "AccelerationStructure" } } }, "then": { "properties": { "access": { "enum": ["BuildRead", "BuildWrite", "QueryRead"] }, "ordering": { "const": "Ordered" }, "subresources": { "type": "null" } } }, "else": { "properties": { "access": { "enum": ["None", "Vertex", "Index", "Constant", "StructuredRead", "StorageRead", "StorageWrite", "StorageReadWrite", "CopySource", "CopyDest", "IndirectArgument", "AccelerationStructureInput", "AccelerationStructureScratch"] } } } }
         }
       ]
     },
@@ -264,14 +265,14 @@
         "buffer": { "type": "object", "required": ["sizeBytes", "strideBytes"], "properties": { "sizeBytes": { "type": "integer", "minimum": 0 }, "strideBytes": { "type": "integer", "minimum": 0 } } },
         "texture": { "type": "object", "required": ["format", "extent", "mips", "slices", "samples"] }
       },
-      "allOf": [{ "if": { "properties": { "type": { "const": "Buffer" } } }, "then": { "required": ["buffer"] }, "else": { "required": ["texture"] } }]
+      "allOf": [{ "if": { "properties": { "type": { "const": "Buffer" } } }, "then": { "required": ["buffer"] }, "else": { "if": { "properties": { "type": { "const": "AccelerationStructure" } } }, "then": { "required": ["accelerationStructure"], "properties": { "imported": { "const": true }, "accelerationStructure": { "type": "object", "required": ["type", "storageBytes"], "properties": { "type": { "enum": ["bottom-level", "top-level"] }, "storageBytes": { "type": "integer", "minimum": 1 } } } } }, "else": { "required": ["texture"] } } }]
     },
     "barrier": {
       "type": "object",
       "required": ["resourceIndex", "resource", "type", "kind", "reason", "before", "after", "subresources"],
       "properties": {
         "type": { "$ref": "#/$defs/resourceType" },
-        "kind": { "enum": ["Transition", "Uav"] },
+        "kind": { "enum": ["Transition", "Uav", "AccelerationStructure"] },
         "reason": { "enum": ["AccessTransition", "OrderedStorageHazard", "FinalStateTransition"] },
         "before": { "$ref": "#/$defs/state" },
         "after": { "$ref": "#/$defs/state" },

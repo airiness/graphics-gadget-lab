@@ -58,7 +58,10 @@ def validate_allocations(document):
 
 
 def validate(document, validator):
-	parameters.validate_export(document["frame"], document["schemaVersion"], 6, document["frameSerial"])
+	version = document["schemaVersion"]
+	# v7 adds AS semantics and permits both existing parameter-provenance forms.
+	parameter_version = 5 if version == 7 and document["frame"].get("parameters") is None else version
+	parameters.validate_export(document["frame"], parameter_version, 6, document["frameSerial"])
 	validator.validate(document)
 	passes = document["compile"]["passes"]
 	if document["frameSerial"] != document["frame"]["frame"]["serial"]:
@@ -240,7 +243,29 @@ def self_test(validator):
 	unsized5["execution"]["totals"].update(logicalBytes=0, unavailableLogicalResources=1)
 	validate(unsized5, validator)
 
+	acceleration7 = copy.deepcopy(buffer5)
+	acceleration7["schemaVersion"] = 7
+	resource7 = acceleration7["compile"]["resources"][0]
+	resource7.update(type="AccelerationStructure", accelerationStructure=dict(type="top-level", storageBytes=65536))
+	del resource7["buffer"]
+	build_state7 = dict(stages="AccelerationStructureBuild", stageBits=1024,
+		access="AccelerationStructureWrite", accessBits=16384, layout="Common")
+	query_state7 = dict(stages="ComputeShader", stageBits=16,
+		access="AccelerationStructureRead", accessBits=8192, layout="Common")
+	resource7["initialState"] = query_state7
+	for barrier7 in acceleration7["compile"]["passes"][0]["preBarriers"] + acceleration7["execution"]["resolvedBarriers"]:
+		barrier7.update(type="AccelerationStructure", before=build_state7, after=query_state7, subresources=None)
+	for node in acceleration7["compile"]["versions"]:
+		node["type"] = "AccelerationStructure"
+	access7 = acceleration7["compile"]["passes"][0]["accesses"][0]
+	access7.update(type="AccelerationStructure", dependencyAccess="Read", writtenResourceNodeIndex=None,
+		writtenVersion=None, access="QueryRead", accessBits=2, stages="ComputeShader", stageBits=16, subresources=None)
+	validate(acceleration7, validator)
+
 	cases = [
+		(acceleration7, ("schemaVersion",), 5),
+		(acceleration7, ("compile", "passes", 0, "accesses", 0, "ordering"), "Unordered"),
+		(acceleration7, ("compile", "passes", 0, "accesses", 0, "access"), "StructuredRead"),
 		(counters, ("schemaVersion",), 3),
 		(counters, ("observation", "nonFiniteWatch"), False),
 		(scanned, ("schemaVersion",), 2),

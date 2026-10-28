@@ -5,6 +5,7 @@
 #include "ApplicationInputSelfTests.h"
 #include "ApplicationLifecycleSelfTests.h"
 #include "DevToolsViewProfileSelfTests.h"
+#include "RenderGraphDiagnosticsSelfTests.h"
 #include "TemporalAALabDiagnosticsSelfTests.h"
 #include "TemporalAALabGpuTimingSelfTests.h"
 #include "FrameCaptureImageEncoderSelfTests.h"
@@ -40,6 +41,7 @@ namespace gglab
 			SelfTestSuiteDesc{ .m_Id = "app-host-configuration", .m_Run = &RunApplicationHostConfigurationSelfTests, },
 			SelfTestSuiteDesc{ .m_Id = "app-lifecycle", .m_Run = &RunApplicationLifecycleSelfTests, },
 			SelfTestSuiteDesc{ .m_Id = "app-devtools-view-profile", .m_Run = &RunDevToolsViewProfileSelfTests, },
+			SelfTestSuiteDesc{ .m_Id = "app-render-graph-diagnostics", .m_Run = &RunRenderGraphDiagnosticsSelfTests, },
 			SelfTestSuiteDesc{ .m_Id = "app-control", .m_Run = &RunApplicationControlSelfTests, },
 			SelfTestSuiteDesc{ .m_Id = "app-temporal-aa-lab-diagnostics", .m_Run = &RunTemporalAALabDiagnosticsSelfTests, },
 			SelfTestSuiteDesc{ .m_Id = "app-temporal-aa-lab-gpu-timing", .m_Run = &RunTemporalAALabGpuTimingSelfTests, },

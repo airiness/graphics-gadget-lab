@@ -621,7 +621,7 @@ namespace gglab
 			{
 				auto& resource = m_Plan->m_Resources[access.m_Resource.Value()];
 				++resource.m_RefCount;
-				resource.m_UsageBits |=
+				resource.m_UsageBits |= access.m_ResourceType == RGResourceType::RGAccelerationStructure ? 0 :
 					access.m_ResourceType == RGResourceType::RGTexture ?
 						static_cast<uint64_t>(
 							ToRHIUsage(static_cast<RGTextureAccess>(access.m_AccessValue))) :

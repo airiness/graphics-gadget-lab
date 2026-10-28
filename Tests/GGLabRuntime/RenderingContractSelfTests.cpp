@@ -586,6 +586,7 @@ namespace gglab
 			{
 				return sampler.IsValid();
 			}
+			bool IsAlive(RHIAccelerationStructureHandle handle) const noexcept override { return handle.IsValid(); }
 			using RHIDevice::ObserveGpuWaitResult;
 			RHIFenceQueryResult QueryFencePointImpl(const RHIFencePoint& fencePoint) const noexcept override
 			{
@@ -3289,6 +3290,93 @@ namespace gglab
 				device.m_CompletedFenceValue = independentFence.m_Value;
 				pool.ReclaimCompleted();
 			}
+		}
+
+		void RunAccelerationStructureGraphTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			TransientResourcePool pool(&device);
+			RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			struct Data
+			{
+			};
+			RGAccelerationStructureId bottom;
+			RGAccelerationStructureId top;
+			RGAccelerationStructureId unused;
+			graph.AddPass<Data>("AS.Setup", [&](RenderGraph::RGBuilder& builder, Data&)
+				{
+					bottom = builder.Import<RGAccelerationStructureResource>("AS.Bottom", { 1, 1 },
+						{ .m_SizeInBytes = 4096 }, RGAccelerationStructureAccess::QueryRead, RGContentValidity::Undefined);
+					top = builder.Import<RGAccelerationStructureResource>("AS.Top", { 2, 1 },
+						{ .m_Type = RHIAccelerationStructureType::TopLevel, .m_SizeInBytes = 4096 },
+						RGAccelerationStructureAccess::QueryRead, RGContentValidity::Undefined);
+					unused = builder.Import<RGAccelerationStructureResource>("AS.Unused", { 3, 1 },
+						{ .m_SizeInBytes = 4096 }, RGAccelerationStructureAccess::QueryRead, RGContentValidity::Undefined);
+				});
+			graph.AddPass<Data>("AS.FirstBuild", [&](RenderGraph::RGBuilder& builder, Data&)
+				{
+					builder.SideEffect();
+					builder.WriteInPlace(bottom, RGAccelerationStructureAccess::BuildWrite);
+				});
+			graph.AddPass<Data>("AS.FinalBuild", [&](RenderGraph::RGBuilder& builder, Data&)
+					{ builder.WriteInPlace(bottom, RGAccelerationStructureAccess::BuildWrite); });
+			graph.AddPass<Data>("AS.TopBuild", [&](RenderGraph::RGBuilder& builder, Data&)
+				{
+					GGLAB_UNUSED(builder.Read(bottom, RGAccelerationStructureAccess::BuildRead));
+					builder.WriteInPlace(top, RGAccelerationStructureAccess::BuildWrite);
+				});
+			graph.AddPass<Data>("AS.Query", [&](RenderGraph::RGBuilder& builder, Data&)
+				{
+					builder.SideEffect();
+					GGLAB_UNUSED(builder.Read(bottom, RGAccelerationStructureAccess::QueryRead));
+					GGLAB_UNUSED(builder.Read(top, RGAccelerationStructureAccess::QueryRead));
+				});
+			graph.AddPass<Data>("AS.UnusedBuild", [&](RenderGraph::RGBuilder& builder, Data&)
+					{ builder.WriteInPlace(unused, RGAccelerationStructureAccess::BuildWrite); });
+			graph.AddPass<Data>("AS.Unrelated", [](RenderGraph::RGBuilder&, Data&) {});
+			const bool compiled = graph.Compile();
+			context.Check(compiled, "Imported AS resources compile through normal versioned dependency analysis");
+			if (compiled)
+			{
+				const auto& passes = graph.GetExecutionPlan()->GetPasses();
+				context.Check(!passes[1].m_Culled && !passes[2].m_Culled && !passes[3].m_Culled &&
+					!passes[4].m_Culled && !passes[5].m_Culled && passes[6].m_Culled,
+					"Imported AS writes retain their external side effects while an unrelated pass is culled");
+				context.Check(std::ranges::any_of(passes[2].m_PreBarriers, [](const auto& barrier)
+					{
+						return barrier.m_Kind == RGBarrierKind::AccelerationStructure;
+					}), "Consecutive live AS writers receive an explicit ordered AS memory barrier");
+				context.Check(std::ranges::any_of(passes[3].m_PreBarriers, [](const auto& barrier)
+					{
+						return barrier.m_Before.m_Access == RHIAccess::AccelerationStructureWrite &&
+							barrier.m_After.m_Access == RHIAccess::AccelerationStructureRead;
+					}), "TLAS construction declares and synchronizes its BLAS build reads");
+				context.Check(std::ranges::any_of(passes[4].m_PreBarriers, [](const auto& barrier)
+					{
+						return barrier.m_After.m_Stages == RHIStage::ComputeShader;
+					}), "The graph carries AS availability to the compute ray-query stage");
+				RGSnapshot snapshot;
+				BuildRenderGraphSnapshot(graph, snapshot);
+				const auto serialized = SerializeRenderGraphSnapshot(snapshot, false);
+				context.Check(serialized.find("AccelerationStructure") != std::string::npos &&
+					serialized.find("BuildRead") != std::string::npos && serialized.find("QueryRead") != std::string::npos,
+					"Graph exports preserve typed AS resources and access semantics");
+				context.Check(graph.ResolveObservation({ .m_Resource = "AS.Top" }, RGObservationKind::ResourceExport).m_Failure ==
+					RGObservationFailure::UnsupportedResource,
+					"Opaque AS storage cannot be reinterpreted by ordinary buffer resource exports");
+			}
+			RenderGraph undefined({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			undefined.AddPass<Data>("AS.UnbuiltRead", [&](RenderGraph::RGBuilder& builder, Data&)
+				{
+					builder.SideEffect();
+					const auto unbuilt = builder.Import<RGAccelerationStructureResource>("AS.Unbuilt", { 4, 1 },
+						{ .m_SizeInBytes = 4096 }, RGAccelerationStructureAccess::QueryRead, RGContentValidity::Undefined);
+					GGLAB_UNUSED(builder.Read(unbuilt));
+				});
+			context.Check(!undefined.Compile(), "A declared AS query cannot consume an unbuilt imported structure");
+			context.Check(!IsRGAccessCompatible(RGAccelerationStructureAccess::BuildRead,
+				RGDependencyAccess::Read, RGOrderingRequirement::Unordered),
+				"AS accesses cannot opt out of dependency ordering");
 		}
 
 		void RunPassProfileIdentityContractTests(SelfTestContext& context) noexcept
@@ -13716,6 +13804,7 @@ namespace gglab
 		RunRenderFrameOutcomeContractTests(context);
 		RunDeferredCommitContractTests(context);
 		RunPassProfileIdentityContractTests(context);
+		RunAccelerationStructureGraphTests(context);
 		RunPreviewSubmissionContractTests(context);
 		RunPreviewPassContractTests(context);
 		RunFrameConstantUploadTests(context);

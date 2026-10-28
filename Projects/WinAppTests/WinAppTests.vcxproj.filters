@@ -19,6 +19,7 @@
     <ClCompile Include="..\..\Tests\WinApp\NapaVoxelRaycastEditSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\NapaVoxelSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\ProductRuntimeInspection.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\RenderGraphDiagnosticsSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\RuntimePathSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\TemporalAALabDiagnosticsSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\TemporalAALabGpuTimingSelfTests.cpp" />
@@ -41,6 +42,7 @@
     <ClInclude Include="..\..\Tests\WinApp\NapaVoxelSelfTestCases.h" />
     <ClInclude Include="..\..\Tests\WinApp\NapaVoxelSelfTests.h" />
     <ClInclude Include="..\..\Tests\WinApp\ProductRuntimeInspection.h" />
+    <ClInclude Include="..\..\Tests\WinApp\RenderGraphDiagnosticsSelfTests.h" />
     <ClInclude Include="..\..\Tests\WinApp\RuntimePathSelfTests.h" />
     <ClInclude Include="..\..\Tests\WinApp\TemporalAALabDiagnosticsSelfTests.h" />
     <ClInclude Include="..\..\Tests\WinApp\TemporalAALabGpuTimingSelfTests.h" />

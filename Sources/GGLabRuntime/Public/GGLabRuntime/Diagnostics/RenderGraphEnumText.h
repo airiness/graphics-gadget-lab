@@ -30,6 +30,7 @@ namespace gglab::diagnostics
 		static constexpr std::array Entries = {
 			EnumTextEntry{ RGResourceType::RGTexture, "Texture", "Texture" },
 			EnumTextEntry{ RGResourceType::RGBuffer, "Buffer", "Buffer" },
+			EnumTextEntry{ RGResourceType::RGAccelerationStructure, "AccelerationStructure", "AccelerationStructure" },
 		};
 	};
 	template <> struct RGEnumTextTraits<RGOrderingRequirement>
@@ -63,6 +64,7 @@ namespace gglab::diagnostics
 		static constexpr std::array Entries = {
 			EnumTextEntry{ RGBarrierKind::Transition, "Transition", "Transition" },
 			EnumTextEntry{ RGBarrierKind::Uav, "Uav", "UAV" },
+			EnumTextEntry{ RGBarrierKind::AccelerationStructure, "AccelerationStructure", "AS Memory" },
 		};
 	};
 	template <> struct RGEnumTextTraits<RGBarrierReason>
@@ -103,6 +105,8 @@ namespace gglab::diagnostics
 			EnumTextEntry{ RGBufferAccess::CopySource, "CopySource", "CopySrc" },
 			EnumTextEntry{ RGBufferAccess::CopyDest, "CopyDest", "CopyDst" },
 			EnumTextEntry{ RGBufferAccess::IndirectArgument, "IndirectArgument", "IndirectArgument" },
+			EnumTextEntry{ RGBufferAccess::AccelerationStructureInput, "AccelerationStructureInput", "AS Input" },
+			EnumTextEntry{ RGBufferAccess::AccelerationStructureScratch, "AccelerationStructureScratch", "AS Scratch" },
 		};
 	};
 	template <> struct RGEnumTextTraits<RHITextureUsage>
@@ -128,12 +132,24 @@ namespace gglab::diagnostics
 			EnumTextEntry{ RHIBufferUsage::IndirectArgument, "IndirectArgument", "IndirectArgument" },
 			EnumTextEntry{ RHIBufferUsage::CopySource, "CopySource", "CopySource" },
 			EnumTextEntry{ RHIBufferUsage::CopyDest, "CopyDest", "CopyDest" },
+			EnumTextEntry{ RHIBufferUsage::AccelerationStructureInput, "AccelerationStructureInput", "AS Input" },
+			EnumTextEntry{ RHIBufferUsage::AccelerationStructureStorage, "AccelerationStructureStorage", "AS Storage" },
+			EnumTextEntry{ RHIBufferUsage::AccelerationStructureScratch, "AccelerationStructureScratch", "AS Scratch" },
+		};
+	};
+	template <> struct RGEnumTextTraits<RGAccelerationStructureAccess>
+	{
+		static constexpr std::array Entries = {
+			EnumTextEntry{ RGAccelerationStructureAccess::BuildRead, "BuildRead", "Build Read" },
+			EnumTextEntry{ RGAccelerationStructureAccess::BuildWrite, "BuildWrite", "Build Write" },
+			EnumTextEntry{ RGAccelerationStructureAccess::QueryRead, "QueryRead", "Query Read" },
 		};
 	};
 	template <> struct RGEnumTextTraits<RHIStage>
 	{
 		static constexpr std::array Entries = {
 			EnumTextEntry{ RHIStage::DrawIndirect, "DrawIndirect", "DrawIndirect" },
+			EnumTextEntry{ RHIStage::AccelerationStructureBuild, "AccelerationStructureBuild", "AS Build" },
 			EnumTextEntry{ RHIStage::IndexInput, "IndexInput", "IndexInput" },
 			EnumTextEntry{ RHIStage::VertexShader, "VertexShader", "VertexShader" },
 			EnumTextEntry{ RHIStage::PixelShader, "PixelShader", "PixelShader" },
@@ -162,6 +178,8 @@ namespace gglab::diagnostics
 			EnumTextEntry{ RHIAccess::DepthStencilRead, "DepthStencilRead", "DepthStencilRead" },
 			EnumTextEntry{ RHIAccess::DepthStencilWrite, "DepthStencilWrite", "DepthStencilWrite" },
 			EnumTextEntry{ RHIAccess::UnorderedAccess, "UnorderedAccess", "UnorderedAccess" },
+			EnumTextEntry{ RHIAccess::AccelerationStructureRead, "AccelerationStructureRead", "AS Read" },
+			EnumTextEntry{ RHIAccess::AccelerationStructureWrite, "AccelerationStructureWrite", "AS Write" },
 			EnumTextEntry{ RHIAccess::CopySource, "CopySource", "CopySource" },
 			EnumTextEntry{ RHIAccess::CopyDest, "CopyDest", "CopyDest" },
 			EnumTextEntry{ RHIAccess::VertexBuffer, "VertexBuffer", "VertexBuffer" },
