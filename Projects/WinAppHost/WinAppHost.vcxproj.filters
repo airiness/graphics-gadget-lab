@@ -186,6 +186,9 @@
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\ForwardPlusLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\GIReferenceLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\GTAOLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
@@ -525,6 +528,9 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\ForwardPlusLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\GIReferenceLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\GTAOLabSession.h">

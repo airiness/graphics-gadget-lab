@@ -4,6 +4,8 @@
 #include "GGLabRuntime/Graphics/Pipeline/RaySceneSunVisibility.h"
 #include "GGLabRuntime/Graphics/Pipeline/RaySceneHitMaterial.h"
 #include "Graphics/RenderPass/RenderPassGIReceiver.h"
+#include "Graphics/RenderPass/RenderPassGIReference.h"
+#include "Graphics/RenderPass/AtmosphereGraphResources.h"
 #include "Graphics/RenderPass/GIReceiverGraphResources.h"
 #include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
 #include "GGLabRuntime/Graphics/RenderContexts.h"
@@ -66,6 +68,7 @@ namespace gglab
 			struct Data {};
 			graph.AddPass<Data>("ImportSunInputs", [&](RenderGraph::RGBuilder& builder, Data&)
 				{
+					builder.GetBlackboard().Create<RGForwardAtmosphereConstants>();
 					const RHITextureDesc depthDesc{ .m_Format = RHIFormat::D32Float,
 						.m_Usage = RHITextureUsage::DepthStencil | RHITextureUsage::Sampled, .m_Extent = { 8, 8, 1 } };
 					auto& depth = builder.GetBlackboard().Create<RGSceneDepthResources>(SceneDepthResourcesName);
@@ -101,6 +104,8 @@ namespace gglab
 			receivers.AddPass(graph, frame, services);
 			RaySceneHitMaterial hitMaterial;
 			hitMaterial.AddPass(graph, frame, services, inputs);
+			RenderPassGIReference reference;
+			reference.AddPass(graph, frame, services, inputs, {});
 			graph.AddPass<Data>("ReturnSunInputs", [&](RenderGraph::RGBuilder& builder, Data&)
 				{
 					builder.Export(inputs.m_Geometries, RGBufferAccess::StructuredRead);
@@ -124,6 +129,12 @@ namespace gglab
 				context.Check(graph.ResolveObservation({ .m_Resource = name }).m_Failure == RGObservationFailure::None,
 					"Every raster receiver attachment has defined background and supports T2 observation");
 			}
+			for (const auto* name : { "GI.Reference.Irradiance", "GI.Reference.Diagnostics",
+				"GI.Reference.Position", "GI.Reference.Identity", "GI.Reference.LambertRadiance" })
+			{
+				context.Check(graph.ResolveObservation({ .m_Resource = name }).m_Failure == RGObservationFailure::None,
+					"Stateless GI reference exports are reachable without a SceneColor or history dependency");
+			}
 			context.Check(graph.ResolveObservation({ .m_Resource = "RayScene.HitAlbedo" }).m_Failure == RGObservationFailure::None,
 				"Hit material reads the frozen material table and receiver coverage before final table export");
 		}
@@ -142,6 +153,39 @@ namespace gglab
 			shadows.m_ShadingEnabled = true;
 			context.Check(!visibility.Prepare(frame, {}),
 				"A CSM for another directional light cannot masquerade as a sun-visibility comparison");
+		}
+
+		void RunGIReferenceInputTests(SelfTestContext& context) noexcept
+		{
+			GIReferenceCreateInfo info;
+			RaySceneDiagnostics scene{ .m_Status = RaySceneStatus::Prepared,
+				.m_BoundsDiagonal = 20.0f, .m_HasCompleteBounds = true };
+			context.Check(ValidateGIReferenceInputs(info, scene).IsReady(),
+				"Complete all-World bounds admit the reference environment estimator");
+			info.m_MaximumDistance = 19.0f;
+			context.Check(ValidateGIReferenceInputs(info, scene).m_Reason == "IncompleteScene",
+				"A short ray cannot turn truncated geometry into an environment miss");
+			info.m_MaximumDistance = 20.0f;
+			context.Check(ValidateGIReferenceInputs(info, scene).IsReady(),
+				"The complete bounds diagonal is an inclusive ray-distance minimum");
+			scene.m_HasCompleteBounds = false;
+			context.Check(!ValidateGIReferenceInputs(info, scene).IsReady(),
+				"Missing eligible-instance bounds reject sky semantics");
+			scene.m_HasCompleteBounds = true;
+			scene.m_Status = RaySceneStatus::NotReady;
+			context.Check(!ValidateGIReferenceInputs(info, scene).IsReady(),
+				"A stale snapshot cannot qualify a partially ready World");
+			scene.m_Status = RaySceneStatus::Prepared;
+			for (const uint32_t samples : { 0u, 4097u })
+			{
+				info.m_SampleCount = samples;
+				context.Check(!ValidateGIReferenceInputs(info, scene).IsReady(),
+					"Empty and unbounded per-frame reference dispatches reject before GPU access");
+			}
+			info.m_SampleCount = 64;
+			info.m_ConstantRadiance[0] = std::numeric_limits<float>::quiet_NaN();
+			context.Check(!ValidateGIReferenceInputs(info, scene).IsReady(),
+				"Non-finite reference radiance cannot enter the estimator");
 		}
 
 		void RunGIReceiverPreparationTests(SelfTestContext& context) noexcept
@@ -758,6 +802,7 @@ namespace gglab
 		RunSunVisibilityPreparationTests(context);
 		RunSunVisibilityGraphTests(context);
 		RunGIReceiverPreparationTests(context);
+		RunGIReferenceInputTests(context);
 		RunTriangleTests(context);
 		RunInstanceTests(context);
 		RunScratchTests(context);

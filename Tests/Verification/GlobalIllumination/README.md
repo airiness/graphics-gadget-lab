@@ -46,8 +46,53 @@ unmatched receivers count against the gate. These exports are unexposed surface
 data, not GI radiance. Run the numerical checker's positive/adversarial self-tests
 without a GPU using `python Tests/Verification/ValidateCoastalGIMaterial.py --self-test`.
 
-These checks cover membership regression, cache reuse and disabled behavior. They
-do not establish exhaustive native traversal coverage or GI quality.
+## Stateless one-bounce reference (F1/F2)
+
+After building WinApp and ShaderCompiler, run:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/RunVerification.ps1 -Suite gi-reference -Configuration Develop -Rhi dx12,vulkan -Python <python-with-numpy-and-jsonschema>
+```
+
+The hidden `gglab.lab.gi_reference` Lab constructs the frozen F1 isolated sphere
+and plane and F2 six-solid, 1 m thick sealed room. All fixture controls use the
+LabRuntime RestartSession path. It locks Native, unjittered rendering with
+TAA/GTAO/bloom off. Seeds 61051/61052 and 64/128 samples exercise independent and
+doubled estimates; F1 white/tinted albedo and EV100 0/10/15 variants must leave
+exported irradiance exactly unchanged. Missing/unmatched/unsupported receivers
+fail rather than disappearing from measurements.
+
+`GI.Reference.Irradiance` is scene-referred E, without receiver albedo,
+pre-exposure or the primary receiver's direct sun. `GI.Reference.LambertRadiance`
+is the reduced diffuse diagnostic `albedo * E / pi`, not the complete Forward
+material or Final. The reference does not read SceneColor, IBL irradiance, a field,
+a denoiser or temporal history; every frame replays its fixed seed. Environment
+misses require complete all-World bounds and `t_max >= bounds diagonal`.
+
+The suite exports eight float arrays and the same-frame graph per observation.
+`ValidateGIReference.py` checks the frozen inputs, finite values and named
+primitive/world-space masks; it writes `measurement-mask.png` overlays and
+`numerical-results.json`. F1 and F2's exterior roof require mean E within 1% of
+pi L. F2 interior masks require exactly zero irradiance and zero sky misses.
+A secondary backface at a touching-solid seam remains an occluded hit, never sky;
+its count is reported. Primary lookup follows raster sidedness at those seams.
+Fixture normal scale is zero so the RGBA8 flat-normal fallback cannot introduce a
+normal-map tilt. The checker has headless tests:
+
+```powershell
+python Tests/Verification/ValidateGIReference.py --self-test
+```
+
+This suite qualifies only the initial constant-environment, sun-off F1/F2
+one-bounce slice. The shared hit-sun/WorldSunTransmittance and filtered environment
+shader paths compile for both RHIs, but their nonzero-sun/Physical Sky GPU energy
+checks, mip-0 bias measurement, multi-bounce/depth convergence and full Forward
+composition remain open. No DDGI, field quality, Final or performance acceptance
+is established.
+
+Ray-scene and GI-off checks cover membership regression, cache reuse and disabled
+behavior, not exhaustive native traversal coverage. Reference checks establish
+only the analytic fixture scope above, not overall GI quality.
 Fixture design and baseline reproduction notes live in `gglab-docs`:
 `GGLab_Global_Illumination_Fixture_Specification.md` and
 `GGLab_Global_Illumination_Design_And_Plan.md` section 11.2. The fixture version/hash

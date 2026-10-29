@@ -1658,12 +1658,12 @@ namespace gglab
 		const ApplicationContentRegistration desktop = CreateDesktopApplicationContent();
 		const ApplicationContentSelection desktopSelection = ResolveApplicationContentSelection(desktop, DesktopLabHostDemoId, DesktopDefaultLabId);
 		context.Check(desktop.IsValid() && desktop.m_Demos.size() == 4 &&
-			desktop.m_Labs.size() == 18 && desktopSelection.Succeeded() &&
+			desktop.m_Labs.size() == 19 && desktopSelection.Succeeded() &&
 			std::ranges::any_of(desktop.m_Labs, [](const LabRegistration& lab) noexcept
 				{
 					return lab.m_Descriptor.m_Id == LabId("gglab.lab.temporal_aa");
 				}),
-			"Windows desktop composition includes four Demo entries and eighteen Labs");
+			"Windows desktop composition includes four Demo entries and nineteen Labs");
 		for (const std::string_view retiredLabId : {
 			"gglab.lab.task_system",
 				"gglab.lab.asset_publication",
@@ -1718,6 +1718,8 @@ namespace gglab
 			"Coordinate conformance selection contributes four stable shader demands");
 		checkSelectedDemand("gglab.lab.ray_query", 54,
 			"Ray-query selection contributes query, preview and pipeline-identity artifacts without changing raster startup demand");
+		checkSelectedDemand("gglab.lab.gi_reference", 52,
+			"GI reference opts into receiver/reference shaders without changing ordinary raster startup demand");
 		checkSelectedDemand("gglab.lab.coastal_ray_scene", 54,
 			"Coastal ray-scene selection contributes its membership and sun-visibility programs to raster startup demand");
 		checkSelectedDemand("gglab.lab.napa_voxel", 52,

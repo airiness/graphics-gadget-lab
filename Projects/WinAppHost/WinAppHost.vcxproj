@@ -278,6 +278,7 @@
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\RenderGraphComputeLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\RayQueryLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CoastalRaySceneLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\GIReferenceLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Validation\CoastalRaySceneOracle.cpp" />
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CoordinateConformanceLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\SampleableDepthLabSession.cpp" />
@@ -414,6 +415,7 @@
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\RenderGraphComputeLabSession.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\RayQueryLabSession.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CoastalRaySceneLabSession.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\GIReferenceLabSession.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Validation\CoastalRaySceneOracle.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CoordinateConformanceLabSession.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\SampleableDepthLabSession.h" />

@@ -1043,7 +1043,7 @@
       "function": "global",
       "operation": "SanitizeHDRColor",
       "count": 2,
-      "bodySha256": "eaca8857599fb682fa8ca4e767e4562b197ab9a3697d3ea4c9b74be466a76533",
+      "bodySha256": "f4aab9b93da966e17950f4b4c756d05103bcabaa86fd4da1f9f6c7b93dd32deb",
       "programs": [
         "gglab.shader.forward-pbr"
       ],
@@ -1558,6 +1558,24 @@
         "fp16Maximum": "report"
       },
       "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "gi-ray-scene.gitrace-hit.isfinite",
+      "source": "Lighting/GIRayScene.hlsli",
+      "function": "GITraceHit",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "eaf790872359d4c199e29126d87e9593f7bbf81036a83ca2293c6a42a21fd67c",
+      "programs": [
+        "gglab.shader.ray-scene"
+      ],
+      "kind": "recovery",
+      "evidence": "counter",
+      "policy": {
+        "negative": "error",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Invalid transformed triangle normals reject the reference sample explicitly; record the source value before the rejection. Squared normal length is not FP16 radiance."
     }
   ],
   "injectionPoints": [

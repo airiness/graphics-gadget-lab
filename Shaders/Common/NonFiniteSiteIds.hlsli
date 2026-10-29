@@ -77,7 +77,8 @@ static const uint NF_SITE_PASS_TEMPORAL_AA_CSMAIN_ISFINITE = 72u;
 static const uint NF_SITE_PASS_TEMPORAL_AA_CSMAIN_IS_TEMPORAL_HISTORY_ACCUMULATION_VALID = 73u;
 static const uint NF_SITE_PASS_TEMPORAL_AA_CSMAIN_SANITIZE_HDRCOLOR = 74u;
 static const uint NF_SITE_PASS_TEMPORAL_REFERENCE_CSMAIN_ISFINITE = 75u;
-static const uint NF_SITE_COUNT = 76u;
+static const uint NF_SITE_GI_RAY_SCENE_GITRACE_HIT_ISFINITE = 76u;
+static const uint NF_SITE_COUNT = 77u;
 static const uint NF_PROGRAM_COUNT = 29u;
 
 static const uint NF_INJECT_PASS_RENDER_GRAPH_COMPUTE_SMOKE_CSNONFINITEPROBE_PROBE = 0u;
@@ -86,5 +87,5 @@ static const uint NF_INJECT_PASS_TEMPORAL_AA_CSMAIN_HISTORY = 2u;
 static const uint NF_INJECTION_POINT_COUNT = 3u;
 
 static const uint NF_ABI_VERSION = 2u;
-static const uint NF_INVENTORY_LOW = 0x9adaea85u;
-static const uint NF_INVENTORY_HIGH = 0x8263c15fu;
+static const uint NF_INVENTORY_LOW = 0x6bf1fd21u;
+static const uint NF_INVENTORY_HIGH = 0x120b50ceu;

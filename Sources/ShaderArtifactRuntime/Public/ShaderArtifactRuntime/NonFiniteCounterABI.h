@@ -13,10 +13,10 @@ namespace gglab::nonfinite
 	inline constexpr uint32_t CounterMagic = 0x4e464354;
 	inline constexpr uint32_t HeaderBytes = 32;
 	inline constexpr uint32_t RecordBytes = 32;
-	inline constexpr uint32_t InventoryLow = 0x9adaea85;
-	inline constexpr uint32_t InventoryHigh = 0x8263c15f;
-	inline constexpr std::string_view VariantSuffix = ".nonfinite-counters.9adaea858263c15ffc6b08af73bb842e1b4d14bd35f9475d77dfb220d5b3db77";
-	inline constexpr uint32_t SiteCount = 76;
+	inline constexpr uint32_t InventoryLow = 0x6bf1fd21;
+	inline constexpr uint32_t InventoryHigh = 0x120b50ce;
+	inline constexpr std::string_view VariantSuffix = ".nonfinite-counters.6bf1fd21120b50ce7ee305b394bda53bd18954f3d5cc366c9730a0b14e77e4dd";
+	inline constexpr uint32_t SiteCount = 77;
 	inline constexpr uint32_t ProgramCount = 29;
 	// The frame injection block follows the site records: point + 1 (zero is none),
 	// IEEE bits, x, y, component, applied count and two reserved words.
@@ -101,6 +101,7 @@ namespace gglab::nonfinite
 		Site{ "pass-temporal-aa.csmain.is-temporal-history-accumulation-valid", "report", "report" },
 		Site{ "pass-temporal-aa.csmain.sanitize-hdrcolor", "expected", "error" },
 		Site{ "pass-temporal-reference.csmain.isfinite", "report", "report" },
+		Site{ "gi-ray-scene.gitrace-hit.isfinite", "error", "report" },
 	};
 	struct InjectionPoint { std::string_view m_Id; std::string_view m_Claim; };
 	inline constexpr std::array<InjectionPoint, 3> InjectionPoints{

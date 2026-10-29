@@ -74,8 +74,19 @@ namespace gglab
 					.m_Space = "render view, jittered opaque raster samples",
 					.m_Description = "R: binary RT sun visibility. G: production CSM filtering/bias/blend/fade. B: 1 matched opaque receiver, 0 background, -1 unmatched raster depth. A: first accepted blocker distance, -1 on miss; not nearest-hit distance. Ray origins use triangle-face ULP offsets; sun rays stop at 1000 m." };
 			}
+			if (name == "GI.Reference.Irradiance" || name == "GI.Reference.LambertRadiance")
+			{
+				return ResourceExportSemantics{
+					.m_Role = name == "GI.Reference.Irradiance" ? "gi.reference.irradiance" : "gi.reference.lambert-radiance",
+					.m_Units = "scene-referred linear RGB, unexposed",
+					.m_Space = "Native unjittered render view before temporal integration",
+					.m_Description = "Stateless one-bounce reference. Irradiance excludes receiver albedo and direct receiver sun. LambertRadiance is reduced diffuse albedo * E / pi, not full Forward material or Final. Irradiance alpha: 0 background, 1 valid, -1 unsupported receiver, -2 unmatched/invalid receiver, -3 invalid secondary sample; never drop invalid pixels from metrics." };
+			}
 			constexpr std::array giRecords
 			{
+				std::pair{ "GI.Reference.Position", "RGB: reconstructed committed-triangle world position in metres. A: 1 matched primary receiver, 0 otherwise." },
+				std::pair{ "GI.Reference.Identity", "R/G: primary snapshot instance and primitive indices; B: oriented geometric normal Y; A: 1 matched receiver. -1 without receiver." },
+				std::pair{ "GI.Reference.Diagnostics", "RGBA: miss, surface hit, single-sided backface hit and invalid secondary fractions, divided by requested sample count. Below-face directions contribute zero and stay in the denominator." },
 				std::pair{ "GI.Receiver.FaceNormal", "RGB: world triangle face normal oriented toward vertex normal. A: 0 background, 1 opaque, 2 MASK; BLEND excluded." },
 				std::pair{ "GI.Receiver.VertexNormal", "RGB: interpolated world vertex normal after double-sided flip. A: raster front face +1, back face -1; background 0." },
 				std::pair{ "GI.Receiver.ShadingNormal", "RGB: production normal-mapped world shading normal. A: metallic [0,1]." },

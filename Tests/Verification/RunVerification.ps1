@@ -41,6 +41,7 @@ $catalog = @(
     @{ name = 'capture-bundle-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateCaptureBundles.py'; arguments = @('--self-test') }) },
     @{ name = 'gpu-timing-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateGpuTiming.py'; arguments = @('--self-test') }) },
     @{ name = 'parameter-frames-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateParameterFrames.py'; arguments = @('--self-test') }) },
+    @{ name = 'gi-reference'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIReference.ps1' }) },
     @{ name = 'coastal-ray-scene'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestCoastalRayScene.ps1' }) },
     @{ name = 'lighting-profiles'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestLightingProfiles.ps1' }) },
     @{ name = 'sequence-parameter-events'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestSequenceParameterEvents.ps1' }) },
@@ -115,7 +116,7 @@ try {
                     $parameters = @{ OutputDirectory = $directory }
                     if ($item.group -eq 'gpu') {
                         $parameters = @{ RunDirectory = (Join-Path $directory 'run'); Configuration = $config; Rhi = $Rhi }
-                        if ($item.name -in @('taa-comparison', 'session-lifecycle', 'coastal-ray-scene')) { $parameters.Python = $Python }
+                        if ($item.name -in @('taa-comparison', 'session-lifecycle', 'coastal-ray-scene', 'gi-reference')) { $parameters.Python = $Python }
                     }
                     $execution = Invoke-VerificationScript $path $parameters
                     $text = $execution.output + $execution.error

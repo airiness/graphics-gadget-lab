@@ -137,6 +137,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RaySceneSunVisibility.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RaySceneHitMaterial.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGIReceiver.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGIReference.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassTemporalAA.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassTemporalReference.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBL.cpp" />
@@ -533,6 +534,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassFrameCapture.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGTAO.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGIReceiver.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGIReference.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\GIReceiverGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassTemporalAA.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassTemporalReference.h" />
@@ -647,6 +649,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RayScene.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\RaySceneSunVisibility.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\RaySceneHitMaterial.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIReference.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetManager.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetManagerState.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureDerivedDataCoordinator.h" />

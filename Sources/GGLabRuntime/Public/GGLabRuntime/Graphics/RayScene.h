@@ -70,6 +70,10 @@ namespace gglab
 		uint32_t m_MaterialCount = 0;
 		uint64_t m_VertexBytes = 0;
 		uint64_t m_IndexBytes = 0;
+		// Conservative all-eligible-instance world bounds, independent of camera culling.
+		// Environment-miss consumers must reject an incomplete proof or a shorter ray.
+		float m_BoundsDiagonal = 0.0f;
+		bool m_HasCompleteBounds = false;
 	};
 
 	// Graph-local imports. Declare all traversed BLAS reads as well as the TLAS read.

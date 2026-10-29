@@ -4,6 +4,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlus.h"
+#include "GGLabRuntime/Graphics/RayScene.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/Pipeline/TemporalMotion.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
@@ -154,6 +155,8 @@ namespace gglab
 		GGLAB_ASSERT_MSG(context.IsRenderSceneReady() && framePlan.m_DepthCoverage.IsValid(),
 			"A Ready Forward+ frame has prepared scene data and a valid depth coverage plan.");
 
+		const auto referenceScene = m_GIReference ?
+			m_GIReference->m_RayScene->AddBuildPasses(rg) : RaySceneGraphResources{};
 		auto* swapChain = services.m_Presentation->GetSwapChain();
 
 		const uint32_t frameBackBufferIndex = context.m_BackBufferIndex;
@@ -522,6 +525,10 @@ namespace gglab
 		{
 			m_GIReceiverPass.AddPass(rg, context, services);
 		}
+		if (m_GIReference)
+		{
+			m_GIReferencePass.AddPass(rg, context, services, referenceScene, *m_GIReference);
+		}
 		if (depthCoverageFramePlan.AddsForwardOpaquePass())
 		{
 			m_AerialPerspectivePass.AddPass(rg, context, services);
@@ -790,6 +797,14 @@ namespace gglab
 			if (m_EnableGIReceiver)
 			{
 				result = m_GIReceiverPass.Prepare(context, services, m_ForwardPBRShaderSet.m_CoverageVertexShader);
+				if (!result.IsReady())
+				{
+					return result;
+				}
+			}
+			if (m_GIReference)
+			{
+				result = m_GIReferencePass.Prepare(context, services, *m_GIReference);
 				if (!result.IsReady())
 				{
 					return result;

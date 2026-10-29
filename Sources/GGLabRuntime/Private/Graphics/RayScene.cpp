@@ -2,6 +2,7 @@
 #include "Graphics/MaterialGpuEncoder.h"
 #include "Graphics/RayScenePlan.h"
 #include "GGLabRuntime/Core/Math/Transform.h"
+#include "GGLabRuntime/Core/Math/BoundingVolumes.h"
 #include "GGLabRuntime/Core/World.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -12,9 +13,11 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstring>
 #include <format>
+#include <optional>
 #include <span>
 #include <utility>
 
@@ -230,6 +233,10 @@ namespace gglab
 			return fail(RaySceneStatus::Unavailable, "Ray queries are not enabled on the device.");
 		}
 		std::vector<RaySceneSource> sources;
+		std::optional<math::Aabb> bounds;
+		bool completeBounds = true;
+		diagnostics.m_HasCompleteBounds = false;
+		diagnostics.m_BoundsDiagonal = 0.0f;
 		const auto& registry = world.GetRegistry();
 		for (auto&& [entity, transform, modelComponent] : registry.view<
 			const components::TransformComponent, const components::ModelComponent>().each())
@@ -264,6 +271,15 @@ namespace gglab
 					return fail(RaySceneStatus::InvalidSource, "Ray mesh indices or positions failed upload validation.");
 				}
 				const auto matrix = modelMesh.m_LocalTransform * entityWorld;
+				if (material->m_AlphaMode == AlphaMode::Opaque)
+				{
+					completeBounds = completeBounds && mesh->m_HasBounds;
+					if (mesh->m_HasBounds)
+					{
+						const auto instanceBounds = math::Transform(mesh->m_Aabb, matrix);
+						bounds = bounds ? math::Merge(*bounds, instanceBounds) : instanceBounds;
+					}
+				}
 				const auto vertices = device.QueryBufferDescription(mesh->m_VertexBufferBinding.m_Buffer);
 				const auto indices = device.QueryBufferDescription(mesh->m_IndexBufferBinding.m_Buffer);
 				if (!vertices || !indices)
@@ -293,6 +309,12 @@ namespace gglab
 		if (diagnostics.m_Status != RaySceneStatus::Prepared)
 		{
 			return diagnostics.m_Status;
+		}
+		if (bounds && completeBounds)
+		{
+			diagnostics.m_BoundsDiagonal = 2.0f * bounds->m_Extents.Length();
+			diagnostics.m_HasCompleteBounds = std::isfinite(diagnostics.m_BoundsDiagonal) &&
+				diagnostics.m_BoundsDiagonal > 0.0f;
 		}
 		const auto previous = m_State->m_Snapshot;
 		if (previous && HasSameRayInstances(previous->m_Plan, plan))

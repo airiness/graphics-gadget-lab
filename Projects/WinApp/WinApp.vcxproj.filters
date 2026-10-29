@@ -66,6 +66,9 @@
     <FxCompile Include="..\..\Shaders\Passes\PassGIReceiver.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassGIReference.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassGTAO.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
@@ -278,7 +281,13 @@
     <None Include="..\..\Shaders\Lighting\ForwardPlus.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>
+    <None Include="..\..\Shaders\Lighting\GIHitLighting.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
     <None Include="..\..\Shaders\Lighting\GIHitMaterial.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\GIRayScene.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\Shaders\Lighting\GTAO.hlsli">
@@ -294,6 +303,9 @@
       <Filter>Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\Shaders\Lighting\SpecularIntegrationMath.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\WorldSunTransmittance.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\Shaders\Metadata\NonFiniteSites.json">

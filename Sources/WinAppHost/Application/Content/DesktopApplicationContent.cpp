@@ -9,6 +9,7 @@
 #include "Application/Lab/Sessions/CoastalRaySceneLabSession.h"
 #include "Application/Lab/Sessions/ForwardPlusLabSession.h"
 #include "Application/Lab/Sessions/GTAOLabSession.h"
+#include "Application/Lab/Sessions/GIReferenceLabSession.h"
 #include "Application/Lab/Sessions/LightingContractLabSession.h"
 #include "Application/Lab/Sessions/MathFoundationLabSession.h"
 #include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
@@ -86,6 +87,8 @@ namespace gglab
 			},
 		};
 		registration.m_Labs = {
+			{ GIReferenceLabSession::GetDescriptor(), &GIReferenceLabSession::Create,
+				{ shader_programs::GIReceiverPixel, shader_programs::GIReferenceCompute } },
 			{ CoastalRaySceneLabSession::GetDescriptor(), &CoastalRaySceneLabSession::Create,
 				{ shader_programs::RaySceneProbeCompute, shader_programs::RaySceneSunVisibilityCompute,
 					shader_programs::RaySceneHitMaterialCompute, shader_programs::GIReceiverPixel } },

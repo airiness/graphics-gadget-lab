@@ -1,8 +1,10 @@
 #pragma once
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIReference.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineSceneExtensionBase.h"
 
 #include <memory>
+#include <optional>
 
 namespace gglab
 {
@@ -19,6 +21,8 @@ namespace gglab
 		// Runtime-owned receiver diagnostics before the temporal boundary. Requires
 		// Native, unjittered rendering with TAA off; ordinary compositions leave this off.
 		bool m_EnableGIReceiver = false;
+		// Also enables receivers; records a stateless float reference before TAA.
+		std::optional<GIReferenceCreateInfo> m_GIReference;
 	};
 
 	[[nodiscard]] std::unique_ptr<RenderPipelineBase> CreateRenderPipelineForwardPlus(

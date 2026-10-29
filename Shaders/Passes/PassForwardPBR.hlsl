@@ -7,7 +7,7 @@
 #include <Common/SurfaceEvaluation.hlsli>
 #include <Common/EnvironmentSampling.hlsli>
 #include <Lighting/AmbientOcclusion.hlsli>
-#include <Lighting/AtmosphereBinding.hlsli>
+#include <Lighting/WorldSunTransmittance.hlsli>
 #include <Lighting/ForwardPlus.hlsli>
 #include <Lighting/DirectionalShadowVisibility.hlsli>
 #include <Lighting/DirectionalShadowData.hlsli>
@@ -281,31 +281,6 @@ bool ResolveLightVector(LightData light, float3 positionWS, out float3 L, out fl
 	return attenuation > 0.0;
 }
 
-float3 WorldSunTransmittance(float3 positionWS, float3 sunDirection)
-{
-	if (g_Pass.AtmosphereTransmittanceIndex == 0xffffffffu)
-	{
-		return 1.0.xxx;
-	}
-	float3 positionKm = positionWS * g_Atmosphere.World.w - g_Atmosphere.World.xyz;
-	float radiusKm = length(positionKm);
-	float bottomKm = g_Atmosphere.Radii.x;
-	float topKm = g_Atmosphere.Radii.y;
-	float mu = dot(positionKm, sunDirection) / max(radiusKm, 1.0e-6);
-	float b = radiusKm * mu;
-	float c = (radiusKm - bottomKm) * (radiusKm + bottomKm);
-	float discriminant = b * b - c;
-	if (b < 0.0 && discriminant >= 0.0 && -b - sqrt(discriminant) > 0.0001)
-	{
-		return 0.0.xxx;
-	}
-	float2 unitUV = saturate(float2(mu * 0.5 + 0.5,
-		(radiusKm - bottomKm) / max(topKm - bottomKm, 1.0e-6)));
-	float2 uv = (unitUV * float2(255.0, 63.0) + 0.5) / float2(256.0, 64.0);
-	return GetTexture2DFloat4(g_Pass.AtmosphereTransmittanceIndex).SampleLevel(
-		GetSamplerState(g_Pass.AtmosphereSamplerIndex), uv, 0).rgb;
-}
-
 float3 EvaluateDirectLight(uint lightIndex, float3 positionWS,
 	ShadowReceiverPlane shadowReceiver, PreparedMaterialShading material)
 {
@@ -338,7 +313,8 @@ float3 EvaluateDirectLight(uint lightIndex, float3 positionWS,
 	float3 illuminance = light.Color.rgb * light.Intensity;
 	if (lightIndex == g_Scene.WorldSunLightIndex)
 	{
-		illuminance *= WorldSunTransmittance(positionWS, L);
+		illuminance *= WorldSunTransmittance(positionWS, L,
+			g_Pass.AtmosphereTransmittanceIndex, g_Pass.AtmosphereSamplerIndex);
 	}
 	const float3 directResponse = EvaluateDirectMaterialResponse(L, NoL, coatNoL, material,
 		lightIndex == g_Scene.WorldSunLightIndex, g_Scene.WorldSunAngularRadius);
