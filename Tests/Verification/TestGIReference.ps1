@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Checks stateless one-bounce F1/F2 reference exports. Does not qualify DDGI or Final.
+Checks stateless F1-F4 and independent sun/sky contracts. Does not qualify DDGI or Final.
 #>
 [CmdletBinding()]
 param(
@@ -76,20 +76,72 @@ try {
                 foreach ($view in @('F2_Interior','F2_Floor','F2_Ceiling','F2_West','F2_East','F2_Front','F2_Roof')) {
                     $observations += @{directory="$backend/$view";fixture=2;samples=64;seed=61051;albedo=0;ev100=10;view=$view}
                 }
+                foreach ($view in @('F3_Interior','F3_Floor','F3_Ceiling','F3_West','F3_East','F3_Front','F3_Roof')) {
+                    $observations += @{directory="$backend/$view";fixture=3;samples=64;seed=61051;albedo=0;ev100=10;view=$view}
+                }
+                # Each base family has independent-seed and doubled-sample observations.
+                foreach ($surface in @('Floor','Back')) {
+                    foreach ($variant in @('base','independent','double')) {
+                        $observations += @{directory="$backend/f4-$($surface.ToLower())-$variant";fixture=4;
+                            samples=$(if ($variant -eq 'double') {4096} else {2048});
+                            seed=$(if ($variant -eq 'independent') {61052} else {61051});
+                            albedo=0;ev100=10;view="F4_$surface";variant=$variant}
+                    }
+                }
+                foreach ($view in @('F4_Overview','F4_West','F4_East')) {
+                    $observations += @{directory="$backend/$view";fixture=4;samples=512;seed=61051;albedo=0;ev100=10;view=$view}
+                }
+                foreach ($variant in @('base','independent','double','intensity','red','receiver','blocked','atmosphere')) {
+                    $observations += @{directory="$backend/sun-$variant";
+                        fixture=$(if ($variant -eq 'blocked') {6} else {5});
+                        samples=$(if ($variant -eq 'double') {1024} else {512});
+                        seed=$(if ($variant -eq 'independent') {61052} else {61051});
+                        albedo=$(if ($variant -eq 'receiver') {1} else {0});ev100=10;view='Contract_Sun';variant=$variant;
+                        sun_lux=$(if ($variant -eq 'intensity') {20000} else {10000});
+                        secondary_albedo=$(if ($variant -eq 'red') {1} else {0});atmosphere=($variant -eq 'atmosphere')}
+                }
+                foreach ($variant in @('direct','cube')) {
+                    $observations += @{directory="$backend/constant-$variant";fixture=7;samples=512;seed=61051;
+                        albedo=0;ev100=10;view='Contract_Environment';environment=$(if ($variant -eq 'cube') {1} else {0})}
+                }
+                foreach ($source in @('gradient','physical')) {
+                    $variants = if ($source -eq 'gradient') { @('base','independent','double','intensity','yaw','mip0') } else {
+                        @('base','independent','double','mip0') }
+                    foreach ($variant in $variants) {
+                        $observations += @{directory="$backend/$source-$variant";fixture=7;
+                            samples=$(if ($variant -eq 'double') {1024} else {512});
+                            seed=$(if ($variant -eq 'independent') {61052} else {61051});
+                            albedo=0;ev100=10;view='Contract_Environment';variant=$variant;
+                            environment=$(if ($source -eq 'gradient') {2} else {3});
+                            filter=$(if ($variant -eq 'mip0') {1} else {0});
+                            intensity=$(if ($variant -eq 'intensity') {2} else {1});
+                            yaw=$(if ($variant -eq 'yaw') {90} else {0})}
+                    }
+                }
                 $targets = @('GI.Reference.Irradiance','GI.Reference.Diagnostics','GI.Reference.Position',
                     'GI.Reference.Identity','GI.Receiver.FaceNormal','GI.Receiver.ShadingNormal',
                     'GI.Receiver.HitAlbedo','GI.Reference.LambertRadiance') | ForEach-Object { @{resource=$_} }
                 $products = @(@{kind='resource';targets=@($targets)},@{kind='graph'})
                 foreach ($observation in $observations) {
+                    foreach ($entry in @{environment=0;filter=0;intensity=1;yaw=0;sun_lux=10000;secondary_albedo=0;atmosphere=$false}.GetEnumerator()) {
+                        if (-not $observation.ContainsKey($entry.Key)) { $observation[$entry.Key] = $entry.Value }
+                    }
                     $changes = @()
-                    foreach ($key in @('fixture','samples','seed','albedo','ev100')) {
-                        $type = if ($key -in @('samples','seed')) { 'uint' } else { 'enum' }
+                    foreach ($key in @('fixture','samples','seed','albedo','ev100','environment','filter','intensity','yaw','sun_lux','secondary_albedo','atmosphere')) {
+                        $type = if ($key -in @('samples','seed')) { 'uint' } elseif ($key -eq 'atmosphere') { 'bool' } else { 'enum' }
                         $changes += @{id="gi_reference.$key";type=$type;value=$observation[$key]}
                     }
                     $effect = Invoke-VerificationSession set $session @{ExpectedRunIdentity=$run;WaitConsumed=$true;
                         Changes=($changes | ConvertTo-Json -Compress -Depth 6);TimeoutSeconds=$TimeoutSeconds}
                     Check ($effect.batch.succeeded) "$($observation.directory)-parameters-consumed"
                     $captureDirectory = Join-Path $configDirectory $observation.directory
+                    if ($observation.fixture -ge 4) {
+                        $lightingTargets = @('GI.Reference.Irradiance','GI.Reference.Diagnostics','GI.Reference.Position',
+                            'GI.Reference.Identity','GI.Receiver.HitAlbedo','GI.Receiver.ShadingNormal',
+                            'GI.Reference.SunIrradiance','GI.Reference.EnvironmentIrradiance') | ForEach-Object { @{resource=$_} }
+                        $products = @(@{kind='resource';targets=@($lightingTargets)},@{kind='graph'})
+                    }
+                    else { $products = @(@{kind='resource';targets=@($targets)},@{kind='graph'}) }
                     $capture = Invoke-VerificationSession capture $session @{ExpectedRunIdentity=$run;
                         Timing='after-ready';SettleFrames=1;View=$observation.view;RequiredContentId='gglab.lab.gi_reference';
                         Products=($products | ConvertTo-Json -Compress -Depth 8);
@@ -112,13 +164,56 @@ try {
         }
         Write-VerificationJson "$configDirectory/cases.json" @($cases)
         Check-Python "$PSScriptRoot/ValidateGIReference.py" $configDirectory `
-            "$configDirectory/validation.json" "$config-F1-F2-numerical-gates"
+            "$configDirectory/validation.json" "$config-F1-F4-lighting-numerical-gates"
         foreach ($validator in @('ValidateCaptureBundles.py','ValidateResourceExports.py','ValidateRenderGraphExports.py')) {
             Check-Python "$root/Scripts/Verification/$validator" $configDirectory `
                 "$configDirectory/$validator.result.json" "$config-$validator"
         }
+        # The pinned GI-off pixels are qualified for Develop. Run the ordinary
+        # composition in fresh processes, with no GI Lab or ray-scene activation.
+        if ($config -eq 'Develop') {
+            foreach ($backend in $Rhi) {
+                $offDirectory = Join-Path $configDirectory "gi-off-$backend"
+                $offSession = "gi-reference-off-$runId-$backend"
+                $offStart = $null
+                try {
+                    $offStart = Invoke-VerificationSession start $offSession @{Configuration=$config;Rhi=$backend;
+                        Demo='atrium';WindowSize='1280x800';NoDevTools=$true;Validation='standard';
+                        StateRoot="$offDirectory/state";StartTimeoutSeconds=$TimeoutSeconds}
+                    Write-VerificationJson "$offDirectory/start.json" $offStart
+                    Check ($offStart.ownership -eq 'created') "$backend-gi-off-owned-run"
+                    foreach ($view in @('Retreat_SeaPassage','Retreat_Courtyard','GI_InteriorExterior','Retreat_Lounge')) {
+                        $offCapture = Invoke-VerificationSession capture $offSession @{
+                            ExpectedRunIdentity=$offStart.runIdentity;Timing='after-ready';SettleFrames=64;View=$view;
+                            Label='pre-gi-g0';Products='[{"kind":"image","source":"scene"},{"kind":"graph"}]';
+                            OutputDirectory="$offDirectory/captures";TimeoutSeconds=$TimeoutSeconds}
+                        Write-VerificationJson "$offDirectory/$view.json" $offCapture
+                        Check ($offCapture.status -eq 'completed' -and $offCapture.publication -eq 'Published') "$backend-gi-off-$view"
+                    }
+                }
+                finally {
+                    if ($offStart -and $offStart.ownership -eq 'created') {
+                        $offStop = Invoke-VerificationSession stop $offSession @{ExpectedRunIdentity=$offStart.runIdentity}
+                        Write-VerificationJson "$offDirectory/stop.json" $offStop
+                        Check ($offStop.ok -and $offStop.exitCode -eq 0) "$backend-gi-off-exited-cleanly"
+                        $offLog = Get-Content -LiteralPath $offStart.outputLog -Raw
+                        Check ($offLog -notmatch '\[error\]|\[critical\]|Validation Error|VUID-') "$backend-gi-off-no-errors"
+                    }
+                }
+                $comparison = @(& powershell -NoProfile -ExecutionPolicy Bypass -File "$root/Scripts/Verification/CompareCaptures.ps1" -Reference "$root/Assets/Media/GGLabCoastalRetreat/GI/Daylight/$backend" -Candidate "$offDirectory/captures" -Threshold 0 -MaxMeanError 0 -MaxDifferingPercent 0 -RequireMatchingInputs)
+                $comparisonExit = $LASTEXITCODE
+                Write-VerificationJson "$offDirectory/comparison.json" ($comparison | ConvertFrom-Json)
+                Check ($comparisonExit -eq 0) "$backend-gi-off-exact-pixel-and-input-regression"
+                foreach ($graphFile in Get-ChildItem "$offDirectory/captures" -Filter '*.graph.json') {
+                    $offGraph = Get-Content -LiteralPath $graphFile.FullName -Raw | ConvertFrom-Json
+                    $giPasses = @($offGraph.compile.passes | Where-Object { -not $_.culled -and $_.name -match '^(GI\.|RayScene\.)' })
+                    Check ($giPasses.Count -eq 0) "$backend-gi-off-no-reference-or-ray-scene-work"
+                }
+            }
+        }
+
     }
-    $result = @{ok=$true;directory=$output;checks=$checks;scope='F1/F2 one-bounce, not DDGI or Final'}
+    $result = @{ok=$true;directory=$output;checks=$checks;scope='F1-F4 and sun/sky contracts; D=1, not DDGI or Final'}
 }
 catch {
     $result = @{ok=$false;directory=$output;checks=$checks;error=$_.Exception.Message}

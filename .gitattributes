@@ -35,6 +35,7 @@ Shaders/Tests/Generated/*.hlsli text eol=lf
 *.jpg    binary
 *.jpeg   binary
 *.dds    binary
+*.hdr    binary
 *.tga    binary
 *.fbx    binary
 *.glb    binary

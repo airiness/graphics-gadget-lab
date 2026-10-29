@@ -28,6 +28,10 @@ cbuffer Parameters : register(b2)
 	uint AtmosphereSampler;
 	uint ReceiverAlbedoIndex;
 	uint LambertRadianceIndex;
+	uint SunIrradianceIndex;
+	uint EnvironmentIrradianceIndex;
+	uint EnvironmentFilter;
+	uint RowOffset;
 };
 
 uint GIHash(uint value)
@@ -60,7 +64,7 @@ float3 GICosineDirection(float3 normal, float2 sample)
 [numthreads(8, 8, 1)]
 void CSMain(uint3 id : SV_DispatchThreadID)
 {
-	const uint2 pixel = id.xy;
+	const uint2 pixel = uint2(id.x, id.y + RowOffset);
 	if (any(pixel >= uint2(Width, Height)))
 	{
 		return;
@@ -70,6 +74,10 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	RWTexture2D<float4> positions = GetRWTexture2DFloat4(PositionIndex);
 	RWTexture2D<float4> identities = GetRWTexture2DFloat4(IdentityIndex);
 	RWTexture2D<float4> lambertRadiance = GetRWTexture2DFloat4(LambertRadianceIndex);
+	RWTexture2D<float4> sunIrradiance = GetRWTexture2DFloat4(SunIrradianceIndex);
+	RWTexture2D<float4> environmentIrradiance = GetRWTexture2DFloat4(EnvironmentIrradianceIndex);
+	sunIrradiance[pixel] = 0.0.xxxx;
+	environmentIrradiance[pixel] = 0.0.xxxx;
 	lambertRadiance[pixel] = 0.0.xxxx;
 	irradiance[pixel] = 0.0.xxxx;
 	diagnostics[pixel] = 0.0.xxxx;
@@ -98,16 +106,54 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	primary.TMax = distance + tolerance;
 	const uint3 counts = uint3(InstanceCount, GeometryCount, MaterialCount);
 	GIHit receiver;
-	if (GITraceHit(primary, counts, receiver, true) != GIHitSurface)
+	uint receiverOutcome = GITraceHit(primary, counts, receiver, true);
+	bool receiverFallback = false;
+	if (receiverOutcome == GIHitMiss)
+	{
+		// Raster edge coverage is quantized to subpixels; an ideal centre ray
+		// can miss a covered silhouette. Search only a 1/128-pixel envelope,
+		// retaining the raster face/depth match and an explicit fallback marker.
+		// This never applies to secondary rays or converts their hits into sky.
+		const float footprint = 2.0 * abs(positionVS.z * view.InvProjMat[1][1]) / (float)(Height);
+		const float epsilon = max(2.0e-6, footprint / 128.0);
+		const float3 right = mul(float4(1, 0, 0, 0), view.InvViewMat).xyz;
+		const float3 up = mul(float4(0, 1, 0, 0), view.InvViewMat).xyz;
+		const float2 offsets[8] =
+		{
+			float2(-1, 0), float2(1, 0), float2(0, -1), float2(0, 1),
+			float2(-1, -1), float2(-1, 1), float2(1, -1), float2(1, 1)
+		};
+		float nearest = tolerance + 4.0 * epsilon;
+		for (uint attempt = 0; attempt < 8; ++attempt)
+		{
+			RayDesc shifted = primary;
+			const float3 target = position + epsilon *
+				(right * offsets[attempt].x + up * offsets[attempt].y);
+			shifted.Direction = normalize(target - primary.Origin);
+			GIHit candidate;
+			const uint outcome = GITraceHit(shifted, counts, candidate, true);
+			const float error = length(candidate.Position - position);
+			if (outcome == GIHitSurface && dot(candidate.FaceNormal, face.xyz) > 0.9999 && error < nearest)
+			{
+				nearest = error;
+				receiver = candidate;
+				receiverOutcome = outcome;
+				receiverFallback = true;
+			}
+		}
+	}
+	if (receiverOutcome != GIHitSurface)
 	{
 		irradiance[pixel] = float4(0.0, 0.0, 0.0, -2.0);
 		return;
 	}
 	positions[pixel] = float4(receiver.Position, 1.0);
-	identities[pixel] = float4((float)(receiver.Instance), (float)(receiver.Primitive), receiver.FaceNormal.y, 1.0);
+	identities[pixel] = float4((float)(receiver.Instance), (float)(receiver.Primitive), receiver.FaceNormal.y, receiverFallback ? 2.0 : 1.0);
 	const float3 normal = normalize(GetTexture2DFloat4(ShadingIndex).Load(int3(pixel, 0)).xyz);
 	uint randomState = GIHash(Seed ^ GIHash(pixel.x + Width * pixel.y));
-	float3 sum = 0.0.xxx;
+	float3 sunSum = 0.0.xxx;
+	float3 environmentSum = 0.0.xxx;
+	const float environmentMip = ConstantEnvironment != 0 ? -1.0 : GIEnvironmentMip(EnvironmentFilter);
 	uint4 outcomes = 0;
 	for (uint index = 0; index < SampleCount; ++index)
 	{
@@ -130,17 +176,23 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 		outcomes[outcome] += 1;
 		if (outcome == GIHitMiss)
 		{
-			sum += EvaluateGIMiss(direction, ConstantEnvironment != 0, ConstantRadiance);
+			environmentSum += EvaluateGIMiss(direction, ConstantEnvironment != 0, ConstantRadiance, environmentMip);
 		}
 		else if (outcome == GIHitSurface)
 		{
-			sum += EvaluateGIHitSun(hit, MaximumDistance, TransmittanceIndex, AtmosphereSampler);
+			sunSum += EvaluateGIHitSun(hit, MaximumDistance, TransmittanceIndex, AtmosphereSampler);
 		}
 	}
 	// Scene-referred E: no pre-exposure, receiver albedo, direct receiver sun, TAA,
 	// denoiser or inter-frame sum. Replaying a seed is independent of submission count.
 	const float validity = outcomes.w == 0 ? 1.0 : -3.0;
-	const float3 estimate = sum * (3.14159265358979323846 / (float)(SampleCount));
+	const float weight = 3.14159265358979323846 / (float)(SampleCount);
+	const float3 sunEstimate = sunSum * weight;
+	const float3 environmentEstimate = environmentSum * weight;
+	const float3 estimate = sunEstimate + environmentEstimate;
+	// Alpha records the actual attenuation/filter path, not receiver validity.
+	sunIrradiance[pixel] = float4(sunEstimate, TransmittanceIndex != 0xffffffffu ? 1.0 : 0.0);
+	environmentIrradiance[pixel] = float4(environmentEstimate, environmentMip);
 	irradiance[pixel] = float4(estimate, validity);
 	// Reduced diffuse diagnostic only, not the complete Forward material or Final.
 	const float3 albedo = GetTexture2DFloat4(ReceiverAlbedoIndex).Load(int3(pixel, 0)).rgb;

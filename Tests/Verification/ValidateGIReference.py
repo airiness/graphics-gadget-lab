@@ -1,4 +1,4 @@
-"""Validate the initial stateless F1/F2 one-bounce reference, not DDGI or Final."""
+"""Validate the stateless F1-F4 one-bounce reference, not DDGI or Final."""
 import argparse
 import json
 from pathlib import Path
@@ -32,13 +32,13 @@ def measurement_mask(case, values, camera):
     if case["fixture"] == 1:
         return covered & (identity[..., 0] == 0) & np.isin(identity[..., 1], [0, 1]) & \
             (np.abs(position[..., 0]) <= 1) & (np.abs(position[..., 2]) <= 1)
-    instance, primitives = ROOM_FACES[case["view"]]
+    instance, primitives = ROOM_FACES[case["view"].replace("F3_", "F2_")]
     mask = covered & (identity[..., 0] == instance) & np.isin(identity[..., 1], primitives)
     x, y, z = (position[..., axis] for axis in range(3))
-    if case["view"] in ("F2_Floor", "F2_Ceiling", "F2_Roof"):
-        radius = 1 if case["view"] == "F2_Roof" else 1.5
+    if case["view"].split("_", 1)[-1] in ("Floor", "Ceiling", "Roof"):
+        radius = 1 if case["view"].endswith("_Roof") else 1.5
         mask &= (np.abs(x) <= radius) & (np.abs(z) <= radius)
-    elif case["view"] in ("F2_West", "F2_East"):
+    elif case["view"].split("_", 1)[-1] in ("West", "East"):
         mask &= (np.abs(z) <= 1.5) & (y >= 0.5) & (y <= 3.5)
     else:
         mask &= (np.abs(x) <= 1.5) & (y >= 0.5) & (y <= 3.5)
@@ -87,18 +87,20 @@ def inspect(root, case):
                 "Flat fixture inherits a normal-map or quantized fallback tilt")
     mask = measurement_mask(case, values, frame["camera"])
     require(mask.sum() >= 32, f"Empty or unusable mask: {case['view']}")
-    lit = case["fixture"] != 2 or case["view"] == "F2_Roof"
+    lit = case["fixture"] not in (2, 3) or case["view"].endswith("_Roof")
     expected = np.pi if lit else 0.0
     mean = e[..., :3][mask].mean(axis=0, dtype=np.float64)
     error = float(np.max(np.abs(mean / np.pi - 1))) if lit else float(np.max(e[..., :3][mask]))
     require(error <= (0.01 if lit else 0.0), f"Irradiance gate failed ({case['view']}): {error}")
-    if case["fixture"] == 2 and not lit:
+    if case["fixture"] in (2, 3) and not lit:
         require(np.all(diagnostics[..., 0][mask] == 0), "Sealed interior rays incorrectly became sky misses")
+        require(np.all(diagnostics[..., 0][covered] == 0) and np.all(e[..., :3][covered] == 0),
+                "Closed-room face/seam receiver has false sky or energy")
         # A ray exactly on a touching-box seam can commit the adjacent box's backface
         # (e.g. front-wall top against ceiling bottom). It is still an occluded HIT,
         # never sky. Require every sample to hit; retain/report backfaces explicitly.
         require(np.all(diagnostics[..., 1:3].sum(-1)[mask] == 1), "Closed shell lost a blocked sample")
-    albedo = np.array([0.5] * 3 if case["fixture"] == 2 else
+    albedo = np.array([0.5] * 3 if case["fixture"] in (2, 3) else
                       ([0.2, 0.5, 0.8] if case["albedo"] else [1.0] * 3))
     require(np.max(np.abs(values["GI.Receiver.HitAlbedo"][mask, :3] - albedo)) <= 1e-6,
             "Fixture albedo does not match the frozen linear material")
@@ -125,7 +127,8 @@ def inspect(root, case):
     png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
     png += chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b"")
     (directory / "measurement-mask.png").write_bytes(png)
-    return {"maskPixels": int(mask.sum()), "meanIrradiance": mean.tolist(), "error": error,
+    return {"primaryLookupFallbacks": int(np.count_nonzero(values["GI.Reference.Identity"][..., 3] == 2)),
+            "maskPixels": int(mask.sum()), "meanIrradiance": mean.tolist(), "error": error,
             "validReceivers": int(covered.sum()), "expectedIrradiance": expected,
             "backfaceSamples": int(np.rint(diagnostics[..., 2][mask].sum() * case["samples"]))}, e, mask
 
@@ -134,7 +137,8 @@ def validate(root):
     cases = json.loads((root / "cases.json").read_text(encoding="utf-8-sig"))
     results = {}
     arrays = {}
-    for case in cases:
+    legacy = [case for case in cases if case["fixture"] <= 3]
+    for case in legacy:
         key = case["directory"]
         results[key], arrays[key], _ = inspect(root, case)
     for backend in sorted({case["directory"].split("/")[0] for case in cases}):
@@ -147,15 +151,19 @@ def validate(root):
                 require(not np.array_equal(base, arrays[f"{prefix}-independent"]),
                         "Independent reference seed did not change sphere sample outcomes")
     if any(case["directory"].startswith("vulkan/") for case in cases):
-        for case in cases:
+        for case in legacy:
             if case["directory"].startswith("dx12/"):
                 other = case["directory"].replace("dx12/", "vulkan/", 1)
                 left, right = arrays[case["directory"]], arrays[other]
                 require(np.array_equal(left[..., 3], right[..., 3]), "Cross-RHI receiver validity differs")
                 require(np.max(np.abs(left[..., :3] - right[..., :3])) <= 0.05,
                         "Cross-RHI irradiance disagreement exceeds one 64-sample cosine contribution")
+    lighting = [case for case in cases if case["fixture"] >= 4]
+    if lighting:
+        from ValidateGIReferenceLighting import validate as validate_lighting
+        validate_lighting(root, lighting)
     (root / "numerical-results.json").write_text(json.dumps(results, indent=2) + "\n")
-    return {"status": "passed", "observations": len(results), "scope": "F1/F2 stateless one-bounce, not DDGI or Final"}
+    return {"status": "passed", "observations": len(cases), "scope": "F1-F4 and sun/sky contracts; D=1, not DDGI or Final"}
 
 
 def self_test():

@@ -183,6 +183,12 @@ namespace gglab
 					"Empty and unbounded per-frame reference dispatches reject before GPU access");
 			}
 			info.m_SampleCount = 64;
+			info.m_EnvironmentFilter = static_cast<GIReferenceEnvironmentFilter>(99);
+			context.Check(!ValidateGIReferenceInputs(info, scene).IsReady(),
+				"Unknown environment filters cannot silently change the reference signal");
+			info.m_EnvironmentFilter = GIReferenceEnvironmentFilter::MipZero;
+			context.Check(ValidateGIReferenceInputs(info, scene).IsReady(),
+				"Mip-zero environment comparison is a supported explicit signal");
 			info.m_ConstantRadiance[0] = std::numeric_limits<float>::quiet_NaN();
 			context.Check(!ValidateGIReferenceInputs(info, scene).IsReady(),
 				"Non-finite reference radiance cannot enter the estimator");

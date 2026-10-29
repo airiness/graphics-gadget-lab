@@ -48,15 +48,22 @@ namespace gglab
 			uint32_t m_AtmosphereSampler = 0;
 			uint32_t m_ReceiverAlbedo = 0;
 			uint32_t m_LambertRadiance = 0;
+			uint32_t m_SunIrradiance = 0;
+			uint32_t m_EnvironmentIrradiance = 0;
+			uint32_t m_EnvironmentFilter = 0;
+			uint32_t m_RowOffset = 0;
 		};
-		static_assert(sizeof(Parameters) == 96 && offsetof(Parameters, m_ConstantRadiance) == 64 &&
-			offsetof(Parameters, m_Transmittance) == 80);
+		static_assert(sizeof(Parameters) == 112 && offsetof(Parameters, m_ConstantRadiance) == 64 &&
+			offsetof(Parameters, m_Transmittance) == 80 &&
+			offsetof(Parameters, m_SunIrradiance) == 96 && offsetof(Parameters, m_RowOffset) == 108);
 	}
 
 	RenderFrameValidationResult ValidateGIReferenceInputs(
 		const GIReferenceCreateInfo& info, const RaySceneDiagnostics& scene) noexcept
 	{
-		if (info.m_SampleCount == 0 || info.m_SampleCount > 4096 ||
+		if ((info.m_EnvironmentFilter != GIReferenceEnvironmentFilter::Face32 &&
+			info.m_EnvironmentFilter != GIReferenceEnvironmentFilter::MipZero) ||
+			info.m_SampleCount == 0 || info.m_SampleCount > 4096 ||
 			!std::isfinite(info.m_MaximumDistance) || info.m_MaximumDistance <= 0.0f ||
 			!std::ranges::all_of(info.m_ConstantRadiance,
 				[](float value) { return std::isfinite(value) && value >= 0.0f; }))
@@ -156,6 +163,17 @@ namespace gglab
 		const RenderServices& services, const RaySceneGraphResources& scene,
 		const GIReferenceCreateInfo& info) noexcept
 	{
+		if (!info.m_ConstantEnvironment)
+		{
+			const auto& bake = services.m_Environment->GetBakingStatus();
+			if (!bake.m_HasActiveBake || bake.m_ActiveGeneration !=
+				services.m_Environment->GetBakeRequestGeneration())
+			{
+				// Keep recording the frame's bake work. Skipping the whole frame here
+				// would prevent publication; after-ready observations wait on IBL.
+				return;
+			}
+		}
 		struct PassData
 		{
 			RGTextureViewId m_Depth;
@@ -164,6 +182,8 @@ namespace gglab
 			RGTextureViewId m_Transmittance;
 			RGTextureViewId m_ReceiverAlbedo;
 			RGTextureViewId m_LambertRadiance;
+			RGTextureViewId m_SunIrradiance;
+			RGTextureViewId m_EnvironmentIrradiance;
 			std::array<RGTextureViewId, OutputNames.size()> m_Outputs{};
 			TypedConstantSnapshot<AtmosphereGPU> m_Atmosphere;
 			Parameters m_Parameters;
@@ -205,6 +225,14 @@ namespace gglab
 					{ .m_Format = RHIFormat::R32G32B32A32Float, .m_Extent = extent });
 				builder.WriteInPlace(radiance, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
 				data.m_LambertRadiance = builder.CreateView<RHITextureViewType::UnorderedAccess>(radiance);
+				auto sun = builder.CreateTexture("GI.Reference.SunIrradiance",
+					{ .m_Format = RHIFormat::R32G32B32A32Float, .m_Extent = extent });
+				builder.WriteInPlace(sun, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+				data.m_SunIrradiance = builder.CreateView<RHITextureViewType::UnorderedAccess>(sun);
+				auto environment = builder.CreateTexture("GI.Reference.EnvironmentIrradiance",
+					{ .m_Format = RHIFormat::R32G32B32A32Float, .m_Extent = extent });
+				builder.WriteInPlace(environment, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+				data.m_EnvironmentIrradiance = builder.CreateView<RHITextureViewType::UnorderedAccess>(environment);
 				GGLAB_UNUSED(builder.Read(scene.m_TopLevel, RGAccelerationStructureAccess::QueryRead));
 				for (const auto blas : scene.m_BottomLevels)
 				{
@@ -221,6 +249,7 @@ namespace gglab
 					.m_ConstantEnvironment = info.m_ConstantEnvironment ? 1u : 0u,
 					.m_ConstantRadiance = info.m_ConstantRadiance, .m_MaximumDistance = info.m_MaximumDistance,
 					.m_AtmosphereSampler = services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp) };
+				data.m_Parameters.m_EnvironmentFilter = static_cast<uint32_t>(info.m_EnvironmentFilter);
 				builder.SideEffect();
 			},
 			[this, &frame, &services, scene](RGExecuteContext& execute, PassData& data)
@@ -249,6 +278,8 @@ namespace gglab
 				parameters.m_Shading = execute.GetViewDescriptor(data.m_Shading).m_Index;
 				parameters.m_ReceiverAlbedo = execute.GetViewDescriptor(data.m_ReceiverAlbedo).m_Index;
 				parameters.m_LambertRadiance = execute.GetViewDescriptor(data.m_LambertRadiance).m_Index;
+				parameters.m_SunIrradiance = execute.GetViewDescriptor(data.m_SunIrradiance).m_Index;
+				parameters.m_EnvironmentIrradiance = execute.GetViewDescriptor(data.m_EnvironmentIrradiance).m_Index;
 				if (data.m_Transmittance.IsValid())
 				{
 					parameters.m_Transmittance = execute.GetViewDescriptor(data.m_Transmittance).m_Index;
@@ -257,9 +288,20 @@ namespace gglab
 				{
 					parameters.m_Outputs[index] = execute.GetViewDescriptor(data.m_Outputs[index]).m_Index;
 				}
-				if (commands->SetConstantBufferData(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+				// Bound work per dispatch at high sample counts. Rows are disjoint:
+				// no persistent sum, submission advancement or batch-dependent RNG.
+				const uint64_t rowWork = static_cast<uint64_t>(parameters.m_Width) * parameters.m_SampleCount;
+				const uint32_t rows = std::max(8u, static_cast<uint32_t>(8'388'608 / rowWork) / 8 * 8);
+				for (uint32_t row = 0; row < parameters.m_Height; row += rows)
 				{
-					commands->Dispatch((parameters.m_Width + 7) / 8, (parameters.m_Height + 7) / 8, 1);
+					parameters.m_RowOffset = row;
+					if (!commands->SetConstantBufferData(
+						static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+					{
+						return;
+					}
+					const auto count = std::min(rows, parameters.m_Height - row);
+					commands->Dispatch((parameters.m_Width + 7) / 8, (count + 7) / 8, 1);
 				}
 			});
 	}

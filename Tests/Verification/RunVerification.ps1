@@ -41,6 +41,10 @@ $catalog = @(
     @{ name = 'capture-bundle-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateCaptureBundles.py'; arguments = @('--self-test') }) },
     @{ name = 'gpu-timing-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateGpuTiming.py'; arguments = @('--self-test') }) },
     @{ name = 'parameter-frames-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateParameterFrames.py'; arguments = @('--self-test') }) },
+    @{ name = 'gi-reference-contracts'; group = 'contracts'; steps = @(
+        @{ path = 'Tests/Verification/ValidateGIReference.py'; arguments = @('--self-test') },
+        @{ path = 'Tests/Verification/ValidateGIReferenceLighting.py'; arguments = @('--self-test') },
+        @{ path = 'Tests/Verification/GlobalIllumination/GenerateReferenceEnvironments.py'; arguments = @('--check') }) },
     @{ name = 'gi-reference'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIReference.ps1' }) },
     @{ name = 'coastal-ray-scene'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestCoastalRayScene.ps1' }) },
     @{ name = 'lighting-profiles'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestLightingProfiles.ps1' }) },

@@ -1,7 +1,9 @@
 #pragma once
 #include "AssetPreparationTracker.h"
 #include "Lab/LabSessionBase.h"
-#include "GGLabRuntime/Graphics/EnvironmentLightingSettings.h"
+#include "GGLabRuntime/Graphics/EnvironmentLightingOverrideBase.h"
+
+#include <filesystem>
 
 namespace gglab
 {
@@ -24,7 +26,8 @@ namespace gglab
 	private:
 		AssetPreparationTracker m_Assets;
 		LoadingProgress m_Progress;
-		EnvironmentLightingSettings m_PreviousEnvironment;
-		bool m_Entered = false;
+		std::unique_ptr<EnvironmentLightingOverrideBase> m_LightingOverride;
+		std::filesystem::path m_PreviousEnvironmentFile;
+		bool m_SelectedEnvironment = false;
 	};
 }

@@ -3,7 +3,20 @@
 #include <Lighting/GIRayScene.hlsli>
 #include <Lighting/WorldSunTransmittance.hlsli>
 
-float3 EvaluateGIMiss(float3 direction, bool constantEnvironment, float3 constantRadiance)
+float GIEnvironmentMip(uint filter)
+{
+	const uint2 binding = g_Scene.IBLResource.EnvironmentBinding;
+	TextureCube<float4> environment = GetTextureCubeFloat4(binding.x);
+	uint width;
+	uint height;
+	uint levels;
+	environment.GetDimensions(0, width, height, levels);
+	return filter == 1 ? 0.0 :
+		min(max(log2(max((float)(width) / 32.0, 1.0)), 0.0), (float)(levels - 1));
+}
+
+float3 EvaluateGIMiss(float3 direction, bool constantEnvironment, float3 constantRadiance,
+	float environmentMip)
 {
 	if (constantEnvironment)
 	{
@@ -11,16 +24,11 @@ float3 EvaluateGIMiss(float3 direction, bool constantEnvironment, float3 constan
 	}
 	const uint2 binding = g_Scene.IBLResource.EnvironmentBinding;
 	TextureCube<float4> environment = GetTextureCubeFloat4(binding.x);
-	uint width;
-	uint height;
-	uint levels;
-	environment.GetDimensions(0, width, height, levels);
-	// The same declared 32-texel-face filter is used by reference and future field rays.
-	// This is the radiance cubemap, never irradiance/specular IBL or SceneColor.
-	const float mip = min(max(log2(max((float)(width) / 32.0, 1.0)), 0.0), (float)(levels - 1));
+	// Radiance cubemap, never irradiance/specular IBL or SceneColor. Mip zero is
+	// a declared comparison signal; the production-compatible default is a 32-texel face.
 	return environment.SampleLevel(GetSamplerState(binding.y),
-		WorldToEnvironmentDirection(direction, g_Scene.IBLResource.EnvironmentRotationRadians), mip).rgb *
-		g_Scene.IBLResource.EnvironmentIntensity;
+		WorldToEnvironmentDirection(direction, g_Scene.IBLResource.EnvironmentRotationRadians),
+		environmentMip).rgb * g_Scene.IBLResource.EnvironmentIntensity;
 }
 
 float3 EvaluateGIHitSun(GIHit hit, float maximumDistance, uint transmittance, uint samplerIndex)

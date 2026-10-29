@@ -10,6 +10,12 @@ namespace gglab
 	class RayScene;
 	struct RaySceneDiagnostics;
 
+	enum class GIReferenceEnvironmentFilter : uint32_t
+	{
+		Face32,
+		MipZero,
+	};
+
 	// Opt-in Runtime reference configuration. The owner prepares this all-World ray
 	// scene before Forward+ frame validation. The recipe retains it and owns its graph
 	// imports and queries; do not import the same scene separately in that frame.
@@ -21,6 +27,9 @@ namespace gglab
 		bool m_ConstantEnvironment = true;
 		std::array<float, 3> m_ConstantRadiance{ 1.0f, 1.0f, 1.0f };
 		float m_MaximumDistance = 1000.0f;
+		// Published radiance cubemap signal; ignored for direct constant inputs.
+		// Face32 is the declared default, MipZero measures filtering bias.
+		GIReferenceEnvironmentFilter m_EnvironmentFilter = GIReferenceEnvironmentFilter::Face32;
 	};
 
 	[[nodiscard]] RenderFrameValidationResult ValidateGIReferenceInputs(
