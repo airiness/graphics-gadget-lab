@@ -178,9 +178,13 @@ Each frame derives one private outcome from the Renderer path and the RHI result
 
 | Outcome | Required Runtime participant order |
 | --- | --- |
-| Submitted / Failed | Runtime capture → live/bake atmosphere → temporal transaction/history → last submitted fence and IBL scheduler → graph retirement |
-| Discarded | Live/bake atmosphere → IBL scheduler → last submitted fence → temporal transaction → graph retirement → Runtime capture |
-| CompletionUnknown | Poison → fail/retain Runtime capture → retain live/bake atmosphere → abort IBL scheduling → abort/invalidate temporal state; no ordinary graph retirement |
+| Submitted / Failed | GI reference observation → Runtime capture → live/bake atmosphere → temporal transaction/history → last submitted fence and IBL scheduler → graph retirement |
+| Discarded | GI reference observation → live/bake atmosphere → IBL scheduler → last submitted fence → temporal transaction → graph retirement → Runtime capture |
+| CompletionUnknown | Retain GI reference observation → poison → fail/retain Runtime capture → retain live/bake atmosphere → abort IBL scheduling → abort/invalidate temporal state; no ordinary graph retirement |
+
+GI reference sums and RNG state commit only on Submitted. GPU completion gates
+new sample batches and capture readiness. Cancellation retires resources through
+the last-use fence; unknown completion retains them through checked teardown.
 
 On the abort path, capture releases unsubmitted taps after the RHI abort has
 recorded the frame's resource uses.

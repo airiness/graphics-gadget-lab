@@ -153,6 +153,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\CameraController.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\CameraPath.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\TemporalReferenceAccumulator.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIReferenceObservation.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GTAOTemporalHistory.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\CameraRig.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\RenderQueueSnapshotBuilder.cpp" />
@@ -391,6 +392,8 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\CameraPath.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\TemporalReference.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\TemporalReferenceAccumulator.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIReferenceObservation.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIReferenceTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\TemporalHistoryTextures.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GTAOTemporalHistory.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\CameraTooling.h" />

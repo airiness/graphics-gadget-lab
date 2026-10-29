@@ -1,4 +1,4 @@
-"""Validate the stateless F1-F4 one-bounce reference, not DDGI or Final."""
+"""Validate the bounded D=1 F1-F4 one-bounce reference, not DDGI or Final."""
 import argparse
 import json
 from pathlib import Path
@@ -51,6 +51,8 @@ def inspect(root, case):
     require(len(records) == 1, f"Expected one export in {directory}")
     record = json.loads(records[0].read_text(encoding="utf-8-sig"))
     frame = record["frame"]
+    gates = [gate for gate in frame["readiness"]["gates"] if gate["name"] == "gi-reference"]
+    require(len(gates) == 1 and gates[0]["state"] == "ready", "Reference observation is not GPU-complete")
     require(frame["camera"]["referenceView"] == case["view"], "Wrong locked reference view")
     require(frame["content"]["labId"] == "gglab.lab.gi_reference", "Wrong Lab")
     require(frame["temporal"]["status"] == "disabled" and frame["temporal"]["jitterPixels"] == [0, 0] and

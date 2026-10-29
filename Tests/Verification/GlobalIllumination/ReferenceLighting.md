@@ -1,12 +1,12 @@
 # GI reference lighting verification
 
-The opt-in GI Reference Lab implements a stateless D=1 irradiance estimator.
-This slice does not qualify a depth-converged reference, DDGI or Final.
-Frozen fixture specification v1 and its input hash remain unchanged.
+The GI Reference Lab measures scene-referred diffuse irradiance using environment
+misses and Sun-lit secondary surfaces. Fixtures follow the frozen specification
+identified by `Inputs.json`.
 
 ## Inputs and observations
 
-Fixture values 0/1/2 retain F1 sphere, F1 plane and F2. Values 3/4 add frozen
+Fixture values 0/1/2 select F1 sphere, F1 plane and F2. Values 3/4 select
 F3/F4; 5/6 are independent sun transport and off-camera shadow-blocker contracts;
 7 is a sphere for published-environment contracts. Lighting-contract parameters
 do not change frozen F1-F4 lighting. Every configuration change uses RestartSession.
@@ -42,8 +42,19 @@ matches (1) from bounded silhouette fallback (2). The latter searches a per-axis
 1/128-pixel envelope with a 2-micrometre minimum, requires matching face/depth,
 and never changes secondary hit/miss semantics. Invalid receivers still fail.
 
-High-sample work uses disjoint row dispatches. Pixel coordinates, seed and sample
-sequence do not depend on row partitioning. There is no inter-frame accumulation.
+Observations resume fixed-seed sampling across bounded GPU submissions. Sums,
+counts and RNG state advance together only on Submitted; failed/discarded work
+never contributes. Input changes start a new observation. Batch partitioning must
+preserve the sample sequence and complete output arrays.
+
+`gi_reference.samples` sets the observation total; `gi_reference.batch_samples`
+limits samples per submission. Runtime also caps pixel count times batch samples.
+Limits are defined by [GIReference.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GIReference.h)
+and input validation. This bounds sampling work, not execution time.
+
+`after-ready` waits for GPU completion through the `gi-reference` readiness gate.
+Completed means calculated, not converged. Accumulation does not reuse TAA or
+other observations.
 
 ## Independent checks and masks
 
@@ -52,12 +63,13 @@ analytically and atmosphere optical depth with independent float64 quadrature.
 It checks final receiver E, not only secondary surface radiance. Sun intensity,
 secondary material and receiver material change independently.
 
-Frozen F4 cannot produce coloured solar transport at D=1: a beam entering with
-|X| <= 1 and Y <= 3 reaches the floor before X can reach either coloured wall
-(the largest X is 1 + 0.2 * 3 = 1.6 < 2). The neutral floor and right jamb do
-reflect sun. The CPU oracle includes the complete opening thickness, sunlit
-floor strip and jamb, with separate sky integration. Colour transport is proved
-by the independent red-secondary contract; F4 remains unchanged.
+The frozen F4 opening does not directly illuminate its coloured side walls.
+A beam entering with |X| <= 1 and Y <= 3 reaches the floor before X can reach
+either coloured wall (the largest X is 1 + 0.2 * 3 = 1.6 < 2). Stopping at the
+first secondary hit therefore produces neutral solar transport. The floor and
+right jamb reflect sun. The CPU oracle includes the complete opening thickness,
+sunlit floor strip and jamb, with separate sky integration. The independent
+red-secondary contract checks colour transport.
 
 F3 checks every interior receiver, including seams, for zero irradiance and
 zero sky misses, and retains an exterior roof control. F4 preserves floor,
@@ -74,8 +86,9 @@ a 1e-6 absolute normalization floor for dark values. Sealed interiors remain
 exactly black. Cross-RHI checks compare identical mask membership and ROI means;
 complex per-pixel paths need not be bit-identical. Filter bias is reported
 separately, including per-pixel RGB RMSE and maximum error, luminance NRMSE, and
-95th-percentile/maximum luminance differences so ROI averaging cannot hide it. A D=1 SamplingConverged ROI still reports ReferenceUnconverged for
-DDGI comparison because depth convergence has not been established.
+95th-percentile/maximum luminance differences so ROI averaging cannot hide it.
+SamplingConverged alone does not qualify an ROI for DDGI comparison: it remains
+ReferenceUnconverged until depth convergence is also established.
 
 ~~~powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/RunVerification.ps1 -Suite gi-reference-contracts -Python <python-with-numpy-and-jsonschema>
@@ -83,9 +96,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/RunVerifi
 ~~~
 
 The GPU suite preserves actual World Lighting generations, environment inputs,
-LOD, seed, sample count, masks and graph evidence. F4 uses 2048/4096 samples;
-simpler lighting contracts use 512/1024. Develop also checks eight GI-off Coastal
-captures against the pinned pixels and effective inputs, and verifies no GI or
-ray-scene graph work executes. The GI-off pinned image gate is Develop-only.
-Native validation, resource/bundle/graph schema validation and clean session
-shutdown remain required.
+LOD, seed, sample count, masks and graph evidence. It checks identical-seed estimates
+across batch partitions and observations larger than a single batch. Develop also
+checks GI-off Coastal captures against pinned pixels and effective inputs, with no
+GI or ray-scene graph work. Native validation, resource/bundle/graph schemas and
+clean session shutdown are required.
+
+For same-adapter controls from a known source revision, invoke
+`TestGIReference.ps1 -GIOffBaselineDirectory <directory>` with `dx12` and `vulkan`
+subdirectories containing the control captures. The receipt records the selected
+directory and whether the pinned baseline was used. Pixel and input gates apply
+to either baseline.

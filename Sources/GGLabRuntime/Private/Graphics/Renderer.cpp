@@ -1,4 +1,5 @@
 #include "Graphics/Renderer.h"
+#include "Graphics/Pipeline/GIReferenceObservation.h"
 #include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
 #include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
@@ -130,6 +131,7 @@ namespace gglab
 
 		m_TransientResourcePool = std::make_unique<TransientResourcePool>(device);
 		m_PersistentTexturePool = std::make_unique<PersistentTexturePool>(device);
+		m_GIReferenceObservation = std::make_unique<GIReferenceObservation>(*device, *m_PersistentTexturePool);
 		m_Atmosphere = std::make_unique<AtmosphereSystem>(device, m_PersistentTexturePool.get());
 		m_BakeAtmosphere = std::make_unique<AtmosphereSystem>(device, m_PersistentTexturePool.get());
 		m_TemporalHistoryManager =
@@ -293,6 +295,8 @@ namespace gglab
 		m_TemporalReferenceAccumulator.reset();
 		m_GTAOTemporalHistory->Release(m_LastSubmittedFencePoint);
 		m_GTAOTemporalHistory.reset();
+		m_GIReferenceObservation->Shutdown();
+		m_GIReferenceObservation.reset();
 		m_PersistentTexturePool.reset();
 		m_TransientResourcePool.reset();
 		m_AssetUploadScheduler.reset();
@@ -346,6 +350,7 @@ namespace gglab
 		{
 			profiler->SetRenderFrameSerial(frameSerial);
 		}
+		m_GIReferenceObservation->BeginFrame(frameSerial);
 		m_ActiveFrame = {};
 		m_ActiveFrame.m_RHIFrame = rhiFrame;
 		m_ActiveFrame.m_Serial = frameSerial;
@@ -596,6 +601,7 @@ namespace gglab
 	{
 		GGLAB_ASSERT(m_HasActiveFrame && outcome.m_FrameSerial == m_ActiveFrame.m_Serial);
 		const RHIFencePoint fence = outcome.m_Fence;
+		m_GIReferenceObservation->Settle(outcome);
 		switch (outcome.m_Kind)
 		{
 		case RenderFrameOutcomeKind::Submitted:
@@ -702,6 +708,12 @@ namespace gglab
 		}
 	}
 
+	GIReferenceObservationDiagnostics Renderer::GetGIReferenceObservationDiagnostics() const noexcept
+	{
+		return m_GIReferenceObservation ? m_GIReferenceObservation->GetDiagnostics() :
+			GIReferenceObservationDiagnostics{};
+	}
+
 	void Renderer::AbandonGpuOwners() noexcept
 	{
 		// Destroying an owner could free memory the GPU still reads. Process exit reclaims the
@@ -717,6 +729,7 @@ namespace gglab
 		GGLAB_UNUSED(m_TemporalHistoryManager.release());
 		GGLAB_UNUSED(m_TemporalReferenceAccumulator.release());
 		GGLAB_UNUSED(m_GTAOTemporalHistory.release());
+		GGLAB_UNUSED(m_GIReferenceObservation.release());
 		GGLAB_UNUSED(m_PersistentTexturePool.release());
 		GGLAB_UNUSED(m_TransientResourcePool.release());
 		GGLAB_UNUSED(m_AssetUploadScheduler.release());

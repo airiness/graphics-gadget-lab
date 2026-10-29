@@ -804,7 +804,8 @@ namespace gglab
 			}
 			if (m_GIReference)
 			{
-				result = m_GIReferencePass.Prepare(context, services, *m_GIReference);
+				result = m_GIReferencePass.Prepare(context, services, *m_GIReference,
+					m_ForwardPBRShaderSet.m_CoverageVertexShader);
 				if (!result.IsReady())
 				{
 					return result;

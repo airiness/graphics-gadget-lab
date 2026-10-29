@@ -1,0 +1,81 @@
+#pragma once
+#include "GGLabRuntime/Graphics/Pipeline/GIReference.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIReferenceTypes.h"
+#include "Graphics/Pipeline/TemporalHistoryTextures.h"
+#include "Graphics/RenderFrameOutcome.h"
+
+#include <array>
+#include <cstdint>
+#include <memory>
+
+namespace gglab
+{
+	class RHIDevice;
+
+	struct GIReferenceObservationKey
+	{
+		std::shared_ptr<RayScene> m_Scene;
+		uint64_t m_SceneRevision = 0;
+		uint64_t m_LightingGeneration = 0;
+		uint64_t m_EnvironmentGeneration = 0;
+		uint64_t m_ShaderGeneration = 0;
+		uint64_t m_ReceiverShaderGeneration = 0;
+		uint64_t m_CoverageShaderGeneration = 0;
+		std::array<float, 16> m_ViewProjection{};
+		std::array<float, 3> m_CameraPosition{};
+		std::array<float, 3> m_ConstantRadiance{};
+		float m_MaximumDistance = 0;
+		float m_EnvironmentIntensity = 0;
+		float m_EnvironmentRotation = 0;
+		uint32_t m_Width = 0;
+		uint32_t m_Height = 0;
+		uint32_t m_Samples = 0;
+		uint32_t m_Seed = 0;
+		GIReferenceEnvironmentFilter m_Filter = GIReferenceEnvironmentFilter::Face32;
+		bool m_ConstantEnvironment = true;
+
+		bool operator==(const GIReferenceObservationKey&) const noexcept = default;
+	};
+
+	// Renderer-owned, independent of temporal history and of the Lab's lifetime.
+	// Every sum and the primary RNG state advance together on Submitted. One unfinished
+	// batch is allowed; only a Completed fence permits consuming its GPU-written data.
+	class GIReferenceObservation final
+	{
+	public:
+		using Surface = TemporalHistoryTextures<4>::RenderGraphSurface;
+		GIReferenceObservation(RHIDevice& device, PersistentTexturePool& pool) noexcept;
+		~GIReferenceObservation();
+		void BeginFrame(uint64_t serial) noexcept;
+		[[nodiscard]] bool Prepare(const GIReferenceObservationKey& key,
+			uint32_t samplesPerBatch, uint32_t sampleWorkBudget) noexcept;
+		[[nodiscard]] std::array<Surface, 4> Import(RenderGraph::RGBuilder& builder) noexcept;
+		void Export(RenderGraph::RGBuilder& builder, const std::array<Surface, 4>& surfaces) noexcept;
+		void MarkRecorded() noexcept { m_Recorded = true; }
+		void Settle(const RenderFrameOutcome& outcome) noexcept;
+		void Cancel() noexcept;
+		void Shutdown() noexcept;
+		[[nodiscard]] GIReferenceObservationDiagnostics GetDiagnostics() const noexcept
+		{
+			auto result = m_Diagnostics;
+			result.m_Active = m_Visited;
+			return result;
+		}
+
+	private:
+		void Release() noexcept;
+		RHIDevice& m_Device;
+		PersistentTexturePool& m_Pool;
+		TemporalHistoryTextures<4> m_Textures;
+		GIReferenceObservationKey m_Key{};
+		GIReferenceObservationDiagnostics m_Diagnostics{};
+		RHIFencePoint m_LastUse{};
+		RHIFencePoint m_PendingFence{};
+		uint64_t m_FrameSerial = 0;
+		bool m_Visited = false;
+		bool m_Exported = false;
+		bool m_Recorded = false;
+		bool m_UnknownCompletion = false;
+		bool m_Settled = false;
+	};
+}

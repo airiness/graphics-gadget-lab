@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Checks stateless F1-F4 and independent sun/sky contracts. Does not qualify DDGI or Final.
+Checks bounded D=1 F1-F4 and independent sun/sky contracts. Does not qualify DDGI or Final.
 #>
 [CmdletBinding()]
 param(
@@ -9,6 +9,7 @@ param(
     [string]$OutputDirectory,
     [string]$RunDirectory,
     [string]$Python = 'python',
+    [string]$GIOffBaselineDirectory,
     [int]$TimeoutSeconds = 300
 )
 $ErrorActionPreference = 'Stop'
@@ -16,6 +17,9 @@ Set-StrictMode -Version 3.0
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Import-Module (Join-Path $root 'Scripts/Verification/VerificationSupport.psm1')
 if (-not $OutputDirectory -and -not $RunDirectory) { $OutputDirectory = Join-Path $root 'Build/Validation/GIReference' }
+$pinnedGIOff = -not $GIOffBaselineDirectory
+if ($pinnedGIOff) { $GIOffBaselineDirectory = Join-Path $root 'Assets/Media/GGLabCoastalRetreat/GI/Daylight' }
+$GIOffBaselineDirectory = (Resolve-Path -LiteralPath $GIOffBaselineDirectory).Path
 $runId = [Guid]::NewGuid().ToString('N').Substring(0, 8)
 $output = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory -RunId $runId
 $checks = @()
@@ -100,6 +104,12 @@ try {
                         sun_lux=$(if ($variant -eq 'intensity') {20000} else {10000});
                         secondary_albedo=$(if ($variant -eq 'red') {1} else {0});atmosphere=($variant -eq 'atmosphere')}
                 }
+                foreach ($batch in @(1,7,31,4096)) {
+                    $observations += @{directory="$backend/sun-batch-$batch";fixture=5;samples=512;seed=61051;
+                        albedo=0;ev100=10;view='Contract_Sun';batch_samples=$batch}
+                }
+                $observations += @{directory="$backend/long-plane";fixture=1;samples=8193;seed=61051;
+                    albedo=0;ev100=10;view='F1_Plane';batch_samples=31}
                 foreach ($variant in @('direct','cube')) {
                     $observations += @{directory="$backend/constant-$variant";fixture=7;samples=512;seed=61051;
                         albedo=0;ev100=10;view='Contract_Environment';environment=$(if ($variant -eq 'cube') {1} else {0})}
@@ -123,12 +133,12 @@ try {
                     'GI.Receiver.HitAlbedo','GI.Reference.LambertRadiance') | ForEach-Object { @{resource=$_} }
                 $products = @(@{kind='resource';targets=@($targets)},@{kind='graph'})
                 foreach ($observation in $observations) {
-                    foreach ($entry in @{environment=0;filter=0;intensity=1;yaw=0;sun_lux=10000;secondary_albedo=0;atmosphere=$false}.GetEnumerator()) {
+                    foreach ($entry in @{batch_samples=64;environment=0;filter=0;intensity=1;yaw=0;sun_lux=10000;secondary_albedo=0;atmosphere=$false}.GetEnumerator()) {
                         if (-not $observation.ContainsKey($entry.Key)) { $observation[$entry.Key] = $entry.Value }
                     }
                     $changes = @()
-                    foreach ($key in @('fixture','samples','seed','albedo','ev100','environment','filter','intensity','yaw','sun_lux','secondary_albedo','atmosphere')) {
-                        $type = if ($key -in @('samples','seed')) { 'uint' } elseif ($key -eq 'atmosphere') { 'bool' } else { 'enum' }
+                    foreach ($key in @('fixture','samples','batch_samples','seed','albedo','ev100','environment','filter','intensity','yaw','sun_lux','secondary_albedo','atmosphere')) {
+                        $type = if ($key -in @('samples','batch_samples','seed')) { 'uint' } elseif ($key -eq 'atmosphere') { 'bool' } else { 'enum' }
                         $changes += @{id="gi_reference.$key";type=$type;value=$observation[$key]}
                     }
                     $effect = Invoke-VerificationSession set $session @{ExpectedRunIdentity=$run;WaitConsumed=$true;
@@ -200,7 +210,7 @@ try {
                         Check ($offLog -notmatch '\[error\]|\[critical\]|Validation Error|VUID-') "$backend-gi-off-no-errors"
                     }
                 }
-                $comparison = @(& powershell -NoProfile -ExecutionPolicy Bypass -File "$root/Scripts/Verification/CompareCaptures.ps1" -Reference "$root/Assets/Media/GGLabCoastalRetreat/GI/Daylight/$backend" -Candidate "$offDirectory/captures" -Threshold 0 -MaxMeanError 0 -MaxDifferingPercent 0 -RequireMatchingInputs)
+                $comparison = @(& powershell -NoProfile -ExecutionPolicy Bypass -File "$root/Scripts/Verification/CompareCaptures.ps1" -Reference "$GIOffBaselineDirectory/$backend" -Candidate "$offDirectory/captures" -Threshold 0 -MaxMeanError 0 -MaxDifferingPercent 0 -RequireMatchingInputs)
                 $comparisonExit = $LASTEXITCODE
                 Write-VerificationJson "$offDirectory/comparison.json" ($comparison | ConvertFrom-Json)
                 Check ($comparisonExit -eq 0) "$backend-gi-off-exact-pixel-and-input-regression"
@@ -213,10 +223,10 @@ try {
         }
 
     }
-    $result = @{ok=$true;directory=$output;checks=$checks;scope='F1-F4 and sun/sky contracts; D=1, not DDGI or Final'}
+    $result = @{ok=$true;directory=$output;checks=$checks;pinnedGIOff=$pinnedGIOff;giOffBaseline=$GIOffBaselineDirectory;scope='F1-F4 and sun/sky contracts; D=1, not DDGI or Final'}
 }
 catch {
-    $result = @{ok=$false;directory=$output;checks=$checks;error=$_.Exception.Message}
+    $result = @{ok=$false;directory=$output;checks=$checks;pinnedGIOff=$pinnedGIOff;giOffBaseline=$GIOffBaselineDirectory;error=$_.Exception.Message}
 }
 Write-VerificationJson "$output/result.json" $result
 [Console]::Out.WriteLine(($result | ConvertTo-Json -Compress -Depth 12))

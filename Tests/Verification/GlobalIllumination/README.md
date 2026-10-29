@@ -46,7 +46,7 @@ unmatched receivers count against the gate. These exports are unexposed surface
 data, not GI radiance. Run the numerical checker's positive/adversarial self-tests
 without a GPU using `python Tests/Verification/ValidateCoastalGIMaterial.py --self-test`.
 
-## Stateless one-bounce reference (F1/F2)
+## Irradiance reference
 
 After building WinApp and ShaderCompiler, run:
 
@@ -66,8 +66,9 @@ fail rather than disappearing from measurements.
 pre-exposure or the primary receiver's direct sun. `GI.Reference.LambertRadiance`
 is the reduced diffuse diagnostic `albedo * E / pi`, not the complete Forward
 material or Final. The reference does not read SceneColor, IBL irradiance, a field,
-a denoiser or temporal history; every frame replays its fixed seed. Environment
-misses require complete all-World bounds and `t_max >= bounds diagonal`.
+a denoiser or temporal history. Each observation resumes its fixed-seed sequence
+across bounded submissions. Environment misses require complete all-World bounds
+and `t_max >= bounds diagonal`.
 
 The suite exports eight float arrays and the same-frame graph per observation.
 `ValidateGIReference.py` checks the frozen inputs, finite values and named
@@ -83,12 +84,9 @@ normal-map tilt. The checker has headless tests:
 python Tests/Verification/ValidateGIReference.py --self-test
 ```
 
-This suite qualifies only the initial constant-environment, sun-off F1/F2
-one-bounce slice. The shared hit-sun/WorldSunTransmittance and filtered environment
-shader paths compile for both RHIs, but their nonzero-sun/Physical Sky GPU energy
-checks, mip-0 bias measurement, multi-bounce/depth convergence and full Forward
-composition remain open. No DDGI, field quality, Final or performance acceptance
-is established.
+See [ReferenceLighting.md](ReferenceLighting.md) for the Sun/Sky fixtures, filter
+checks, batching and capture-readiness contracts. Reference measurements do not
+establish field quality, Final or performance acceptance.
 
 Ray-scene and GI-off checks cover membership regression, cache reuse and disabled
 behavior, not exhaustive native traversal coverage. Reference checks establish

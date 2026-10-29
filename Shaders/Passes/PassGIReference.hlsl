@@ -32,6 +32,11 @@ cbuffer Parameters : register(b2)
 	uint EnvironmentIrradianceIndex;
 	uint EnvironmentFilter;
 	uint RowOffset;
+	uint4 PreviousIndices;
+	uint4 NextIndices;
+	uint SampleBegin;
+	uint ObservationEnabled;
+	uint2 Padding;
 };
 
 uint GIHash(uint value)
@@ -83,6 +88,13 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	diagnostics[pixel] = 0.0.xxxx;
 	positions[pixel] = 0.0.xxxx;
 	identities[pixel] = -1.0.xxxx;
+	if (ObservationEnabled != 0 && SampleCount != 0)
+	{
+		GetRWTexture2DFloat4(NextIndices.x)[pixel] = 0.0.xxxx;
+		GetRWTexture2DFloat4(NextIndices.y)[pixel] = 0.0.xxxx;
+		GetRWTexture2DFloat4(NextIndices.z)[pixel] = 0.0.xxxx;
+		GetRWTexture2DUint(NextIndices.w)[pixel] = 0;
+	}
 	const float4 face = GetTexture2DFloat4(FaceIndex).Load(int3(pixel, 0));
 	if (face.w == 0.0)
 	{
@@ -151,10 +163,17 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	identities[pixel] = float4((float)(receiver.Instance), (float)(receiver.Primitive), receiver.FaceNormal.y, receiverFallback ? 2.0 : 1.0);
 	const float3 normal = normalize(GetTexture2DFloat4(ShadingIndex).Load(int3(pixel, 0)).xyz);
 	uint randomState = GIHash(Seed ^ GIHash(pixel.x + Width * pixel.y));
-	float3 sunSum = 0.0.xxx;
-	float3 environmentSum = 0.0.xxx;
+	precise float3 sunSum = 0.0.xxx;
+	precise float3 environmentSum = 0.0.xxx;
 	const float environmentMip = ConstantEnvironment != 0 ? -1.0 : GIEnvironmentMip(EnvironmentFilter);
 	uint4 outcomes = 0;
+	if (ObservationEnabled != 0 && SampleBegin != 0)
+	{
+		sunSum = GetTexture2DFloat4(PreviousIndices.x).Load(int3(pixel, 0)).rgb;
+		environmentSum = GetTexture2DFloat4(PreviousIndices.y).Load(int3(pixel, 0)).rgb;
+		outcomes = (uint4)(GetTexture2DFloat4(PreviousIndices.z).Load(int3(pixel, 0)));
+		randomState = GetTexture2DUint(PreviousIndices.w).Load(int3(pixel, 0));
+	}
 	for (uint index = 0; index < SampleCount; ++index)
 	{
 		const float u = GIRandom(randomState);
@@ -184,9 +203,17 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 		}
 	}
 	// Scene-referred E: no pre-exposure, receiver albedo, direct receiver sun, TAA,
-	// denoiser or inter-frame sum. Replaying a seed is independent of submission count.
+	// denoiser or cross-observation reuse. Sums and primary RNG preserve sample order.
+	if (ObservationEnabled != 0 && SampleCount != 0)
+	{
+		GetRWTexture2DFloat4(NextIndices.x)[pixel] = float4(sunSum, 0.0);
+		GetRWTexture2DFloat4(NextIndices.y)[pixel] = float4(environmentSum, 0.0);
+		GetRWTexture2DFloat4(NextIndices.z)[pixel] = (float4)(outcomes);
+		GetRWTexture2DUint(NextIndices.w)[pixel] = randomState;
+	}
+	const uint totalSamples = max(SampleBegin + SampleCount, 1u);
 	const float validity = outcomes.w == 0 ? 1.0 : -3.0;
-	const float weight = 3.14159265358979323846 / (float)(SampleCount);
+	const float weight = 3.14159265358979323846 / (float)(totalSamples);
 	const float3 sunEstimate = sunSum * weight;
 	const float3 environmentEstimate = environmentSum * weight;
 	const float3 estimate = sunEstimate + environmentEstimate;
@@ -197,5 +224,5 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	// Reduced diffuse diagnostic only, not the complete Forward material or Final.
 	const float3 albedo = GetTexture2DFloat4(ReceiverAlbedoIndex).Load(int3(pixel, 0)).rgb;
 	lambertRadiance[pixel] = float4(albedo * estimate / 3.14159265358979323846, validity);
-	diagnostics[pixel] = (float4)(outcomes) / (float)(SampleCount);
+	diagnostics[pixel] = (float4)(outcomes) / (float)(totalSamples);
 }

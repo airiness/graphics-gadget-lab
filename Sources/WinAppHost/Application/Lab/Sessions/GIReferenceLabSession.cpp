@@ -23,6 +23,7 @@ namespace gglab
 	{
 		const LabParameterId FixtureId("gi_reference.fixture");
 		const LabParameterId SamplesId("gi_reference.samples");
+		const LabParameterId BatchSamplesId("gi_reference.batch_samples");
 		const LabParameterId SeedId("gi_reference.seed");
 		const LabParameterId AlbedoId("gi_reference.albedo");
 		const LabParameterId ExposureId("gi_reference.ev100");
@@ -100,6 +101,9 @@ namespace gglab
 				{ 5, "Contract: sun transport" }, { 6, "Contract: off-camera sun blocker" },
 				{ 7, "Contract: published environment sphere" } } }));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = SamplesId, .m_Name = "Samples per pixel", .m_Group = "Reference",
+			.m_Type = LabParameterType::UInt, .m_Impact = LabChangeImpact::RestartSession,
+			.m_DefaultValue = uint32_t(64), .m_MinValue = LabValue(uint32_t(1)), .m_MaxValue = LabValue(uint32_t(1048576)) }));
+		GGLAB_UNUSED(parameters.Add({ .m_Id = BatchSamplesId, .m_Name = "Samples per submission", .m_Group = "Reference",
 			.m_Type = LabParameterType::UInt, .m_Impact = LabChangeImpact::RestartSession,
 			.m_DefaultValue = uint32_t(64), .m_MinValue = LabValue(uint32_t(1)), .m_MaxValue = LabValue(uint32_t(4096)) }));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = SeedId, .m_Name = "Independent seed", .m_Group = "Reference",
@@ -305,6 +309,7 @@ namespace gglab
 		GIReferenceCreateInfo reference{ .m_RayScene = std::make_shared<RayScene>(),
 			.m_SampleCount = GetParameters().Get(SamplesId, uint32_t(64)),
 			.m_Seed = GetParameters().Get(SeedId, uint32_t(61051)) };
+		reference.m_SamplesPerBatch = GetParameters().Get(BatchSamplesId, uint32_t(64));
 		reference.m_ConstantEnvironment = environment == 0;
 		// The HDR importer decodes RGBE bin centres: (128 + 0.5) / 128.
 		// Match that exact constant in the independent direct-input contract.
@@ -384,7 +389,7 @@ namespace gglab
 	LabDescriptor GIReferenceLabSession::GetDescriptor() noexcept
 	{
 		return { .m_Id = GetId(), .m_DisplayName = "GI Reference", .m_Category = "Lighting",
-			.m_Description = "Stateless one-bounce irradiance reference: frozen F1-F4 and independent sun/sky contracts.",
+			.m_Description = "Bounded D=1 irradiance reference: frozen F1-F4 and independent sun/sky contracts.",
 			.m_Kind = LabKind::Scene, .m_SchemaVersion = 1 };
 	}
 	std::unique_ptr<LabSessionBase> GIReferenceLabSession::Create(const LabSessionCreateInfo& info) noexcept

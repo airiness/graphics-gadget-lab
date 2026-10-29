@@ -51,6 +51,10 @@ Atlas ID: atlas.runtime.render-pipeline
   the Runtime-owned [receiver pass](../../../Sources/GGLabRuntime/Private/Graphics/RenderPass/RenderPassGIReceiver.cpp)
   before the temporal boundary. It requires Native, unjittered rendering with TAA
   off; receiver records shared by Runtime consumers stay Private.
+- **GI reference:** the optional reference pass uses the Renderer-owned
+  [observation](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIReferenceObservation.h).
+  Sum/RNG pairs commit at settlement and retire by fence; read-only progress uses
+  [GIReferenceTypes.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GIReferenceTypes.h).
 - **Lifetime:** a Lab session owns its pipeline through `LabSessionBase`. The Forward+
   recipe owns its Runtime passes and the scene extension it was created with.
 - **Boundary:** [pass ownership](../Runtime_Boundaries_Map.md#pass-ownership); the

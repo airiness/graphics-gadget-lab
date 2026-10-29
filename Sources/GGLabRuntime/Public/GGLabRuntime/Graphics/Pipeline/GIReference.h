@@ -30,6 +30,10 @@ namespace gglab
 		// Published radiance cubemap signal; ignored for direct constant inputs.
 		// Face32 is the declared default, MipZero measures filtering bias.
 		GIReferenceEnvironmentFilter m_EnvironmentFilter = GIReferenceEnvironmentFilter::Face32;
+		// Total observation samples are independent of submission partitioning.
+		uint32_t m_SamplesPerBatch = 64;
+		// Maximum width * height * batch samples. Extents exceeding this reject.
+		uint32_t m_SampleWorkPerSubmission = 8'388'608;
 	};
 
 	[[nodiscard]] RenderFrameValidationResult ValidateGIReferenceInputs(

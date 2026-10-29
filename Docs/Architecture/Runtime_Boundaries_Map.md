@@ -51,8 +51,10 @@ The opt-in `RenderPipelineForwardPlusCreateInfo::m_GIReference` configures the
 Runtime-owned `RenderPassGIReference` immediately after GI receiver production and
 before the temporal boundary. Its Public `GIReferenceCreateInfo` retains a
 Lab-prepared, complete `RayScene`; the Runtime recipe imports that scene once and
-owns its queries. The initial reference is stateless: it exports scene-referred
-irradiance without reading SceneColor or advancing any inter-frame accumulator.
+owns its queries. Renderer owns the bounded observation and its accumulation,
+independently of the Lab and temporal histories; see [frame settlement](Frame_Execution_Map.md#frame-settlement).
+`RenderPresentationAccess` returns immutable progress. AppRuntime selects captures
+after pipeline validation identifies the current observation.
 
 ## Lab-owned composition
 

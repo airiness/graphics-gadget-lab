@@ -1,5 +1,6 @@
 #include "RayQueryContractSelfTests.h"
 #include "AssetTestServices.h"
+#include "Graphics/Pipeline/GIReferenceObservation.h"
 #include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
 #include "GGLabRuntime/Graphics/Pipeline/RaySceneSunVisibility.h"
 #include "GGLabRuntime/Graphics/Pipeline/RaySceneHitMaterial.h"
@@ -176,11 +177,11 @@ namespace gglab
 			context.Check(!ValidateGIReferenceInputs(info, scene).IsReady(),
 				"A stale snapshot cannot qualify a partially ready World");
 			scene.m_Status = RaySceneStatus::Prepared;
-			for (const uint32_t samples : { 0u, 4097u })
+			for (const uint32_t samples : { 0u, 1048577u })
 			{
 				info.m_SampleCount = samples;
 				context.Check(!ValidateGIReferenceInputs(info, scene).IsReady(),
-					"Empty and unbounded per-frame reference dispatches reject before GPU access");
+					"Empty and oversized reference observations reject before GPU access");
 			}
 			info.m_SampleCount = 64;
 			info.m_EnvironmentFilter = static_cast<GIReferenceEnvironmentFilter>(99);
@@ -192,6 +193,115 @@ namespace gglab
 			info.m_ConstantRadiance[0] = std::numeric_limits<float>::quiet_NaN();
 			context.Check(!ValidateGIReferenceInputs(info, scene).IsReady(),
 				"Non-finite reference radiance cannot enter the estimator");
+		}
+
+		void RunGIReferenceObservationTests(SelfTestContext& context) noexcept
+		{
+			asset_test::TestRHIDevice device;
+			device.SetFencesComplete(false);
+			PersistentTexturePool textures(&device);
+			TransientResourcePool transients(&device);
+			GIReferenceObservation observation(device, textures);
+			GIReferenceObservationKey key{ .m_Width = 8, .m_Height = 8, .m_Samples = 9 };
+			const RHIFencePoint fence{ RHIFenceHandle(0, 1), 1 };
+			const auto record = [&]() noexcept
+				{
+					RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &transients });
+					struct Data {};
+					graph.AddPass<Data>("ObservationBatch", RGPassEncoderType::Compute,
+						[&](RenderGraph::RGBuilder& builder, Data&)
+						{
+							auto surfaces = observation.Import(builder);
+							for (auto& surface : surfaces)
+							{
+								if (observation.GetDiagnostics().m_SubmittedSamples != 0)
+								{
+									GGLAB_UNUSED(builder.Read(surface.m_Previous, RGTextureAccess::Sample, RHIStage::ComputeShader));
+								}
+								if (observation.GetDiagnostics().m_BatchSamples != 0)
+								{
+									builder.WriteInPlace(surface.m_Next, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+								}
+							}
+							observation.Export(builder, surfaces);
+							builder.SideEffect();
+						});
+					context.Check(graph.Compile(), "GI accumulation imports and final states compile");
+					observation.MarkRecorded();
+				};
+			observation.BeginFrame(1);
+			context.Check(!observation.Prepare(key, 4, 63), "An extent cannot exceed the entire submission budget");
+			context.Check(observation.Prepare(key, 8, 256) && observation.GetDiagnostics().m_BatchSamples == 4,
+				"The whole submission is bounded by pixels times samples");
+			record();
+			observation.Settle({ RenderFrameOutcomeKind::Discarded, 1, {} });
+			context.Check(observation.GetDiagnostics().m_SubmittedSamples == 0, "Discarded batches do not advance");
+			observation.BeginFrame(2);
+			GGLAB_UNUSED(observation.Prepare(key, 4, 256));
+			record();
+			observation.Settle({ RenderFrameOutcomeKind::Submitted, 2, fence });
+			observation.Settle({ RenderFrameOutcomeKind::Submitted, 2, fence });
+			context.Check(observation.GetDiagnostics().m_SubmittedSamples == 4 &&
+				observation.GetDiagnostics().m_CompletedSamples == 0 && observation.GetDiagnostics().m_CommittedVersion == 1,
+				"Submitted advances once and does not claim GPU completion");
+			observation.BeginFrame(3);
+			GGLAB_UNUSED(observation.Prepare(key, 4, 256));
+			context.Check(observation.GetDiagnostics().m_BatchSamples == 0, "Only one unfinished sample batch is allowed");
+			observation.Settle({ RenderFrameOutcomeKind::Discarded, 3, {} });
+			device.SetFencesComplete(true);
+			observation.BeginFrame(4);
+			GGLAB_UNUSED(observation.Prepare(key, 8, 512));
+			context.Check(observation.GetDiagnostics().m_CompletedSamples == 4 &&
+				observation.GetDiagnostics().m_BatchSamples == 5, "Completion permits the exact remaining range with a new partition");
+			record();
+			observation.Settle({ RenderFrameOutcomeKind::Submitted, 4, fence });
+			observation.BeginFrame(5);
+			GGLAB_UNUSED(observation.Prepare(key, 4, 256));
+			context.Check(observation.GetDiagnostics().m_Status == GIReferenceObservationStatus::Completed &&
+				observation.GetDiagnostics().m_CompletedSamples == 9 && observation.GetDiagnostics().m_BatchSamples == 0,
+				"A completed observation resolves without counting further samples");
+			const auto generation = observation.GetDiagnostics().m_Generation;
+			++key.m_SceneRevision;
+			GGLAB_UNUSED(observation.Prepare(key, 4, 256));
+			context.Check(observation.GetDiagnostics().m_Generation == generation + 1 &&
+				observation.GetDiagnostics().m_SubmittedSamples == 0, "Snapshot changes cancel and restart the observation");
+			record();
+			observation.Settle({ RenderFrameOutcomeKind::Failed, 5, fence });
+			context.Check(observation.GetDiagnostics().m_Status == GIReferenceObservationStatus::Failed &&
+				observation.GetDiagnostics().m_SubmittedSamples == 0, "Failed execution never contributes, even with a fence");
+			observation.Cancel();
+			device.SetFencesComplete(false);
+			observation.BeginFrame(6);
+			GGLAB_UNUSED(observation.Prepare(key, 4, 256));
+			record();
+			observation.Settle({ RenderFrameOutcomeKind::CompletionUnknown, 6, {} });
+			observation.Cancel();
+			context.Check(textures.GetDiagnostics().m_ActiveTextureCount == 8 &&
+				!observation.Prepare(key, 4, 256), "Unknown completion retains GPU owners and prevents restart");
+			device.SetFencesComplete(true);
+			observation.Shutdown();
+			textures.Tick();
+			observation.BeginFrame(7);
+			GGLAB_UNUSED(observation.Prepare(key, 4, 256));
+			record();
+			device.SetFencesComplete(false);
+			observation.Settle({ RenderFrameOutcomeKind::Submitted, 7, fence });
+			observation.Cancel();
+			context.Check(textures.GetDiagnostics().m_PendingRetirementTextureCount == 8,
+				"Cancellation retains the entire sum/RNG pair through its last-use fence");
+			textures.Tick();
+			context.Check(textures.GetDiagnostics().m_PendingRetirementTextureCount == 8,
+				"Pending cancelled resources cannot retire early");
+			observation.BeginFrame(8);
+			GGLAB_UNUSED(observation.Prepare(key, 4, 256));
+			observation.Settle({ RenderFrameOutcomeKind::Submitted, 8, fence });
+			context.Check(observation.GetDiagnostics().m_SubmittedSamples == 0,
+				"Submission without a recorded/exported batch cannot advance samples");
+			device.SetFencesComplete(true);
+			observation.Shutdown();
+			textures.Tick();
+			context.Check(textures.GetDiagnostics().m_ActiveTextureCount == 0 &&
+				textures.GetDiagnostics().m_PendingRetirementTextureCount == 0, "Verified teardown releases every observation surface");
 		}
 
 		void RunGIReceiverPreparationTests(SelfTestContext& context) noexcept
@@ -809,6 +919,7 @@ namespace gglab
 		RunSunVisibilityGraphTests(context);
 		RunGIReceiverPreparationTests(context);
 		RunGIReferenceInputTests(context);
+		RunGIReferenceObservationTests(context);
 		RunTriangleTests(context);
 		RunInstanceTests(context);
 		RunScratchTests(context);

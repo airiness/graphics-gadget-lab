@@ -8,15 +8,16 @@ namespace gglab
 	class RenderGraph;
 	struct RaySceneGraphResources;
 
-	// Stateless, per-frame one-bounce estimator. No submitted-sample advancement,
-	// persistent accumulation, field lookup, denoiser or temporal history.
+	// D=1 estimator backed by the Renderer-owned bounded observation.
+	// No field lookup, denoiser or cross-observation temporal history.
 	class RenderPassGIReference final
 	{
 	public:
 		RenderPassGIReference() noexcept;
 		~RenderPassGIReference();
 		[[nodiscard]] RenderFrameValidationResult Prepare(const RenderFrameContext& frame,
-			const RenderServices& services, const GIReferenceCreateInfo& info) noexcept;
+			const RenderServices& services, const GIReferenceCreateInfo& info,
+			ShaderID coverageVertex) noexcept;
 		void AddPass(RenderGraph& graph, const RenderFrameContext& frame,
 			const RenderServices& services, const RaySceneGraphResources& scene,
 			const GIReferenceCreateInfo& info) noexcept;

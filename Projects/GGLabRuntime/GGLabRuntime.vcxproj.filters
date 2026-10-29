@@ -555,6 +555,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\ForwardPlusDebugReadback.cpp">
       <Filter>Private\Graphics\Pipeline</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIReferenceObservation.cpp">
+      <Filter>Private\Graphics\Pipeline</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GTAOTemporalHistory.cpp">
       <Filter>Private\Graphics\Pipeline</Filter>
     </ClCompile>
@@ -1270,6 +1273,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\MaterialGpuEncoder.h">
       <Filter>Private\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIReferenceObservation.h">
+      <Filter>Private\Graphics\Pipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GTAOCapability.h">
       <Filter>Private\Graphics\Pipeline</Filter>
@@ -2136,6 +2142,9 @@
       <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIReference.h">
+      <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIReferenceTypes.h">
       <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GTAO.h">

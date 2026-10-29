@@ -6159,8 +6159,10 @@ namespace gglab
 							runtime.GetRenderHost()->IsInitialized();
 					};
 				runtime.Shutdown({ .m_ApplicationTooling = &tooling });
-				checks.Check(cancellationRejected && toolingRejected && probe.m_ContainedCleanupAfterRevocation,
-					"Shutdown revokes before callbacks while contained cleanup retains live providers");
+				checks.Check(cancellationRejected, "Shutdown revokes before task cancellation callbacks");
+				checks.Check(toolingRejected, "Shutdown revokes before tooling callbacks");
+				checks.Check(probe.m_ContainedCleanupAfterRevocation,
+					"Contained cleanup retains live providers after revocation");
 				bool invoked = false;
 				checks.Check(!runtime.GetRenderServices().IsValid() && !retained.TryUse(
 					[&](const RenderServices&) noexcept { invoked = true; }) && !invoked,

@@ -11,7 +11,7 @@ import numpy as np
 LUMA = np.array([0.2126, 0.7152, 0.0722])
 ABSOLUTE = 1e-6
 RELATIVE = 0.01
-DEFAULTS = dict(fixture=0, samples=64, seed=61051, albedo=0, ev100=10,
+DEFAULTS = dict(fixture=0, samples=64, batch_samples=64, seed=61051, albedo=0, ev100=10,
                 environment=0, filter=0, intensity=1, yaw=0, sun_lux=10000,
                 secondary_albedo=0, atmosphere=False)
 
@@ -192,6 +192,8 @@ def inspect(root, case):
     record = json.loads(records[0].read_text(encoding="utf-8-sig"))
     frame = record["frame"]
     require(frame["readiness"]["ready"], "Unready lighting observation")
+    gates = [g for g in frame["readiness"]["gates"] if g["name"] == "gi-reference"]
+    require(len(gates) == 1 and gates[0]["state"] == "ready", "Reference observation is not GPU-complete")
     require(frame["content"]["labId"] == "gglab.lab.gi_reference" and
             frame["camera"]["referenceView"] == case["view"], "Wrong content/view")
     require(frame["temporal"]["status"] == "disabled" and frame["temporal"]["jitterPixels"] == [0, 0] and
@@ -352,6 +354,13 @@ def validate(root, cases):
                 change = relative_error(right[signal], left[signal])
                 require(change < RELATIVE, f"Cross-RHI component error: {key}/{name}/{signal}: {change}")
                 component_comparisons[f"{key}/{name}/{signal}"] = change
+    # Complete arrays must preserve the exact primary RNG and addition order.
+    for case in cases:
+        if "/sun-batch-" in case["directory"]:
+            key = case["directory"]
+            baseline = key.split("/", 1)[0] + "/sun-base"
+            require(results[key]["irradianceSha256"] == results[baseline]["irradianceSha256"],
+                    f"Submission partition changed the D=1 estimator: {key}")
     # Same-seed changes isolate each physical factor; primary receiver albedo cannot change E.
     for backend in sorted({c["directory"].split("/")[0] for c in cases}):
         def roi(name):
