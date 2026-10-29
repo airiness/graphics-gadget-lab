@@ -448,6 +448,8 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
 '@
     # Keep catalog expectations and leaf fixtures together so their counts cannot drift.
     $gpuLeaves = [ordered]@{
+        'gi-reference' = 'TestGIReference.ps1'
+        'coastal-ray-scene' = 'TestCoastalRayScene.ps1'
         'lighting-profiles' = 'TestLightingProfiles.ps1'
         'sequence-parameter-events' = 'TestSequenceParameterEvents.ps1'
         'sequence-deferred-events' = 'TestDeferredSequenceEvents.ps1'
@@ -471,7 +473,7 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
         'coastal-assets', 'gi-inputs', 'verification-support', 'source-normalization',
         'nonfinite-sites', 'render-graph-schema',
         'resource-export-schema', 'nonfinite-coverage-schema', 'capture-comparison', 'taa-comparison-workflow',
-        'capture-bundle-schema', 'gpu-timing-schema', 'parameter-frames-schema'
+        'capture-bundle-schema', 'gpu-timing-schema', 'parameter-frames-schema', 'gi-reference-contracts'
     )
     foreach ($leaf in $gpuLeaves.Values) {
         [IO.File]::WriteAllText((Join-Path $runnerTests $leaf), $leafSource, (New-Object Text.UTF8Encoding($false)))
@@ -489,8 +491,10 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
     }
     Check (($gpuResult.suites | Where-Object name -eq 'taa-comparison').steps[0].receipt.python -eq
         'fixture-python-path') 'runner-forwards-selected-python-to-taa-workflow'
-    Check (($gpuResult.suites | Where-Object name -eq 'session-lifecycle').steps[0].receipt.python -eq
-        'fixture-python-path') 'runner-forwards-selected-python-to-session-lifecycle'
+    foreach ($suite in @('session-lifecycle', 'coastal-ray-scene', 'gi-reference')) {
+        Check (($gpuResult.suites | Where-Object name -eq $suite).steps[0].receipt.python -eq
+            'fixture-python-path') "runner-forwards-selected-python-to-$suite"
+    }
     $unused = Join-Path $output 'must-not-create'
     $list = Invoke-VerificationScript $runner @{ List=$true; OutputDirectory=$unused }
     $items = $list.output | ConvertFrom-Json
