@@ -34,6 +34,8 @@ namespace gglab
 				.m_Geometry = { MeshID(9), 1 },
 				.m_Vertices = { RHIBufferHandle{ 0, 1 }, 0, 56, 168 },
 				.m_Indices = { RHIBufferHandle{ 1, 1 }, 0, 12, RHIFormat::R32Uint },
+				.m_VertexBufferDesc = { .m_SizeInBytes = 168, .m_Usage = RHIBufferUsage::CopySource },
+				.m_IndexBufferDesc = { .m_SizeInBytes = 12, .m_Usage = RHIBufferUsage::CopySource },
 				.m_VertexCount = 3, .m_IndexCount = 3,
 				.m_MaterialKey = RenderMaterialKey::FromAsset(MaterialID(2)),
 				.m_Transform = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0 } };
@@ -100,6 +102,52 @@ namespace gglab
 				"Singular instance transforms fail before GPU allocation");
 			context.Check(PlanRayScene({ opaque, opaque }, {}, limits, other, reason) == RaySceneStatus::InvalidSource,
 				"Duplicate durable instance identities fail preparation");
+			auto subrange = opaque;
+			subrange.m_Vertices.m_Offset = 1024;
+			subrange.m_Indices.m_Offset = 256;
+			subrange.m_VertexBufferDesc.m_SizeInBytes = 2048;
+			subrange.m_IndexBufferDesc.m_SizeInBytes = 512;
+			context.Check(PlanRayScene({ subrange }, {}, limits, other, reason) == RaySceneStatus::Prepared &&
+				other.m_Geometries[0].m_SourceVertices.m_Offset == 1024 &&
+				other.m_Geometries[0].m_SourceIndices.m_Offset == 256 &&
+				other.m_Geometries[0].m_SourceVertexDesc.m_SizeInBytes == 2048,
+				"Nonzero raster subranges retain physical offsets and the actual allocation extent");
+			auto tooShort = subrange;
+			tooShort.m_Vertices.m_SizeInBytes = 124;
+			context.Check(PlanRayScene({ tooShort }, {}, limits, other, reason) == RaySceneStatus::InvalidSource,
+				"A ray pool copy cannot read trailing Vertex attributes outside its logical binding");
+			tooShort = subrange;
+			tooShort.m_Indices.m_SizeInBytes = 8;
+			context.Check(PlanRayScene({ tooShort }, {}, limits, other, reason) == RaySceneStatus::InvalidSource,
+				"Index reads are bounded by the binding as well as the allocation");
+			tooShort = subrange;
+			tooShort.m_VertexBufferDesc.m_SizeInBytes = 1191;
+			context.Check(PlanRayScene({ tooShort }, {}, limits, other, reason) == RaySceneStatus::InvalidSource,
+				"A logical binding cannot exceed the real allocation even when its payload fits");
+			tooShort = subrange;
+			tooShort.m_Indices.m_Offset = std::numeric_limits<uint64_t>::max() - 3;
+			tooShort.m_IndexBufferDesc.m_SizeInBytes = std::numeric_limits<uint64_t>::max();
+			context.Check(PlanRayScene({ tooShort }, {}, limits, other, reason) == RaySceneStatus::InvalidSource,
+				"Physical offset plus logical length cannot wrap around");
+			tooShort = subrange;
+			tooShort.m_Vertices.m_Offset = 1025;
+			context.Check(PlanRayScene({ tooShort }, {}, limits, other, reason) == RaySceneStatus::InvalidSource,
+				"Nonzero position offsets still require float alignment");
+			auto shared = subrange;
+			shared.m_EntityIdentity = 20;
+			shared.m_Geometry.m_Mesh = MeshID(10);
+			shared.m_Vertices.m_Offset = 1280;
+			shared.m_Indices.m_Offset = 300;
+			context.Check(PlanRayScene({ subrange, shared }, {}, limits, other, reason) == RaySceneStatus::Prepared &&
+				other.m_Geometries.size() == 2, "Distinct meshes may occupy disjoint subranges of one same-role allocation");
+			shared.m_Geometry = subrange.m_Geometry;
+			context.Check(PlanRayScene({ subrange, shared }, {}, limits, other, reason) == RaySceneStatus::InvalidSource,
+				"Equal mesh identities cannot silently merge different physical subranges");
+			shared = subrange;
+			shared.m_Indices.m_Buffer = shared.m_Vertices.m_Buffer;
+			shared.m_IndexBufferDesc = shared.m_VertexBufferDesc;
+			context.Check(PlanRayScene({ shared }, {}, limits, other, reason) == RaySceneStatus::UnsupportedGeometry,
+				"Mixed vertex/index allocation states remain explicitly unsupported");
 		}
 
 		void RunDX12PipelineIdentityTests(SelfTestContext& context) noexcept

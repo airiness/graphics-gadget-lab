@@ -97,6 +97,10 @@ namespace gglab
 
 		virtual bool IsAlive(RHITextureHandle texture) const noexcept = 0;
 		virtual bool IsAlive(RHIBufferHandle buffer) const noexcept = 0;
+		// Resource extent and capabilities, not allocator/heap padding or a binding range.
+		// Owner-thread query; stale/unsupported handles return nullopt. Debug labels are omitted.
+		[[nodiscard]] virtual std::optional<RHIBufferDesc> QueryBufferDescription(
+			RHIBufferHandle) const noexcept { return std::nullopt; }
 		[[nodiscard]] virtual bool IsAlive(RHIAccelerationStructureHandle) const noexcept { return false; }
 		[[nodiscard]] virtual RHIAllocationFacts QueryAccelerationStructureAllocationFacts(
 			RHIAccelerationStructureHandle) const noexcept { return {}; }

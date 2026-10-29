@@ -528,6 +528,22 @@ namespace gglab
 			m_ResourceManager.IsAlive(buffer);
 	}
 
+	std::optional<RHIBufferDesc> VulkanDevice::QueryBufferDescription(RHIBufferHandle buffer) const noexcept
+	{
+		if (!RequireOwnerThread("VulkanDevice::QueryBufferDescription"))
+		{
+			return std::nullopt;
+		}
+		const auto* desc = m_ResourceManager.ResolveBufferDesc(buffer);
+		if (!desc)
+		{
+			return std::nullopt;
+		}
+		auto result = *desc;
+		result.m_DebugName = nullptr;
+		return result;
+	}
+
 	bool VulkanDevice::IsAlive(RHISamplerHandle sampler) const noexcept
 	{
 		return RequireOwnerThread("VulkanDevice::IsAlive(sampler)") &&

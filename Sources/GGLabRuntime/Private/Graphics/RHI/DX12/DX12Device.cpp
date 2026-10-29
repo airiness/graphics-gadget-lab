@@ -499,6 +499,18 @@ namespace gglab
 		return m_ResourceManager.IsAlive(buffer);
 	}
 
+	std::optional<RHIBufferDesc> DX12Device::QueryBufferDescription(RHIBufferHandle buffer) const noexcept
+	{
+		const auto* desc = m_ResourceManager.ResolveBufferDesc(buffer);
+		if (!desc)
+		{
+			return std::nullopt;
+		}
+		auto result = *desc;
+		result.m_DebugName = nullptr;
+		return result;
+	}
+
 	bool DX12Device::IsAlive(RHISamplerHandle sampler) const noexcept
 	{
 		return m_DescriptorCache && m_DescriptorCache->IsSamplerAlive(sampler);

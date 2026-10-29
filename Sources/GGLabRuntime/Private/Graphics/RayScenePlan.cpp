@@ -101,6 +101,17 @@ namespace gglab
 			entry.m_Flags = 1;
 			if (geometry == plan.m_Geometries.end())
 			{
+				const bool mixedRoles = source.m_Vertices.m_Buffer == source.m_Indices.m_Buffer ||
+					std::any_of(plan.m_Geometries.begin(), plan.m_Geometries.end(), [&source](const auto& existing)
+						{
+							return existing.m_SourceVertices.m_Buffer == source.m_Indices.m_Buffer ||
+								existing.m_SourceIndices.m_Buffer == source.m_Vertices.m_Buffer;
+						});
+				if (mixedRoles)
+				{
+					return fail(RaySceneStatus::UnsupportedGeometry,
+						"Ray source allocations cannot mix vertex and index raster states.");
+				}
 				if (plan.m_Geometries.size() >= capacity.m_MaxGeometries)
 				{
 					return fail(RaySceneStatus::CapacityExceeded, "Ray geometry capacity exceeded.");
@@ -116,8 +127,9 @@ namespace gglab
 				{
 					return fail(RaySceneStatus::CapacityExceeded, "Ray geometry byte pool capacity exceeded.");
 				}
-				const RHIBufferDesc vertices{ .m_SizeInBytes = source.m_Vertices.m_SizeInBytes };
-				const RHIBufferDesc indices{ .m_SizeInBytes = source.m_Indices.m_SizeInBytes };
+				// Bindings describe a logical subrange; allocation extents come from the device.
+				const auto& vertices = source.m_VertexBufferDesc;
+				const auto& indices = source.m_IndexBufferDesc;
 				const RHIASIndexedTriangles triangles{
 					.m_Vertices = { source.m_Vertices.m_Buffer, source.m_Vertices.m_Offset, vertexBytes },
 					.m_VertexCount = source.m_VertexCount,
@@ -125,11 +137,19 @@ namespace gglab
 					.m_Indices = { source.m_Indices.m_Buffer, source.m_Indices.m_Offset, indexBytes },
 					.m_IndexCount = source.m_IndexCount, .m_IndexFormat = source.m_Indices.m_Format };
 				if (source.m_Vertices.m_Stride != sizeof(Vertex) ||
+					!Test(vertices.m_Usage, RHIBufferUsage::CopySource) ||
+					!Test(indices.m_Usage, RHIBufferUsage::CopySource) ||
+					source.m_Vertices.m_Offset > vertices.m_SizeInBytes ||
+					source.m_Vertices.m_SizeInBytes > vertices.m_SizeInBytes - source.m_Vertices.m_Offset ||
+					source.m_Indices.m_Offset > indices.m_SizeInBytes ||
+					source.m_Indices.m_SizeInBytes > indices.m_SizeInBytes - source.m_Indices.m_Offset ||
+					vertexBytes > source.m_Vertices.m_SizeInBytes || indexBytes > source.m_Indices.m_SizeInBytes ||
 					!ValidateRHIASIndexedTriangles(triangles, vertices, indices, limits).IsValid())
 				{
 					return fail(RaySceneStatus::InvalidSource, "Invalid ray mesh layout or buffer range.");
 				}
 				plan.m_Geometries.push_back({ source.m_Geometry, source.m_Vertices, source.m_Indices,
+					vertices, indices,
 					{ static_cast<uint32_t>(plan.m_VertexBytes), static_cast<uint32_t>(plan.m_IndexBytes),
 						source.m_IndexCount / 3, source.m_VertexCount } });
 				plan.m_VertexBytes += vertexBytes;
@@ -137,8 +157,7 @@ namespace gglab
 			}
 			else if (geometry->m_GPU.m_VertexCount != source.m_VertexCount ||
 				geometry->m_GPU.m_TriangleCount * 3 != source.m_IndexCount ||
-				geometry->m_SourceVertices.m_Buffer != source.m_Vertices.m_Buffer ||
-				geometry->m_SourceIndices.m_Buffer != source.m_Indices.m_Buffer)
+				geometry->m_SourceVertices != source.m_Vertices || geometry->m_SourceIndices != source.m_Indices)
 			{
 				return fail(RaySceneStatus::InvalidSource, "Conflicting ray mesh content identities.");
 			}

@@ -28,6 +28,8 @@ namespace gglab
 		RaySceneGeometryKey m_Geometry;
 		RHIVertexBufferBinding m_Vertices;
 		RHIIndexBufferBinding m_Indices;
+		RHIBufferDesc m_VertexBufferDesc;
+		RHIBufferDesc m_IndexBufferDesc;
 		uint32_t m_VertexCount = 0;
 		uint32_t m_IndexCount = 0;
 		RenderMaterialKey m_MaterialKey;
@@ -41,6 +43,8 @@ namespace gglab
 		RaySceneGeometryKey m_Key;
 		RHIVertexBufferBinding m_SourceVertices;
 		RHIIndexBufferBinding m_SourceIndices;
+		RHIBufferDesc m_SourceVertexDesc;
+		RHIBufferDesc m_SourceIndexDesc;
 		RaySceneGeometryGPU m_GPU;
 	};
 

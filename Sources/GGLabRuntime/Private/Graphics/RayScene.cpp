@@ -262,12 +262,19 @@ namespace gglab
 					return fail(RaySceneStatus::InvalidSource, "Ray mesh indices or positions failed upload validation.");
 				}
 				const auto matrix = modelMesh.m_LocalTransform * entityWorld;
+				const auto vertices = device.QueryBufferDescription(mesh->m_VertexBufferBinding.m_Buffer);
+				const auto indices = device.QueryBufferDescription(mesh->m_IndexBufferBinding.m_Buffer);
+				if (!vertices || !indices)
+				{
+					return fail(RaySceneStatus::InvalidSource, "Ray mesh buffer descriptions are unavailable.");
+				}
 				sources.push_back({
 					.m_EntityIdentity = static_cast<uint32_t>(entt::to_integral(entity)),
 					.m_Model = model->m_Id, .m_ModelGeneration = model->m_ContentGeneration,
 					.m_ModelMeshIndex = index,
 					.m_Geometry = { mesh->m_Id, mesh->m_ContentGeneration },
 					.m_Vertices = mesh->m_VertexBufferBinding, .m_Indices = mesh->m_IndexBufferBinding,
+					.m_VertexBufferDesc = *vertices, .m_IndexBufferDesc = *indices,
 					.m_VertexCount = mesh->m_VertexCount, .m_IndexCount = mesh->m_IndexCount,
 					.m_MaterialKey = overridden ? RenderMaterialKey::FromRuntime(overrideMaterial->m_Key) :
 						RenderMaterialKey::FromAsset(modelMesh.m_MaterialId),
@@ -364,7 +371,13 @@ namespace gglab
 			});
 		if (buildGeometry || !snapshot->m_TablesUploaded)
 		{
-			auto sourceIds = std::make_shared<std::vector<std::pair<RGBufferId, RGBufferId>>>();
+			struct SourceImport
+			{
+				RHIBufferHandle m_Buffer;
+				RGBufferId m_Id;
+				RGBufferAccess m_RasterAccess;
+			};
+			auto sourceIds = std::make_shared<std::vector<SourceImport>>();
 			struct CopyData
 			{
 				std::vector<RGBufferId> m_SourceVertices;
@@ -375,22 +388,34 @@ namespace gglab
 				{
 					if (buildGeometry)
 					{
+						auto importSource = [&](const char* name, RHIBufferHandle buffer,
+							const RHIBufferDesc& desc, RGBufferAccess rasterAccess)
+							{
+								const auto found = std::find_if(sourceIds->begin(), sourceIds->end(),
+									[buffer](const auto& imported)
+									{
+										return imported.m_Buffer == buffer;
+									});
+								if (found != sourceIds->end())
+								{
+									return found->m_Id;
+								}
+								const auto id = builder.ImportBuffer(name, buffer, desc, rasterAccess, RGContentValidity::Defined);
+								GGLAB_UNUSED(builder.Read(id, RGBufferAccess::CopySource));
+								sourceIds->push_back({ buffer, id, rasterAccess });
+								return id;
+							};
 						for (size_t index = 0; index < snapshot->m_Plan.m_Geometries.size(); ++index)
 						{
 							const auto& source = snapshot->m_Plan.m_Geometries[index];
-							data.m_SourceVertices.push_back(builder.ImportBuffer(
+							data.m_SourceVertices.push_back(importSource(
 								("RayScene.SourceVertex." + std::to_string(index)).c_str(), source.m_SourceVertices.m_Buffer,
-								{ .m_SizeInBytes = source.m_SourceVertices.m_SizeInBytes, .m_StrideInBytes = sizeof(Vertex),
-									.m_Usage = RHIBufferUsage::Vertex | RHIBufferUsage::CopyDest | RHIBufferUsage::CopySource },
-								RGBufferAccess::Vertex, RGContentValidity::Defined));
-							data.m_SourceIndices.push_back(builder.ImportBuffer(
+								source.m_SourceVertexDesc,
+								RGBufferAccess::Vertex));
+							data.m_SourceIndices.push_back(importSource(
 								("RayScene.SourceIndex." + std::to_string(index)).c_str(), source.m_SourceIndices.m_Buffer,
-								{ .m_SizeInBytes = source.m_SourceIndices.m_SizeInBytes, .m_StrideInBytes = sizeof(uint32_t),
-									.m_Usage = RHIBufferUsage::Index | RHIBufferUsage::CopyDest | RHIBufferUsage::CopySource },
-								RGBufferAccess::Index, RGContentValidity::Defined));
-							GGLAB_UNUSED(builder.Read(data.m_SourceVertices.back(), RGBufferAccess::CopySource));
-							GGLAB_UNUSED(builder.Read(data.m_SourceIndices.back(), RGBufferAccess::CopySource));
-							sourceIds->emplace_back(data.m_SourceVertices.back(), data.m_SourceIndices.back());
+								source.m_SourceIndexDesc,
+								RGBufferAccess::Index));
 						}
 						builder.WriteInPlace(resources->m_Vertices, RGBufferAccess::CopyDest);
 						builder.WriteInPlace(resources->m_Indices, RGBufferAccess::CopyDest);
@@ -447,10 +472,9 @@ namespace gglab
 				{
 					if (buildGeometry)
 					{
-						for (const auto& [vertices, indices] : *sourceIds)
+						for (const auto& source : *sourceIds)
 						{
-							builder.Export(vertices, RGBufferAccess::Vertex);
-							builder.Export(indices, RGBufferAccess::Index);
+							builder.Export(source.m_Id, source.m_RasterAccess);
 						}
 					}
 				});
