@@ -339,6 +339,8 @@ namespace gglab
 		const bool buildGeometry = !geometry->m_Built;
 		const bool buildTop = !top->m_Built;
 		auto resources = std::make_shared<RaySceneGraphResources>();
+		resources->m_GeometryCount = static_cast<uint32_t>(snapshot->m_Plan.m_Geometries.size());
+		resources->m_InstanceCount = static_cast<uint32_t>(snapshot->m_Plan.m_Instances.size());
 		resources->m_Lifetime = snapshot;
 		graph.AddPass<EmptyData>("RayScene.Import",
 			[=](RenderGraph::RGBuilder& builder, EmptyData&)

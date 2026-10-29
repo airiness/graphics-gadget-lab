@@ -67,6 +67,13 @@ namespace gglab
 					.m_Space = "display view",
 					.m_Description = "Ambient visibility; one is unoccluded." };
 			}
+			if (name == "RayScene.SunVisibility")
+			{
+				return ResourceExportSemantics{ .m_Role = "ray-scene.sun-visibility",
+					.m_Units = "R/G visibility [0,1]; B receiver state; A metres",
+					.m_Space = "render view, jittered opaque raster samples",
+					.m_Description = "R: binary RT sun visibility. G: production CSM filtering/bias/blend/fade. B: 1 matched opaque receiver, 0 background, -1 unmatched raster depth. A: first accepted blocker distance, -1 on miss; not nearest-hit distance. Ray origins use triangle-face ULP offsets; sun rays stop at 1000 m." };
+			}
 			return std::nullopt;
 		}
 

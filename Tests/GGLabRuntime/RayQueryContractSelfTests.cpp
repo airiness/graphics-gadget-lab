@@ -1,6 +1,13 @@
 #include "RayQueryContractSelfTests.h"
+#include "AssetTestServices.h"
 #include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
+#include "GGLabRuntime/Graphics/Pipeline/RaySceneSunVisibility.h"
 #include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
+#include "GGLabRuntime/Graphics/RenderContexts.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
+#include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
+#include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
+#include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 #include "GGLabRuntime/Graphics/RHI/RHIAccelerationStructure.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGResourceUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12BindingLayoutUtils.h"
@@ -26,6 +33,85 @@ namespace gglab
 {
 	namespace
 	{
+		void RunSunVisibilityGraphTests(SelfTestContext& context) noexcept
+		{
+			class Samplers final : public RenderSamplerAccess
+			{
+			public:
+				SamplerID GetOrCreateSampler(const SamplerKey&) noexcept override { return {}; }
+				SamplerID GetPresetSamplerId(SamplerPreset) const noexcept override { return {}; }
+				uint32_t GetSamplerIndex(SamplerPreset) const noexcept override { return 0; }
+				uint32_t GetSamplerIndex(const SamplerID&) const noexcept override { return 0; }
+				uint32_t ResolveSamplerIndex(SamplerID, SamplerPreset) const noexcept override { return 0; }
+			} samplers;
+			RenderScene scene;
+			scene.m_WorldSun.emplace();
+			DirectionalShadowFramePlan shadows;
+			shadows.m_ShadingEnabled = true;
+			const std::array<RenderQueue, 1> queues{};
+			RenderFrameContext frame{ .m_RenderScene = scene, .m_RenderQueues = queues,
+				.m_DirectionalShadowFramePlan = &shadows };
+			const RenderServices services{ .m_Samplers = &samplers };
+			asset_test::TestRHIDevice device;
+			TransientResourcePool pool(&device);
+			RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			RaySceneGraphResources inputs;
+			inputs.m_GeometryCount = 1;
+			inputs.m_InstanceCount = 1;
+			struct Data {};
+			graph.AddPass<Data>("ImportSunInputs", [&](RenderGraph::RGBuilder& builder, Data&)
+				{
+					const RHITextureDesc depthDesc{ .m_Format = RHIFormat::D32Float,
+						.m_Usage = RHITextureUsage::DepthStencil | RHITextureUsage::Sampled, .m_Extent = { 8, 8, 1 } };
+					auto& depth = builder.GetBlackboard().Create<RGSceneDepthResources>(SceneDepthResourcesName);
+					depth.m_Texture = builder.ImportTexture("Depth", device.CreateTexture({ .m_Desc = depthDesc }, {}), depthDesc,
+						RGTextureAccess::Sample, RGContentValidity::Defined);
+					depth.m_SrvDesc = MakeRHITexture2DViewDesc(RHIFormat::R32Float, 0, 1, RHITextureAspect::Depth);
+					auto& shadow = builder.GetBlackboard().Create<RGShadowResources>(ShadowResourcesName);
+					shadow.m_DirectionalShadowMap = builder.ImportTexture("Shadow", device.CreateTexture({ .m_Desc = depthDesc }, {}), depthDesc,
+						RGTextureAccess::Sample, RGContentValidity::Defined);
+					inputs.m_TopLevel = builder.Import<RGAccelerationStructureResource>("TLAS", device.CreateAccelerationStructure(
+						{ .m_Type = RHIAccelerationStructureType::TopLevel, .m_SizeInBytes = 256 }),
+						{ .m_Type = RHIAccelerationStructureType::TopLevel, .m_SizeInBytes = 256 },
+						RGAccelerationStructureAccess::QueryRead, RGContentValidity::Defined);
+					const std::array buffers{ &inputs.m_Vertices, &inputs.m_Indices, &inputs.m_Geometries, &inputs.m_Instances };
+					for (uint32_t index = 0; index < buffers.size(); ++index)
+					{
+						const RHIBufferDesc desc{ .m_SizeInBytes = 256, .m_StrideInBytes = 16, .m_Usage = RHIBufferUsage::Structured };
+						*buffers[index] = builder.ImportBuffer(("Pool" + std::to_string(index)).c_str(), device.CreateBuffer(desc, {}),
+							{ .m_SizeInBytes = 256, .m_StrideInBytes = 16, .m_Usage = RHIBufferUsage::Structured },
+							RGBufferAccess::StructuredRead, RGContentValidity::Defined);
+					}
+				});
+			// Compile-only cancellation exercises production declarations without executing an unprepared shader.
+			RaySceneSunVisibility visibility;
+			visibility.AddPass(graph, frame, services, inputs);
+			graph.AddPass<Data>("ReturnSunInputs", [&](RenderGraph::RGBuilder& builder, Data&)
+				{
+					builder.Export(inputs.m_Geometries, RGBufferAccess::StructuredRead);
+					builder.Export(inputs.m_Instances, RGBufferAccess::StructuredRead);
+				});
+			context.Check(graph.Compile(), "Sun visibility compiles with inferred transient usage and final imported states");
+			context.Check(graph.ResolveObservation({ .m_Resource = "RayScene.SunVisibility" }).m_Failure == RGObservationFailure::None,
+				"The reachable float sun tap supports T2 observation without a persistent copy allocation");
+		}
+
+		void RunSunVisibilityPreparationTests(SelfTestContext& context) noexcept
+		{
+			RenderScene scene;
+			DirectionalShadowFramePlan shadows;
+			RenderFrameContext frame{ .m_RenderScene = scene, .m_DirectionalShadowFramePlan = &shadows };
+			RaySceneSunVisibility visibility;
+			context.Check(!visibility.Prepare(frame, {}),
+				"Missing WorldSun rejects sun-visibility composition before any GPU service access");
+			scene.m_WorldSun.emplace();
+			scene.m_WorldSunLightIndex = 0;
+			scene.m_DirectionalShadowLightIndex = 1;
+			shadows.m_ShadingEnabled = true;
+			context.Check(!visibility.Prepare(frame, {}),
+				"A CSM for another directional light cannot masquerade as a sun-visibility comparison");
+		}
+
 		void RunRayScenePlanTests(SelfTestContext& context) noexcept
 		{
 			const RHIASBuildLimits limits{ 1024, 1024, 256 };
@@ -610,6 +696,8 @@ namespace gglab
 		static_assert(!std::is_convertible_v<RHIBufferHandle, RHIAccelerationStructureHandle>);
 		RunCapabilityTests(context);
 		RunRayScenePlanTests(context);
+		RunSunVisibilityPreparationTests(context);
+		RunSunVisibilityGraphTests(context);
 		RunTriangleTests(context);
 		RunInstanceTests(context);
 		RunScratchTests(context);

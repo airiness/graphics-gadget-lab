@@ -13,6 +13,7 @@
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 #include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
+#include "GGLabRuntime/Graphics/Pipeline/RaySceneSunVisibility.h"
 #include "GGLabRuntime/Graphics/RayScene.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
@@ -193,6 +194,10 @@ namespace gglab
 					m_Initialized = true;
 					m_State->m_Failed = !m_State->Initialize(context) || !InitializeLayout(context, services);
 				}
+				if (!m_SunVisibility.Prepare(frame, services))
+				{
+					return RenderFrameValidationResult::ContractFailure("Coastal sun-visibility preparation failed");
+				}
 				if (!m_State->m_Failed)
 				{
 					m_State->CheckReadback(frame.m_FrameSlotIndex);
@@ -205,9 +210,11 @@ namespace gglab
 			void BuildRenderGraph(RenderGraph& graph, const RenderFrameContext& frame,
 				const RenderServices& services) noexcept override
 			{
+				RaySceneGraphResources rayScene;
 				if (m_State->m_Enabled)
 				{
 					const auto scene = m_State->m_Scene.AddBuildPasses(graph);
+					rayScene = scene;
 					const auto counts = m_State->m_Scene.GetDiagnostics();
 					struct ProbeData { RGBufferId m_Results; RGBufferId m_Readback; };
 					const auto slot = frame.m_FrameSlotIndex;
@@ -276,14 +283,20 @@ namespace gglab
 									*receipt = commit.m_Fence;
 								});
 						});
-					graph.AddPass<EmptyData>("Lab.CoastalRayScene.RestoreTables",
-						[scene](RenderGraph::RGBuilder& builder, EmptyData&)
-						{
-							builder.Export(scene.m_Geometries, RGBufferAccess::StructuredRead);
-							builder.Export(scene.m_Instances, RGBufferAccess::StructuredRead);
-						});
 				}
 				m_Raster->BuildRenderGraph(graph, frame, services);
+				if (m_State->m_Enabled)
+				{
+					m_SunVisibility.AddPass(graph, frame, services, rayScene);
+					struct FinishData {};
+					// Export seals these imports; every ray consumer must be declared first.
+					graph.AddPass<FinishData>("Lab.CoastalRayScene.RestoreTables",
+						[rayScene](RenderGraph::RGBuilder& builder, FinishData&)
+						{
+							builder.Export(rayScene.m_Geometries, RGBufferAccess::StructuredRead);
+							builder.Export(rayScene.m_Instances, RGBufferAccess::StructuredRead);
+						});
+				}
 			}
 
 		private:
@@ -315,6 +328,7 @@ namespace gglab
 			ResolvedRenderLayout m_Layout;
 			ComputePipelineRecipe m_Recipe;
 			ComputePipelineSlot m_Slot;
+			RaySceneSunVisibility m_SunVisibility;
 			bool m_Initialized = false;
 		};
 	}

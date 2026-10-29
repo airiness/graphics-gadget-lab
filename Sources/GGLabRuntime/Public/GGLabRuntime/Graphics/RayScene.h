@@ -77,6 +77,8 @@ namespace gglab
 	// Pools and tables finish in StructuredRead; acceleration structures in QueryRead.
 	struct RaySceneGraphResources
 	{
+		uint32_t m_GeometryCount = 0;
+		uint32_t m_InstanceCount = 0;
 		RGAccelerationStructureId m_TopLevel;
 		std::vector<RGAccelerationStructureId> m_BottomLevels;
 		RGBufferId m_Vertices;

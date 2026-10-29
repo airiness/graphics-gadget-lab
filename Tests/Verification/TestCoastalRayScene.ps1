@@ -49,10 +49,20 @@ try {
                 Write-VerificationJson "$directory/start.json" $start
                 Check ($start.ownership -eq 'created') "$case-owned-run"
                 $run = $start.runIdentity
+                $warmup = Invoke-VerificationSession capture $session @{ ExpectedRunIdentity=$run;
+                    Timing='after-ready';SettleFrames=1;RequiredContentId='gglab.lab.coastal_ray_scene';
+                    OutputDirectory="$directory/warmup";TimeoutSeconds=$TimeoutSeconds }
+                Write-VerificationJson "$directory/warmup.json" $warmup
+                Check ($warmup.status -eq 'completed' -and $warmup.publication -eq 'Published') "$case-ready-before-parameters"
+                $unjittered = Invoke-VerificationSession set $session @{ ExpectedRunIdentity=$run;WaitConsumed=$true;
+                    Changes='[{"id":"view.taa.enabled","type":"bool","value":false}]';TimeoutSeconds=$TimeoutSeconds }
+                Write-VerificationJson "$directory/unjittered.json" $unjittered
+                Check ($unjittered.batch.succeeded) "$case-unjittered-raster-samples"
                 $products = @(@{kind='image';source='scene'},@{kind='resource';targets=@(
                     @{resource='CoastalRayScene.Hits'},@{resource='RayScene.GeometryTable'},
-                    @{resource='RayScene.InstanceTable'})},@{kind='graph'})
-                foreach ($view in @('Retreat_SeaPassage','Retreat_Courtyard')) {
+                    @{resource='RayScene.InstanceTable'},@{resource='RayScene.SunVisibility'},
+                    @{resource='DisplayView.DepthBuffer'})},@{kind='graph'})
+                foreach ($view in @('Retreat_SeaPassage','Retreat_Courtyard','GI_InteriorExterior','Retreat_Lounge')) {
                     $captures = "$directory/$view"
                     $capture = Invoke-VerificationSession capture $session @{ ExpectedRunIdentity=$run;
                         Timing='after-ready';SettleFrames=32;View=$view;RequiredContentId='gglab.lab.coastal_ray_scene';
@@ -65,6 +75,9 @@ try {
                     $graph = Get-Content -LiteralPath (Get-VerificationCaptureFile $capture '.graph.json' 2) -Raw | ConvertFrom-Json
                     Check (@($graph.compile.passes | Where-Object name -in @('RayScene.Copy','RayScene.BuildBLAS','RayScene.BuildTLAS')).Count -eq 0) "$case-static-cache-$view"
                 }
+                $sun = @(& $Python "$PSScriptRoot/ValidateCoastalSunVisibility.py" --root $directory --output "$directory/sun-visibility.json" 2>&1)
+                if ($LASTEXITCODE -ne 0) { throw "Sun visibility validation failed: $($sun -join ' ')" }
+                Check $true "$case-sun-visibility"
                 $exercise = Invoke-VerificationSession set $session @{ ExpectedRunIdentity=$run;WaitConsumed=$true;
                     Changes='[{"id":"coastal_ray_scene.exercise_updates","type":"bool","value":true}]';TimeoutSeconds=$TimeoutSeconds }
                 Write-VerificationJson "$directory/exercise.json" $exercise
@@ -102,6 +115,11 @@ try {
             Check ($log -notmatch '\[(error|critical)\]|D3D12 ERROR|Validation Error|VUID-|GPU_BASED_VALIDATION_|ASSERT') "$case-native-validation"
             Check ($log -match 'Coastal RayScene update checks: passed=true, blasBuilds=59, tlasBuilds=4\.') "$case-dirty-tlas-reuses-blas"
             $cases += @{configuration=$config;backend=$backend;passed=$true;directory=$directory}
+        }
+        if ('dx12' -in $Rhi -and 'vulkan' -in $Rhi) {
+            $sun = @(& $Python "$PSScriptRoot/ValidateCoastalSunVisibility.py" --left "$output/$config-dx12" --right "$output/$config-vulkan" --output "$output/$config-cross-rhi.json" 2>&1)
+            if ($LASTEXITCODE -ne 0) { throw "Cross-RHI visibility validation failed: $($sun -join ' ')" }
+            Check $true "$config-sun-visibility-agreement"
         }
     }
     $result = @{ok=$true;directory=$output;checks=$checks;cases=$cases}

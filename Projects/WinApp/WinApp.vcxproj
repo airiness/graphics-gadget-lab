@@ -208,6 +208,7 @@
     <None Include="..\..\Shaders\Lighting\Atmosphere.hlsli" />
     <None Include="..\..\Shaders\Lighting\AtmosphereBinding.hlsli" />
     <None Include="..\..\Shaders\Lighting\DirectionalShadowData.hlsli" />
+    <None Include="..\..\Shaders\Lighting\DirectionalShadowVisibility.hlsli" />
     <None Include="..\..\Shaders\Lighting\EnvironmentImportanceSampling.hlsli" />
     <None Include="..\..\Shaders\Lighting\ForwardPlus.hlsli" />
     <None Include="..\..\Shaders\Lighting\GTAO.hlsli" />
@@ -253,6 +254,7 @@
     <FxCompile Include="..\..\Shaders\Passes\PassPostProcessPreview.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassRayQuery.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassRaySceneProbe.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassRaySceneSunVisibility.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassRenderGraphComputeSmoke.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassShadowMapPreview.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassSkybox.hlsl" />

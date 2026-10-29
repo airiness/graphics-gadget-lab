@@ -13,11 +13,11 @@ namespace gglab::nonfinite
 	inline constexpr uint32_t CounterMagic = 0x4e464354;
 	inline constexpr uint32_t HeaderBytes = 32;
 	inline constexpr uint32_t RecordBytes = 32;
-	inline constexpr uint32_t InventoryLow = 0x161b9549;
-	inline constexpr uint32_t InventoryHigh = 0xb01a2a20;
-	inline constexpr std::string_view VariantSuffix = ".nonfinite-counters.161b9549b01a2a20f354c08e36fbdfe7199a1d805b941cfbc0defa1220159356";
+	inline constexpr uint32_t InventoryLow = 0x838ce12c;
+	inline constexpr uint32_t InventoryHigh = 0x9c6482b4;
+	inline constexpr std::string_view VariantSuffix = ".nonfinite-counters.838ce12c9c6482b4545594dab06284700a4ba05a819f5ba20d1ef16c02c3fcb1";
 	inline constexpr uint32_t SiteCount = 76;
-	inline constexpr uint32_t ProgramCount = 27;
+	inline constexpr uint32_t ProgramCount = 28;
 	// The frame injection block follows the site records: point + 1 (zero is none),
 	// IEEE bits, x, y, component, applied count and two reserved words.
 	inline constexpr uint32_t InjectionBytes = 32;
@@ -131,6 +131,7 @@ namespace gglab::nonfinite
 		"gglab.shader.napa-voxel",
 		"gglab.shader.physical-sky-preview",
 		"gglab.shader.post-process-preview",
+		"gglab.shader.ray-scene",
 		"gglab.shader.render-graph-compute",
 		"gglab.shader.shadow-map-preview",
 		"gglab.shader.skybox",

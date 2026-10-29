@@ -157,6 +157,8 @@ namespace gglab::shader_programs
 		"gglab.shader.ray-query", "pixel.preview", ShaderStage::Pixel };
 	inline const ShaderProgramRef RaySceneProbeCompute{
 		"gglab.shader.ray-scene", "compute.membership", ShaderStage::Compute };
+	inline const ShaderProgramRef RaySceneSunVisibilityCompute{
+		"gglab.shader.ray-scene", "compute.sun-visibility", ShaderStage::Compute };
 	inline const ShaderProgramRef RenderGraphComputeReadWrite{
 		"gglab.shader.render-graph-compute", "compute.read-write", ShaderStage::Compute };
 	inline const ShaderProgramRef RenderGraphComputeNonFiniteProbe{

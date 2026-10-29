@@ -9,7 +9,7 @@
 #include <Lighting/AmbientOcclusion.hlsli>
 #include <Lighting/AtmosphereBinding.hlsli>
 #include <Lighting/ForwardPlus.hlsli>
-#include <Lighting/ShadowSampling.hlsli>
+#include <Lighting/DirectionalShadowVisibility.hlsli>
 #include <Lighting/DirectionalShadowData.hlsli>
 #include <PBR/DirectLighting.hlsli>
 #include <PBR/IndirectLighting.hlsli>
@@ -180,55 +180,16 @@ MaterialIBLResponse SampleMaterialEnvironment(PreparedMaterialShading material)
 	return response;
 }
 
-float SampleDirectionalShadowCascade(float3 positionWS, ShadowReceiverPlane receiver,
-	float receiverNoL, uint cascadeIndex)
-{
-	const uint viewIndex = g_Shadow.ViewBaseIndex + cascadeIndex;
-	const ShadowProjection projection = ProjectToShadowMap(positionWS, viewIndex);
-	if (!projection.IsValid)
-	{
-		return 1.0;
-	}
-	Texture2DArray<float> shadowMap = GetTexture2DArrayFloat(g_Pass.ShadowMapTextureIndex);
-	SamplerComparisonState samplerState = GetSamplerComparisonState(g_Pass.ShadowMapSamplerIndex);
-	const float2 texelSize = 1.0.xx / max((float)(g_Pass.ShadowMapSize), 1.0);
-	const float2 gradient = ComputeShadowReceiverDepthGradient(receiver, viewIndex);
-	const float residualBias = EvaluateDirectionalShadowReceiverBias(cascadeIndex, receiverNoL, g_Shadow);
-	// Each hardware comparison blends four texels. Account for its one-texel support,
-	// while PCF tap offsets below follow the actual receiver plane instead of adding bias.
-	const float bilinearBias = ShadowBilinearReceiverBias(gradient.x, gradient.y, texelSize.x, texelSize.y);
-	const float compareDepth = projection.ReceiverDepth - residualBias - bilinearBias;
-	if (!IsShadowPCFEnabled())
-	{
-		return SampleShadowHard(shadowMap, samplerState, projection.UV, cascadeIndex, saturate(compareDepth));
-	}
-	return SampleShadowPCF3x3(shadowMap, samplerState, projection.UV, cascadeIndex,
-		compareDepth, texelSize, gradient);
-}
-
 float SampleDirectionalShadow(float3 positionWS, ShadowReceiverPlane receiver, float receiverNoL)
 {
 	if (!IsShadowEnabled())
 	{
 		return 1.0;
 	}
-	const float mainViewZ = TransformPositionVS(float4(positionWS, 1.0),
-		LoadViewData(g_Shadow.MainViewIndex)).z;
-	const uint cascadeIndex = SelectDirectionalShadowCascade(mainViewZ, g_Shadow);
-	if (cascadeIndex >= g_Shadow.CascadeCount)
-	{
-		return 1.0;
-	}
-	float visibility = SampleDirectionalShadowCascade(positionWS, receiver, receiverNoL, cascadeIndex);
-	const float blendStart = g_Shadow.BlendStart[cascadeIndex];
-	const float blendWidth = g_Shadow.SplitFar[cascadeIndex] - blendStart;
-	if (cascadeIndex + 1u < g_Shadow.CascadeCount && blendWidth > 0.0 && mainViewZ > blendStart)
-	{
-		const float next = SampleDirectionalShadowCascade(positionWS, receiver, receiverNoL, cascadeIndex + 1u);
-		visibility = lerp(visibility, next, smoothstep(blendStart, g_Shadow.SplitFar[cascadeIndex], mainViewZ));
-	}
-	const float fade = saturate((mainViewZ - g_Shadow.DistanceFadeStart) * g_Shadow.DistanceFadeInvRange);
-	return lerp(visibility, 1.0, fade * fade * (3.0 - 2.0 * fade));
+	Texture2DArray<float> shadowMap = GetTexture2DArrayFloat(g_Pass.ShadowMapTextureIndex);
+	SamplerComparisonState samplerState = GetSamplerComparisonState(g_Pass.ShadowMapSamplerIndex);
+	return EvaluateDirectionalShadowVisibility(positionWS, receiver, receiverNoL, g_Shadow,
+		shadowMap, samplerState, g_Pass.ShadowMapSize, IsShadowPCFEnabled());
 }
 
 float3 ApplyShadowDiagnosticsOverlay(float3 color, float3 positionWS)

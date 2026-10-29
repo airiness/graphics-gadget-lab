@@ -167,6 +167,7 @@ namespace gglab
 			ShaderProgramBuildRecord{ &RayQueryVertex, L"Passes/PassRayQuery.hlsl", L"VSMain" },
 			ShaderProgramBuildRecord{ &RayQueryPixel, L"Passes/PassRayQuery.hlsl", L"PSMain" },
 			ShaderProgramBuildRecord{ &RaySceneProbeCompute, L"Passes/PassRaySceneProbe.hlsl", L"CSMain" },
+			ShaderProgramBuildRecord{ &RaySceneSunVisibilityCompute, L"Passes/PassRaySceneSunVisibility.hlsl", L"CSMain" },
 			ShaderProgramBuildRecord{ &RenderGraphComputeReadWrite, L"Passes/PassRenderGraphComputeSmoke.hlsl", L"CSReadWrite" },
 			ShaderProgramBuildRecord{ &RenderGraphComputeNonFiniteProbe, L"Passes/PassRenderGraphComputeSmoke.hlsl", L"CSNonFiniteProbe" },
 			ShaderProgramBuildRecord{ &RenderGraphComputePreviewVertex, L"Passes/PassRenderGraphComputeSmoke.hlsl", L"VSMain" },

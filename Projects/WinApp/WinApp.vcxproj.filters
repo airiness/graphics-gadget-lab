@@ -108,6 +108,9 @@
     <FxCompile Include="..\..\Shaders\Passes\PassRaySceneProbe.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassRaySceneSunVisibility.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassRenderGraphComputeSmoke.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
@@ -258,6 +261,9 @@
       <Filter>Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\Shaders\Lighting\DirectionalShadowData.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\DirectionalShadowVisibility.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\Shaders\Lighting\EnvironmentImportanceSampling.hlsli">

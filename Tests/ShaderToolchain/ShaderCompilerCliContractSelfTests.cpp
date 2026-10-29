@@ -10,6 +10,7 @@
 #include "GGLabTestCore/SelfTest.h"
 #include "DevelopmentShaderPaths.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
+#include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
 #include "ShaderArtifactRuntime/ShaderArtifactStore.h"
 #include "ShaderArtifactRuntime/ShaderLooseArtifactIO.h"
 #include "Targets/DX12ShaderTarget.h"
@@ -1410,7 +1411,7 @@ namespace gglab
 			const std::filesystem::path& sourceRoot,
 			const std::filesystem::path& tempRoot) noexcept
 		{
-			constexpr size_t ExpectedRuntimeProgramCount = 131;
+			constexpr size_t ExpectedRuntimeProgramCount = 134;
 			const std::string expectedProgramCountField = std::format("\"programCount\":{}", ExpectedRuntimeProgramCount);
 			const CliRunResult missingRequiredOption = RunCli({ L"build-runtime", L"--result-format", L"json", });
 			const CliRunResult unknownOption = RunCli({ L"build-runtime", L"--bogus", L"--result-format", L"json", });
@@ -1502,6 +1503,9 @@ namespace gglab
 				shader_programs::TemporalAADisplayDepthPixel,
 				shader_programs::GTAOTemporalCompute,
 				shader_programs::GTAOTemporalDiagnosticsCompute,
+				shader_programs::RaySceneSunVisibilityCompute,
+				nonfinite::CounterVariant(shader_programs::RaySceneProbeCompute),
+				nonfinite::CounterVariant(shader_programs::RaySceneSunVisibilityCompute),
 			};
 			for (const ShaderProgramRef& programRef : requiredPrograms)
 			{
