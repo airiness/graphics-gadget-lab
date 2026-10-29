@@ -22,6 +22,11 @@ namespace gglab
 		std::optional<LoadingProgress> GetActiveLoadingProgress() const noexcept override;
 		void AppendCaptureReadiness(FrameCaptureReadiness& readiness) const noexcept override;
 		std::string GetCaptureContentId() const noexcept override;
+		std::optional<FrameCaptureAssetBundle> GetCaptureAssetBundle() const noexcept override
+		{
+			const auto* session = m_Runtime.GetActiveSession();
+			return session ? session->GetCaptureAssetBundle() : std::nullopt;
+		}
 
 		void OnEnter() noexcept override;
 		void OnResize(uint32_t width, uint32_t height) noexcept override;

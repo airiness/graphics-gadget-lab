@@ -27,6 +27,8 @@ namespace gglab
 	{
 		MeshID m_Id{};
 		bool m_IsUploaded = false;
+		// Upload-time proof for indexed triangle AS input, independent of raster use.
+		bool m_IsRayGeometryValid = false;
 		bool m_HasBounds = false;
 		bool m_CancelRequested = false;
 		bool m_IsReloading = false;

@@ -268,6 +268,8 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Resource\TransientResourcePool.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Geometry.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\MaterialGpuEncoder.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RayScene.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RayScenePlan.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetLoadProgress.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Renderer.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\CapturePayloadBudget.cpp" />
@@ -636,6 +638,8 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderParameters.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Geometry.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\MaterialGpuEncoder.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RayScenePlan.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RayScene.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetManager.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetManagerState.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureDerivedDataCoordinator.h" />

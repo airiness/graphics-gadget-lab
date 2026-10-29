@@ -105,6 +105,9 @@
     <FxCompile Include="..\..\Shaders\Passes\PassRayQuery.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassRaySceneProbe.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassRenderGraphComputeSmoke.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>

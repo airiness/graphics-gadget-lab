@@ -171,6 +171,9 @@
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\AtmosphereRangeLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CoastalRaySceneLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CoordinateConformanceLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
@@ -504,6 +507,9 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\AtmosphereRangeLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CoastalRaySceneLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CoordinateConformanceLabSession.h">

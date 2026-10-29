@@ -1,6 +1,7 @@
 #include "Graphics/RHI/DX12/DX12AccelerationStructureManager.h"
 #include "Graphics/RHI/DX12/DX12Device.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"
+#include "Graphics/RHI/DX12/DX12RayQuerySupport.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 
 #include <cstring>
@@ -121,11 +122,13 @@ namespace gglab
 		}
 		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO sizes{};
 		m_Device.Get()->GetRaytracingAccelerationStructurePrebuildInfo(&native, &sizes);
-		if (sizes.ResultDataMaxSizeInBytes == 0 || sizes.ScratchDataSizeInBytes == 0)
+		// Native prebuild sizes need not be multiples of the AS storage alignment.
+		const uint64_t storageBytes = AlignDX12ASStorageSize(sizes.ResultDataMaxSizeInBytes);
+		if (storageBytes == 0 || sizes.ScratchDataSizeInBytes == 0)
 		{
 			return std::nullopt;
 		}
-		return RHIASBuildSizes{ sizes.ResultDataMaxSizeInBytes, sizes.ScratchDataSizeInBytes };
+		return RHIASBuildSizes{ storageBytes, sizes.ScratchDataSizeInBytes };
 	}
 
 	RHIAccelerationStructureHandle DX12AccelerationStructureManager::Create(

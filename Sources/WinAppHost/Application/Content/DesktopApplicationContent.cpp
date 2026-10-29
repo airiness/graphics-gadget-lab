@@ -6,6 +6,7 @@
 #include "Application/Lab/Sessions/AtmosphereRangeLabSession.h"
 #include "Application/Lab/Sessions/CoordinateConformanceLabSession.h"
 #include "Application/Lab/Sessions/CullingLabSession.h"
+#include "Application/Lab/Sessions/CoastalRaySceneLabSession.h"
 #include "Application/Lab/Sessions/ForwardPlusLabSession.h"
 #include "Application/Lab/Sessions/GTAOLabSession.h"
 #include "Application/Lab/Sessions/LightingContractLabSession.h"
@@ -85,6 +86,8 @@ namespace gglab
 			},
 		};
 		registration.m_Labs = {
+			{ CoastalRaySceneLabSession::GetDescriptor(), &CoastalRaySceneLabSession::Create,
+				{ shader_programs::RaySceneProbeCompute } },
 			{ RayQueryLabSession::GetDescriptor(), &RayQueryLabSession::Create,
 				{ shader_programs::RayQueryCompute, shader_programs::RayQueryVertex, shader_programs::RayQueryPixel,
 					shader_programs::NonFiniteScanClearCompute } },

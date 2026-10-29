@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -2432,6 +2433,16 @@ namespace gglab
 
 		mesh->m_VertexCount = vertexCount;
 		mesh->m_IndexCount = indexCount;
+		mesh->m_IsRayGeometryValid = indexCount != 0 && indexCount % 3 == 0 &&
+			std::all_of(indicesData.begin(), indicesData.end(), [vertexCount](uint32_t index)
+				{
+					return index < vertexCount;
+				}) &&
+			std::all_of(verticesData.begin(), verticesData.end(), [](const Vertex& vertex)
+				{
+					return std::isfinite(vertex.m_Position.m_X) && std::isfinite(vertex.m_Position.m_Y) &&
+						std::isfinite(vertex.m_Position.m_Z);
+				});
 
 		const auto vertexBufferSize = static_cast<uint64_t>(vertexCount) * sizeof(Vertex);
 		const auto indexBufferSize = static_cast<uint64_t>(indexCount) * sizeof(uint32_t);
@@ -2454,12 +2465,12 @@ namespace gglab
 		RHIBufferDesc vertexBufferDesc{};
 		vertexBufferDesc.m_SizeInBytes = vertexBufferSize;
 		vertexBufferDesc.m_StrideInBytes = sizeof(Vertex);
-		vertexBufferDesc.m_Usage = RHIBufferUsage::Vertex | RHIBufferUsage::CopyDest;
+		vertexBufferDesc.m_Usage = RHIBufferUsage::Vertex | RHIBufferUsage::CopyDest | RHIBufferUsage::CopySource;
 
 		RHIBufferDesc indexBufferDesc{};
 		indexBufferDesc.m_SizeInBytes = indexBufferSize;
 		indexBufferDesc.m_StrideInBytes = sizeof(uint32_t);
-		indexBufferDesc.m_Usage = RHIBufferUsage::Index | RHIBufferUsage::CopyDest;
+		indexBufferDesc.m_Usage = RHIBufferUsage::Index | RHIBufferUsage::CopyDest | RHIBufferUsage::CopySource;
 
 		const std::string_view meshName =
 			mesh->m_Name.Name().empty() ? std::string_view("UnnamedMesh") : mesh->m_Name.Name();

@@ -8,6 +8,7 @@
 #include "Graphics/RHI/DX12/DX12PipelineSystem.h"
 #include "Graphics/RHI/DX12/Utility/DX12BarrierUtils.h"
 #include "Graphics/RHI/AccelerationStructureStore.h"
+#include "Graphics/RayScenePlan.h"
 #if GGLAB_ENABLE_VULKAN
 #include "Graphics/RHI/Vulkan/VulkanPipelineSystem.h"
 #include "Graphics/RHI/Vulkan/VulkanRayQuerySupport.h"
@@ -25,6 +26,82 @@ namespace gglab
 {
 	namespace
 	{
+		void RunRayScenePlanTests(SelfTestContext& context) noexcept
+		{
+			const RHIASBuildLimits limits{ 1024, 1024, 256 };
+			RaySceneSource opaque{
+				.m_EntityIdentity = 4, .m_Model = ModelID(7), .m_ModelGeneration = 1,
+				.m_Geometry = { MeshID(9), 1 },
+				.m_Vertices = { RHIBufferHandle{ 0, 1 }, 0, 56, 168 },
+				.m_Indices = { RHIBufferHandle{ 1, 1 }, 0, 12, RHIFormat::R32Uint },
+				.m_VertexCount = 3, .m_IndexCount = 3,
+				.m_MaterialKey = RenderMaterialKey::FromAsset(MaterialID(2)),
+				.m_Transform = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0 } };
+			auto second = opaque;
+			second.m_EntityIdentity = 8;
+			second.m_Transform[3] = 200;
+			auto blend = opaque;
+			blend.m_EntityIdentity = 1;
+			blend.m_AlphaMode = AlphaMode::Blend;
+			RayScenePlan baseline;
+			std::string reason;
+			context.Check(PlanRayScene({ second, opaque, blend }, {}, limits, baseline, reason) == RaySceneStatus::Prepared &&
+				baseline.m_Geometries.size() == 1 && baseline.m_Instances.size() == 3 &&
+				baseline.m_OpaqueCount == 2 && baseline.m_BlendCount == 1 &&
+				baseline.m_VertexBytes == 168 && baseline.m_IndexBytes == 12,
+				"Ray snapshot deduplicates shared geometry and retains distant instances independently of camera visibility");
+			context.Check(baseline.m_Sources[0].m_EntityIdentity == 1 &&
+				baseline.m_Instances[0].m_Flags == 0 && baseline.m_Instances[0].m_GeometryIndex == UINT32_MAX &&
+				baseline.m_Instances[1].m_Flags == 1,
+				"BLEND has a stable excluded table entry and no fake or null BLAS in the TLAS");
+			RayScenePlan other;
+			context.Check(PlanRayScene({ blend, opaque, second }, {}, limits, other, reason) == RaySceneStatus::Prepared &&
+				HasSameRayInstances(baseline, other), "Source enumeration does not change the snapshot mapping");
+			second.m_Transform[7] = 3;
+			GGLAB_UNUSED(PlanRayScene({ second, opaque, blend }, {}, limits, other, reason));
+			context.Check(HasSameRayGeometry(baseline, other) && !HasSameRayTransforms(baseline, other),
+				"Rigid transforms dirty only the TLAS while reusing immutable geometry and BLAS");
+			second.m_Transform[7] = 0;
+			second.m_EntityIdentity += 1u << 20;
+			GGLAB_UNUSED(PlanRayScene({ second, opaque, blend }, {}, limits, other, reason));
+			context.Check(HasSameRayGeometry(baseline, other) && !HasSameRayInstances(baseline, other),
+				"Recycled entity indices retain their generation in the instance identity");
+			auto material = opaque;
+			material.m_Material.BaseColorFactor.m_R = 0.4f;
+			RayScenePlan originalSingle;
+			GGLAB_UNUSED(PlanRayScene({ opaque }, {}, limits, originalSingle, reason));
+			GGLAB_UNUSED(PlanRayScene({ material }, {}, limits, other, reason));
+			context.Check(HasSameRayTransforms(originalSingle, other) && !HasSameRayInstances(originalSingle, other),
+				"Material content changes replace snapshot tables without rebuilding the TLAS");
+			auto generation = opaque;
+			generation.m_Geometry.m_ContentGeneration = 2;
+			GGLAB_UNUSED(PlanRayScene({ generation }, {}, limits, other, reason));
+			context.Check(!HasSameRayGeometry(originalSingle, other),
+				"Mesh content generation invalidates the BLAS key even when its slot and layout match");
+			auto mask = opaque;
+			mask.m_AlphaMode = AlphaMode::Mask;
+			context.Check(PlanRayScene({ mask }, {}, limits, other, reason) == RaySceneStatus::UnsupportedGeometry &&
+				other.m_Instances.empty(), "MASK rejects preparation without publishing a partial opaque snapshot");
+			auto capacity = RaySceneCapacity{};
+			capacity.m_MaxInstances = 1;
+			context.Check(PlanRayScene({ opaque, blend }, capacity, limits, other, reason) == RaySceneStatus::CapacityExceeded,
+				"Excluded entries still count against the fixed instance table capacity");
+			capacity = {};
+			capacity.m_MaxVertexBytes = 167;
+			context.Check(PlanRayScene({ opaque }, capacity, limits, other, reason) == RaySceneStatus::CapacityExceeded,
+				"Ray pool overflow is reported instead of truncating geometry");
+			auto invalid = opaque;
+			invalid.m_Indices.m_Format = RHIFormat::Unknown;
+			context.Check(PlanRayScene({ invalid }, {}, limits, other, reason) == RaySceneStatus::InvalidSource,
+				"The ray snapshot rejects a non-R32 index layout");
+			invalid = opaque;
+			invalid.m_Transform[0] = 0;
+			context.Check(PlanRayScene({ invalid }, {}, limits, other, reason) == RaySceneStatus::InvalidSource,
+				"Singular instance transforms fail before GPU allocation");
+			context.Check(PlanRayScene({ opaque, opaque }, {}, limits, other, reason) == RaySceneStatus::InvalidSource,
+				"Duplicate durable instance identities fail preparation");
+		}
+
 		void RunDX12PipelineIdentityTests(SelfTestContext& context) noexcept
 		{
 			for (const bool compute : { false, true })
@@ -70,6 +147,11 @@ namespace gglab
 
 		void RunCapabilityTests(SelfTestContext& context) noexcept
 		{
+			context.Check(AlignDX12ASStorageSize(9344) == 9472 && AlignDX12ASStorageSize(9472) == 9472,
+				"DX12 rounds native Coastal BLAS prebuild sizes to its storage alignment");
+			context.Check(AlignDX12ASStorageSize(0) == 0 &&
+				AlignDX12ASStorageSize(std::numeric_limits<uint64_t>::max()) == 0,
+				"DX12 storage alignment rejects empty and overflowing sizes");
 			const RHIRayQueryCapabilities absent{};
 			context.Check(!absent.m_Supported && !absent.m_Enabled &&
 				absent.m_UnavailableReason == RHIRayQueryUnavailableReason::BackendUnavailable,
@@ -479,6 +561,7 @@ namespace gglab
 		static_assert(!std::is_convertible_v<RHIAccelerationStructureHandle, RHIBufferHandle>);
 		static_assert(!std::is_convertible_v<RHIBufferHandle, RHIAccelerationStructureHandle>);
 		RunCapabilityTests(context);
+		RunRayScenePlanTests(context);
 		RunTriangleTests(context);
 		RunInstanceTests(context);
 		RunScratchTests(context);

@@ -2,9 +2,17 @@
 #include "GGLabRuntime/Graphics/RHI/RHIAccelerationStructure.h"
 
 #include <d3d12.h>
+#include <limits>
 
 namespace gglab
 {
+	[[nodiscard]] constexpr uint64_t AlignDX12ASStorageSize(uint64_t minimumSize) noexcept
+	{
+		constexpr uint64_t mask = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BYTE_ALIGNMENT - 1;
+		return minimumSize > std::numeric_limits<uint64_t>::max() - mask ?
+			0 : (minimumSize + mask) & ~mask;
+	}
+
 	[[nodiscard]] constexpr RHIRayQueryCapabilities EvaluateDX12RayQuerySupport(
 		D3D12_RAYTRACING_TIER tier, D3D_SHADER_MODEL shaderModel) noexcept
 	{

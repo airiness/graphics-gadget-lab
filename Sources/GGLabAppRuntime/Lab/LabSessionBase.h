@@ -1,4 +1,5 @@
 #pragma once
+#include "Capture/FrameCaptureMetadata.h"
 #include "GGLabRuntime/Graphics/LightingProfile.h"
 #include "GGLabRuntime/Graphics/LightingMutationResult.h"
 #include "GGLabRuntime/Graphics/WorldLightingControlBase.h"
@@ -107,6 +108,10 @@ namespace gglab
 			return std::nullopt;
 		}
 		virtual std::span<const WorldLightingProfile> GetLightingProfiles() const noexcept { return {}; }
+		virtual std::optional<FrameCaptureAssetBundle> GetCaptureAssetBundle() const noexcept
+		{
+			return std::nullopt;
+		}
 		void ApplyParameterChanges(LabChangeImpact impact) noexcept;
 		void ApplyRestoredParametersForPrepare(LabChangeImpact impact) noexcept;
 

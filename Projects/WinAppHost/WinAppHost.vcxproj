@@ -277,6 +277,7 @@
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\PostProcessLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\RenderGraphComputeLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\RayQueryLabSession.cpp" />
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CoastalRaySceneLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CoordinateConformanceLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\SampleableDepthLabSession.cpp" />
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\SurfaceProbeLabSession.cpp" />
@@ -411,6 +412,7 @@
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\PostProcessLabSession.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\RenderGraphComputeLabSession.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\RayQueryLabSession.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CoastalRaySceneLabSession.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CoordinateConformanceLabSession.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\SampleableDepthLabSession.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\SurfaceProbeLabSession.h" />
