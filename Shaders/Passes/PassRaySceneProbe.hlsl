@@ -23,7 +23,6 @@ cbuffer Parameters : register(b0)
 };
 
 // A fixed world-space downward grid checks scene membership independently of the camera.
-// Lighting and the RT sun-visibility comparison belong to the next integration slice.
 [numthreads(8, 8, 1)]
 void CSMain(uint3 id : SV_DispatchThreadID)
 {

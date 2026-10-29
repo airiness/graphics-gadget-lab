@@ -69,7 +69,7 @@ namespace gglab
 				{ "referenceSample", sample.m_ReferenceSample },
 				{ "firstFrame", sample.m_FirstFrame },
 				{ "cameraCut", sample.m_CameraCut },
-				{ "conditions", {
+				{ "conditions",{
 					{ "gpuProfiling", true },
 					{ "profilingStateChanged", sample.m_ProfilingStateChanged },
 					{ "developmentTools", sample.m_DevelopmentTools },
@@ -96,7 +96,7 @@ namespace gglab
 		return Json{
 			{ "schema", "gglab.gpu-timing" },
 			{ "schemaVersion", 1 },
-			{ "sequence", {
+			{ "sequence",{
 				{ "id", m_Status->m_SequenceId },
 				{ "path", m_Status->m_CameraPathId },
 				{ "pathVersion", m_Status->m_CameraPathVersion },
@@ -105,16 +105,16 @@ namespace gglab
 				{ "firstFrameSerial", first },
 				{ "lastFrameSerial", last } } },
 			{ "context", Json::parse(m_TimingContext) },
-			{ "coverage", {
+			{ "coverage",{
 				{ "requestedSamples", requested },
 				{ "recordedSamples", timing.m_Samples.size() },
 				{ "samples", std::move(samples) } } },
-			{ "frame", {
+			{ "frame",{
 				{ "milliseconds", timing.m_FrameMilliseconds },
 				{ "statistics", summary(timing.m_FrameMilliseconds) } } },
 			{ "scopes", std::move(scopes) },
 			{ "stablePassSet", stable },
-			{ "measurement", {
+			{ "measurement",{
 				{ "gpuProfilingRequested", true },
 				{ "validation", environment.at("validation") },
 				{ "profilingStateChanged", profilingChanged } } },
@@ -142,7 +142,7 @@ namespace gglab
 		return Json{
 			{ "schema", "gglab.parameter-frames" },
 			{ "schemaVersion", 1 },
-			{ "sequence", {
+			{ "sequence",{
 				{ "id", m_Status->m_SequenceId },
 				{ "path", m_Status->m_CameraPathId },
 				{ "pathVersion", m_Status->m_CameraPathVersion },
@@ -767,10 +767,10 @@ namespace gglab
 				}
 				if (batch.m_State == ParameterBatchState::Failed ||
 					std::ranges::any_of(batch.m_Items, [](const auto& item)
-					{
-						return item.IsTerminal() && item.m_State != ParameterEffectState::Consumed &&
-							item.m_State != ParameterEffectState::NoChange;
-					}))
+						{
+							return item.IsTerminal() && item.m_State != ParameterEffectState::Consumed &&
+								item.m_State != ParameterEffectState::NoChange;
+						}))
 				{
 					event.m_Failure = batch.m_Failure.empty() ? "An event effect did not reach consumption." : batch.m_Failure;
 					Fail(event.m_Failure);
@@ -947,9 +947,9 @@ namespace gglab
 		{
 			if (event.m_Frame == m_Frame && (!event.m_Batch ||
 				std::ranges::any_of(event.m_Batch->m_Items, [](const auto& item)
-				{
-					return item.m_DeclaredClass == ParameterEffectClass::Immediate && !item.IsTerminal();
-				})))
+					{
+						return item.m_DeclaredClass == ParameterEffectClass::Immediate && !item.IsTerminal();
+					})))
 			{
 				Fail("An Immediate event did not reach its terminal receipt in the submitted sequence frame.");
 				return;
@@ -1160,11 +1160,13 @@ namespace gglab
 	void FrameSequenceCoordinator::CompleteIfFinished() noexcept
 	{
 		CollectArtifactPublication();
-		if (m_Status && m_Status->m_State == FrameSequenceState::Finishing &&
-			std::ranges::all_of(m_Status->m_Events, [](const auto& event)
+
+		const auto allEventsTerminal = m_Status && std::ranges::all_of(m_Status->m_Events, [](const auto& event)
 			{
 				return event.m_Batch && event.m_Batch->IsTerminal();
-			}) &&
+			});
+		if (m_Status && m_Status->m_State == FrameSequenceState::Finishing &&
+			allEventsTerminal &&
 			m_CaptureJobs.empty() &&
 			m_PendingGpuTimingFrames.empty() &&
 			(!m_WatchCoverageId || (m_Status->m_WatchCoverage && m_Status->m_WatchCoverage->m_Complete)))
