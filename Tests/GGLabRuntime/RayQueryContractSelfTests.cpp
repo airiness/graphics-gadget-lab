@@ -2,10 +2,14 @@
 #include "AssetTestServices.h"
 #include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
 #include "GGLabRuntime/Graphics/Pipeline/RaySceneSunVisibility.h"
+#include "GGLabRuntime/Graphics/Pipeline/RaySceneHitMaterial.h"
+#include "Graphics/RenderPass/RenderPassGIReceiver.h"
+#include "Graphics/RenderPass/GIReceiverGraphResources.h"
 #include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
 #include "GGLabRuntime/Graphics/RenderContexts.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
+#include "GGLabRuntime/Graphics/RenderPass/IBLGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 #include "GGLabRuntime/Graphics/RHI/RHIAccelerationStructure.h"
@@ -58,6 +62,7 @@ namespace gglab
 			RaySceneGraphResources inputs;
 			inputs.m_GeometryCount = 1;
 			inputs.m_InstanceCount = 1;
+			inputs.m_MaterialCount = 1;
 			struct Data {};
 			graph.AddPass<Data>("ImportSunInputs", [&](RenderGraph::RGBuilder& builder, Data&)
 				{
@@ -67,6 +72,12 @@ namespace gglab
 					depth.m_Texture = builder.ImportTexture("Depth", device.CreateTexture({ .m_Desc = depthDesc }, {}), depthDesc,
 						RGTextureAccess::Sample, RGContentValidity::Defined);
 					depth.m_SrvDesc = MakeRHITexture2DViewDesc(RHIFormat::R32Float, 0, 1, RHITextureAspect::Depth);
+					depth.m_DsvDesc = MakeRHITexture2DViewDesc(RHIFormat::D32Float, 0, 1, RHITextureAspect::Depth);
+					auto& ibl = builder.GetBlackboard().Create<RGIBLResources>(IBLResourcesName);
+					const RHITextureDesc lutDesc{ .m_Format = RHIFormat::R16G16Float,
+						.m_Usage = RHITextureUsage::Sampled, .m_Extent = { 8, 8, 1 } };
+					ibl.m_BrdfLut = builder.ImportTexture("BRDF", device.CreateTexture({ .m_Desc = lutDesc }, {}),
+						lutDesc, RGTextureAccess::Sample, RGContentValidity::Defined);
 					auto& shadow = builder.GetBlackboard().Create<RGShadowResources>(ShadowResourcesName);
 					shadow.m_DirectionalShadowMap = builder.ImportTexture("Shadow", device.CreateTexture({ .m_Desc = depthDesc }, {}), depthDesc,
 						RGTextureAccess::Sample, RGContentValidity::Defined);
@@ -74,7 +85,7 @@ namespace gglab
 						{ .m_Type = RHIAccelerationStructureType::TopLevel, .m_SizeInBytes = 256 }),
 						{ .m_Type = RHIAccelerationStructureType::TopLevel, .m_SizeInBytes = 256 },
 						RGAccelerationStructureAccess::QueryRead, RGContentValidity::Defined);
-					const std::array buffers{ &inputs.m_Vertices, &inputs.m_Indices, &inputs.m_Geometries, &inputs.m_Instances };
+					const std::array buffers{ &inputs.m_Vertices, &inputs.m_Indices, &inputs.m_Geometries, &inputs.m_Instances, &inputs.m_Materials };
 					for (uint32_t index = 0; index < buffers.size(); ++index)
 					{
 						const RHIBufferDesc desc{ .m_SizeInBytes = 256, .m_StrideInBytes = 16, .m_Usage = RHIBufferUsage::Structured };
@@ -86,14 +97,35 @@ namespace gglab
 			// Compile-only cancellation exercises production declarations without executing an unprepared shader.
 			RaySceneSunVisibility visibility;
 			visibility.AddPass(graph, frame, services, inputs);
+			RenderPassGIReceiver receivers;
+			receivers.AddPass(graph, frame, services);
+			RaySceneHitMaterial hitMaterial;
+			hitMaterial.AddPass(graph, frame, services, inputs);
 			graph.AddPass<Data>("ReturnSunInputs", [&](RenderGraph::RGBuilder& builder, Data&)
 				{
 					builder.Export(inputs.m_Geometries, RGBufferAccess::StructuredRead);
 					builder.Export(inputs.m_Instances, RGBufferAccess::StructuredRead);
+					const auto& receiverResources = builder.GetBlackboard().Get<RGGIReceiverResources>(
+						GIReceiverResourcesName);
+					for (const auto texture : receiverResources.m_Textures)
+					{
+						const auto& clear = builder.GetTextureDesc(texture).m_ClearValue;
+						context.Check(clear && clear->m_Format == RHIFormat::R32G32B32A32Float &&
+							!clear->m_IsDepthStencil && std::ranges::all_of(clear->m_Color,
+								[](float value) { return value == 0.0f; }),
+							"Receiver optimized clears match the zero background, including class alpha");
+					}
 				});
 			context.Check(graph.Compile(), "Sun visibility compiles with inferred transient usage and final imported states");
 			context.Check(graph.ResolveObservation({ .m_Resource = "RayScene.SunVisibility" }).m_Failure == RGObservationFailure::None,
 				"The reachable float sun tap supports T2 observation without a persistent copy allocation");
+			for (const auto* name : GIReceiverTextureNames)
+			{
+				context.Check(graph.ResolveObservation({ .m_Resource = name }).m_Failure == RGObservationFailure::None,
+					"Every raster receiver attachment has defined background and supports T2 observation");
+			}
+			context.Check(graph.ResolveObservation({ .m_Resource = "RayScene.HitAlbedo" }).m_Failure == RGObservationFailure::None,
+				"Hit material reads the frozen material table and receiver coverage before final table export");
 		}
 
 		void RunSunVisibilityPreparationTests(SelfTestContext& context) noexcept
@@ -110,6 +142,33 @@ namespace gglab
 			shadows.m_ShadingEnabled = true;
 			context.Check(!visibility.Prepare(frame, {}),
 				"A CSM for another directional light cannot masquerade as a sun-visibility comparison");
+		}
+
+		void RunGIReceiverPreparationTests(SelfTestContext& context) noexcept
+		{
+			RenderScene scene;
+			std::array<RenderView, 1> views{};
+			views[0].m_Width = 8;
+			views[0].m_Height = 8;
+			views[0].m_DisplayWidth = 16;
+			views[0].m_DisplayHeight = 16;
+			RenderFrameContext frame{ .m_RenderViews = views, .m_RenderScene = scene };
+			RenderPassGIReceiver receivers;
+			context.Check(!receivers.Prepare(frame, {}, {}).IsReady(),
+				"Upscaled receiver domains fail before pipeline/service access");
+			views[0].m_DisplayWidth = 8;
+			views[0].m_DisplayHeight = 8;
+			frame.m_TemporalFramePlan.m_Consumers[static_cast<size_t>(TemporalConsumer::TemporalAA)].m_Status = TemporalConsumerStatus::Active;
+			context.Check(!receivers.Prepare(frame, {}, {}).IsReady(),
+				"An active temporal resolve cannot publish GI reference receivers");
+			frame.m_TemporalFramePlan = {};
+			frame.m_TemporalFramePlan.m_Services = TemporalService::ProjectionJitter;
+			context.Check(!receivers.Prepare(frame, {}, {}).IsReady(),
+				"Reference-owned projection jitter also rejects GI receiver preparation");
+			frame.m_TemporalFramePlan = {};
+			views[0].m_JitterPixels.m_X = 0.25f;
+			context.Check(!receivers.Prepare(frame, {}, {}).IsReady(),
+				"A stale jittered raster view cannot masquerade as unjittered receiver data");
 		}
 
 		void RunRayScenePlanTests(SelfTestContext& context) noexcept
@@ -698,6 +757,7 @@ namespace gglab
 		RunRayScenePlanTests(context);
 		RunSunVisibilityPreparationTests(context);
 		RunSunVisibilityGraphTests(context);
+		RunGIReceiverPreparationTests(context);
 		RunTriangleTests(context);
 		RunInstanceTests(context);
 		RunScratchTests(context);

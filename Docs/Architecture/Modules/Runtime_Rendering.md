@@ -47,6 +47,10 @@ Atlas ID: atlas.runtime.render-pipeline
   and [RenderPipelineBlackboard.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h).
 - **Implementation:** [Forward+ recipe](../../../Sources/GGLabRuntime/Private/Graphics/RenderPipeline/RenderPipelineForwardPlus.cpp)
   and its [factory](../../../Sources/GGLabRuntime/Private/Graphics/RenderPipeline/RenderPipelineForwardPlusFactory.cpp).
+- **GI receivers:** `RenderPipelineForwardPlusCreateInfo::m_EnableGIReceiver` selects
+  the Runtime-owned [receiver pass](../../../Sources/GGLabRuntime/Private/Graphics/RenderPass/RenderPassGIReceiver.cpp)
+  before the temporal boundary. It requires Native, unjittered rendering with TAA
+  off; receiver records shared by Runtime consumers stay Private.
 - **Lifetime:** a Lab session owns its pipeline through `LabSessionBase`. The Forward+
   recipe owns its Runtime passes and the scene extension it was created with.
 - **Boundary:** [pass ownership](../Runtime_Boundaries_Map.md#pass-ownership); the

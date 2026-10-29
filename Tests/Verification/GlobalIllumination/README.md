@@ -34,6 +34,18 @@ values. `ValidateCoastalSunVisibility.py` checks finite values, receiver coverag
 and at least 99.5% cross-RHI agreement; unmatched receivers count as disagreement.
 CSM differences are reported separately from that gate.
 
+The Coastal Lab also enables Runtime GI receiver diagnostics at Native resolution
+with TAA off. The suite captures receiver/material and shading records in separate
+bounded resource groups. `ValidateCoastalGIMaterial.py` checks coverage, the three
+normal meanings, production diffuse/specular inputs and reduced GI albedo decoded
+from the committed triangle. It repeats the material check after entity recycling
+and compares both RHIs. Each export group explicitly names/restores its locked
+reference view. Material agreement must reach 99.5% over opaque receiver coverage
+with maximum RGB albedo error 0.003 and vertex-normal dot product at least 0.999;
+unmatched receivers count against the gate. These exports are unexposed surface
+data, not GI radiance. Run the numerical checker's positive/adversarial self-tests
+without a GPU using `python Tests/Verification/ValidateCoastalGIMaterial.py --self-test`.
+
 These checks cover membership regression, cache reuse and disabled behavior. They
 do not establish exhaustive native traversal coverage or GI quality.
 Fixture design and baseline reproduction notes live in `gglab-docs`:

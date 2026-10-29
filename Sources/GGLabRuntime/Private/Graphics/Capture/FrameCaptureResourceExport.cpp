@@ -74,6 +74,28 @@ namespace gglab
 					.m_Space = "render view, jittered opaque raster samples",
 					.m_Description = "R: binary RT sun visibility. G: production CSM filtering/bias/blend/fade. B: 1 matched opaque receiver, 0 background, -1 unmatched raster depth. A: first accepted blocker distance, -1 on miss; not nearest-hit distance. Ray origins use triangle-face ULP offsets; sun rays stop at 1000 m." };
 			}
+			constexpr std::array giRecords
+			{
+				std::pair{ "GI.Receiver.FaceNormal", "RGB: world triangle face normal oriented toward vertex normal. A: 0 background, 1 opaque, 2 MASK; BLEND excluded." },
+				std::pair{ "GI.Receiver.VertexNormal", "RGB: interpolated world vertex normal after double-sided flip. A: raster front face +1, back face -1; background 0." },
+				std::pair{ "GI.Receiver.ShadingNormal", "RGB: production normal-mapped world shading normal. A: metallic [0,1]." },
+				std::pair{ "GI.Receiver.DiffuseWeight", "RGB: production directional diffuse weight [0,1]. A: clearcoat factor [0,1]." },
+				std::pair{ "GI.Receiver.BaseColor", "RGB: scene-linear production base color. A: frame raster material table index; not a ray-snapshot material index." },
+				std::pair{ "GI.Receiver.ReflectionRoughness", "RGB: production anisotropic IBL reflection direction in world space. A: effective base perceptual roughness." },
+				std::pair{ "GI.Receiver.ClearcoatNormalRoughness", "RGB: production world clearcoat normal. A: effective clearcoat perceptual roughness." },
+				std::pair{ "GI.Receiver.HitAlbedo", "RGB: reduced GI diffuse albedo at explicit <=64 texel mip, using raster UVs. A: 1 covered, 0 background." },
+				std::pair{ "RayScene.HitAlbedo", "RGB: reduced GI diffuse albedo from committed triangle UVs and snapshot material. A: 0 background, 1 hit, 2 single-sided backface, -1 unmatched, -2 invalid." },
+				std::pair{ "RayScene.HitNormal", "RGB: transformed, interpolated world vertex normal, flipped only for double-sided backfaces. A: native front face +1, back face -1; 0 without hit." },
+				std::pair{ "RayScene.HitIdentity", "RGBA: snapshot instance, primitive, material and geometry indices; -1 without hit. Exact float integers within current scene limits." },
+			};
+			for (const auto& [resource, description] : giRecords)
+			{
+				if (name == resource)
+				{
+					return ResourceExportSemantics{ .m_Role = "gi.surface-data", .m_Units = "scene-referred, unexposed; channel-specific",
+						.m_Space = "Native unjittered render view before temporal integration", .m_Description = description };
+				}
+			}
 			return std::nullopt;
 		}
 

@@ -22,7 +22,9 @@ namespace gglab
 {
 	namespace
 	{
-		static_assert(sizeof(Vertex) == 56 && offsetof(Vertex, m_Position) == 0);
+		static_assert(sizeof(Vertex) == 56 && offsetof(Vertex, m_Position) == 0 &&
+			offsetof(Vertex, m_Normal) == 12 && offsetof(Vertex, m_TexCoord0) == 24 &&
+			offsetof(Vertex, m_TexCoord1) == 32 && offsetof(Vertex, m_Tangent) == 40);
 		struct EmptyData {};
 
 		struct GeometryCache
@@ -341,6 +343,7 @@ namespace gglab
 		auto resources = std::make_shared<RaySceneGraphResources>();
 		resources->m_GeometryCount = static_cast<uint32_t>(snapshot->m_Plan.m_Geometries.size());
 		resources->m_InstanceCount = static_cast<uint32_t>(snapshot->m_Plan.m_Instances.size());
+		resources->m_MaterialCount = static_cast<uint32_t>(snapshot->m_Plan.m_Materials.size());
 		resources->m_Lifetime = snapshot;
 		graph.AddPass<EmptyData>("RayScene.Import",
 			[=](RenderGraph::RGBuilder& builder, EmptyData&)

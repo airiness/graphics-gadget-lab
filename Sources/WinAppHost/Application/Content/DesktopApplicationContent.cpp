@@ -87,7 +87,8 @@ namespace gglab
 		};
 		registration.m_Labs = {
 			{ CoastalRaySceneLabSession::GetDescriptor(), &CoastalRaySceneLabSession::Create,
-				{ shader_programs::RaySceneProbeCompute, shader_programs::RaySceneSunVisibilityCompute } },
+				{ shader_programs::RaySceneProbeCompute, shader_programs::RaySceneSunVisibilityCompute,
+					shader_programs::RaySceneHitMaterialCompute, shader_programs::GIReceiverPixel } },
 			{ RayQueryLabSession::GetDescriptor(), &RayQueryLabSession::Create,
 				{ shader_programs::RayQueryCompute, shader_programs::RayQueryVertex, shader_programs::RayQueryPixel,
 					shader_programs::NonFiniteScanClearCompute } },

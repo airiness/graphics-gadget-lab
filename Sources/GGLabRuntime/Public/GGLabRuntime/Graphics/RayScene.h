@@ -79,6 +79,7 @@ namespace gglab
 	{
 		uint32_t m_GeometryCount = 0;
 		uint32_t m_InstanceCount = 0;
+		uint32_t m_MaterialCount = 0;
 		RGAccelerationStructureId m_TopLevel;
 		std::vector<RGAccelerationStructureId> m_BottomLevels;
 		RGBufferId m_Vertices;

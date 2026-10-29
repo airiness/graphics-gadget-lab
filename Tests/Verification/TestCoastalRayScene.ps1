@@ -33,6 +33,25 @@ function Validate-Bundle($Capture, [string]$Directory) {
         Check ($code -eq 0) "$Directory-$validator"
     }
 }
+function Capture-GIMaterial([string]$Session, $Run, [string]$Directory, [string]$View) {
+    # Eight float arrays (including depth) fit the existing slot/readback budget.
+    $groups = @{
+        receivers = @('GI.Receiver.FaceNormal','GI.Receiver.VertexNormal','GI.Receiver.ShadingNormal',
+            'GI.Receiver.HitAlbedo','RayScene.HitAlbedo','RayScene.HitNormal','RayScene.HitIdentity','DisplayView.DepthBuffer')
+        shading = @('GI.Receiver.FaceNormal','GI.Receiver.DiffuseWeight','GI.Receiver.BaseColor',
+            'GI.Receiver.ReflectionRoughness','GI.Receiver.ClearcoatNormalRoughness','DisplayView.DepthBuffer')
+    }
+    foreach ($group in @('receivers','shading')) {
+        $targets = @($groups[$group] | ForEach-Object { @{resource=$_} })
+        $products = @(@{kind='resource';targets=$targets},@{kind='graph'})
+        $dataDirectory = "$Directory/$group"
+        $capture = Invoke-VerificationSession capture $Session @{ ExpectedRunIdentity=$Run;
+            Timing='after-ready';SettleFrames=1;View=$View;RequiredContentId='gglab.lab.coastal_ray_scene';
+            Products=($products | ConvertTo-Json -Compress -Depth 8);OutputDirectory=$dataDirectory;TimeoutSeconds=$TimeoutSeconds }
+        Write-VerificationJson "$dataDirectory/capture.json" $capture
+        Validate-Bundle $capture $dataDirectory
+    }
+}
 try {
     $Python = (Get-Command $Python -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
     foreach ($config in $Configuration) {
@@ -74,10 +93,14 @@ try {
                         $metadata.content.assetBundle.revision -eq '79092da0d167d3bd041de9ead925c45d9f5ed8083cb07f2c0f5351afb94467e9') "$case-asset-lock-$view"
                     $graph = Get-Content -LiteralPath (Get-VerificationCaptureFile $capture '.graph.json' 2) -Raw | ConvertFrom-Json
                     Check (@($graph.compile.passes | Where-Object name -in @('RayScene.Copy','RayScene.BuildBLAS','RayScene.BuildTLAS')).Count -eq 0) "$case-static-cache-$view"
+                    Capture-GIMaterial $session $run $captures $view
                 }
                 $sun = @(& $Python "$PSScriptRoot/ValidateCoastalSunVisibility.py" --root $directory --output "$directory/sun-visibility.json" 2>&1)
                 if ($LASTEXITCODE -ne 0) { throw "Sun visibility validation failed: $($sun -join ' ')" }
                 Check $true "$case-sun-visibility"
+                $material = @(& $Python "$PSScriptRoot/ValidateCoastalGIMaterial.py" --root $directory --output "$directory/gi-material.json" 2>&1)
+                if ($LASTEXITCODE -ne 0) { throw "GI material validation failed: $($material -join ' ')" }
+                Check $true "$case-gi-material"
                 $exercise = Invoke-VerificationSession set $session @{ ExpectedRunIdentity=$run;WaitConsumed=$true;
                     Changes='[{"id":"coastal_ray_scene.exercise_updates","type":"bool","value":true}]';TimeoutSeconds=$TimeoutSeconds }
                 Write-VerificationJson "$directory/exercise.json" $exercise
@@ -87,6 +110,10 @@ try {
                     OutputDirectory="$directory/exercise";TimeoutSeconds=$TimeoutSeconds }
                 Write-VerificationJson "$directory/exercise-capture.json" $capture
                 Check ($capture.status -eq 'completed' -and $capture.publication -eq 'Published') "$case-updates-submitted"
+                Capture-GIMaterial $session $run "$directory/updates/Retreat_SeaPassage" 'Retreat_SeaPassage'
+                $material = @(& $Python "$PSScriptRoot/ValidateCoastalGIMaterial.py" --root "$directory/updates" --view Retreat_SeaPassage --output "$directory/updates/gi-material.json" 2>&1)
+                if ($LASTEXITCODE -ne 0) { throw "Updated GI material validation failed: $($material -join ' ')" }
+                Check $true "$case-updated-gi-material"
                 $disabled = Invoke-VerificationSession set $session @{ ExpectedRunIdentity=$run;WaitConsumed=$true;
                     Changes='[{"id":"coastal_ray_scene.enabled","type":"bool","value":false}]';TimeoutSeconds=$TimeoutSeconds }
                 Write-VerificationJson "$directory/disable.json" $disabled
@@ -97,6 +124,8 @@ try {
                 $graph = Get-Content -LiteralPath (Get-VerificationCaptureFile $capture '.graph.json') -Raw | ConvertFrom-Json
                 Check (@($graph.compile.passes | Where-Object name -like '*RayScene*').Count -eq 0 -and
                     @($graph.compile.resources | Where-Object name -like '*RayScene*').Count -eq 0) "$case-disabled-no-ray-work"
+                Check (@($graph.compile.passes | Where-Object name -eq 'GI.Receiver').Count -eq 0 -and
+                    @($graph.compile.resources | Where-Object name -like 'GI.Receiver.*').Count -eq 0) "$case-disabled-no-receiver-work"
             } catch { $caseFailure=$_;throw }
             finally {
                 if ($start -and $start.ownership -eq 'created') {
@@ -120,6 +149,9 @@ try {
             $sun = @(& $Python "$PSScriptRoot/ValidateCoastalSunVisibility.py" --left "$output/$config-dx12" --right "$output/$config-vulkan" --output "$output/$config-cross-rhi.json" 2>&1)
             if ($LASTEXITCODE -ne 0) { throw "Cross-RHI visibility validation failed: $($sun -join ' ')" }
             Check $true "$config-sun-visibility-agreement"
+            $material = @(& $Python "$PSScriptRoot/ValidateCoastalGIMaterial.py" --left "$output/$config-dx12" --right "$output/$config-vulkan" --output "$output/$config-gi-material-cross-rhi.json" 2>&1)
+            if ($LASTEXITCODE -ne 0) { throw "Cross-RHI GI material validation failed: $($material -join ' ')" }
+            Check $true "$config-gi-material-agreement"
         }
     }
     $result = @{ok=$true;directory=$output;checks=$checks;cases=$cases}

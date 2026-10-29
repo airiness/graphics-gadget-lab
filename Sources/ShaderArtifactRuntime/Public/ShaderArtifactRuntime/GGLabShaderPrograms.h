@@ -159,6 +159,10 @@ namespace gglab::shader_programs
 		"gglab.shader.ray-scene", "compute.membership", ShaderStage::Compute };
 	inline const ShaderProgramRef RaySceneSunVisibilityCompute{
 		"gglab.shader.ray-scene", "compute.sun-visibility", ShaderStage::Compute };
+	inline const ShaderProgramRef RaySceneHitMaterialCompute{
+		"gglab.shader.ray-scene", "compute.hit-material", ShaderStage::Compute };
+	inline const ShaderProgramRef GIReceiverPixel{
+		"gglab.shader.gi-receiver", "pixel.receiver", ShaderStage::Pixel };
 	inline const ShaderProgramRef RenderGraphComputeReadWrite{
 		"gglab.shader.render-graph-compute", "compute.read-write", ShaderStage::Compute };
 	inline const ShaderProgramRef RenderGraphComputeNonFiniteProbe{

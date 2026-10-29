@@ -16,6 +16,9 @@ namespace gglab
 		// the HDR-diff validation recipe; production compositions leave it empty.
 		std::shared_ptr<ForwardPlusDebugReadback> m_ForwardPlusDebugReadback;
 		std::unique_ptr<RenderPipelineSceneExtensionBase> m_SceneExtension;
+		// Runtime-owned receiver diagnostics before the temporal boundary. Requires
+		// Native, unjittered rendering with TAA off; ordinary compositions leave this off.
+		bool m_EnableGIReceiver = false;
 	};
 
 	[[nodiscard]] std::unique_ptr<RenderPipelineBase> CreateRenderPipelineForwardPlus(

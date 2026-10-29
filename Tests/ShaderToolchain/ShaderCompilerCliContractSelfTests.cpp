@@ -1411,7 +1411,7 @@ namespace gglab
 			const std::filesystem::path& sourceRoot,
 			const std::filesystem::path& tempRoot) noexcept
 		{
-			constexpr size_t ExpectedRuntimeProgramCount = 134;
+			constexpr size_t ExpectedRuntimeProgramCount = 138;
 			const std::string expectedProgramCountField = std::format("\"programCount\":{}", ExpectedRuntimeProgramCount);
 			const CliRunResult missingRequiredOption = RunCli({ L"build-runtime", L"--result-format", L"json", });
 			const CliRunResult unknownOption = RunCli({ L"build-runtime", L"--bogus", L"--result-format", L"json", });
@@ -1504,8 +1504,12 @@ namespace gglab
 				shader_programs::GTAOTemporalCompute,
 				shader_programs::GTAOTemporalDiagnosticsCompute,
 				shader_programs::RaySceneSunVisibilityCompute,
+				shader_programs::RaySceneHitMaterialCompute,
+				shader_programs::GIReceiverPixel,
 				nonfinite::CounterVariant(shader_programs::RaySceneProbeCompute),
 				nonfinite::CounterVariant(shader_programs::RaySceneSunVisibilityCompute),
+				nonfinite::CounterVariant(shader_programs::RaySceneHitMaterialCompute),
+				nonfinite::CounterVariant(shader_programs::GIReceiverPixel),
 			};
 			for (const ShaderProgramRef& programRef : requiredPrograms)
 			{

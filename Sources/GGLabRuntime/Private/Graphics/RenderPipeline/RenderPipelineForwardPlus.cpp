@@ -518,6 +518,10 @@ namespace gglab
 			}
 		}
 
+		if (m_EnableGIReceiver)
+		{
+			m_GIReceiverPass.AddPass(rg, context, services);
+		}
 		if (depthCoverageFramePlan.AddsForwardOpaquePass())
 		{
 			m_AerialPerspectivePass.AddPass(rg, context, services);
@@ -783,6 +787,14 @@ namespace gglab
 		}
 		if (result.IsReady())
 		{
+			if (m_EnableGIReceiver)
+			{
+				result = m_GIReceiverPass.Prepare(context, services, m_ForwardPBRShaderSet.m_CoverageVertexShader);
+				if (!result.IsReady())
+				{
+					return result;
+				}
+			}
 			m_FramePlan = std::move(plan);
 		}
 		return result;

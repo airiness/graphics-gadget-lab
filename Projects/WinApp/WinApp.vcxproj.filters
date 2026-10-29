@@ -63,6 +63,9 @@
     <FxCompile Include="..\..\Shaders\Passes\PassForwardPlusValidation.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassGIReceiver.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassGTAO.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
@@ -103,6 +106,9 @@
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassRayQuery.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassRaySceneHitMaterial.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassRaySceneProbe.hlsl">
@@ -270,6 +276,9 @@
       <Filter>Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\Shaders\Lighting\ForwardPlus.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\GIHitMaterial.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\Shaders\Lighting\GTAO.hlsli">

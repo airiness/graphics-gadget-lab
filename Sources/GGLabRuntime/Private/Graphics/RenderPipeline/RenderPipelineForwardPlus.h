@@ -11,6 +11,7 @@
 #include "Graphics/RenderPass/RenderPassForwardTransparent.h"
 #include "Graphics/RenderPass/RenderPassFrameCapture.h"
 #include "Graphics/RenderPass/RenderPassGTAO.h"
+#include "Graphics/RenderPass/RenderPassGIReceiver.h"
 #include "Graphics/RenderPass/RenderPassAtmosphere.h"
 #include "Graphics/RenderPass/RenderPassAerialPerspective.h"
 #include "Graphics/RenderPass/RenderPassIBL.h"
@@ -42,6 +43,7 @@ namespace gglab
 			// tile readback and the HDR-diff validation recipe.
 			std::shared_ptr<ForwardPlusDebugReadback> m_ForwardPlusDebugReadback;
 			std::unique_ptr<RenderPipelineSceneExtensionBase> m_SceneExtension;
+			bool m_EnableGIReceiver = false;
 		};
 
 		explicit RenderPipelineForwardPlus(
@@ -54,6 +56,7 @@ namespace gglab
 		explicit RenderPipelineForwardPlus(CreateInfo createInfo) noexcept :
 			m_ForwardPlusDebugReadback(std::move(createInfo.m_ForwardPlusDebugReadback)),
 			m_SceneExtension(std::move(createInfo.m_SceneExtension)),
+			m_EnableGIReceiver(createInfo.m_EnableGIReceiver),
 			m_ForwardPlusCullPass(m_ForwardPlusDebugReadback),
 			m_ForwardPlusValidationPass(m_ForwardPlusDebugReadback)
 		{
@@ -92,6 +95,8 @@ namespace gglab
 
 		std::shared_ptr<ForwardPlusDebugReadback> m_ForwardPlusDebugReadback;
 		std::unique_ptr<RenderPipelineSceneExtensionBase> m_SceneExtension;
+		bool m_EnableGIReceiver = false;
+		RenderPassGIReceiver m_GIReceiverPass;
 		RenderPassDirectionalShadowMap m_DirectionalShadowMapPass;
 		RenderPassShadowMapPreview m_ShadowMapPreviewPass;
 		RenderPassClearViewTargets m_ClearViewTargetsPass;

@@ -211,6 +211,7 @@
     <None Include="..\..\Shaders\Lighting\DirectionalShadowVisibility.hlsli" />
     <None Include="..\..\Shaders\Lighting\EnvironmentImportanceSampling.hlsli" />
     <None Include="..\..\Shaders\Lighting\ForwardPlus.hlsli" />
+    <None Include="..\..\Shaders\Lighting\GIHitMaterial.hlsli" />
     <None Include="..\..\Shaders\Lighting\GTAO.hlsli" />
     <None Include="..\..\Shaders\Lighting\IrradianceIntegrationMath.hlsli" />
     <None Include="..\..\Shaders\Lighting\ShadowReceiverPlaneMath.hlsli" />
@@ -239,6 +240,7 @@
     <FxCompile Include="..\..\Shaders\Passes\PassForwardPBR.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassForwardPlusCull.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassForwardPlusValidation.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassGIReceiver.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassGTAO.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassIBLBrdfLUT.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassIBLCubemapPreview.hlsl" />
@@ -253,6 +255,7 @@
     <FxCompile Include="..\..\Shaders\Passes\PassPhysicalSky.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassPostProcessPreview.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassRayQuery.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassRaySceneHitMaterial.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassRaySceneProbe.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassRaySceneSunVisibility.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassRenderGraphComputeSmoke.hlsl" />

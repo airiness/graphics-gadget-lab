@@ -14,6 +14,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/RaySceneSunVisibility.h"
+#include "GGLabRuntime/Graphics/Pipeline/RaySceneHitMaterial.h"
 #include "GGLabRuntime/Graphics/RayScene.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
@@ -153,7 +154,8 @@ namespace gglab
 		{
 		public:
 			explicit CoastalRayScenePipeline(std::shared_ptr<CoastalRaySceneLabState> state) noexcept :
-				m_State(std::move(state)), m_Raster(CreateRenderPipelineForwardPlus()) {}
+				m_State(std::move(state)),
+				m_Raster(CreateRenderPipelineForwardPlus({ .m_EnableGIReceiver = m_State->m_Enabled })) {}
 			std::string_view GetName() const noexcept override { return "Coastal ray scene"; }
 			ResolvedTemporalFramePlan ResolveTemporalFramePlan(TemporalFramePlanResolveInfo info) const noexcept override
 			{
@@ -197,6 +199,10 @@ namespace gglab
 				if (!m_SunVisibility.Prepare(frame, services))
 				{
 					return RenderFrameValidationResult::ContractFailure("Coastal sun-visibility preparation failed");
+				}
+				if (!m_HitMaterial.Prepare(services))
+				{
+					return RenderFrameValidationResult::ContractFailure("Coastal hit-material preparation failed");
 				}
 				if (!m_State->m_Failed)
 				{
@@ -288,6 +294,7 @@ namespace gglab
 				if (m_State->m_Enabled)
 				{
 					m_SunVisibility.AddPass(graph, frame, services, rayScene);
+					m_HitMaterial.AddPass(graph, frame, services, rayScene);
 					struct FinishData {};
 					// Export seals these imports; every ray consumer must be declared first.
 					graph.AddPass<FinishData>("Lab.CoastalRayScene.RestoreTables",
@@ -329,6 +336,7 @@ namespace gglab
 			ComputePipelineRecipe m_Recipe;
 			ComputePipelineSlot m_Slot;
 			RaySceneSunVisibility m_SunVisibility;
+			RaySceneHitMaterial m_HitMaterial;
 			bool m_Initialized = false;
 		};
 	}
@@ -340,7 +348,7 @@ namespace gglab
 		m_State->m_Assets = m_Services.m_AssetManager;
 		SetRenderPipeline(std::make_unique<CoastalRayScenePipeline>(m_State));
 		auto& profile = GetMutableViewRenderProfile();
-		profile.m_TemporalAA.m_Enabled = true;
+		profile.m_TemporalAA.m_Enabled = false;
 		profile.m_Lighting.m_GTAO.m_Enabled = true;
 		profile.m_PostProcess.m_Bloom.m_Enabled = false;
 		profile.m_EnableScenePreExposure = true;
@@ -361,6 +369,7 @@ namespace gglab
 		LabSessionBase::OnParametersRestoredForPrepare(impact);
 		m_State->m_Enabled = GetParameters().Get<bool>(EnabledId, true);
 		m_State->m_ExerciseUpdates = GetParameters().Get<bool>(ExerciseUpdatesId, false);
+		SetRenderPipeline(std::make_unique<CoastalRayScenePipeline>(m_State));
 	}
 	void CoastalRaySceneLabSession::BeginPrepare() noexcept
 	{
