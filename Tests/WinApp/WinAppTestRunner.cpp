@@ -1,6 +1,7 @@
 #include "WinAppTestRunner.h"
 #include "ApplicationHostConfigurationSelfTests.h"
 #include "ApplicationContentRegistrationSelfTests.h"
+#include "CoastalRaySceneOracleSelfTests.h"
 #include "ApplicationControlSelfTests.h"
 #include "ApplicationInputSelfTests.h"
 #include "ApplicationLifecycleSelfTests.h"
@@ -37,6 +38,7 @@ namespace gglab
 		constexpr std::array RegisteredSuites
 		{
 			SelfTestSuiteDesc{ .m_Id = "app-content-registration", .m_Run = &RunApplicationContentRegistrationSelfTests, },
+			SelfTestSuiteDesc{ .m_Id = "coastal-ray-scene-oracle", .m_Run = &RunCoastalRaySceneOracleSelfTests, },
 			SelfTestSuiteDesc{ .m_Id = "app-input", .m_Run = &RunApplicationInputSelfTests, },
 			SelfTestSuiteDesc{ .m_Id = "app-host-configuration", .m_Run = &RunApplicationHostConfigurationSelfTests, },
 			SelfTestSuiteDesc{ .m_Id = "app-lifecycle", .m_Run = &RunApplicationLifecycleSelfTests, },

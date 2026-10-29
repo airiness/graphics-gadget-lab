@@ -1,4 +1,5 @@
 #include "Application/Lab/Sessions/CoastalRaySceneLabSession.h"
+#include "Application/Lab/Validation/CoastalRaySceneOracle.h"
 #include "Application/Content/RuntimeAssetBundle.h"
 #include "Application/Demo/CoastalSceneCameraPaths.h"
 #include "Application/Demo/CoastalSceneLightingProfiles.h"
@@ -32,28 +33,18 @@ namespace gglab
 	{
 		const LabParameterId EnabledId("coastal_ray_scene.enabled");
 		const LabParameterId ExerciseUpdatesId("coastal_ray_scene.exercise_updates");
-		constexpr uint32_t ProbeWidth = 32;
-		struct HitResult
-		{
-			uint32_t m_Hit = 0;
-			uint32_t m_Instance = 0;
-			uint32_t m_Primitive = 0;
-			uint32_t m_Errors = 0;
-			std::array<float, 2> m_Barycentrics{};
-			float m_Distance = 0;
-			float m_Reserved = 0;
-		};
-		static_assert(sizeof(HitResult) == 32 && offsetof(HitResult, m_Barycentrics) == 16 &&
-			offsetof(HitResult, m_Distance) == 24);
-		constexpr uint64_t ResultBytes = ProbeWidth * ProbeWidth * sizeof(HitResult);
+		constexpr uint32_t ProbeWidth = CoastalProbeWidth;
+		using HitResult = CoastalProbeHit;
+		constexpr uint64_t ResultBytes = CoastalProbeRayCount * sizeof(HitResult);
+		constexpr uint64_t ReadbackBytes = ResultBytes + CoastalOracleGeometryBytes + CoastalOracleInstanceBytes;
 		struct Parameters
 		{
 			uint32_t m_Width = ProbeWidth;
 			uint32_t m_InstanceCount = 0;
 			uint32_t m_GeometryCount = 0;
-			uint32_t m_Reserved = 0;
+			float m_OriginOffsetX = 0;
 		};
-		static_assert(sizeof(Parameters) == 16 && offsetof(Parameters, m_Reserved) == 12);
+		static_assert(sizeof(Parameters) == 16 && offsetof(Parameters, m_OriginOffsetX) == 12);
 		const RenderPassInfo ProbeInfo{ .m_TypeName = "Lab.CoastalRayScene.Probe",
 			.m_DisplayName = "Coastal ray-scene membership probe", .m_CategoryName = "Ray Scene",
 			.m_Category = RenderPassCategory::Debug, .m_Type = RenderPassType::Compute };
@@ -79,6 +70,8 @@ namespace gglab
 		bool m_UpdatesVerified = false;
 		uint32_t m_UpdateStep = 0;
 		bool m_Failed = false;
+		float m_ProbeOffsetX = 0;
+		std::string m_FailureReason;
 
 		bool Initialize(RHIContext& context) noexcept
 		{
@@ -88,7 +81,7 @@ namespace gglab
 			m_Readbacks.resize(context.GetFrameSlotCount());
 			for (auto& slot : m_Readbacks)
 			{
-				slot.m_Buffer = RHIBufferOwner(m_Device, m_Device->CreateBuffer({ .m_SizeInBytes = ResultBytes,
+				slot.m_Buffer = RHIBufferOwner(m_Device, m_Device->CreateBuffer({ .m_SizeInBytes = ReadbackBytes,
 					.m_Usage = RHIBufferUsage::CopyDest, .m_MemoryUsage = RHIMemoryUsage::GpuToCpu }));
 				if (!slot.m_Buffer)
 				{
@@ -110,14 +103,14 @@ namespace gglab
 				m_Failed = true;
 				return;
 			}
-			const auto* hits = static_cast<const HitResult*>(m_Device->MapBuffer(slot.m_Buffer.Get(), { 0, ResultBytes }));
+			const auto* hits = static_cast<const HitResult*>(m_Device->MapBuffer(slot.m_Buffer.Get(), { 0, ReadbackBytes }));
 			if (!hits)
 			{
 				m_Failed = true;
 				return;
 			}
 			m_HitCount = 0;
-			for (uint32_t ray = 0; ray < ProbeWidth * ProbeWidth; ++ray)
+			for (uint32_t ray = 0; ray < CoastalProbeRayCount; ++ray)
 			{
 				const auto& hit = hits[ray];
 				if (hit.m_Errors != 0 || hit.m_Hit > 1 || (hit.m_Hit != 0 &&
@@ -130,6 +123,11 @@ namespace gglab
 				}
 				m_HitCount += hit.m_Hit;
 			}
+			const auto* bytes = reinterpret_cast<const std::byte*>(hits);
+			m_Failed = m_Failed ||
+				!ValidateCoastalRaySceneHits({ hits, CoastalProbeRayCount }, m_FailureReason) ||
+				!ValidateCoastalRaySceneTables({ bytes + ResultBytes, CoastalOracleGeometryBytes },
+					{ bytes + ResultBytes + CoastalOracleGeometryBytes, CoastalOracleInstanceBytes }, m_FailureReason);
 			m_Device->UnmapBuffer(slot.m_Buffer.Get(), {});
 			slot.m_Fence = {};
 			m_Failed = m_Failed || m_HitCount == 0;
@@ -138,9 +136,10 @@ namespace gglab
 				if (m_VerifiedFrames == 0)
 				{
 					const auto& scene = m_Scene.GetDiagnostics();
-					GGLAB_LOG_GRAPHICS_INFO("Coastal RayScene verified: geometries={}, instances={}, opaque={}, excludedBlend={}, materials={}, vertexBytes={}, indexBytes={}, probeHits={}/1024.",
+					GGLAB_LOG_GRAPHICS_INFO("Coastal RayScene verified: geometries={}, instances={}, opaque={}, excludedBlend={}, materials={}, vertexBytes={}, indexBytes={}, probeHits={}/1024, fixedHits={}, fixedMisses=2, tableDigests=matched.",
 						scene.m_GeometryCount, scene.m_InstanceCount, scene.m_OpaqueInstanceCount,
-						scene.m_ExcludedBlendCount, scene.m_MaterialCount, scene.m_VertexBytes, scene.m_IndexBytes, m_HitCount);
+						scene.m_ExcludedBlendCount, scene.m_MaterialCount, scene.m_VertexBytes, scene.m_IndexBytes,
+						m_HitCount, CoastalProbeReferences.size());
 				}
 				++m_VerifiedFrames;
 			}
@@ -184,6 +183,11 @@ namespace gglab
 					return RenderFrameValidationResult::ContractFailure("Coastal ray-scene preparation failed",
 						m_State->m_Scene.GetDiagnostics().m_Reason);
 				}
+				if (!ValidateCoastalRaySceneLayout(m_State->m_Scene.GetDiagnostics(), m_State->m_FailureReason))
+				{
+					return RenderFrameValidationResult::ContractFailure("Coastal ray-scene reference layout changed",
+						m_State->m_FailureReason);
+				}
 				if (!m_Initialized)
 				{
 					m_Initialized = true;
@@ -194,7 +198,8 @@ namespace gglab
 					m_State->CheckReadback(frame.m_FrameSlotIndex);
 				}
 				return m_State->m_Failed ? RenderFrameValidationResult::ContractFailure(
-					"Coastal ray-scene GPU membership verification failed") : RenderFrameValidationResult::Ready();
+					"Coastal ray-scene GPU membership verification failed", m_State->m_FailureReason) :
+					RenderFrameValidationResult::Ready();
 			}
 
 			void BuildRenderGraph(RenderGraph& graph, const RenderFrameContext& frame,
@@ -206,6 +211,7 @@ namespace gglab
 					const auto counts = m_State->m_Scene.GetDiagnostics();
 					struct ProbeData { RGBufferId m_Results; RGBufferId m_Readback; };
 					const auto slot = frame.m_FrameSlotIndex;
+					const auto probeOffset = m_State->m_ProbeOffsetX;
 					auto data = std::make_shared<ProbeData>();
 					graph.AddPass<ProbeData>(ProbeInfo.m_TypeName.c_str(), RGPassEncoderType::Compute,
 						[=, this](RenderGraph::RGBuilder& builder, ProbeData& pass)
@@ -223,7 +229,7 @@ namespace gglab
 								RGBufferAccess::CopySource, RGContentValidity::Undefined);
 							builder.WriteInPlace(pass.m_Results, RGBufferAccess::StorageWrite, RHIStage::ComputeShader);
 							pass.m_Readback = builder.ImportBuffer("CoastalRayScene.Readback", m_State->m_Readbacks[slot].m_Buffer.Get(),
-								{ .m_SizeInBytes = ResultBytes, .m_Usage = RHIBufferUsage::CopyDest, .m_MemoryUsage = RHIMemoryUsage::GpuToCpu },
+								{ .m_SizeInBytes = ReadbackBytes, .m_Usage = RHIBufferUsage::CopyDest, .m_MemoryUsage = RHIMemoryUsage::GpuToCpu },
 								RGBufferAccess::CopyDest, RGContentValidity::Undefined);
 							*data = pass;
 						},
@@ -243,7 +249,7 @@ namespace gglab
 							commands->SetReadOnlyBuffer(1, context.GetBufferHandle(scene.m_Geometries));
 							commands->SetReadOnlyBuffer(2, context.GetBufferHandle(scene.m_Instances));
 							commands->SetReadWriteBuffer(3, context.GetBufferHandle(pass.m_Results));
-							commands->SetInlineConstants(4, Parameters{ ProbeWidth, counts.m_InstanceCount, counts.m_GeometryCount });
+							commands->SetInlineConstants(4, Parameters{ ProbeWidth, counts.m_InstanceCount, counts.m_GeometryCount, probeOffset });
 							commands->Dispatch(ProbeWidth / 8, ProbeWidth / 8, 1);
 						});
 					struct EmptyData {};
@@ -251,18 +257,30 @@ namespace gglab
 						[=](RenderGraph::RGBuilder& builder, EmptyData&)
 						{
 							GGLAB_UNUSED(builder.Read(data->m_Results, RGBufferAccess::CopySource));
+							GGLAB_UNUSED(builder.Read(scene.m_Geometries, RGBufferAccess::CopySource));
+							GGLAB_UNUSED(builder.Read(scene.m_Instances, RGBufferAccess::CopySource));
 							builder.WriteInPlace(data->m_Readback, RGBufferAccess::CopyDest);
 							builder.SideEffect();
 						},
-						[this, slot](RGExecuteContext& context, EmptyData&)
+						[this, slot, scene](RGExecuteContext& context, EmptyData&)
 						{
 							context.GetCopyCommandContext()->CopyBuffer(m_State->m_Readbacks[slot].m_Buffer.Get(), 0,
 								m_State->m_Results.Get(), 0, ResultBytes);
+							context.GetCopyCommandContext()->CopyBuffer(m_State->m_Readbacks[slot].m_Buffer.Get(), ResultBytes,
+								context.GetBufferHandle(scene.m_Geometries), 0, CoastalOracleGeometryBytes);
+							context.GetCopyCommandContext()->CopyBuffer(m_State->m_Readbacks[slot].m_Buffer.Get(),
+								ResultBytes + CoastalOracleGeometryBytes, context.GetBufferHandle(scene.m_Instances), 0, CoastalOracleInstanceBytes);
 							auto* receipt = &m_State->m_Readbacks[slot].m_Fence;
 							context.DeferCommit([receipt](const RGCommitContext& commit) noexcept
 								{
 									*receipt = commit.m_Fence;
 								});
+						});
+					graph.AddPass<EmptyData>("Lab.CoastalRayScene.RestoreTables",
+						[scene](RenderGraph::RGBuilder& builder, EmptyData&)
+						{
+							builder.Export(scene.m_Geometries, RGBufferAccess::StructuredRead);
+							builder.Export(scene.m_Instances, RGBufferAccess::StructuredRead);
 						});
 				}
 				m_Raster->BuildRenderGraph(graph, frame, services);
@@ -338,6 +356,12 @@ namespace gglab
 		if (!bundle)
 		{
 			m_Progress = { .m_Status = LoadingStatus::Failed, .m_Stage = "Installed asset validation failed", .m_Detail = failure };
+			return;
+		}
+		if (bundle->m_Id != CoastalOracleBundleId || bundle->m_Revision != CoastalOracleBundleRevision)
+		{
+			m_Progress = { .m_Status = LoadingStatus::Failed, .m_Stage = "Coastal ray-scene reference asset changed",
+				.m_Detail = "Review the frozen probe oracle before using another asset bundle revision." };
 			return;
 		}
 		m_Model = GetAssetOwnerScope().LoadModelAsync(bundle->m_EntryPoint).m_ModelId;
@@ -442,6 +466,7 @@ namespace gglab
 			{
 				registry.get<components::TransformComponent>(entity).m_Position.m_X =
 					m_State->m_UpdateStep == 0 ? 0.5f : 0.0f;
+				m_State->m_ProbeOffsetX = m_State->m_UpdateStep == 0 ? 0.5f : 0.0f;
 			}
 			++m_State->m_UpdateStep;
 			break;

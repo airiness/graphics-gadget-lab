@@ -152,6 +152,7 @@
     <ClCompile Include="..\..\Tests\WinApp\FrameCaptureImageEncoderSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\ApplicationFrameCaptureSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\ApplicationContentRegistrationSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\CoastalRaySceneOracleSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\ApplicationInputSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\ApplicationLifecycleSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\DevelopGuiVulkanPresentationContractSelfTests.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
@@ -178,6 +179,7 @@
     <ClInclude Include="..\..\Tests\WinApp\FrameCaptureImageEncoderSelfTests.h" />
     <ClInclude Include="..\..\Tests\WinApp\ApplicationFrameCaptureSelfTests.h" />
     <ClInclude Include="..\..\Tests\WinApp\ApplicationContentRegistrationSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\CoastalRaySceneOracleSelfTests.h" />
     <ClInclude Include="..\..\Tests\WinApp\ApplicationInputSelfTests.h" />
     <ClInclude Include="..\..\Tests\WinApp\ApplicationLifecycleSelfTests.h" />
     <ClInclude Include="..\..\Tests\WinApp\DevelopGuiVulkanPresentationContractSelfTests.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />

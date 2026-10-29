@@ -19,25 +19,18 @@ cbuffer Parameters : register(b0)
 	uint Width;
 	uint InstanceCount;
 	uint GeometryCount;
-	uint Reserved;
+	float OriginOffsetX;
 };
 
-// A fixed world-space downward grid checks scene membership independently of the camera.
-[numthreads(8, 8, 1)]
-void CSMain(uint3 id : SV_DispatchThreadID)
+HitResult Trace(float3 origin, float3 direction, uint mask)
 {
-	if (id.x >= Width || id.y >= Width)
-	{
-		return;
-	}
-	float2 position = (((float2)(id.xy) + 0.5f) / (float)(Width)) * 32.0f - 16.0f;
 	RayDesc ray;
-	ray.Origin = float3(position.x, 20.0f, position.y);
-	ray.Direction = float3(0.0f, -1.0f, 0.0f);
+	ray.Origin = origin;
+	ray.Direction = direction;
 	ray.TMin = 0.001f;
 	ray.TMax = 100.0f;
 	RayQuery<RAY_FLAG_FORCE_OPAQUE> query;
-	query.TraceRayInline(Scene, RAY_FLAG_NONE, 1, ray);
+	query.TraceRayInline(Scene, RAY_FLAG_NONE, mask, ray);
 	while (query.Proceed())
 	{
 	}
@@ -66,5 +59,24 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 			}
 		}
 	}
-	Results[id.y * Width + id.x] = result;
+	return result;
+}
+
+// Camera-independent grid. The lifecycle exercise translates rays with its rigid root
+// so the same references also detect an omitted or incorrect TLAS transform rebuild.
+[numthreads(8, 8, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+	if (id.x >= Width || id.y >= Width)
+	{
+		return;
+	}
+	float2 position = (((float2)(id.xy) + 0.5f) / (float)(Width)) * 32.0f - 16.0f;
+	Results[id.y * Width + id.x] = Trace(float3(position.x + OriginOffsetX, 20.0f, position.y),
+		float3(0.0f, -1.0f, 0.0f), 1);
+	if (id.x == 0 && id.y == 0)
+	{
+		Results[Width * Width] = Trace(float3(OriginOffsetX, 500.0f, 0.0f), float3(0.0f, 1.0f, 0.0f), 1);
+		Results[Width * Width + 1] = Trace(float3(OriginOffsetX, 20.0f, 0.0f), float3(0.0f, -1.0f, 0.0f), 0);
+	}
 }

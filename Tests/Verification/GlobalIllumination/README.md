@@ -12,6 +12,22 @@ powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/RunVerifi
 ```
 
 This checks local inputs and capture identities; it does not qualify GI rendering.
+
+The Coastal ray-scene regression uses the locked references in WinAppHost's
+`Application/Lab/Validation/CoastalRaySceneOracle.h`. The Lab validates 22 fixed
+hits, two misses and the complete integer geometry/instance table digests on GPU
+readback. The `coastal-ray-scene-oracle` WinAppTests suite independently intersects
+the imported CPU triangles and checks adversarial oracle failures.
+
+After building the application and shader compiler, run the hidden GPU suite
+with Python `numpy` and `jsonschema` available:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/RunVerification.ps1 -Suite coastal-ray-scene -Configuration Develop -Rhi dx12,vulkan
+```
+
+This checks membership regression, cache reuse and disabled behavior. The fixed
+samples do not establish exhaustive native traversal coverage or GI quality.
 Fixture design and baseline reproduction notes live in `gglab-docs`:
 `GGLab_Global_Illumination_Fixture_Specification.md` and
 `GGLab_Global_Illumination_Design_And_Plan.md` section 11.2. The fixture version/hash
