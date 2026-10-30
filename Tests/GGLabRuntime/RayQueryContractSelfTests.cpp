@@ -33,6 +33,7 @@
 #include <cstdint>
 #include <initializer_list>
 #include <limits>
+#include <memory>
 #include <span>
 #include <type_traits>
 
@@ -219,6 +220,22 @@ namespace gglab
 			TransientResourcePool transients(&device);
 			GIReferenceObservation observation(device, textures);
 			GIReferenceObservationKey key{ .m_Width = 8, .m_Height = 8, .m_Samples = 9 };
+			auto sceneOwner = std::make_shared<RayScene>();
+			const std::weak_ptr<RayScene> sceneObserver = sceneOwner;
+			key.m_Scene = sceneOwner;
+			auto sharedScenes = std::make_shared<std::array<RayScene, 2>>();
+			const GIReferenceSceneIdentity firstAlias(std::shared_ptr<RayScene>(sharedScenes, &(*sharedScenes)[0]));
+			const GIReferenceSceneIdentity secondAlias(std::shared_ptr<RayScene>(sharedScenes, &(*sharedScenes)[1]));
+			context.Check(!(firstAlias == secondAlias),
+				"Aliased scene objects sharing an owner still have distinct observation identities");
+			auto identicalKey = key;
+			context.Check(key == identicalKey, "Reference identity preserves the scene control block");
+			sceneOwner.reset();
+			context.Check(sceneObserver.expired() && key == identicalKey,
+				"Reference keys cannot retain scene texture interests past content retirement");
+			key.m_Scene = std::make_shared<RayScene>();
+			context.Check(!(key == identicalKey),
+				"Expired scene identities cannot alias a new owner at a recycled address");
 			const RHIFencePoint fence{ RHIFenceHandle(0, 1), 1 };
 			const auto record = [&]() noexcept
 				{
@@ -458,6 +475,26 @@ namespace gglab
 			device.SetFencesComplete(true);
 			observation.Shutdown();
 			textures.Tick();
+			observation.BeginFrame(13);
+			GGLAB_UNUSED(observation.Prepare(key, 4, 128, 8192));
+			record();
+			device.SetFencesComplete(false);
+			observation.Settle({ RenderFrameOutcomeKind::Submitted, 13, fence });
+			const auto oldGeneration = observation.GetDiagnostics().m_Generation;
+			observation.BeginFrame(14);
+			++key.m_SceneRevision;
+			GGLAB_UNUSED(observation.Prepare(key, 4, 128, 8192));
+			context.Check(observation.GetDiagnostics().m_Generation == oldGeneration + 1 &&
+				observation.GetDiagnostics().m_SubmittedSamples == 0 &&
+				observation.GetDiagnostics().m_SubmittedTiles == 0 &&
+				observation.GetDiagnostics().m_CommittedVersion == 0 && observation.GetTile().m_BeginSweep &&
+				textures.GetDiagnostics().m_PendingRetirementTextureCount == 12,
+				"A material snapshot revision restarts every partial-sweep cursor and retains old storage through its fence");
+			record();
+			observation.Settle({ RenderFrameOutcomeKind::Discarded, 14, {} });
+			device.SetFencesComplete(true);
+			observation.Shutdown();
+			textures.Tick();
 		}
 
 		void RunGIReceiverPreparationTests(SelfTestContext& context) noexcept
@@ -536,6 +573,41 @@ namespace gglab
 			GGLAB_UNUSED(PlanRayScene({ material }, {}, limits, other, reason));
 			context.Check(HasSameRayTransforms(originalSingle, other) && !HasSameRayInstances(originalSingle, other),
 				"Material content changes replace snapshot tables without rebuilding the TLAS");
+			auto textured = opaque;
+			textured.m_TextureContents[0] = { TextureID(14), 1 };
+			textured.m_TextureResources[0] = { 8, 1 };
+			textured.m_Material.BaseColorBinding.TextureSamplerBinding.TextureIndex = 20;
+			RayScenePlan textureBaseline;
+			GGLAB_UNUSED(PlanRayScene({ textured }, {}, limits, textureBaseline, reason));
+			auto replaced = textured;
+			replaced.m_TextureContents[0].m_Generation = 2;
+			GGLAB_UNUSED(PlanRayScene({ replaced }, {}, limits, other, reason));
+			context.Check(HasSameRayTransforms(textureBaseline, other) &&
+				!HasSameRayInstances(textureBaseline, other),
+				"Texture content replacement invalidates a snapshot even when GPU material bytes and descriptor index match");
+			replaced = textured;
+			replaced.m_TextureResources[0] = { 8, 2 };
+			GGLAB_UNUSED(PlanRayScene({ replaced }, {}, limits, other, reason));
+			context.Check(HasSameRayTransforms(textureBaseline, other) &&
+				!HasSameRayInstances(textureBaseline, other),
+				"Texture residency slot reuse invalidates tables without rebuilding unchanged BLAS or TLAS");
+			replaced = textured;
+			replaced.m_TextureContents[1] = { TextureID(15), 4 };
+			GGLAB_UNUSED(PlanRayScene({ replaced }, {}, limits, other, reason));
+			context.Check(!HasSameRayInstances(textureBaseline, other),
+				"Metallic texture content is part of the reduced material identity");
+			replaced = textured;
+			replaced.m_EntityIdentity += 1;
+			replaced.m_TextureContents[0].m_Generation += 1;
+			context.Check(PlanRayScene({ textured, replaced }, {}, limits, other, reason) ==
+				RaySceneStatus::InvalidSource && other.m_Instances.empty(),
+				"Shared material keys cannot alias different texture generations with identical descriptor bytes");
+			replaced = textured;
+			replaced.m_ModelGeneration += 1;
+			GGLAB_UNUSED(PlanRayScene({ replaced }, {}, limits, other, reason));
+			context.Check(HasSameRayGeometry(textureBaseline, other) &&
+				!HasSameRayTransforms(textureBaseline, other),
+				"Reused model slots preserve generation identity independently of mesh cache reuse");
 			auto generation = opaque;
 			generation.m_Geometry.m_ContentGeneration = 2;
 			GGLAB_UNUSED(PlanRayScene({ generation }, {}, limits, other, reason));

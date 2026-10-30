@@ -711,7 +711,7 @@ namespace gglab
 		}
 		m_ParameterControl->OnFrameBuilt(frame.m_FrameSerial, frame.m_RenderScene.m_WorldLightingGeneration,
 			frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)],
-			&frame.m_RenderViews[utils::ToIndex(frame.m_DisplayViewId)]);
+			&frame.m_RenderViews[utils::ToIndex(frame.m_DisplayViewId)], &frame.m_RenderScene);
 		auto parameterFrame = m_ParameterControl->IsEnabled() ?
 			std::make_shared<ParameterFrameState>(m_ParameterControl->CaptureFrameState(
 				frame.m_FrameSerial, m_RenderServiceBindings.m_Environment->GetBakeRequestGeneration(),

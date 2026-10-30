@@ -1239,7 +1239,7 @@ namespace gglab
 	}
 
 	void SessionParameterControl::OnFrameBuilt(uint64_t serial, uint64_t lightingGeneration,
-		const ResolvedViewRenderSettings& settings, const RenderView* view) noexcept
+		const ResolvedViewRenderSettings& settings, const RenderView* view, const RenderScene* scene) noexcept
 	{
 		if (m_Enabled && m_Demo)
 		{
@@ -1249,7 +1249,7 @@ namespace gglab
 		{
 			return;
 		}
-		const ParameterSourceFrame frame{ settings, view, lightingGeneration, m_ContentSerial };
+		const ParameterSourceFrame frame{ settings, view, lightingGeneration, m_ContentSerial, scene, serial };
 		for (auto& entry : m_ParameterBatches)
 		{
 			auto& batch = *entry;

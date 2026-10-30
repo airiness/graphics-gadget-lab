@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabRuntime/Graphics/Asset/TextureAssetViews.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGResource.h"
 
 #include <cstdint>
@@ -54,6 +55,23 @@ namespace gglab
 		AllocationFailed,
 	};
 
+	struct RaySceneMaterialTexture
+	{
+		uint32_t m_MaterialIndex = 0;
+		// Zero is base colour, one is metallic/roughness. Only reduced GI inputs.
+		uint32_t m_Slot = 0;
+		TextureContentRef m_Content{};
+		RHITextureHandle m_Resource{};
+		uint32_t m_SrvIndex = 0;
+		RHIFormat m_Format = RHIFormat::Unknown;
+		uint32_t m_Width = 0;
+		uint32_t m_Height = 0;
+		uint32_t m_MipLevels = 0;
+		uint32_t m_SelectedMip = 0;
+		SourceDigest m_SourceDigest{};
+		ArtifactContentDigest m_ArtifactContentDigest{};
+	};
+
 	struct RaySceneDiagnostics
 	{
 		RaySceneStatus m_Status = RaySceneStatus::NotReady;
@@ -74,6 +92,7 @@ namespace gglab
 		// Environment-miss consumers must reject an incomplete proof or a shorter ray.
 		float m_BoundsDiagonal = 0.0f;
 		bool m_HasCompleteBounds = false;
+		std::vector<RaySceneMaterialTexture> m_MaterialTextures;
 	};
 
 	// Graph-local imports. Declare all traversed BLAS reads as well as the TLAS read.
@@ -97,8 +116,9 @@ namespace gglab
 	// Owner-thread service, with one instance per World/session. Preparation observes
 	// the entire World, never a view's culled draws. Keep source asset interests through
 	// recording; copied geometry survives raster residency. Only ray consumers invoke it.
-	// Geometry layouts are immutable; transforms/materials replace tables and the TLAS
-	// while sharing unchanged pools/BLAS. A changed geometry layout replaces that cache.
+	// Geometry layouts are immutable. Material replacements share unchanged BLAS/TLAS;
+	// transforms replace the TLAS. Snapshots retain reduced-material texture interests
+	// through their query/build submission leases, including off-camera surfaces.
 	class RayScene final
 	{
 	public:

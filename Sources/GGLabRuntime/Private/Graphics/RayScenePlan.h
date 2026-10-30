@@ -1,4 +1,5 @@
 #pragma once
+#include "GGLabRuntime/Graphics/Asset/TextureAssetViews.h"
 #include "GGLabRuntime/Graphics/GPUStructures.h"
 #include "GGLabRuntime/Graphics/GraphicsHandles.h"
 #include "GGLabRuntime/Graphics/MaterialTypes.h"
@@ -34,6 +35,9 @@ namespace gglab
 		uint32_t m_IndexCount = 0;
 		RenderMaterialKey m_MaterialKey;
 		MaterialGPU m_Material{};
+		// Descriptor indices alone do not identify texture contents or residency.
+		std::array<TextureContentRef, 2> m_TextureContents{};
+		std::array<RHITextureHandle, 2> m_TextureResources{};
 		AlphaMode m_AlphaMode = AlphaMode::Opaque;
 		std::array<float, 12> m_Transform{};
 	};

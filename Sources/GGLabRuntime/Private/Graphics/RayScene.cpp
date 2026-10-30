@@ -71,6 +71,7 @@ namespace gglab
 		{
 			// Destruction releases the TLAS before its BLAS/pools. Submission leases
 			// retain this complete owner on every build and query, including failures.
+			AssetOwnerScope m_TextureInterests;
 			std::shared_ptr<GeometryCache> m_Geometry;
 			std::shared_ptr<TopLevelCache> m_Top;
 			RayScenePlan m_Plan;
@@ -286,6 +287,28 @@ namespace gglab
 				{
 					return fail(RaySceneStatus::InvalidSource, "Ray mesh buffer descriptions are unavailable.");
 				}
+				std::array<TextureContentRef, 2> contents{};
+				std::array<RHITextureHandle, 2> textures{};
+				const std::array bindings{ material->m_BaseColorBinding, material->m_MetallicRoughnessBinding };
+				if (material->m_AlphaMode == AlphaMode::Opaque)
+				{
+					for (size_t slot = 0; slot < bindings.size(); ++slot)
+					{
+						if (!bindings[slot].m_TextureId.IsValid())
+						{
+							continue;
+						}
+						assets.MarkTextureUsed(bindings[slot].m_TextureId);
+						contents[slot] = assets.GetTextureContentRef(bindings[slot].m_TextureId);
+						const auto resident = assets.GetResidentTextureResource(contents[slot]);
+						if (!resident)
+						{
+							return fail(RaySceneStatus::NotReady,
+								"A reduced GI material texture is not resident; no fallback snapshot is published.");
+						}
+						textures[slot] = resident->m_Texture;
+					}
+				}
 				sources.push_back({
 					.m_EntityIdentity = static_cast<uint32_t>(entt::to_integral(entity)),
 					.m_Model = model->m_Id, .m_ModelGeneration = model->m_ContentGeneration,
@@ -297,6 +320,7 @@ namespace gglab
 					.m_MaterialKey = overridden ? RenderMaterialKey::FromRuntime(overrideMaterial->m_Key) :
 						RenderMaterialKey::FromAsset(modelMesh.m_MaterialId),
 					.m_Material = MaterialGpuEncoder::Encode(*material, assets, samplers),
+					.m_TextureContents = contents, .m_TextureResources = textures,
 					.m_AlphaMode = material->m_AlphaMode,
 					.m_Transform = { matrix.m_11, matrix.m_21, matrix.m_31, matrix.m_41,
 						matrix.m_12, matrix.m_22, matrix.m_32, matrix.m_42,
@@ -323,6 +347,41 @@ namespace gglab
 		}
 		auto snapshot = std::make_shared<SceneSnapshot>();
 		snapshot->m_Plan = std::move(plan);
+		snapshot->m_TextureInterests = assets.CreateOwnerScope();
+		std::vector<RaySceneMaterialTexture> materialTextures;
+		for (uint32_t index = 0; index < snapshot->m_Plan.m_Sources.size(); ++index)
+		{
+			const auto& source = snapshot->m_Plan.m_Sources[index];
+			const auto materialIndex = snapshot->m_Plan.m_Instances[index].m_MaterialIndex;
+			for (uint32_t slot = 0; slot < source.m_TextureContents.size(); ++slot)
+			{
+				const auto content = source.m_TextureContents[slot];
+				if (!content.IsValid() || std::ranges::any_of(materialTextures, [=](const auto& value)
+					{
+						return value.m_MaterialIndex == materialIndex && value.m_Slot == slot;
+					}))
+				{
+					continue;
+				}
+				const auto resident = assets.GetResidentTextureResource(content);
+				if (!resident || !snapshot->m_TextureInterests.RetainTexture(content))
+				{
+					return fail(RaySceneStatus::NotReady, "GI material texture retention failed.");
+				}
+				const auto& desc = resident->m_Desc;
+				uint32_t level = 0;
+				uint32_t longest = std::max(desc.m_Extent.m_Width, desc.m_Extent.m_Height);
+				while (longest > 64 && level + 1 < desc.m_MipLevels)
+				{
+					longest = std::max(longest >> 1, 1u);
+					++level;
+				}
+				materialTextures.push_back({ materialIndex, slot, content, resident->m_Texture,
+					resident->m_SrvIndex, resident->m_ViewFormat, desc.m_Extent.m_Width,
+					desc.m_Extent.m_Height, desc.m_MipLevels, level,
+					resident->m_SourceDigest, resident->m_ArtifactContentDigest });
+			}
+		}
 		const bool sameGeometry = previous && HasSameRayGeometry(previous->m_Plan, snapshot->m_Plan);
 		snapshot->m_Geometry = sameGeometry ? previous->m_Geometry :
 			CreateGeometry(snapshot->m_Plan, device, diagnostics.m_Reason);
@@ -338,6 +397,7 @@ namespace gglab
 		{
 			return fail(RaySceneStatus::AllocationFailed, "Ray TLAS or snapshot table allocation failed.");
 		}
+		diagnostics.m_MaterialTextures = std::move(materialTextures);
 		++diagnostics.m_Revision;
 		if (!sameGeometry)
 		{

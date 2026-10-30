@@ -165,8 +165,10 @@ new frames; issued attempts retain their own snapshot through readback.
 
 [Run checks](../../Sources/WinAppHost/Application/Control/ApplicationControlProtocol.cpp)
 precede admission and handle lookup, keeping job and batch IDs scoped to their
-process. `OnFrameBuilt` checks effects against the built view; `OnFrameSubmitted`
-records consumption only after a successful EndFrame.
+process. `OnFrameBuilt` checks effects against the built view and frozen scene/table
+identities. Lab projections borrow that scene and frame serial only for the current build;
+a missing frame input is unknown, never a reason to read live authoring storage.
+`OnFrameSubmitted` records consumption only after a successful EndFrame.
 
 Full [graph exports](../../Sources/GGLabRuntime/Private/Diagnostics/Builders/RenderGraphSnapshotJson.cpp)
 record culled passes and executed pass indices. The TAA resolve pass is

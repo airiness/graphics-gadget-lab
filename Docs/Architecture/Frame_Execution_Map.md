@@ -187,7 +187,9 @@ pixels; later tiles preserve them with declared ReadWrite access. Sums, compensa
 publish together only after the complete spatial sweep has submitted. GPU completion gates each
 subsequent tile and capture readiness; partial sweeps resolve the previous complete sample count.
 Cancellation retires resources through the last-use fence; unknown completion retains them
-through checked teardown.
+through checked teardown. Observation scene identity uses a weak control-block key;
+query/build submission leases retain the immutable snapshot and its reduced-material texture
+interests. Observations do not extend content asset ownership into AssetManager shutdown.
 
 On the abort path, capture releases unsubmitted taps after the RHI abort has
 recorded the frame's resource uses.

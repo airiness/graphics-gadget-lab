@@ -13,9 +13,26 @@ namespace gglab
 {
 	class RHIDevice;
 
+	// Observation identity must not prolong a Lab's asset interests into AssetManager
+	// shutdown. Query submission leases own snapshots; this weak control-block key
+	// distinguishes recycled addresses even after a scene has expired.
+	struct GIReferenceSceneIdentity
+	{
+		std::weak_ptr<RayScene> m_Owner;
+		uintptr_t m_Address = 0;
+		GIReferenceSceneIdentity() noexcept = default;
+		GIReferenceSceneIdentity(const std::shared_ptr<RayScene>& owner) noexcept :
+			m_Owner(owner), m_Address(reinterpret_cast<uintptr_t>(owner.get())) {}
+		bool operator==(const GIReferenceSceneIdentity& other) const noexcept
+		{
+			return m_Address == other.m_Address && !m_Owner.owner_before(other.m_Owner) &&
+				!other.m_Owner.owner_before(m_Owner);
+		}
+	};
+
 	struct GIReferenceObservationKey
 	{
-		std::shared_ptr<RayScene> m_Scene;
+		GIReferenceSceneIdentity m_Scene;
 		uint64_t m_SceneRevision = 0;
 		uint64_t m_LightingGeneration = 0;
 		uint64_t m_EnvironmentGeneration = 0;

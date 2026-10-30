@@ -88,7 +88,8 @@ namespace gglab
 		};
 		registration.m_Labs = {
 			{ GIReferenceLabSession::GetDescriptor(), &GIReferenceLabSession::Create,
-				{ shader_programs::GIReceiverPixel, shader_programs::GIReferenceCompute } },
+				{ shader_programs::GIReceiverPixel, shader_programs::GIReferenceCompute,
+					shader_programs::RaySceneHitMaterialCompute } },
 			{ CoastalRaySceneLabSession::GetDescriptor(), &CoastalRaySceneLabSession::Create,
 				{ shader_programs::RaySceneProbeCompute, shader_programs::RaySceneSunVisibilityCompute,
 					shader_programs::RaySceneHitMaterialCompute, shader_programs::GIReceiverPixel } },

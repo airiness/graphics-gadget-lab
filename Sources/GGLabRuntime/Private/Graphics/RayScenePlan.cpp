@@ -47,6 +47,7 @@ namespace gglab
 			});
 		RayScenePlan plan;
 		std::vector<RenderMaterialKey> materialKeys;
+		std::vector<size_t> materialSources;
 		for (size_t index = 0; index < sources.size(); ++index)
 		{
 			const auto& source = sources[index];
@@ -79,9 +80,12 @@ namespace gglab
 					return fail(RaySceneStatus::CapacityExceeded, "Ray material table capacity exceeded.");
 				}
 				materialKeys.push_back(source.m_MaterialKey);
+				materialSources.push_back(index);
 				plan.m_Materials.push_back(source.m_Material);
 			}
-			else if (!EqualMaterial(plan.m_Materials[materialIndex], source.m_Material))
+			else if (!EqualMaterial(plan.m_Materials[materialIndex], source.m_Material) ||
+				sources[materialSources[materialIndex]].m_TextureContents != source.m_TextureContents ||
+				sources[materialSources[materialIndex]].m_TextureResources != source.m_TextureResources)
 			{
 				return fail(RaySceneStatus::InvalidSource, "Conflicting ray material identities.");
 			}
@@ -254,7 +258,8 @@ namespace gglab
 		{
 			const auto& x = a.m_Sources[index];
 			const auto& y = b.m_Sources[index];
-			if (x.m_MaterialKey != y.m_MaterialKey || !EqualMaterial(x.m_Material, y.m_Material))
+			if (x.m_MaterialKey != y.m_MaterialKey || !EqualMaterial(x.m_Material, y.m_Material) ||
+				x.m_TextureContents != y.m_TextureContents || x.m_TextureResources != y.m_TextureResources)
 			{
 				return false;
 			}

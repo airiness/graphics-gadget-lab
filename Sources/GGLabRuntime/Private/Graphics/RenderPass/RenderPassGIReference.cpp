@@ -1,5 +1,6 @@
 #include "Graphics/RenderPass/RenderPassGIReference.h"
 #include "Graphics/Pipeline/GIReferenceObservation.h"
+#include "GGLabRuntime/Graphics/Pipeline/RaySceneHitMaterial.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
@@ -106,6 +107,7 @@ namespace gglab
 
 	struct RenderPassGIReference::State
 	{
+		RaySceneHitMaterial m_HitMaterial;
 		ResolvedRenderLayout m_Layout;
 		ResolvedBindingRef<SceneGPU> m_Scene;
 		ResolvedBindingRef<AtmosphereGPU> m_Atmosphere;
@@ -135,6 +137,10 @@ namespace gglab
 			return RenderFrameValidationResult::ContractFailure("GI reference observation service is unavailable");
 		}
 		auto& state = *m_State;
+		if (info.m_HitMaterialDiagnostics && !state.m_HitMaterial.Prepare(services))
+		{
+			return RenderFrameValidationResult::ContractFailure("GI hit-material diagnostics are unavailable");
+		}
 		if (!state.m_Layout.IsValid())
 		{
 			const RHITextureDesc desc{ .m_Format = RHIFormat::R32G32B32A32Float,
@@ -144,7 +150,7 @@ namespace gglab
 				return RenderFrameValidationResult::ContractFailure("GI reference requires RGBA32F storage textures");
 			}
 			const RHITextureDesc randomDesc{ .m_Format = RHIFormat::R32Uint,
-				.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::UnorderedAccess };
+				.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::UnorderedAccess | RHITextureUsage::CopySource };
 			if (!services.m_Presentation->GetDevice()->QueryTextureSupport(randomDesc).IsSupported())
 			{
 				return RenderFrameValidationResult::ContractFailure("GI reference requires R32Uint RNG storage");
@@ -231,6 +237,10 @@ namespace gglab
 				// would prevent publication; after-ready observations wait on IBL.
 				return;
 			}
+		}
+		if (info.m_HitMaterialDiagnostics)
+		{
+			m_State->m_HitMaterial.AddPass(graph, frame, services, scene);
 		}
 		struct PassData
 		{

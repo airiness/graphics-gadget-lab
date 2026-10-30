@@ -1,5 +1,9 @@
 #include "Application/Lab/Sessions/GIReferenceLabSession.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
+#include "GGLabRuntime/Core/Log/LogMacros.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
+#include "GGLabRuntime/Graphics/RenderScene.h"
+#include "GGLabRuntime/Graphics/RenderServices.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
@@ -10,8 +14,12 @@
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
 #include "GGLabRuntime/Scene/Components.h"
 
+#include <algorithm>
+#include <array>
 #include <cstddef>
+#include <format>
 #include <cstdint>
+#include <cstdlib>
 #include <memory>
 #include <string>
 #include <utility>
@@ -36,6 +44,13 @@ namespace gglab
 		const LabParameterId SunId("gi_reference.sun_lux");
 		const LabParameterId SecondaryAlbedoId("gi_reference.secondary_albedo");
 		const LabParameterId AtmosphereId("gi_reference.atmosphere");
+		const LabParameterId MaterialCaseId("gi_reference.material_case");
+		constexpr uint32_t MaterialCaseCount = 23;
+
+		RuntimeMaterialKey MaterialCaseKey(uint32_t value) noexcept
+		{
+			return RuntimeMaterialKey(std::format("gglab.lab.gi_reference.material.{}", value));
+		}
 
 		class GIReferencePipeline final : public RenderPipelineBase
 		{
@@ -102,7 +117,7 @@ namespace gglab
 				{ 3, "F3 sealed thin-wall room" }, { 4, "F4 sunlit coloured room" },
 				{ 5, "Contract: sun transport" }, { 6, "Contract: off-camera sun blocker" },
 				{ 7, "Contract: published environment sphere" },
-				{ 8, "Contract: coupled diffuse planes" } } }));
+				{ 8, "Contract: coupled diffuse planes" }, { 9, "Contract: reduced hit material and snapshots" } } }));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = SamplesId, .m_Name = "Samples per pixel", .m_Group = "Reference",
 			.m_Type = LabParameterType::UInt, .m_Impact = LabChangeImpact::RestartSession,
 			.m_DefaultValue = uint32_t(64), .m_MinValue = LabValue(uint32_t(1)), .m_MaxValue = LabValue(uint32_t(1048576)) }));
@@ -146,6 +161,11 @@ namespace gglab
 		GGLAB_UNUSED(parameters.Add({ .m_Id = AtmosphereId, .m_Name = "Contract atmosphere", .m_Group = "Lighting contracts",
 			.m_Type = LabParameterType::Bool, .m_Impact = LabChangeImpact::RestartSession,
 			.m_DefaultValue = false }));
+		GGLAB_UNUSED(parameters.Add({ .m_Id = MaterialCaseId, .m_Name = "Material contract case",
+			.m_Group = "Material contracts", .m_Type = LabParameterType::UInt,
+			.m_Impact = LabChangeImpact::Immediate, .m_DefaultValue = uint32_t(0),
+			.m_MinValue = LabValue(uint32_t(0)),
+			.m_MaxValue = LabValue(uint32_t(MaterialCaseCount - 1)) }));
 		auto& profile = GetMutableViewRenderProfile();
 		profile.m_TemporalAA.m_Enabled = false;
 		profile.m_Lighting.m_GTAO.m_Enabled = false;
@@ -185,7 +205,15 @@ namespace gglab
 			.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers, .m_World = &m_World,
 			.m_MaterialInstance = material };
 		std::vector<CameraReferenceView> views;
-		if (fixture == 0 || fixture == 7)
+		if (fixture == 9)
+		{
+			BuildMaterialContract();
+			views = {
+				View("Contract_MaterialWall", { 0, 2, -3 }, { 0, 2, 2 }, 35, exposure),
+				View("Contract_MaterialFloor", { 0, 1.5f, -3 }, { 0, 0, 0 }, 45, exposure),
+			};
+		}
+		else if (fixture == 0 || fixture == 7)
 		{
 			GGLAB_UNUSED(primitive::Sphere::Create(primitiveInfo));
 			m_Assets.TrackModel(ProceduralSphereModelID, "F1 sphere", 1.0f);
@@ -292,7 +320,7 @@ namespace gglab
 		}
 		const bool contract = fixture >= 5;
 		const auto environment = contract ? GetParameters().Get(EnvironmentId, int32_t(0)) : 0;
-		if (fixture == 4 || fixture == 5 || fixture == 6 || fixture == 8 || environment == 3)
+		if (fixture == 4 || fixture == 5 || fixture == 6 || fixture == 8 || fixture == 9 || environment == 3)
 		{
 			auto& registry = m_World.GetRegistry();
 			const auto light = registry.create();
@@ -315,11 +343,13 @@ namespace gglab
 		const bool registered = GetCameraRig().SetReferenceViews(std::move(views));
 		const bool restored = GetCameraRig().RestoreReferenceView(firstView);
 		GGLAB_ASSERT(registered && restored);
-		GIReferenceCreateInfo reference{ .m_RayScene = std::make_shared<RayScene>(),
+		m_RayScene = std::make_shared<RayScene>();
+		GIReferenceCreateInfo reference{ .m_RayScene = m_RayScene,
 			.m_SampleCount = GetParameters().Get(SamplesId, uint32_t(64)),
 			.m_Seed = GetParameters().Get(SeedId, uint32_t(61051)) };
 		reference.m_SamplesPerBatch = GetParameters().Get(BatchSamplesId, uint32_t(64));
 		reference.m_MaximumDepth = GetParameters().Get(DepthId, uint32_t(1));
+		reference.m_HitMaterialDiagnostics = fixture == 9;
 		reference.m_MaximumTilePixels = GetParameters().Get(TilePixelsId, uint32_t(0));
 		reference.m_ConstantEnvironment = environment == 0;
 		// The HDR importer decodes RGBE bin centres: (128 + 0.5) / 128.
@@ -334,11 +364,277 @@ namespace gglab
 			*m_Services.m_AssetManager, std::move(reference)));
 		m_World.MarkLightingAuthoringChanged();
 		m_Progress = m_Assets.BuildProgress(*m_Services.m_AssetManager, "Preparing GI reference fixture");
+		UpdateMaterialProgress();
+	}
+
+	void GIReferenceLabSession::BuildMaterialContract() noexcept
+	{
+		auto& assets = *m_Services.m_AssetManager;
+		auto* samplers = m_Services.m_RenderServices.m_Samplers;
+		wchar_t* fixtureRoot = nullptr;
+		size_t fixtureRootLength = 0;
+		const auto environmentResult = _wdupenv_s(
+			&fixtureRoot, &fixtureRootLength, L"GGLAB_GI_MATERIAL_FIXTURE_ROOT");
+		const std::filesystem::path directory = environmentResult == 0 && fixtureRoot ? fixtureRoot : L"";
+		std::free(fixtureRoot);
+		constexpr std::array files{ "pattern.dds", "metal.dds", "mip64.dds", "mip65.dds",
+			"mip129.dds", "short256.dds", "replacement.dds", "normal.dds" };
+		for (size_t index = 0; index < files.size(); ++index)
+		{
+			const auto semantic = index == 1 ? TextureSemantic::MetallicRoughness :
+				index == 7 ? TextureSemantic::Normal : TextureSemantic::BaseColor;
+			if (directory.is_absolute())
+			{
+				m_MaterialTextures[index] = GetAssetOwnerScope().LoadTextureAsync(
+					directory / files[index], semantic).m_TextureId;
+			}
+		}
+		components::MaterialInstanceComponent receiver;
+		receiver.m_Key = RuntimeMaterialKey("gglab.lab.gi_reference.material.receiver");
+		receiver.m_Properties.m_BaseColor = Color(0.7f, 0.7f, 0.7f, 1);
+		receiver.m_Properties.m_MetallicFactor = 0;
+		receiver.m_Properties.m_RoughnessFactor = 1;
+		receiver.m_Properties.m_NormalScale = 0;
+		primitive::PrimitiveBase::CreateInfo plane{ .m_AssetManager = &assets,
+			.m_SamplerRegistry = samplers, .m_World = &m_World, .m_MaterialInstance = receiver };
+		plane.m_Transform.m_Scale = Vector3(2, 2, 1);
+		plane.m_Transform.m_Rotation = math::RotationFromTo(Vector3(0, 0, -1), Vector3::Up);
+		GGLAB_UNUSED(primitive::Plane::Create(plane));
+		m_Assets.TrackModel(ProceduralPlaneModelID, "Material contract receiver");
+		// A separate procedural mesh makes UV1 observably different from UV0. Both
+		// versions are prepared before updates; switching them replaces geometry.
+		for (uint32_t version = 0; version < m_MaterialModels.size(); ++version)
+		{
+			auto mesh = std::make_unique<Mesh>();
+			mesh->m_Name = StringID("GI material UV plane");
+			AssetManager::MeshUploadData upload;
+			for (const auto& uv : std::array<Vector2, 4>{ Vector2(0, 1), Vector2(0, 0),
+				Vector2(1, 0), Vector2(1, 1) })
+			{
+				upload.m_VerticesData.push_back({ Vector3(uv.m_X * 2 - 1, 1 - uv.m_Y * 2, 0),
+					Vector3(0, 0, -1), uv,
+					Vector2(0.2f + 0.5f * uv.m_Y, 0.1f + (version == 0 ? 0.7f : 0.3f) * uv.m_X),
+					Vector4(1, 0, 0, 1) });
+			}
+			upload.m_IndicesData = { 0, 1, 2, 0, 2, 3 };
+			const auto meshId = assets.AddProceduralMesh(std::move(mesh), upload);
+			auto model = std::make_unique<Model>();
+			model->m_Name = StringID("GI material UV plane");
+			model->m_MeshInstance.push_back({ meshId, ProceduralPrimitiveMaterialID });
+			m_MaterialModels[version] = assets.AddProceduralModel(std::move(model));
+			const auto* storedModel = assets.GetModel(m_MaterialModels[version]);
+			const bool retained = storedModel && GetAssetOwnerScope().RetainModel(
+				m_MaterialModels[version], storedModel->m_ContentGeneration);
+			GGLAB_ASSERT(retained);
+			m_Assets.TrackModel(m_MaterialModels[version], "Material contract UV geometry");
+		}
+		auto& registry = m_World.GetRegistry();
+		m_MaterialWall = registry.create();
+		registry.emplace<components::TransformComponent>(m_MaterialWall);
+		registry.emplace<components::ModelComponent>(m_MaterialWall, m_MaterialModels[0]);
+		registry.emplace<components::MaterialInstanceComponent>(m_MaterialWall);
+		ApplyImmediateParameters();
+	}
+
+	void GIReferenceLabSession::UpdateMaterialProgress() noexcept
+	{
+		if (GetParameters().Get(FixtureId, int32_t(0)) != 9 || m_Progress.HasFailed())
+		{
+			return;
+		}
+		for (const auto texture : m_MaterialTextures)
+		{
+			const auto content = m_Services.m_AssetManager->GetTextureContentRef(texture);
+			const auto state = m_Services.m_AssetManager->GetTextureState(content);
+			if (!state || *state == AssetState::Failed)
+			{
+				m_Progress = { .m_Status = LoadingStatus::Failed,
+					.m_Stage = "Material fixtures unavailable",
+					.m_Detail = "Generate textures with ValidateGIReferenceMaterials.py --generate and set GGLAB_GI_MATERIAL_FIXTURE_ROOT." };
+				return;
+			}
+			if (*state != AssetState::Ready)
+			{
+				m_Progress = { .m_Status = LoadingStatus::Preparing, .m_Stage = "Loading material fixtures" };
+				return;
+			}
+		}
+	}
+
+	void GIReferenceLabSession::ApplyImmediateParameters() noexcept
+	{
+		auto& registry = m_World.GetRegistry();
+		if (!registry.valid(m_MaterialWall))
+		{
+			return;
+		}
+		const auto value = GetParameters().Get(MaterialCaseId, uint32_t(0));
+		if (value == 16 && m_MaterialCase != value)
+		{
+			const auto model = registry.get<components::ModelComponent>(m_MaterialWall);
+			registry.destroy(m_MaterialWall);
+			m_MaterialWall = registry.create();
+			registry.emplace<components::TransformComponent>(m_MaterialWall);
+			registry.emplace<components::ModelComponent>(m_MaterialWall, model);
+			registry.emplace<components::MaterialInstanceComponent>(m_MaterialWall);
+		}
+		auto& transform = registry.get<components::TransformComponent>(m_MaterialWall);
+		transform = {};
+		transform.m_Position = Vector3(0, 2, value == 15 ? 3.0f : 2.0f);
+		transform.m_Scale = Vector3(2, 2, 1);
+		if (value == 13 || value == 14)
+		{
+			transform.m_Rotation = math::RotationFromTo(Vector3(0, 0, -1), Vector3(0, 0, 1));
+		}
+		registry.get<components::ModelComponent>(m_MaterialWall).m_ModelId =
+			m_MaterialModels[value == 19 ? 1 : 0];
+		auto& instance = registry.get<components::MaterialInstanceComponent>(m_MaterialWall);
+		instance = {};
+		instance.m_Key = MaterialCaseKey(value);
+		auto& material = instance.m_Properties;
+		material.m_BaseColor = value == 0 ? Color::White : Color(0.6f, 0.8f, 0.4f, 1);
+		material.m_MetallicFactor = 0;
+		material.m_NormalScale = 0;
+		material.m_RoughnessFactor = 1;
+		if ((value >= 2 && value <= 12) || value == 19 || value == 21)
+		{
+			const uint32_t texture = value >= 8 && value <= 11 ? value - 6 : value == 21 ? 6 : 0;
+			material.m_BaseColorBinding.m_TextureId = m_MaterialTextures[texture];
+			material.m_BaseColorBinding.m_SamplerId = m_Services.m_RenderServices.m_Samplers->
+				GetPresetSamplerId(value == 6 ? SamplerPreset::PointClamp :
+					value == 7 ? SamplerPreset::LinearWrap : SamplerPreset::LinearClamp);
+		}
+		if (value == 3)
+		{
+			material.m_MetallicFactor = 0.5f;
+			material.m_MetallicRoughnessBinding.m_TextureId = m_MaterialTextures[1];
+			material.m_MetallicRoughnessBinding.m_SamplerId = m_Services.m_RenderServices.m_Samplers->
+				GetPresetSamplerId(SamplerPreset::PointClamp);
+		}
+		if (value == 4 || value == 19)
+		{
+			material.m_BaseColorBinding.m_TexCoordIndex = 1;
+		}
+		if (value == 5 || value == 6 || value == 7)
+		{
+			auto& binding = material.m_BaseColorBinding;
+			binding.m_UVOffset = Vector2(-0.25f, 0.15f);
+			binding.m_UVScale = Vector2(2.0f, 1.5f);
+			binding.m_UVRotation = 0.5f;
+		}
+		if (value == 12)
+		{
+			// Secondary GI deliberately ignores these inputs. The floor receiver has
+			// no normal map, so its primary direction distribution remains unchanged.
+			material.m_NormalBinding.m_TextureId = m_MaterialTextures[7];
+			material.m_NormalScale = 1;
+			material.m_RoughnessFactor = 0.03f;
+			material.m_EmissiveColor = Color(30, 10, 50, 1);
+			material.m_EmissiveBinding.m_TextureId = m_MaterialTextures[0];
+			material.m_ClearcoatFactor = 1;
+			material.m_ClearcoatBinding.m_TextureId = m_MaterialTextures[1];
+		}
+		if (value == 13)
+		{
+			material.m_Flags = MaterialFlags::DoubleSided;
+		}
+		if (value == 17)
+		{
+			material.m_AlphaMode = AlphaMode::Blend;
+		}
+		if (value == 22)
+		{
+			material.m_AlphaMode = AlphaMode::Mask;
+		}
+		m_MaterialCase = value;
+	}
+
+	void GIReferenceLabSession::OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept
+	{
+		if (!m_RayScene || GetParameters().Get(FixtureId, int32_t(0)) != 9)
+		{
+			return;
+		}
+		const auto& scene = m_RayScene->GetDiagnostics();
+		if (scene.m_Revision == m_LoggedSnapshot)
+		{
+			return;
+		}
+		m_LoggedSnapshot = scene.m_Revision;
+		GGLAB_LOG_GRAPHICS_INFO("GI material snapshot: case={}, revision={}, geometry={}, blas={}, tlas={}, entity={}, blend={}.",
+			m_MaterialCase, scene.m_Revision, scene.m_GeometryRevision, scene.m_BottomLevelBuildCount,
+			scene.m_TopLevelBuildCount, entt::to_integral(m_MaterialWall), scene.m_ExcludedBlendCount);
+		for (const auto& input : scene.m_MaterialTextures)
+		{
+			GGLAB_LOG_GRAPHICS_INFO("GI material texture: revision={}, material={}, slot={}, id={}, generation={}, resource={}:{}, srv={}, format={}, width={}, height={}, levels={}, mip={}, source={}, artifact={}.",
+				scene.m_Revision, input.m_MaterialIndex, input.m_Slot, input.m_Content.m_Id.Value(),
+				input.m_Content.m_Generation, input.m_Resource.Index(), input.m_Resource.Generation(),
+				input.m_SrvIndex, uint32_t(input.m_Format), input.m_Width, input.m_Height,
+				input.m_MipLevels, input.m_SelectedMip, SourceDigestText(input.m_SourceDigest, 32),
+				ArtifactContentDigestText(input.m_ArtifactContentDigest, 32));
+		}
+		GGLAB_UNUSED(feedback);
+	}
+
+	bool GIReferenceLabSession::SupportsImmediateParameter(const LabParameterId& id) const noexcept
+	{
+		return id == MaterialCaseId && GetParameters().Get(FixtureId, int32_t(0)) == 9;
+	}
+
+	std::optional<LabValue> GIReferenceLabSession::ReadImmediateParameterFrameValue(
+		const LabParameterId& id, const LabParameterFrameContext& frame) const noexcept
+	{
+		if (id != MaterialCaseId || !frame.m_Scene || frame.m_FrameSerial == 0)
+		{
+			return std::nullopt;
+		}
+		// Read the frozen material identity actually assigned to this frame's table;
+		// authoring parameter storage is not evidence of consumption.
+		for (uint32_t value = 0; value < MaterialCaseCount; ++value)
+		{
+			const auto key = RenderMaterialKey::FromRuntime(MaterialCaseKey(value));
+			if (std::ranges::any_of(frame.m_Scene->m_RenderInstances, [key](const auto& instance)
+				{
+					return instance.m_MaterialKey == key;
+				}))
+			{
+				return LabValue(value);
+			}
+		}
+		return std::nullopt;
+	}
+
+	void GIReferenceLabSession::BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept
+	{
+		if (!m_RayScene)
+		{
+			return;
+		}
+		const auto& scene = m_RayScene->GetDiagnostics();
+		diagnostics.m_Title = "GI reference snapshot inputs";
+		for (const auto& [name, value] : std::array<std::pair<const char*, uint64_t>, 7>{ {
+			{ "Snapshot revision", scene.m_Revision }, { "Geometry revision", scene.m_GeometryRevision },
+			{ "BLAS builds", scene.m_BottomLevelBuildCount }, { "TLAS builds", scene.m_TopLevelBuildCount },
+			{ "Material case", m_MaterialCase }, { "Material wall entity", entt::to_integral(m_MaterialWall) },
+			{ "Excluded BLEND entries", scene.m_ExcludedBlendCount } } })
+		{
+			diagnostics.m_Metrics.push_back({ name, std::to_string(value) });
+		}
+		for (size_t index = 0; index < scene.m_MaterialTextures.size(); ++index)
+		{
+			const auto& input = scene.m_MaterialTextures[index];
+			diagnostics.m_Metrics.push_back({ std::format("Material texture {}", index), std::format(
+				"material={};slot={};id={};generation={};resource={}:{};srv={};format={};width={};height={};levels={};mip={}",
+				input.m_MaterialIndex, input.m_Slot, input.m_Content.m_Id.Value(), input.m_Content.m_Generation,
+				input.m_Resource.Index(), input.m_Resource.Generation(), input.m_SrvIndex, uint32_t(input.m_Format),
+				input.m_Width, input.m_Height, input.m_MipLevels, input.m_SelectedMip) });
+		}
 	}
 
 	void GIReferenceLabSession::TickPrepare() noexcept
 	{
 		m_Progress = m_Assets.BuildProgress(*m_Services.m_AssetManager, "Preparing GI reference fixture");
+		UpdateMaterialProgress();
 	}
 	void GIReferenceLabSession::CommitPrepare() noexcept
 	{

@@ -160,3 +160,5 @@ Only immutable completed captures are reusable. Both-RHI runs also compare commo
 qualified candidates per ROI with the declared 1% rule and identical masks; differing
 selected depth/sample candidates are explicitly unavailable for that comparison.
 Runtime Completed remains calculation progress, not numerical certification.
+
+Material transport and snapshot qualification use the separate [material contract](ReferenceMaterials.md).

@@ -406,6 +406,9 @@ namespace gglab
 			const std::filesystem::path& path,
 			TextureSemantic semantic = TextureSemantic::GenericColor,
 			TaskPriority priority = TaskPriority::Normal) noexcept;
+		// Retain an existing procedural or imported model and its dependency closure.
+		[[nodiscard]] bool RetainModel(ModelID modelId, uint64_t generation,
+			TaskPriority priority = TaskPriority::High) noexcept;
 		[[nodiscard]] bool RetainTexture(
 			TextureContentRef content, TaskPriority priority = TaskPriority::High) noexcept;
 		void Reset() noexcept;

@@ -81,7 +81,7 @@ namespace gglab
 			{
 				descriptions[index] = { .m_CreateInfo = { .m_Desc = {
 					.m_Format = index == 3 ? RHIFormat::R32Uint : RHIFormat::R32G32B32A32Float,
-					.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::UnorderedAccess,
+					.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::UnorderedAccess | RHITextureUsage::CopySource,
 					.m_Extent = { key.m_Width, key.m_Height, 1 } } }, .m_AllocationNames = names[index] };
 			}
 			if (!m_Textures.Acquire(m_Pool, descriptions))

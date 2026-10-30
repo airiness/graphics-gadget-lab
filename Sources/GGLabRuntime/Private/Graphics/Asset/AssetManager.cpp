@@ -327,6 +327,24 @@ namespace gglab
 		return request;
 	}
 
+	bool AssetOwnerScope::RetainModel(ModelID modelId, uint64_t generation, TaskPriority priority) noexcept
+	{
+		const auto* model = m_Manager ? m_Manager->GetModel(modelId) : nullptr;
+		if (!model || !m_Owner.IsValid() || generation == 0 ||
+			model->m_ContentGeneration != generation || priority == TaskPriority::Count)
+		{
+			return false;
+		}
+		AssetLease lease = m_Manager->AcquireAssetLease(
+			m_Owner, AssetKind::Model, modelId.Value(), generation, priority);
+		if (!lease.IsValid())
+		{
+			return false;
+		}
+		m_Leases.emplace_back(std::move(lease));
+		return true;
+	}
+
 	bool AssetOwnerScope::RetainTexture(TextureContentRef content, TaskPriority priority) noexcept
 	{
 		if (!m_Manager || !m_Owner.IsValid() || !content.IsValid() ||
