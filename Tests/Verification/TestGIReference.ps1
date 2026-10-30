@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Checks bounded D=1 F1-F4 and independent sun/sky contracts. Does not qualify DDGI or Final.
+Checks bounded fixed-depth F1-F4 and independent sun/sky transport. Does not qualify DDGI or Final.
 #>
 [CmdletBinding()]
 param(
@@ -10,6 +10,7 @@ param(
     [string]$RunDirectory,
     [string]$Python = 'python',
     [string]$GIOffBaselineDirectory,
+    [ValidateSet('All', 'OneBounce', 'Transport')][string]$CaseSet = 'All',
     [int]$TimeoutSeconds = 300
 )
 $ErrorActionPreference = 'Stop'
@@ -40,6 +41,8 @@ function Check-Python([string]$Script, [string]$Directory, [string]$Result, [str
 }
 try {
     $Python = (Get-Command $Python -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+    & $Python -c 'import numpy, jsonschema'
+    if ($LASTEXITCODE -ne 0) { throw 'The selected Python must provide numpy and jsonschema.' }
     foreach ($config in $Configuration) {
         $configDirectory = Join-Path $output $config
         $null = New-Item -ItemType Directory -Path $configDirectory -Force
@@ -61,71 +64,114 @@ try {
                     OutputDirectory="$directory/warmup";TimeoutSeconds=$TimeoutSeconds }
                 Check ($warmup.status -eq 'completed' -and $warmup.publication -eq 'Published') "$backend-ready"
                 $observations = @()
-                foreach ($fixture in @(0,1)) {
-                    $view = if ($fixture -eq 0) { 'F1_Sphere' } else { 'F1_Plane' }
-                    $variants = @(
-                        @{name='base';samples=64;seed=61051;albedo=0;ev100=10},
-                        @{name='independent';samples=64;seed=61052;albedo=0;ev100=10},
-                        @{name='double';samples=128;seed=61051;albedo=0;ev100=10},
-                        @{name='white-ev0';samples=64;seed=61051;albedo=0;ev100=0},
-                        @{name='white-ev15';samples=64;seed=61051;albedo=0;ev100=15},
-                        @{name='tint-ev0';samples=64;seed=61051;albedo=1;ev100=0},
-                        @{name='tint-ev10';samples=64;seed=61051;albedo=1;ev100=10},
-                        @{name='tint-ev15';samples=64;seed=61051;albedo=1;ev100=15})
-                    foreach ($variant in $variants) {
-                        $observations += @{directory="$backend/f$fixture-$($variant.name)";fixture=$fixture;
-                            samples=$variant.samples;seed=$variant.seed;albedo=$variant.albedo;ev100=$variant.ev100;view=$view}
+                if ($CaseSet -ne 'Transport') {
+                    foreach ($fixture in @(0,1)) {
+                        $view = if ($fixture -eq 0) { 'F1_Sphere' } else { 'F1_Plane' }
+                        $variants = @(
+                            @{name='base';samples=64;seed=61051;albedo=0;ev100=10},
+                            @{name='independent';samples=64;seed=61052;albedo=0;ev100=10},
+                            @{name='double';samples=128;seed=61051;albedo=0;ev100=10},
+                            @{name='white-ev0';samples=64;seed=61051;albedo=0;ev100=0},
+                            @{name='white-ev15';samples=64;seed=61051;albedo=0;ev100=15},
+                            @{name='tint-ev0';samples=64;seed=61051;albedo=1;ev100=0},
+                            @{name='tint-ev10';samples=64;seed=61051;albedo=1;ev100=10},
+                            @{name='tint-ev15';samples=64;seed=61051;albedo=1;ev100=15})
+                        foreach ($variant in $variants) {
+                            $observations += @{directory="$backend/f$fixture-$($variant.name)";fixture=$fixture;
+                                samples=$variant.samples;seed=$variant.seed;albedo=$variant.albedo;ev100=$variant.ev100;view=$view}
+                        }
                     }
-                }
-                foreach ($view in @('F2_Interior','F2_Floor','F2_Ceiling','F2_West','F2_East','F2_Front','F2_Roof')) {
-                    $observations += @{directory="$backend/$view";fixture=2;samples=64;seed=61051;albedo=0;ev100=10;view=$view}
-                }
-                foreach ($view in @('F3_Interior','F3_Floor','F3_Ceiling','F3_West','F3_East','F3_Front','F3_Roof')) {
-                    $observations += @{directory="$backend/$view";fixture=3;samples=64;seed=61051;albedo=0;ev100=10;view=$view}
-                }
-                # Each base family has independent-seed and doubled-sample observations.
-                foreach ($surface in @('Floor','Back')) {
-                    foreach ($variant in @('base','independent','double')) {
-                        $observations += @{directory="$backend/f4-$($surface.ToLower())-$variant";fixture=4;
-                            samples=$(if ($variant -eq 'double') {4096} else {2048});
-                            seed=$(if ($variant -eq 'independent') {61052} else {61051});
-                            albedo=0;ev100=10;view="F4_$surface";variant=$variant}
+                    foreach ($view in @('F2_Interior','F2_Floor','F2_Ceiling','F2_West','F2_East','F2_Front','F2_Roof')) {
+                        $observations += @{directory="$backend/$view";fixture=2;samples=64;seed=61051;albedo=0;ev100=10;view=$view}
                     }
-                }
-                foreach ($view in @('F4_Overview','F4_West','F4_East')) {
-                    $observations += @{directory="$backend/$view";fixture=4;samples=512;seed=61051;albedo=0;ev100=10;view=$view}
-                }
-                foreach ($variant in @('base','independent','double','intensity','red','receiver','blocked','atmosphere')) {
-                    $observations += @{directory="$backend/sun-$variant";
-                        fixture=$(if ($variant -eq 'blocked') {6} else {5});
-                        samples=$(if ($variant -eq 'double') {1024} else {512});
-                        seed=$(if ($variant -eq 'independent') {61052} else {61051});
-                        albedo=$(if ($variant -eq 'receiver') {1} else {0});ev100=10;view='Contract_Sun';variant=$variant;
-                        sun_lux=$(if ($variant -eq 'intensity') {20000} else {10000});
-                        secondary_albedo=$(if ($variant -eq 'red') {1} else {0});atmosphere=($variant -eq 'atmosphere')}
-                }
-                foreach ($batch in @(1,7,31,4096)) {
-                    $observations += @{directory="$backend/sun-batch-$batch";fixture=5;samples=512;seed=61051;
-                        albedo=0;ev100=10;view='Contract_Sun';batch_samples=$batch}
-                }
-                $observations += @{directory="$backend/long-plane";fixture=1;samples=8193;seed=61051;
-                    albedo=0;ev100=10;view='F1_Plane';batch_samples=31}
-                foreach ($variant in @('direct','cube')) {
-                    $observations += @{directory="$backend/constant-$variant";fixture=7;samples=512;seed=61051;
-                        albedo=0;ev100=10;view='Contract_Environment';environment=$(if ($variant -eq 'cube') {1} else {0})}
-                }
-                foreach ($source in @('gradient','physical')) {
-                    $variants = if ($source -eq 'gradient') { @('base','independent','double','intensity','yaw','mip0') } else {
-                        @('base','independent','double','mip0') }
-                    foreach ($variant in $variants) {
-                        $observations += @{directory="$backend/$source-$variant";fixture=7;
+                    foreach ($view in @('F3_Interior','F3_Floor','F3_Ceiling','F3_West','F3_East','F3_Front','F3_Roof')) {
+                        $observations += @{directory="$backend/$view";fixture=3;samples=64;seed=61051;albedo=0;ev100=10;view=$view}
+                    }
+                    # Each base family has independent-seed and doubled-sample observations.
+                    foreach ($surface in @('Floor','Back')) {
+                        foreach ($variant in @('base','independent','double')) {
+                            $observations += @{directory="$backend/f4-$($surface.ToLower())-$variant";fixture=4;
+                                samples=$(if ($variant -eq 'double') {4096} else {2048});
+                                seed=$(if ($variant -eq 'independent') {61052} else {61051});
+                                albedo=0;ev100=10;view="F4_$surface";variant=$variant}
+                        }
+                    }
+                    foreach ($view in @('F4_Overview','F4_West','F4_East')) {
+                        $observations += @{directory="$backend/$view";fixture=4;samples=512;seed=61051;albedo=0;ev100=10;view=$view}
+                    }
+                    foreach ($variant in @('base','independent','double','intensity','red','receiver','blocked','atmosphere')) {
+                        $observations += @{directory="$backend/sun-$variant";
+                            fixture=$(if ($variant -eq 'blocked') {6} else {5});
                             samples=$(if ($variant -eq 'double') {1024} else {512});
                             seed=$(if ($variant -eq 'independent') {61052} else {61051});
-                            albedo=0;ev100=10;view='Contract_Environment';variant=$variant;
-                            environment=$(if ($source -eq 'gradient') {2} else {3});
-                            filter=$(if ($variant -eq 'mip0') {1} else {0});
-                            intensity=$(if ($variant -eq 'intensity') {2} else {1});
-                            yaw=$(if ($variant -eq 'yaw') {90} else {0})}
+                            albedo=$(if ($variant -eq 'receiver') {1} else {0});ev100=10;view='Contract_Sun';variant=$variant;
+                            sun_lux=$(if ($variant -eq 'intensity') {20000} else {10000});
+                            secondary_albedo=$(if ($variant -eq 'red') {1} else {0});atmosphere=($variant -eq 'atmosphere')}
+                    }
+                    foreach ($batch in @(1,7,31,4096)) {
+                        $observations += @{directory="$backend/sun-batch-$batch";fixture=5;samples=512;seed=61051;
+                            albedo=0;ev100=10;view='Contract_Sun';batch_samples=$batch}
+                    }
+                    $observations += @{directory="$backend/long-plane";fixture=1;samples=8193;seed=61051;
+                        albedo=0;ev100=10;view='F1_Plane';batch_samples=31}
+                    foreach ($variant in @('direct','cube')) {
+                        $observations += @{directory="$backend/constant-$variant";fixture=7;samples=512;seed=61051;
+                            albedo=0;ev100=10;view='Contract_Environment';environment=$(if ($variant -eq 'cube') {1} else {0})}
+                    }
+                    foreach ($source in @('gradient','physical')) {
+                        $variants = if ($source -eq 'gradient') { @('base','independent','double','intensity','yaw','mip0') } else {
+                            @('base','independent','double','mip0') }
+                        foreach ($variant in $variants) {
+                            $observations += @{directory="$backend/$source-$variant";fixture=7;
+                                samples=$(if ($variant -eq 'double') {1024} else {512});
+                                seed=$(if ($variant -eq 'independent') {61052} else {61051});
+                                albedo=0;ev100=10;view='Contract_Environment';variant=$variant;
+                                environment=$(if ($source -eq 'gradient') {2} else {3});
+                                filter=$(if ($variant -eq 'mip0') {1} else {0});
+                                intensity=$(if ($variant -eq 'intensity') {2} else {1});
+                                yaw=$(if ($variant -eq 'yaw') {90} else {0})}
+                        }
+                    }
+                }
+                if ($CaseSet -ne 'OneBounce') {
+                    foreach ($depth in @(1,2,3,4)) {
+                        $observations += @{directory="$backend/transport-planes-d$depth";fixture=8;
+                            depth=$depth;samples=4096;seed=61051;albedo=0;secondary_albedo=1;ev100=10;
+                            view='Contract_Sun';transport=$true}
+                        $observations += @{directory="$backend/transport-f4-d$depth";fixture=4;
+                            depth=$depth;samples=4096;seed=61051;albedo=0;ev100=10;view='F4_Floor';transport=$true}
+                    }
+                    foreach ($depth in @(2,3)) {
+                        foreach ($variant in @('independent','double')) {
+                            foreach ($fixture in @(8,4)) {
+                                $family = if ($fixture -eq 8) {'planes'} else {'f4'}
+                                $observations += @{directory="$backend/transport-$family-d$depth-$variant";fixture=$fixture;
+                                    depth=$depth;samples=$(if ($variant -eq 'double') {8192} else {4096});
+                                    seed=$(if ($variant -eq 'independent') {61052} else {61051});
+                                    albedo=0;secondary_albedo=$(if ($fixture -eq 8) {1} else {0});ev100=10;
+                                    view=$(if ($fixture -eq 8) {'Contract_Sun'} else {'F4_Floor'});
+                                    variant=$variant;transport=$true}
+                            }
+                        }
+                    }
+                    foreach ($depth in @(1,2,3)) {
+                        $observations += @{directory="$backend/transport-receiver-d$depth";fixture=8;
+                            depth=$depth;samples=4096;seed=61051;albedo=1;secondary_albedo=1;ev100=10;
+                            view='Contract_Sun';transport=$true}
+                    }
+                    foreach ($batch in @(1,7,31)) {
+                        $observations += @{directory="$backend/transport-batch-$batch";fixture=8;depth=3;
+                            samples=512;seed=61051;albedo=0;secondary_albedo=1;ev100=10;
+                            view='Contract_Sun';batch_samples=$batch;variant='batch';transport=$true}
+                    }
+                    foreach ($fixture in @(2,3)) {
+                        foreach ($depth in @(2,3,4)) {
+                            foreach ($surface in @('Interior','Floor','Ceiling','West','East','Front','Roof')) {
+                                $observations += @{directory="$backend/transport-f$fixture-d$depth-$surface";fixture=$fixture;
+                                    depth=$depth;samples=64;seed=61051;albedo=0;ev100=10;
+                                    view="F${fixture}_$surface";transport=$true}
+                            }
+                        }
                     }
                 }
                 $targets = @('GI.Reference.Irradiance','GI.Reference.Diagnostics','GI.Reference.Position',
@@ -133,19 +179,27 @@ try {
                     'GI.Receiver.HitAlbedo','GI.Reference.LambertRadiance') | ForEach-Object { @{resource=$_} }
                 $products = @(@{kind='resource';targets=@($targets)},@{kind='graph'})
                 foreach ($observation in $observations) {
-                    foreach ($entry in @{batch_samples=64;environment=0;filter=0;intensity=1;yaw=0;sun_lux=10000;secondary_albedo=0;atmosphere=$false}.GetEnumerator()) {
+                    foreach ($entry in @{depth=1;transport=$false;batch_samples=64;environment=0;filter=0;intensity=1;yaw=0;sun_lux=10000;secondary_albedo=0;atmosphere=$false}.GetEnumerator()) {
                         if (-not $observation.ContainsKey($entry.Key)) { $observation[$entry.Key] = $entry.Value }
                     }
                     $changes = @()
-                    foreach ($key in @('fixture','samples','batch_samples','seed','albedo','ev100','environment','filter','intensity','yaw','sun_lux','secondary_albedo','atmosphere')) {
-                        $type = if ($key -in @('samples','batch_samples','seed')) { 'uint' } elseif ($key -eq 'atmosphere') { 'bool' } else { 'enum' }
+                    foreach ($key in @('fixture','depth','samples','batch_samples','seed','albedo','ev100','environment','filter','intensity','yaw','sun_lux','secondary_albedo','atmosphere')) {
+                        $type = if ($key -in @('depth','samples','batch_samples','seed')) { 'uint' } elseif ($key -eq 'atmosphere') { 'bool' } else { 'enum' }
                         $changes += @{id="gi_reference.$key";type=$type;value=$observation[$key]}
                     }
                     $effect = Invoke-VerificationSession set $session @{ExpectedRunIdentity=$run;WaitConsumed=$true;
                         Changes=($changes | ConvertTo-Json -Compress -Depth 6);TimeoutSeconds=$TimeoutSeconds}
                     Check ($effect.batch.succeeded) "$($observation.directory)-parameters-consumed"
                     $captureDirectory = Join-Path $configDirectory $observation.directory
-                    if ($observation.fixture -ge 4) {
+                    if ($observation.transport) {
+                        # Preserve the eight-target group bound. Primary normals are
+                        # covered by the retained D=1 suite; this group adds path validity.
+                        $transportTargets = @('GI.Reference.Irradiance','GI.Reference.Diagnostics','GI.Reference.Position',
+                            'GI.Reference.Identity','GI.Receiver.HitAlbedo','GI.Reference.PathDiagnostics',
+                            'GI.Reference.SunIrradiance','GI.Reference.EnvironmentIrradiance') | ForEach-Object { @{resource=$_} }
+                        $products = @(@{kind='resource';targets=@($transportTargets)},@{kind='graph'})
+                    }
+                    elseif ($observation.fixture -ge 4) {
                         $lightingTargets = @('GI.Reference.Irradiance','GI.Reference.Diagnostics','GI.Reference.Position',
                             'GI.Reference.Identity','GI.Receiver.HitAlbedo','GI.Receiver.ShadingNormal',
                             'GI.Reference.SunIrradiance','GI.Reference.EnvironmentIrradiance') | ForEach-Object { @{resource=$_} }
@@ -179,9 +233,16 @@ try {
             Check-Python "$root/Scripts/Verification/$validator" $configDirectory `
                 "$configDirectory/$validator.result.json" "$config-$validator"
         }
+        if ($CaseSet -ne 'OneBounce' -and $config -in @('Debug','Develop')) {
+            $transactions = Invoke-VerificationScript "$PSScriptRoot/TestGIReferenceTransactions.ps1" @{
+                Configuration=$config;Rhi=$Rhi;Python=$Python;
+                RunDirectory="$configDirectory/transactions";TimeoutSeconds=$TimeoutSeconds}
+            Write-VerificationJson "$configDirectory/transactions-receipt.json" $transactions
+            Check ($transactions.exitCode -eq 0) "$config-reference-transactions-and-deep-invalidity"
+        }
         # The pinned GI-off pixels are qualified for Develop. Run the ordinary
         # composition in fresh processes, with no GI Lab or ray-scene activation.
-        if ($config -eq 'Develop') {
+        if ($config -eq 'Develop' -and $CaseSet -ne 'Transport') {
             foreach ($backend in $Rhi) {
                 $offDirectory = Join-Path $configDirectory "gi-off-$backend"
                 $offSession = "gi-reference-off-$runId-$backend"
@@ -223,7 +284,7 @@ try {
         }
 
     }
-    $result = @{ok=$true;directory=$output;checks=$checks;pinnedGIOff=$pinnedGIOff;giOffBaseline=$GIOffBaselineDirectory;scope='F1-F4 and sun/sky contracts; D=1, not DDGI or Final'}
+    $result = @{ok=$true;directory=$output;checks=$checks;caseSet=$CaseSet;pinnedGIOff=$pinnedGIOff;giOffBaseline=$GIOffBaselineDirectory;scope='Fixed-depth integration; ReferenceUnconverged for DDGI'}
 }
 catch {
     $result = @{ok=$false;directory=$output;checks=$checks;pinnedGIOff=$pinnedGIOff;giOffBaseline=$GIOffBaselineDirectory;error=$_.Exception.Message}

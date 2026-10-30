@@ -44,6 +44,7 @@ $catalog = @(
     @{ name = 'gi-reference-contracts'; group = 'contracts'; steps = @(
         @{ path = 'Tests/Verification/ValidateGIReference.py'; arguments = @('--self-test') },
         @{ path = 'Tests/Verification/ValidateGIReferenceLighting.py'; arguments = @('--self-test') },
+        @{ path = 'Tests/Verification/ValidateGIReferenceTransport.py'; arguments = @('--self-test') },
         @{ path = 'Tests/Verification/GlobalIllumination/GenerateReferenceEnvironments.py'; arguments = @('--check') }) },
     @{ name = 'gi-reference'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIReference.ps1' }) },
     @{ name = 'coastal-ray-scene'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestCoastalRayScene.ps1' }) },

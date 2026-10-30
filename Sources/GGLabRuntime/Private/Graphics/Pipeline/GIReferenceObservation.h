@@ -5,6 +5,7 @@
 #include "Graphics/RenderFrameOutcome.h"
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 
@@ -31,6 +32,7 @@ namespace gglab
 		uint32_t m_Height = 0;
 		uint32_t m_Samples = 0;
 		uint32_t m_Seed = 0;
+		uint32_t m_MaximumDepth = 1;
 		GIReferenceEnvironmentFilter m_Filter = GIReferenceEnvironmentFilter::Face32;
 		bool m_ConstantEnvironment = true;
 
@@ -38,19 +40,21 @@ namespace gglab
 	};
 
 	// Renderer-owned, independent of temporal history and of the Lab's lifetime.
-	// Every sum and the primary RNG state advance together on Submitted. One unfinished
+	// Sums, compensation and primary RNG state advance together on Submitted. One unfinished
 	// batch is allowed; only a Completed fence permits consuming its GPU-written data.
 	class GIReferenceObservation final
 	{
 	public:
-		using Surface = TemporalHistoryTextures<4>::RenderGraphSurface;
+		static constexpr size_t SurfaceCount = 6;
+		using Surface = TemporalHistoryTextures<SurfaceCount>::RenderGraphSurface;
 		GIReferenceObservation(RHIDevice& device, PersistentTexturePool& pool) noexcept;
 		~GIReferenceObservation();
 		void BeginFrame(uint64_t serial) noexcept;
 		[[nodiscard]] bool Prepare(const GIReferenceObservationKey& key,
-			uint32_t samplesPerBatch, uint32_t sampleWorkBudget) noexcept;
-		[[nodiscard]] std::array<Surface, 4> Import(RenderGraph::RGBuilder& builder) noexcept;
-		void Export(RenderGraph::RGBuilder& builder, const std::array<Surface, 4>& surfaces) noexcept;
+			uint32_t samplesPerBatch, uint32_t sampleWorkBudget,
+			uint32_t queryWorkBudget = 16'777'216) noexcept;
+		[[nodiscard]] std::array<Surface, SurfaceCount> Import(RenderGraph::RGBuilder& builder) noexcept;
+		void Export(RenderGraph::RGBuilder& builder, const std::array<Surface, SurfaceCount>& surfaces) noexcept;
 		void MarkRecorded() noexcept { m_Recorded = true; }
 		void Settle(const RenderFrameOutcome& outcome) noexcept;
 		void Cancel() noexcept;
@@ -66,7 +70,7 @@ namespace gglab
 		void Release() noexcept;
 		RHIDevice& m_Device;
 		PersistentTexturePool& m_Pool;
-		TemporalHistoryTextures<4> m_Textures;
+		TemporalHistoryTextures<SurfaceCount> m_Textures;
 		GIReferenceObservationKey m_Key{};
 		GIReferenceObservationDiagnostics m_Diagnostics{};
 		RHIFencePoint m_LastUse{};

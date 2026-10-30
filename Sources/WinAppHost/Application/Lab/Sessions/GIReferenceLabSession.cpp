@@ -24,6 +24,7 @@ namespace gglab
 		const LabParameterId FixtureId("gi_reference.fixture");
 		const LabParameterId SamplesId("gi_reference.samples");
 		const LabParameterId BatchSamplesId("gi_reference.batch_samples");
+		const LabParameterId DepthId("gi_reference.depth");
 		const LabParameterId SeedId("gi_reference.seed");
 		const LabParameterId AlbedoId("gi_reference.albedo");
 		const LabParameterId ExposureId("gi_reference.ev100");
@@ -41,7 +42,7 @@ namespace gglab
 			GIReferencePipeline(World& world, AssetManager& assets, GIReferenceCreateInfo info) noexcept :
 				m_World(world), m_Assets(assets), m_Scene(info.m_RayScene),
 				m_Raster(CreateRenderPipelineForwardPlus({ .m_GIReference = std::move(info) })) {}
-			std::string_view GetName() const noexcept override { return "GI one-bounce reference"; }
+			std::string_view GetName() const noexcept override { return "GI fixed-depth reference"; }
 			ResolvedTemporalFramePlan ResolveTemporalFramePlan(TemporalFramePlanResolveInfo info) const noexcept override
 			{
 				return m_Raster->ResolveTemporalFramePlan(info);
@@ -99,7 +100,8 @@ namespace gglab
 				{ 0, "F1 isolated sphere" }, { 1, "F1 isolated plane" }, { 2, "F2 sealed thick-wall room" },
 				{ 3, "F3 sealed thin-wall room" }, { 4, "F4 sunlit coloured room" },
 				{ 5, "Contract: sun transport" }, { 6, "Contract: off-camera sun blocker" },
-				{ 7, "Contract: published environment sphere" } } }));
+				{ 7, "Contract: published environment sphere" },
+				{ 8, "Contract: coupled diffuse planes" } } }));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = SamplesId, .m_Name = "Samples per pixel", .m_Group = "Reference",
 			.m_Type = LabParameterType::UInt, .m_Impact = LabChangeImpact::RestartSession,
 			.m_DefaultValue = uint32_t(64), .m_MinValue = LabValue(uint32_t(1)), .m_MaxValue = LabValue(uint32_t(1048576)) }));
@@ -109,6 +111,9 @@ namespace gglab
 		GGLAB_UNUSED(parameters.Add({ .m_Id = SeedId, .m_Name = "Independent seed", .m_Group = "Reference",
 			.m_Type = LabParameterType::UInt, .m_Impact = LabChangeImpact::RestartSession,
 			.m_DefaultValue = uint32_t(61051) }));
+		GGLAB_UNUSED(parameters.Add({ .m_Id = DepthId, .m_Name = "Maximum diffuse queries", .m_Group = "Reference",
+			.m_Type = LabParameterType::UInt, .m_Impact = LabChangeImpact::RestartSession,
+			.m_DefaultValue = uint32_t(1), .m_MinValue = LabValue(uint32_t(1)), .m_MaxValue = LabValue(uint32_t(256)) }));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = AlbedoId, .m_Name = "F1 / contract receiver albedo", .m_Group = "Reference",
 			.m_Type = LabParameterType::Enum, .m_Impact = LabChangeImpact::RestartSession,
 			.m_DefaultValue = int32_t(0), .m_EnumItems = { { 0, "White" }, { 1, "Linear (0.2, 0.5, 0.8)" } } }));
@@ -190,7 +195,7 @@ namespace gglab
 			m_Assets.TrackModel(ProceduralPlaneModelID, "F1 plane", 1.0f);
 			views.push_back(View("F1_Plane", { 0, 3, -3 }, { 0, 0, 0 }, 45.0f, exposure));
 		}
-		else if (fixture == 5 || fixture == 6)
+		else if (fixture == 5 || fixture == 6 || fixture == 8)
 		{
 			// Receiver floor and uniformly sunlit wall. The CPU oracle integrates
 			// the wall's projected solid angle independently of shader sampling.
@@ -283,7 +288,7 @@ namespace gglab
 		}
 		const bool contract = fixture >= 5;
 		const auto environment = contract ? GetParameters().Get(EnvironmentId, int32_t(0)) : 0;
-		if (fixture == 4 || fixture == 5 || fixture == 6 || environment == 3)
+		if (fixture == 4 || fixture == 5 || fixture == 6 || fixture == 8 || environment == 3)
 		{
 			auto& registry = m_World.GetRegistry();
 			const auto light = registry.create();
@@ -310,6 +315,7 @@ namespace gglab
 			.m_SampleCount = GetParameters().Get(SamplesId, uint32_t(64)),
 			.m_Seed = GetParameters().Get(SeedId, uint32_t(61051)) };
 		reference.m_SamplesPerBatch = GetParameters().Get(BatchSamplesId, uint32_t(64));
+		reference.m_MaximumDepth = GetParameters().Get(DepthId, uint32_t(1));
 		reference.m_ConstantEnvironment = environment == 0;
 		// The HDR importer decodes RGBE bin centres: (128 + 0.5) / 128.
 		// Match that exact constant in the independent direct-input contract.
@@ -389,7 +395,7 @@ namespace gglab
 	LabDescriptor GIReferenceLabSession::GetDescriptor() noexcept
 	{
 		return { .m_Id = GetId(), .m_DisplayName = "GI Reference", .m_Category = "Lighting",
-			.m_Description = "Bounded D=1 irradiance reference: frozen F1-F4 and independent sun/sky contracts.",
+			.m_Description = "Bounded fixed-depth irradiance reference: frozen F1-F4 and independent sun/sky contracts.",
 			.m_Kind = LabKind::Scene, .m_SchemaVersion = 1 };
 	}
 	std::unique_ptr<LabSessionBase> GIReferenceLabSession::Create(const LabSessionCreateInfo& info) noexcept

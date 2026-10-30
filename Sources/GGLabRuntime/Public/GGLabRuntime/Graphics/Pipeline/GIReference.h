@@ -34,6 +34,12 @@ namespace gglab
 		uint32_t m_SamplesPerBatch = 64;
 		// Maximum width * height * batch samples. Extents exceeding this reject.
 		uint32_t m_SampleWorkPerSubmission = 8'388'608;
+		// Secondary diffuse queries per path; excludes receiver lookup and shadow rays.
+		// The final hit contributes sun NEE, but never substitutes sky for truncation.
+		uint32_t m_MaximumDepth = 1;
+		// Conservative query work: pixels * batch samples * (2 * maximum depth).
+		// Includes one sun shadow query per hit; fixed receiver/resolve work is additional.
+		uint32_t m_QueryWorkPerSubmission = 16'777'216;
 	};
 
 	[[nodiscard]] RenderFrameValidationResult ValidateGIReferenceInputs(

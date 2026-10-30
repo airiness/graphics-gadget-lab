@@ -1,4 +1,4 @@
-"""Validate the bounded D=1 F1-F4 one-bounce reference, not DDGI or Final."""
+"""Validate bounded fixed-depth reference integration, not convergence, DDGI or Final."""
 import argparse
 import json
 from pathlib import Path
@@ -7,7 +7,7 @@ import zlib
 
 import numpy as np
 
-DEFAULTS = {"fixture": 0, "samples": 64, "seed": 61051, "albedo": 0, "ev100": 10}
+DEFAULTS = {"fixture": 0, "depth": 1, "samples": 64, "seed": 61051, "albedo": 0, "ev100": 10}
 ROOM_FACES = {
     "F2_Interior": (4, (2, 3)), "F2_Floor": (0, (4, 5)),
     "F2_Ceiling": (1, (6, 7)), "F2_West": (2, (10, 11)),
@@ -112,9 +112,9 @@ def inspect(root, case):
             "Lambert diagnostic is not albedo * L")
     graph = json.loads(next(directory.glob("*.graph.json")).read_text(encoding="utf-8-sig"))
     executed = {item["name"]: item for item in graph["compile"]["passes"] if not item["culled"]}
-    require("GI.Reference.OneBounce" in executed and "GI.Receiver" in executed,
+    require("GI.Reference.PathTrace" in executed and "GI.Receiver" in executed,
             "Reference/receiver graph work is missing")
-    reference = executed["GI.Reference.OneBounce"]
+    reference = executed["GI.Reference.PathTrace"]
     require(executed["GI.Receiver"]["executionOrder"] < reference["executionOrder"],
             "Reference must follow receiver production")
     require(not any(name.startswith("TAA.") for name in executed), "Temporal work is active")
@@ -139,11 +139,11 @@ def validate(root):
     cases = json.loads((root / "cases.json").read_text(encoding="utf-8-sig"))
     results = {}
     arrays = {}
-    legacy = [case for case in cases if case["fixture"] <= 3]
+    legacy = [case for case in cases if case["fixture"] <= 3 and not case.get("transport")]
     for case in legacy:
         key = case["directory"]
         results[key], arrays[key], _ = inspect(root, case)
-    for backend in sorted({case["directory"].split("/")[0] for case in cases}):
+    for backend in sorted({case["directory"].split("/")[0] for case in legacy}):
         for fixture in (0, 1):
             prefix = f"{backend}/f{fixture}"
             base = arrays[f"{prefix}-base"]
@@ -160,12 +160,16 @@ def validate(root):
                 require(np.array_equal(left[..., 3], right[..., 3]), "Cross-RHI receiver validity differs")
                 require(np.max(np.abs(left[..., :3] - right[..., :3])) <= 0.05,
                         "Cross-RHI irradiance disagreement exceeds one 64-sample cosine contribution")
-    lighting = [case for case in cases if case["fixture"] >= 4]
+    lighting = [case for case in cases if case["fixture"] >= 4 and not case.get("transport")]
     if lighting:
         from ValidateGIReferenceLighting import validate as validate_lighting
         validate_lighting(root, lighting)
+    transport = [case for case in cases if case.get("transport")]
+    if transport:
+        from ValidateGIReferenceTransport import validate as validate_transport
+        validate_transport(root, transport)
     (root / "numerical-results.json").write_text(json.dumps(results, indent=2) + "\n")
-    return {"status": "passed", "observations": len(cases), "scope": "F1-F4 and sun/sky contracts; D=1, not DDGI or Final"}
+    return {"status": "passed", "observations": len(cases), "scope": "Fixed-depth integration; ReferenceUnconverged for DDGI"}
 
 
 def self_test():

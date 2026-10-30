@@ -24,8 +24,8 @@ namespace gglab
 {
 	namespace
 	{
-		const RenderPassInfo PassInfo{ .m_TypeName = "GI.Reference.OneBounce",
-			.m_DisplayName = "One-bounce irradiance reference", .m_CategoryName = "Global Illumination",
+		const RenderPassInfo PassInfo{ .m_TypeName = "GI.Reference.PathTrace",
+			.m_DisplayName = "Fixed-depth irradiance reference", .m_CategoryName = "Global Illumination",
 			.m_Category = RenderPassCategory::Debug, .m_Type = RenderPassType::Compute };
 		constexpr std::array OutputNames{ "GI.Reference.Irradiance", "GI.Reference.Diagnostics",
 			"GI.Reference.Position", "GI.Reference.Identity" };
@@ -58,12 +58,17 @@ namespace gglab
 			std::array<uint32_t, 4> m_Next{};
 			uint32_t m_SampleBegin = 0;
 			uint32_t m_ObservationEnabled = 0;
-			std::array<uint32_t, 2> m_Padding{};
+			uint32_t m_MaximumDepth = 1;
+			uint32_t m_PathDiagnostics = 0;
+			std::array<uint32_t, 2> m_PreviousCompensation{};
+			std::array<uint32_t, 2> m_NextCompensation{};
 		};
-		static_assert(sizeof(Parameters) == 160 && offsetof(Parameters, m_ConstantRadiance) == 64 &&
+		static_assert(sizeof(Parameters) == 176 && offsetof(Parameters, m_ConstantRadiance) == 64 &&
 			offsetof(Parameters, m_Transmittance) == 80 &&
 			offsetof(Parameters, m_SunIrradiance) == 96 && offsetof(Parameters, m_RowOffset) == 108 &&
-			offsetof(Parameters, m_Previous) == 112 && offsetof(Parameters, m_SampleBegin) == 144);
+			offsetof(Parameters, m_Previous) == 112 && offsetof(Parameters, m_SampleBegin) == 144 &&
+			offsetof(Parameters, m_MaximumDepth) == 152 && offsetof(Parameters, m_PathDiagnostics) == 156 &&
+			offsetof(Parameters, m_PreviousCompensation) == 160 && offsetof(Parameters, m_NextCompensation) == 168);
 	}
 
 	RenderFrameValidationResult ValidateGIReferenceInputs(
@@ -74,6 +79,8 @@ namespace gglab
 			info.m_SampleCount == 0 || info.m_SampleCount > 1'048'576 ||
 			info.m_SamplesPerBatch == 0 || info.m_SamplesPerBatch > 4096 ||
 			info.m_SampleWorkPerSubmission == 0 || info.m_SampleWorkPerSubmission > 8'388'608 ||
+			info.m_MaximumDepth == 0 || info.m_MaximumDepth > 256 ||
+			info.m_QueryWorkPerSubmission == 0 || info.m_QueryWorkPerSubmission > 16'777'216 ||
 			!std::isfinite(info.m_MaximumDistance) || info.m_MaximumDistance <= 0.0f ||
 			!std::ranges::all_of(info.m_ConstantRadiance,
 				[](float value) { return std::isfinite(value) && value >= 0.0f; }))
@@ -187,12 +194,13 @@ namespace gglab
 			.m_ConstantRadiance = info.m_ConstantRadiance, .m_MaximumDistance = info.m_MaximumDistance,
 			.m_EnvironmentIntensity = environment.m_Intensity, .m_EnvironmentRotation = environment.m_RotationRadians,
 			.m_Width = view.m_Width, .m_Height = view.m_Height, .m_Samples = info.m_SampleCount,
-			.m_Seed = info.m_Seed, .m_Filter = info.m_EnvironmentFilter,
+			.m_Seed = info.m_Seed, .m_MaximumDepth = info.m_MaximumDepth,
+			.m_Filter = info.m_EnvironmentFilter,
 			.m_ConstantEnvironment = info.m_ConstantEnvironment };
 		static_assert(sizeof(key.m_ViewProjection) == sizeof(view.m_UnjitteredViewProj));
 		std::memcpy(key.m_ViewProjection.data(), &view.m_UnjitteredViewProj, sizeof(key.m_ViewProjection));
 		if (!services.m_GIReferenceObservation->Prepare(key,
-			info.m_SamplesPerBatch, info.m_SampleWorkPerSubmission))
+			info.m_SamplesPerBatch, info.m_SampleWorkPerSubmission, info.m_QueryWorkPerSubmission))
 		{
 			return RenderFrameValidationResult::ContractFailure("GI reference observation preparation failed");
 		}
@@ -226,11 +234,12 @@ namespace gglab
 			RGTextureViewId m_LambertRadiance;
 			RGTextureViewId m_SunIrradiance;
 			RGTextureViewId m_EnvironmentIrradiance;
+			RGTextureViewId m_PathDiagnostics;
 			std::array<RGTextureViewId, OutputNames.size()> m_Outputs{};
 			TypedConstantSnapshot<AtmosphereGPU> m_Atmosphere;
 			Parameters m_Parameters;
-			std::array<RGTextureViewId, 4> m_Previous{};
-			std::array<RGTextureViewId, 4> m_Next{};
+			std::array<RGTextureViewId, GIReferenceObservation::SurfaceCount> m_Previous{};
+			std::array<RGTextureViewId, GIReferenceObservation::SurfaceCount> m_Next{};
 		};
 		graph.AddPass<PassData>(PassInfo.m_TypeName.c_str(), RGPassEncoderType::Compute,
 			[&frame, &services, scene, info](RenderGraph::RGBuilder& builder, PassData& data)
@@ -277,6 +286,10 @@ namespace gglab
 					{ .m_Format = RHIFormat::R32G32B32A32Float, .m_Extent = extent });
 				builder.WriteInPlace(environment, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
 				data.m_EnvironmentIrradiance = builder.CreateView<RHITextureViewType::UnorderedAccess>(environment);
+				auto pathDiagnostics = builder.CreateTexture("GI.Reference.PathDiagnostics",
+					{ .m_Format = RHIFormat::R32G32B32A32Float, .m_Extent = extent });
+				builder.WriteInPlace(pathDiagnostics, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+				data.m_PathDiagnostics = builder.CreateView<RHITextureViewType::UnorderedAccess>(pathDiagnostics);
 				GGLAB_UNUSED(builder.Read(scene.m_TopLevel, RGAccelerationStructureAccess::QueryRead));
 				for (const auto blas : scene.m_BottomLevels)
 				{
@@ -294,6 +307,7 @@ namespace gglab
 					.m_ConstantRadiance = info.m_ConstantRadiance, .m_MaximumDistance = info.m_MaximumDistance,
 					.m_AtmosphereSampler = services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp) };
 				data.m_Parameters.m_EnvironmentFilter = static_cast<uint32_t>(info.m_EnvironmentFilter);
+				data.m_Parameters.m_MaximumDepth = info.m_MaximumDepth;
 				if (auto* observation = services.m_GIReferenceObservation)
 				{
 					const auto progress = observation->GetDiagnostics();
@@ -346,15 +360,32 @@ namespace gglab
 				parameters.m_LambertRadiance = execute.GetViewDescriptor(data.m_LambertRadiance).m_Index;
 				parameters.m_SunIrradiance = execute.GetViewDescriptor(data.m_SunIrradiance).m_Index;
 				parameters.m_EnvironmentIrradiance = execute.GetViewDescriptor(data.m_EnvironmentIrradiance).m_Index;
+				parameters.m_PathDiagnostics = execute.GetViewDescriptor(data.m_PathDiagnostics).m_Index;
 				for (size_t index = 0; index < data.m_Previous.size(); ++index)
 				{
 					if (parameters.m_SampleBegin != 0)
 					{
-						parameters.m_Previous[index] = execute.GetViewDescriptor(data.m_Previous[index]).m_Index;
+						const auto descriptor = execute.GetViewDescriptor(data.m_Previous[index]).m_Index;
+						if (index < parameters.m_Previous.size())
+						{
+							parameters.m_Previous[index] = descriptor;
+						}
+						else
+						{
+							parameters.m_PreviousCompensation[index - parameters.m_Previous.size()] = descriptor;
+						}
 					}
 					if (parameters.m_ObservationEnabled && parameters.m_SampleCount != 0)
 					{
-						parameters.m_Next[index] = execute.GetViewDescriptor(data.m_Next[index]).m_Index;
+						const auto descriptor = execute.GetViewDescriptor(data.m_Next[index]).m_Index;
+						if (index < parameters.m_Next.size())
+						{
+							parameters.m_Next[index] = descriptor;
+						}
+						else
+						{
+							parameters.m_NextCompensation[index - parameters.m_Next.size()] = descriptor;
+						}
 					}
 				}
 				if (data.m_Transmittance.IsValid())
@@ -367,7 +398,8 @@ namespace gglab
 				}
 				// The observation bounds the entire submission; row dispatches also bound
 				// encoder work. Resolve-only frames do not advance samples or RNG.
-				const uint64_t rowWork = static_cast<uint64_t>(parameters.m_Width) * std::max(1u, parameters.m_SampleCount);
+				const uint64_t rowWork = static_cast<uint64_t>(parameters.m_Width) *
+					std::max(1u, parameters.m_SampleCount) * (2ull * parameters.m_MaximumDepth);
 				const uint32_t rows = std::max(8u, static_cast<uint32_t>(8'388'608 / rowWork) / 8 * 8);
 				for (uint32_t row = 0; row < parameters.m_Height; row += rows)
 				{

@@ -41,12 +41,20 @@ namespace gglab
 	}
 
 	bool GIReferenceObservation::Prepare(const GIReferenceObservationKey& key,
-		uint32_t samplesPerBatch, uint32_t sampleWorkBudget) noexcept
+		uint32_t samplesPerBatch, uint32_t sampleWorkBudget, uint32_t queryWorkBudget) noexcept
 	{
 		m_Visited = true;
 		const uint64_t pixels = static_cast<uint64_t>(key.m_Width) * key.m_Height;
 		if (m_UnknownCompletion || pixels == 0 || pixels > sampleWorkBudget ||
-			key.m_Samples == 0 || samplesPerBatch == 0)
+			key.m_Samples == 0 || samplesPerBatch == 0 ||
+			key.m_MaximumDepth == 0 || key.m_MaximumDepth > 256)
+		{
+			return false;
+		}
+		const uint64_t queriesPerSample = pixels * (2ull * key.m_MaximumDepth);
+		// Whole-image batches only. Reject before allocation if one sample cannot fit;
+		// partial tiles must not advance the existing whole-image sample cursor.
+		if (queriesPerSample > queryWorkBudget)
 		{
 			return false;
 		}
@@ -56,14 +64,17 @@ namespace gglab
 			m_Key = key;
 			const uint64_t generation = m_Diagnostics.m_Generation + 1;
 			m_Diagnostics = { .m_Status = GIReferenceObservationStatus::Running,
-				.m_Generation = generation, .m_TargetSamples = key.m_Samples };
-			std::array<TemporalHistoryTextures<4>::SurfaceDesc, 4> descriptions{};
-			constexpr std::array<std::array<std::string_view, 2>, 4> names
+				.m_Generation = generation, .m_TargetSamples = key.m_Samples,
+				.m_MaximumDepth = key.m_MaximumDepth };
+			std::array<TemporalHistoryTextures<SurfaceCount>::SurfaceDesc, SurfaceCount> descriptions{};
+			constexpr std::array<std::array<std::string_view, 2>, SurfaceCount> names
 			{
 				std::array<std::string_view, 2>{ "GI.Reference.SunSum0", "GI.Reference.SunSum1" },
 				std::array<std::string_view, 2>{ "GI.Reference.EnvironmentSum0", "GI.Reference.EnvironmentSum1" },
 				std::array<std::string_view, 2>{ "GI.Reference.OutcomeSum0", "GI.Reference.OutcomeSum1" },
 				std::array<std::string_view, 2>{ "GI.Reference.RandomState0", "GI.Reference.RandomState1" },
+				std::array<std::string_view, 2>{ "GI.Reference.SunCompensation0", "GI.Reference.SunCompensation1" },
+				std::array<std::string_view, 2>{ "GI.Reference.EnvironmentCompensation0", "GI.Reference.EnvironmentCompensation1" },
 			};
 			for (size_t index = 0; index < descriptions.size(); ++index)
 			{
@@ -86,19 +97,22 @@ namespace gglab
 		{
 			m_Diagnostics.m_BatchSamples = std::min({ samplesPerBatch,
 				static_cast<uint32_t>(sampleWorkBudget / pixels),
+				static_cast<uint32_t>(queryWorkBudget / queriesPerSample),
 				key.m_Samples - m_Diagnostics.m_SubmittedSamples });
 		}
 		return true;
 	}
 
-	std::array<GIReferenceObservation::Surface, 4> GIReferenceObservation::Import(
+	std::array<GIReferenceObservation::Surface, GIReferenceObservation::SurfaceCount> GIReferenceObservation::Import(
 		RenderGraph::RGBuilder& builder) noexcept
 	{
-		std::array<Surface, 4> surfaces{};
+		std::array<Surface, SurfaceCount> surfaces{};
 		constexpr std::array previous{ "GI.Reference.PreviousSunSum", "GI.Reference.PreviousEnvironmentSum",
-			"GI.Reference.PreviousOutcomeSum", "GI.Reference.PreviousRandomState" };
+			"GI.Reference.PreviousOutcomeSum", "GI.Reference.PreviousRandomState",
+			"GI.Reference.PreviousSunCompensation", "GI.Reference.PreviousEnvironmentCompensation" };
 		constexpr std::array next{ "GI.Reference.NextSunSum", "GI.Reference.NextEnvironmentSum",
-			"GI.Reference.NextOutcomeSum", "GI.Reference.NextRandomState" };
+			"GI.Reference.NextOutcomeSum", "GI.Reference.NextRandomState",
+			"GI.Reference.NextSunCompensation", "GI.Reference.NextEnvironmentCompensation" };
 		for (size_t index = 0; index < surfaces.size(); ++index)
 		{
 			surfaces[index] = m_Textures.Import(builder, index, previous[index], next[index],
@@ -108,7 +122,7 @@ namespace gglab
 	}
 
 	void GIReferenceObservation::Export(RenderGraph::RGBuilder& builder,
-		const std::array<Surface, 4>& surfaces) noexcept
+		const std::array<Surface, SurfaceCount>& surfaces) noexcept
 	{
 		const bool writing = m_Diagnostics.m_BatchSamples != 0;
 		for (const auto& surface : surfaces)
@@ -119,7 +133,7 @@ namespace gglab
 			}
 			if (writing)
 			{
-				GGLAB_ASSERT(TemporalHistoryTextures<4>::IsFullyWritten(builder, surface));
+				GGLAB_ASSERT(TemporalHistoryTextures<SurfaceCount>::IsFullyWritten(builder, surface));
 				builder.Export(surface.m_Next, RGTextureAccess::None);
 			}
 		}

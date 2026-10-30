@@ -11,7 +11,7 @@ import numpy as np
 LUMA = np.array([0.2126, 0.7152, 0.0722])
 ABSOLUTE = 1e-6
 RELATIVE = 0.01
-DEFAULTS = dict(fixture=0, samples=64, batch_samples=64, seed=61051, albedo=0, ev100=10,
+DEFAULTS = dict(fixture=0, depth=1, samples=64, batch_samples=64, seed=61051, albedo=0, ev100=10,
                 environment=0, filter=0, intensity=1, yaw=0, sun_lux=10000,
                 secondary_albedo=0, atmosphere=False)
 
@@ -152,7 +152,7 @@ def masks(case, values, camera):
     identity = values["GI.Reference.Identity"]
     covered = values["GI.Reference.Position"][..., 3] == 1
     x, y, z = (p[..., i] for i in range(3))
-    if case["fixture"] in (5, 6):
+    if case["fixture"] in (5, 6, 8):
         return {"floor": covered & (identity[..., 0] == 0) & np.isin(identity[..., 1], [0, 1]) &
                 (np.abs(x) <= 1) & (np.abs(z) <= 1)}
     if case["fixture"] == 7:
@@ -308,8 +308,8 @@ def inspect(root, case):
                                     oracleError=error)
     graph = json.loads(next(directory.glob("*.graph.json")).read_text(encoding="utf-8-sig"))
     passes = {p["name"]: p for p in graph["compile"]["passes"] if not p["culled"]}
-    require("GI.Reference.OneBounce" in passes and "GI.Receiver" in passes, "Missing GI graph work")
-    require(passes["GI.Receiver"]["executionOrder"] < passes["GI.Reference.OneBounce"]["executionOrder"],
+    require("GI.Reference.PathTrace" in passes and "GI.Receiver" in passes, "Missing GI graph work")
+    require(passes["GI.Receiver"]["executionOrder"] < passes["GI.Reference.PathTrace"]["executionOrder"],
             "Reference precedes receivers")
     require(not any(p.startswith("TAA.") for p in passes), "Temporal work is active")
     return result

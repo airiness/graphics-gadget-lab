@@ -182,7 +182,7 @@ Each frame derives one private outcome from the Renderer path and the RHI result
 | Discarded | GI reference observation → live/bake atmosphere → IBL scheduler → last submitted fence → temporal transaction → graph retirement → Runtime capture |
 | CompletionUnknown | Retain GI reference observation → poison → fail/retain Runtime capture → retain live/bake atmosphere → abort IBL scheduling → abort/invalidate temporal state; no ordinary graph retirement |
 
-GI reference sums and RNG state commit only on Submitted. GPU completion gates
+GI reference sums, compensation and RNG state commit only on Submitted. GPU completion gates
 new sample batches and capture readiness. Cancellation retires resources through
 the last-use fence; unknown completion retains them through checked teardown.
 

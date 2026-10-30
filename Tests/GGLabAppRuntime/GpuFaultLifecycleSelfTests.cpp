@@ -6122,6 +6122,7 @@ namespace gglab
 					"Suspension preserves published services");
 				runtime.HandleHostEvent({ .m_Type = AppHostEventType::Resumed });
 				std::latch registered(1);
+				std::latch cancelled(1);
 				bool cancellationRejected = false;
 				const auto task = runtime.GetTaskSystem()->Submit({}, [&](std::stop_token token) noexcept
 					{
@@ -6130,12 +6131,12 @@ namespace gglab
 								cancellationRejected = !runtime.GetRenderServices().IsValid() &&
 									!retained.IsValid() && runtime.GetLifecycleState() ==
 									AppRuntimeLifecycleState::ShuttingDown;
+								cancelled.count_down();
 							});
 						registered.count_down();
-						while (!token.stop_requested())
-						{
-							std::this_thread::yield();
-						}
+						// Keep the registration alive until its callback runs. The stop
+						// bit can become visible before request_stop invokes the callback.
+						cancelled.wait();
 						return TaskResult::Success();
 					});
 				checks.Check(task.IsValid(), "Service shutdown regression registers a cancellable task");

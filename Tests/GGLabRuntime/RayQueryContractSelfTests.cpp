@@ -193,6 +193,22 @@ namespace gglab
 			info.m_ConstantRadiance[0] = std::numeric_limits<float>::quiet_NaN();
 			context.Check(!ValidateGIReferenceInputs(info, scene).IsReady(),
 				"Non-finite reference radiance cannot enter the estimator");
+			info.m_ConstantRadiance[0] = 1.0f;
+			for (const uint32_t depth : { 0u, 257u })
+			{
+				info.m_MaximumDepth = depth;
+				context.Check(!ValidateGIReferenceInputs(info, scene).IsReady(),
+					"Invalid fixed depths reject instead of silently clamping transport");
+			}
+			for (const uint32_t depth : { 1u, 2u, 3u, 4u, 256u })
+			{
+				info.m_MaximumDepth = depth;
+				context.Check(ValidateGIReferenceInputs(info, scene).IsReady(),
+					"Fixed depths are valid independently of per-extent work admission");
+			}
+			info.m_QueryWorkPerSubmission = 0;
+			context.Check(!ValidateGIReferenceInputs(info, scene).IsReady(),
+				"An empty query-work budget rejects before submission");
 		}
 
 		void RunGIReferenceObservationTests(SelfTestContext& context) noexcept
@@ -261,9 +277,19 @@ namespace gglab
 				observation.GetDiagnostics().m_CompletedSamples == 9 && observation.GetDiagnostics().m_BatchSamples == 0,
 				"A completed observation resolves without counting further samples");
 			const auto generation = observation.GetDiagnostics().m_Generation;
+			key.m_MaximumDepth = 3;
+			context.Check(!observation.Prepare(key, 8, 512, 383),
+				"A minimum whole-image batch must fit diffuse and shadow query work");
+			context.Check(observation.Prepare(key, 8, 512, 768) &&
+				observation.GetDiagnostics().m_BatchSamples == 2 &&
+				observation.GetDiagnostics().m_MaximumDepth == 3 &&
+				observation.GetDiagnostics().m_SubmittedSamples == 0 &&
+				observation.GetDiagnostics().m_Generation == generation + 1,
+				"Depth changes reset sums and query cost bounds the new batch");
+			key.m_MaximumDepth = 1;
 			++key.m_SceneRevision;
 			GGLAB_UNUSED(observation.Prepare(key, 4, 256));
-			context.Check(observation.GetDiagnostics().m_Generation == generation + 1 &&
+			context.Check(observation.GetDiagnostics().m_Generation == generation + 2 &&
 				observation.GetDiagnostics().m_SubmittedSamples == 0, "Snapshot changes cancel and restart the observation");
 			record();
 			observation.Settle({ RenderFrameOutcomeKind::Failed, 5, fence });
@@ -276,7 +302,7 @@ namespace gglab
 			record();
 			observation.Settle({ RenderFrameOutcomeKind::CompletionUnknown, 6, {} });
 			observation.Cancel();
-			context.Check(textures.GetDiagnostics().m_ActiveTextureCount == 8 &&
+			context.Check(textures.GetDiagnostics().m_ActiveTextureCount == 12 &&
 				!observation.Prepare(key, 4, 256), "Unknown completion retains GPU owners and prevents restart");
 			device.SetFencesComplete(true);
 			observation.Shutdown();
@@ -287,10 +313,10 @@ namespace gglab
 			device.SetFencesComplete(false);
 			observation.Settle({ RenderFrameOutcomeKind::Submitted, 7, fence });
 			observation.Cancel();
-			context.Check(textures.GetDiagnostics().m_PendingRetirementTextureCount == 8,
+			context.Check(textures.GetDiagnostics().m_PendingRetirementTextureCount == 12,
 				"Cancellation retains the entire sum/RNG pair through its last-use fence");
 			textures.Tick();
-			context.Check(textures.GetDiagnostics().m_PendingRetirementTextureCount == 8,
+			context.Check(textures.GetDiagnostics().m_PendingRetirementTextureCount == 12,
 				"Pending cancelled resources cannot retire early");
 			observation.BeginFrame(8);
 			GGLAB_UNUSED(observation.Prepare(key, 4, 256));

@@ -130,10 +130,23 @@ uint GITraceHit(RayDesc ray, uint3 counts, out GIHit hit, bool rasterReceiver)
 		1.19209318e-7 * abs(translation);
 	hit.OriginError = dot(worldError, abs(hit.FaceNormal)) +
 		inverseNormalLength * dot(localError, abs(localNormal));
+	const float3 normalA = mul(normalMatrix, asfloat(GIVertices.Load3(addresses.x + 12)));
+	const float3 normalB = mul(normalMatrix, asfloat(GIVertices.Load3(addresses.y + 12)));
+	const float3 normalC = mul(normalMatrix, asfloat(GIVertices.Load3(addresses.z + 12)));
+	// Finite zero normals retain the established face-normal fallback. Non-finite
+	// inputs must reject the hit before normalization can conceal a deep-path error.
+	if (!all(isfinite(NonFiniteObserveValue(NF_SITE_GI_RAY_SCENE_GITRACE_HIT_ISFINITE, normalA))) ||
+		!all(isfinite(NonFiniteObserveValue(NF_SITE_GI_RAY_SCENE_GITRACE_HIT_ISFINITE, normalB))) ||
+		!all(isfinite(NonFiniteObserveValue(NF_SITE_GI_RAY_SCENE_GITRACE_HIT_ISFINITE, normalC))) ||
+		!all(isfinite(NonFiniteObserveValue(NF_SITE_GI_RAY_SCENE_GITRACE_HIT_ISFINITE,
+			float4(hit.Position, hit.OriginError)))))
+	{
+		return GIHitInvalid;
+	}
 	hit.VertexNormal = SafeNormalize(
-		SafeNormalize(mul(normalMatrix, asfloat(GIVertices.Load3(addresses.x + 12))), hit.FaceNormal) * weights.x +
-		SafeNormalize(mul(normalMatrix, asfloat(GIVertices.Load3(addresses.y + 12))), hit.FaceNormal) * weights.y +
-		SafeNormalize(mul(normalMatrix, asfloat(GIVertices.Load3(addresses.z + 12))), hit.FaceNormal) * weights.z,
+		SafeNormalize(normalA, hit.FaceNormal) * weights.x +
+		SafeNormalize(normalB, hit.FaceNormal) * weights.y +
+		SafeNormalize(normalC, hit.FaceNormal) * weights.z,
 		hit.FaceNormal);
 	const MaterialData material = GIMaterials[instance.y];
 	if (material.AlphaMode != MaterialAlphaModeOpaque)
@@ -153,7 +166,15 @@ uint GITraceHit(RayDesc ray, uint3 counts, out GIHit hit, bool rasterReceiver)
 		asfloat(GIVertices.Load2(addresses.y + 24)) * weights.y + asfloat(GIVertices.Load2(addresses.z + 24)) * weights.z;
 	const float2 uv1 = asfloat(GIVertices.Load2(addresses.x + 32)) * weights.x +
 		asfloat(GIVertices.Load2(addresses.y + 32)) * weights.y + asfloat(GIVertices.Load2(addresses.z + 32)) * weights.z;
+	if (!all(isfinite(NonFiniteObserveValue(NF_SITE_GI_RAY_SCENE_GITRACE_HIT_ISFINITE, float4(uv0, uv1)))))
+	{
+		return GIHitInvalid;
+	}
 	hit.Albedo = EvaluateGIHitAlbedo(material, uv0, uv1);
+	if (!all(isfinite(NonFiniteObserveValue(NF_SITE_GI_RAY_SCENE_GITRACE_HIT_ISFINITE, hit.Albedo))))
+	{
+		return GIHitInvalid;
+	}
 	return GIHitSurface;
 }
 

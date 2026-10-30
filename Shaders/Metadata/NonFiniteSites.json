@@ -1564,8 +1564,8 @@
       "source": "Lighting/GIRayScene.hlsli",
       "function": "GITraceHit",
       "operation": "isfinite",
-      "count": 1,
-      "bodySha256": "eaf790872359d4c199e29126d87e9593f7bbf81036a83ca2293c6a42a21fd67c",
+      "count": 7,
+      "bodySha256": "6add314edd6c9c5b0493d021aa9370a15f8a21be8bfbd71c51c33a5c860200aa",
       "programs": [
         "gglab.shader.ray-scene"
       ],
@@ -1575,7 +1575,25 @@
         "negative": "error",
         "fp16Maximum": "report"
       },
-      "rationale": "Invalid transformed triangle normals reject the reference sample explicitly; record the source value before the rejection. Squared normal length is not FP16 radiance."
+      "rationale": "Invalid transformed triangle normals, positions, reconstruction errors, vertex normals, UVs and reduced albedo reject the sample explicitly before fallback or texture sampling can hide a deep-path non-finite input. Signed geometry and FP32 values are not radiance clamps."
+    },
+    {
+      "id": "pass-gi-reference.gipathfinite.isfinite",
+      "source": "Passes/PassGIReference.hlsl",
+      "function": "GIPathFinite",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "e85390e419bba7c89881ae4b023c9a713d4b74c9e24baaef6bf4d5195eb73b6f",
+      "programs": [
+        "gglab.shader.ray-scene"
+      ],
+      "kind": "recovery",
+      "evidence": "counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Fixed-depth paths reject non-finite geometry, throughput and lighting at every query; a persistent any-depth invalid count also invalidates the reference estimate. Signed positions/normals and FP32 lighting are legitimate."
     }
   ],
   "injectionPoints": [
@@ -1611,6 +1629,17 @@
       ],
       "claim": "production",
       "rationale": "Temporal AA history read (RGB color, alpha accumulation) before the recovery guards; the recovery branch hides the value from resource scans."
+    },
+    {
+      "id": "pass-gi-reference.csmain.throughput",
+      "source": "Passes/PassGIReference.hlsl",
+      "function": "CSMain",
+      "count": 1,
+      "programs": [
+        "gglab.shader.ray-scene"
+      ],
+      "claim": "production",
+      "rationale": "Debug qualification replaces throughput after the first valid secondary hit and sun NEE. The next bounce must reject it, persist any-depth invalidity independently of first-query outcomes, and report the original non-finite operand through production counters."
     }
   ]
 }

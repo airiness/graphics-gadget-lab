@@ -8,7 +8,7 @@ namespace gglab
 	class RenderGraph;
 	struct RaySceneGraphResources;
 
-	// D=1 estimator backed by the Renderer-owned bounded observation.
+	// Fixed-depth diffuse estimator backed by the Renderer-owned bounded observation.
 	// No field lookup, denoiser or cross-observation temporal history.
 	class RenderPassGIReference final
 	{
