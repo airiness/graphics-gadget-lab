@@ -182,9 +182,12 @@ Each frame derives one private outcome from the Renderer path and the RHI result
 | Discarded | GI reference observation → live/bake atmosphere → IBL scheduler → last submitted fence → temporal transaction → graph retirement → Runtime capture |
 | CompletionUnknown | Retain GI reference observation → poison → fail/retain Runtime capture → retain live/bake atmosphere → abort IBL scheduling → abort/invalidate temporal state; no ordinary graph retirement |
 
-GI reference sums, compensation and RNG state commit only on Submitted. GPU completion gates
-new sample batches and capture readiness. Cancellation retires resources through
-the last-use fence; unknown completion retains them through checked teardown.
+GI reference pending tile cursors advance only on Submitted. The first tile defines all pending
+pixels; later tiles preserve them with declared ReadWrite access. Sums, compensation and RNG state
+publish together only after the complete spatial sweep has submitted. GPU completion gates each
+subsequent tile and capture readiness; partial sweeps resolve the previous complete sample count.
+Cancellation retires resources through the last-use fence; unknown completion retains them
+through checked teardown.
 
 On the abort path, capture releases unsubmitted taps after the RHI abort has
 recorded the frame's resource uses.

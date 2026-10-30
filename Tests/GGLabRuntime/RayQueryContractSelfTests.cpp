@@ -232,7 +232,8 @@ namespace gglab
 							{
 								if (observation.GetDiagnostics().m_SubmittedSamples != 0)
 								{
-									GGLAB_UNUSED(builder.Read(surface.m_Previous, RGTextureAccess::Sample, RHIStage::ComputeShader));
+									GGLAB_UNUSED(builder.Read(surface.m_Previous,
+										RGTextureAccess::Sample, RHIStage::ComputeShader));
 								}
 								if (observation.GetDiagnostics().m_BatchSamples != 0)
 								{
@@ -246,7 +247,7 @@ namespace gglab
 					observation.MarkRecorded();
 				};
 			observation.BeginFrame(1);
-			context.Check(!observation.Prepare(key, 4, 63), "An extent cannot exceed the entire submission budget");
+			context.Check(!observation.Prepare(key, 4, 0), "An empty sample-work budget rejects before allocation");
 			context.Check(observation.Prepare(key, 8, 256) && observation.GetDiagnostics().m_BatchSamples == 4,
 				"The whole submission is bounded by pixels times samples");
 			record();
@@ -278,8 +279,8 @@ namespace gglab
 				"A completed observation resolves without counting further samples");
 			const auto generation = observation.GetDiagnostics().m_Generation;
 			key.m_MaximumDepth = 3;
-			context.Check(!observation.Prepare(key, 8, 512, 383),
-				"A minimum whole-image batch must fit diffuse and shadow query work");
+			context.Check(!observation.Prepare(key, 8, 512, 5),
+				"At least one pixel sample must fit diffuse and shadow query work");
 			context.Check(observation.Prepare(key, 8, 512, 768) &&
 				observation.GetDiagnostics().m_BatchSamples == 2 &&
 				observation.GetDiagnostics().m_MaximumDepth == 3 &&
@@ -328,6 +329,135 @@ namespace gglab
 			textures.Tick();
 			context.Check(textures.GetDiagnostics().m_ActiveTextureCount == 0 &&
 				textures.GetDiagnostics().m_PendingRetirementTextureCount == 0, "Verified teardown releases every observation surface");
+		}
+
+		void RunGIReferenceTilingTests(SelfTestContext& context) noexcept
+		{
+			asset_test::TestRHIDevice device;
+			PersistentTexturePool textures(&device);
+			TransientResourcePool transients(&device);
+			GIReferenceObservation observation(device, textures);
+			GIReferenceObservationKey key{ .m_Width = 16, .m_Height = 8,
+				.m_Samples = 2, .m_MaximumDepth = 64 };
+			const RHIFencePoint fence{ RHIFenceHandle(0, 1), 1 };
+			const auto record = [&]() noexcept
+				{
+					RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &transients });
+					struct Data {};
+					graph.AddPass<Data>("ObservationTile", RGPassEncoderType::Compute,
+						[&](RenderGraph::RGBuilder& builder, Data&)
+						{
+							auto surfaces = observation.Import(builder);
+							for (auto& surface : surfaces)
+							{
+								if (observation.GetDiagnostics().m_SubmittedSamples != 0)
+								{
+									GGLAB_UNUSED(builder.Read(surface.m_Previous, RGTextureAccess::Sample, RHIStage::ComputeShader));
+								}
+								if (observation.GetDiagnostics().m_BatchSamples != 0)
+								{
+									if (observation.GetTile().m_BeginSweep)
+									{
+										builder.WriteInPlace(surface.m_Next,
+											RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+									}
+									else
+									{
+										builder.ReadWriteInPlace(surface.m_Next,
+											RGTextureAccess::StorageReadWrite, RHIStage::ComputeShader);
+									}
+								}
+							}
+							observation.Export(builder, surfaces);
+							builder.SideEffect();
+						});
+					context.Check(graph.Compile(),
+						"A pending tile version has defined contents and graph-owned transitions");
+					observation.MarkRecorded();
+				};
+			observation.BeginFrame(1);
+			context.Check(observation.Prepare(key, 4, 128, 8192) &&
+				observation.GetDiagnostics().m_BatchSamples == 1 &&
+				observation.GetDiagnostics().m_TileCount == 2 && observation.GetTile().m_BeginSweep,
+				"High depth partitions into bounded tiles without reducing the viewport");
+			record();
+			observation.Settle({ RenderFrameOutcomeKind::Discarded, 1, {} });
+			context.Check(observation.GetDiagnostics().m_SubmittedTiles == 0,
+				"Discarded work cannot advance a tile cursor");
+			observation.BeginFrame(2);
+			GGLAB_UNUSED(observation.Prepare(key, 4, 128, 8192));
+			record();
+			device.SetFencesComplete(false);
+			observation.Settle({ RenderFrameOutcomeKind::Submitted, 2, fence });
+			observation.Settle({ RenderFrameOutcomeKind::Submitted, 2, fence });
+			context.Check(observation.GetDiagnostics().m_SubmittedTiles == 1 &&
+				observation.GetDiagnostics().m_SubmittedSamples == 0 &&
+				observation.GetDiagnostics().m_CommittedVersion == 0,
+				"A submitted partial sweep advances exactly once without publishing whole-image samples");
+			observation.BeginFrame(3);
+			GGLAB_UNUSED(observation.Prepare(key, 4, 128, 8192));
+			context.Check(observation.GetDiagnostics().m_BatchSamples == 0,
+				"The next tile waits for GPU completion");
+			record();
+			observation.Settle({ RenderFrameOutcomeKind::Submitted, 3, fence });
+			device.SetFencesComplete(true);
+			observation.BeginFrame(4);
+			GGLAB_UNUSED(observation.Prepare(key, 4, 128, 8192));
+			context.Check(!observation.GetTile().m_BeginSweep && observation.GetTile().m_EndSweep &&
+				observation.GetTile().m_Y == 4 && observation.GetDiagnostics().m_CompletedSamples == 0,
+				"The last tile preserves pending data and uses the original sweep sample range");
+			record();
+			observation.Settle({ RenderFrameOutcomeKind::Submitted, 4, fence });
+			context.Check(observation.GetDiagnostics().m_SubmittedSamples == 1 &&
+				observation.GetDiagnostics().m_CommittedVersion == 1,
+				"Only a complete sweep publishes all six history pairs");
+			for (uint64_t serial = 5; serial <= 8; ++serial)
+			{
+				observation.BeginFrame(serial);
+				GGLAB_UNUSED(observation.Prepare(key, 4, 128, 8192, 32));
+				context.Check(observation.GetDiagnostics().m_TileCount == 4 &&
+					observation.GetDiagnostics().m_BatchSamples == 1,
+					"Partition preferences can change at sweep boundaries without changing observation identity");
+				record();
+				observation.Settle({ RenderFrameOutcomeKind::Submitted, serial, fence });
+			}
+			observation.BeginFrame(9);
+			GGLAB_UNUSED(observation.Prepare(key, 4, 128, 8192));
+			context.Check(observation.GetDiagnostics().m_Status == GIReferenceObservationStatus::Completed &&
+				observation.GetDiagnostics().m_CompletedSamples == 2 &&
+				observation.GetDiagnostics().m_CommittedVersion == 2,
+				"Completed samples and readiness count full sweeps rather than tile submissions");
+			++key.m_Seed;
+			GGLAB_UNUSED(observation.Prepare(key, 4, 128, 8192));
+			record();
+			observation.Settle({ RenderFrameOutcomeKind::Failed, 9, fence });
+			context.Check(observation.GetDiagnostics().m_SubmittedSamples == 0 &&
+				observation.GetDiagnostics().m_SubmittedTiles == 0,
+				"Failed tile writes never publish pending progress");
+			observation.Cancel();
+			observation.BeginFrame(10);
+			GGLAB_UNUSED(observation.Prepare(key, 4, 128, 8192));
+			record();
+			observation.Settle({ RenderFrameOutcomeKind::CompletionUnknown, 10, {} });
+			observation.Cancel();
+			context.Check(textures.GetDiagnostics().m_ActiveTextureCount == 12 &&
+				!observation.Prepare(key, 4, 128, 8192), "Unknown partial sweeps retain every owner through checked teardown");
+			observation.Shutdown();
+			textures.Tick();
+			observation.BeginFrame(11);
+			GGLAB_UNUSED(observation.Prepare(key, 4, 128, 8192));
+			record();
+			device.SetFencesComplete(false);
+			observation.Settle({ RenderFrameOutcomeKind::Submitted, 11, fence });
+			observation.BeginFrame(12);
+			// An inactive Lab never visits the observation during this frame.
+			observation.Settle({ RenderFrameOutcomeKind::Submitted, 12, fence });
+			context.Check(observation.GetDiagnostics().m_Status == GIReferenceObservationStatus::Cancelled &&
+				textures.GetDiagnostics().m_PendingRetirementTextureCount == 12,
+				"Lab deactivation retains every partial-sweep owner through its last-use fence");
+			device.SetFencesComplete(true);
+			observation.Shutdown();
+			textures.Tick();
 		}
 
 		void RunGIReceiverPreparationTests(SelfTestContext& context) noexcept
@@ -946,6 +1076,7 @@ namespace gglab
 		RunGIReceiverPreparationTests(context);
 		RunGIReferenceInputTests(context);
 		RunGIReferenceObservationTests(context);
+		RunGIReferenceTilingTests(context);
 		RunTriangleTests(context);
 		RunInstanceTests(context);
 		RunScratchTests(context);

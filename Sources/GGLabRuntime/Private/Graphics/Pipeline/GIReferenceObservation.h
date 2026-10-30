@@ -40,19 +40,29 @@ namespace gglab
 	};
 
 	// Renderer-owned, independent of temporal history and of the Lab's lifetime.
-	// Sums, compensation and primary RNG state advance together on Submitted. One unfinished
-	// batch is allowed; only a Completed fence permits consuming its GPU-written data.
+	// Pending tiles advance on Submitted; all six surfaces publish only when a whole
+	// sweep is submitted. Only a Completed fence permits scheduling another tile.
 	class GIReferenceObservation final
 	{
 	public:
 		static constexpr size_t SurfaceCount = 6;
 		using Surface = TemporalHistoryTextures<SurfaceCount>::RenderGraphSurface;
+		struct Tile
+		{
+			uint32_t m_X = 0;
+			uint32_t m_Y = 0;
+			uint32_t m_Width = 0;
+			uint32_t m_Height = 0;
+			bool m_BeginSweep = false;
+			bool m_EndSweep = false;
+		};
 		GIReferenceObservation(RHIDevice& device, PersistentTexturePool& pool) noexcept;
 		~GIReferenceObservation();
 		void BeginFrame(uint64_t serial) noexcept;
 		[[nodiscard]] bool Prepare(const GIReferenceObservationKey& key,
 			uint32_t samplesPerBatch, uint32_t sampleWorkBudget,
-			uint32_t queryWorkBudget = 16'777'216) noexcept;
+			uint32_t queryWorkBudget = 16'777'216, uint32_t maximumTilePixels = 0) noexcept;
+		[[nodiscard]] Tile GetTile() const noexcept { return m_Tile; }
 		[[nodiscard]] std::array<Surface, SurfaceCount> Import(RenderGraph::RGBuilder& builder) noexcept;
 		void Export(RenderGraph::RGBuilder& builder, const std::array<Surface, SurfaceCount>& surfaces) noexcept;
 		void MarkRecorded() noexcept { m_Recorded = true; }
@@ -81,5 +91,10 @@ namespace gglab
 		bool m_Recorded = false;
 		bool m_UnknownCompletion = false;
 		bool m_Settled = false;
+		bool m_SweepActive = false;
+		bool m_PendingInitialized = false;
+		uint32_t m_TileWidth = 0;
+		uint32_t m_TileHeight = 0;
+		Tile m_Tile{};
 	};
 }

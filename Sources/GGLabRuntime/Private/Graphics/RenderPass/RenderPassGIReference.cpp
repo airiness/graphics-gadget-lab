@@ -62,13 +62,19 @@ namespace gglab
 			uint32_t m_PathDiagnostics = 0;
 			std::array<uint32_t, 2> m_PreviousCompensation{};
 			std::array<uint32_t, 2> m_NextCompensation{};
+			std::array<uint32_t, 2> m_TileOrigin{};
+			std::array<uint32_t, 2> m_TileExtent{};
+			uint32_t m_BeginSweep = 1;
+			uint32_t m_EndSweep = 1;
+			std::array<uint32_t, 2> m_TilePadding{};
 		};
-		static_assert(sizeof(Parameters) == 176 && offsetof(Parameters, m_ConstantRadiance) == 64 &&
+		static_assert(sizeof(Parameters) == 208 && offsetof(Parameters, m_ConstantRadiance) == 64 &&
 			offsetof(Parameters, m_Transmittance) == 80 &&
 			offsetof(Parameters, m_SunIrradiance) == 96 && offsetof(Parameters, m_RowOffset) == 108 &&
 			offsetof(Parameters, m_Previous) == 112 && offsetof(Parameters, m_SampleBegin) == 144 &&
 			offsetof(Parameters, m_MaximumDepth) == 152 && offsetof(Parameters, m_PathDiagnostics) == 156 &&
-			offsetof(Parameters, m_PreviousCompensation) == 160 && offsetof(Parameters, m_NextCompensation) == 168);
+			offsetof(Parameters, m_PreviousCompensation) == 160 && offsetof(Parameters, m_NextCompensation) == 168 &&
+			offsetof(Parameters, m_TileOrigin) == 176 && offsetof(Parameters, m_BeginSweep) == 192);
 	}
 
 	RenderFrameValidationResult ValidateGIReferenceInputs(
@@ -81,6 +87,7 @@ namespace gglab
 			info.m_SampleWorkPerSubmission == 0 || info.m_SampleWorkPerSubmission > 8'388'608 ||
 			info.m_MaximumDepth == 0 || info.m_MaximumDepth > 256 ||
 			info.m_QueryWorkPerSubmission == 0 || info.m_QueryWorkPerSubmission > 16'777'216 ||
+			info.m_MaximumTilePixels > 8'388'608 ||
 			!std::isfinite(info.m_MaximumDistance) || info.m_MaximumDistance <= 0.0f ||
 			!std::ranges::all_of(info.m_ConstantRadiance,
 				[](float value) { return std::isfinite(value) && value >= 0.0f; }))
@@ -200,7 +207,8 @@ namespace gglab
 		static_assert(sizeof(key.m_ViewProjection) == sizeof(view.m_UnjitteredViewProj));
 		std::memcpy(key.m_ViewProjection.data(), &view.m_UnjitteredViewProj, sizeof(key.m_ViewProjection));
 		if (!services.m_GIReferenceObservation->Prepare(key,
-			info.m_SamplesPerBatch, info.m_SampleWorkPerSubmission, info.m_QueryWorkPerSubmission))
+			info.m_SamplesPerBatch, info.m_SampleWorkPerSubmission, info.m_QueryWorkPerSubmission,
+			info.m_MaximumTilePixels))
 		{
 			return RenderFrameValidationResult::ContractFailure("GI reference observation preparation failed");
 		}
@@ -308,13 +316,19 @@ namespace gglab
 					.m_AtmosphereSampler = services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp) };
 				data.m_Parameters.m_EnvironmentFilter = static_cast<uint32_t>(info.m_EnvironmentFilter);
 				data.m_Parameters.m_MaximumDepth = info.m_MaximumDepth;
+				data.m_Parameters.m_TileExtent = { extent.m_Width, extent.m_Height };
 				if (auto* observation = services.m_GIReferenceObservation)
 				{
 					const auto progress = observation->GetDiagnostics();
 					data.m_Parameters.m_ObservationEnabled = 1;
 					data.m_Parameters.m_SampleBegin = progress.m_SubmittedSamples;
 					data.m_Parameters.m_SampleCount = progress.m_BatchSamples;
-					const auto surfaces = observation->Import(builder);
+					const auto tile = observation->GetTile();
+					data.m_Parameters.m_TileOrigin = { tile.m_X, tile.m_Y };
+					data.m_Parameters.m_TileExtent = { tile.m_Width, tile.m_Height };
+					data.m_Parameters.m_BeginSweep = tile.m_BeginSweep ? 1u : 0u;
+					data.m_Parameters.m_EndSweep = tile.m_EndSweep ? 1u : 0u;
+					auto surfaces = observation->Import(builder);
 					for (size_t index = 0; index < surfaces.size(); ++index)
 					{
 						if (progress.m_SubmittedSamples != 0)
@@ -323,8 +337,17 @@ namespace gglab
 						}
 						if (progress.m_BatchSamples != 0)
 						{
-							auto next = surfaces[index].m_Next;
-							builder.WriteInPlace(next, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+							auto& next = surfaces[index].m_Next;
+							if (tile.m_BeginSweep)
+							{
+								// The first tile initializes the entire pending version.
+								builder.WriteInPlace(next, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+							}
+							else
+							{
+								// Preserve defined pixels written by preceding tile submissions.
+								builder.ReadWriteInPlace(next, RGTextureAccess::StorageReadWrite, RHIStage::ComputeShader);
+							}
 							data.m_Next[index] = builder.CreateView<RHITextureViewType::UnorderedAccess>(next);
 						}
 					}
@@ -399,7 +422,7 @@ namespace gglab
 				// The observation bounds the entire submission; row dispatches also bound
 				// encoder work. Resolve-only frames do not advance samples or RNG.
 				const uint64_t rowWork = static_cast<uint64_t>(parameters.m_Width) *
-					std::max(1u, parameters.m_SampleCount) * (2ull * parameters.m_MaximumDepth);
+					std::max(1ull, static_cast<uint64_t>(parameters.m_SampleCount) * 2 * parameters.m_MaximumDepth);
 				const uint32_t rows = std::max(8u, static_cast<uint32_t>(8'388'608 / rowWork) / 8 * 8);
 				for (uint32_t row = 0; row < parameters.m_Height; row += rows)
 				{

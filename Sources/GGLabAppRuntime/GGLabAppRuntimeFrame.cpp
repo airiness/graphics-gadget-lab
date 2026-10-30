@@ -753,9 +753,10 @@ namespace gglab
 				reference.m_Status == GIReferenceObservationStatus::Completed ? FrameCaptureGateState::Ready :
 					reference.m_Status == GIReferenceObservationStatus::Failed ? FrameCaptureGateState::Failed :
 						FrameCaptureGateState::Pending,
-				std::format("Observation {}: D={}, {}/{} completed samples, {} submitted, version {}.",
+				std::format("Observation {}: D={}, {}/{} completed samples, {} submitted, version {}; sweep {} samples, tiles {}/{} submitted.",
 					reference.m_Generation, reference.m_MaximumDepth, reference.m_CompletedSamples, reference.m_TargetSamples,
-					reference.m_SubmittedSamples, reference.m_CommittedVersion),
+					reference.m_SubmittedSamples, reference.m_CommittedVersion, reference.m_SweepSamples,
+					reference.m_SubmittedTiles, reference.m_TileCount),
 				"gi-reference", reference.m_Generation);
 		}
 		// Select captures only after validation has identified this frame's observation.

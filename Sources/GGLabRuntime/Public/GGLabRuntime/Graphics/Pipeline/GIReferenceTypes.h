@@ -23,6 +23,9 @@ namespace gglab
 		uint32_t m_CompletedSamples = 0;
 		uint32_t m_BatchSamples = 0;
 		uint32_t m_MaximumDepth = 1;
+		uint32_t m_SweepSamples = 0;
+		uint32_t m_SubmittedTiles = 0;
+		uint32_t m_TileCount = 0;
 		bool m_Active = false;
 	};
 }

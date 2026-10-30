@@ -32,7 +32,8 @@ namespace gglab
 		GIReferenceEnvironmentFilter m_EnvironmentFilter = GIReferenceEnvironmentFilter::Face32;
 		// Total observation samples are independent of submission partitioning.
 		uint32_t m_SamplesPerBatch = 64;
-		// Maximum width * height * batch samples. Extents exceeding this reject.
+		// Maximum sampled pixels * batch samples per submission. Full-viewport
+		// receiver/resolve overhead is additional; viewports are capped at 8,388,608 pixels.
 		uint32_t m_SampleWorkPerSubmission = 8'388'608;
 		// Secondary diffuse queries per path; excludes receiver lookup and shadow rays.
 		// The final hit contributes sun NEE, but never substitutes sky for truncation.
@@ -40,6 +41,9 @@ namespace gglab
 		// Conservative query work: pixels * batch samples * (2 * maximum depth).
 		// Includes one sun shadow query per hit; fixed receiver/resolve work is additional.
 		uint32_t m_QueryWorkPerSubmission = 16'777'216;
+		// Optional partition cap; zero selects the largest tile fitting both budgets.
+		// Partitioning changes neither the sample sequence nor observation identity.
+		uint32_t m_MaximumTilePixels = 0;
 	};
 
 	[[nodiscard]] RenderFrameValidationResult ValidateGIReferenceInputs(

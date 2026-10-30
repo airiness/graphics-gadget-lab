@@ -107,3 +107,56 @@ For same-adapter controls from a known source revision, invoke
 subdirectories containing the control captures. The receipt records the selected
 directory and whether the pinned baseline was used. Pixel and input gates apply
 to either baseline.
+
+## Automatic ROI qualification
+
+`TestGIReferenceConvergence.ps1` runs fixed 640x400 F1 plane, F2/F3 floor and
+frozen F4 floor/back views. F4 retains separate red/green-adjacent floor masks.
+At each depth it observes both seeds 61051/61052 at N and 2N. Both seed comparisons
+and both sample-doubling comparisons must pass for RGB and Rec.709 luminance of
+E, Sun and environment separately. The strict relative limit is 0.01, with
+denominator `max(abs(reference), 1e-6)`, matching the existing lighting gates. The
+higher sample/depth result is the reference for doubling. All receivers and any-bounce invalid paths
+are checked before computing ROI statistics.
+
+Depth comparisons use 8/16/32/64/128/256, with sampling qualified on both sides at
+the same N, seeds, camera and masks. If more samples are needed, the lower depth
+is observed again at that common N. A certificate selects the higher depth and
+larger sample count; it is scoped to the recorded ROI and inputs. Limits produce
+`ReferenceUnconverged`, never permission to judge DDGI against an unconverged ROI.
+F1-F3 default to N=64 and F4 to N=4096; initial counts, depth/sample ceilings and
+execution budgets are explicit run settings. Numerical settings belong to the recipe;
+execution budgets are retained per attempt and may be increased on resume. The first candidate is 2N.
+
+Runtime reduces samples per sweep before spatial tiling. At D64/128/256 even a
+single whole-image sample exceeds the conservative query budget, so tiles span
+submissions. The first tile initializes all pending pixels. Later tiles declare
+ReadWrite preservation. Submitted advances the tile cursor; only a complete sweep
+publishes all six sum/compensation/RNG pairs. Completion gates the next tile and
+capture readiness. Partial sweeps resolve the previous complete estimate.
+The optional `gi_reference.tile_pixels` changes execution partitioning only.
+
+~~~powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/RunVerification.ps1 -Suite gi-reference-tiling -Configuration Develop -Rhi dx12,vulkan -Python <python-with-numpy-and-jsonschema>
+powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/TestGIReferenceConvergence.ps1 -RunDirectory Build/Validation/GIReferenceConvergence/MyRun -Python <python-with-numpy-and-jsonschema>
+# Resume explicitly with exactly the same numerical recipe and source/binaries.
+powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/TestGIReferenceConvergence.ps1 -RunDirectory Build/Validation/GIReferenceConvergence/MyRun -Resume -Python <python-with-numpy-and-jsonschema>
+~~~
+
+New runs refuse an existing directory. Checkpoints contain only validated completed
+captures and SHA-256 receipts; incomplete attempts are preserved under distinct retry
+directories. Resume audits source/compiler/product binary hashes, configuration,
+device/driver, effective lighting, camera, extent and masks. World Lighting generation
+values are recorded per capture; safe Lab restarts need not share generation numbers.
+Per-pass compiled shader identities remain unavailable; the recipe hashes shader
+sources and compiler binaries explicitly instead of inventing artifact identities.
+N remains an observation identity, so changing N restarts Runtime accumulation.
+
+`MaximumObservations` limits total cached observations; `MaximumSeconds` limits each
+attempt between observations (an in-flight observation has `TimeoutSeconds`). An
+optional `CancellationFile` requests a clean stop at an observation boundary. Reports
+distinguish Running, Cancelled, Failed, ReferenceUnconverged and ReferenceConverged.
+Only immutable completed captures are reusable. Both-RHI runs also compare common
+qualified candidates per ROI with the declared 1% rule and identical masks; differing
+selected depth/sample candidates are explicitly unavailable for that comparison.
+Runtime Completed remains calculation progress, not numerical certification.

@@ -40,6 +40,11 @@ cbuffer Parameters : register(b2)
 	uint PathDiagnosticsIndex;
 	uint2 PreviousCompensationIndices;
 	uint2 NextCompensationIndices;
+	uint2 TileOrigin;
+	uint2 TileExtent;
+	uint BeginSweep;
+	uint EndSweep;
+	uint2 TilePadding;
 };
 
 uint GIHash(uint value)
@@ -128,14 +133,22 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	diagnostics[pixel] = 0.0.xxxx;
 	positions[pixel] = 0.0.xxxx;
 	identities[pixel] = -1.0.xxxx;
-	if (ObservationEnabled != 0 && SampleCount != 0)
+	if (ObservationEnabled != 0 && SampleCount != 0 && BeginSweep != 0)
 	{
-		GetRWTexture2DFloat4(NextIndices.x)[pixel] = 0.0.xxxx;
-		GetRWTexture2DFloat4(NextIndices.y)[pixel] = 0.0.xxxx;
-		GetRWTexture2DFloat4(NextIndices.z)[pixel] = 0.0.xxxx;
-		GetRWTexture2DUint(NextIndices.w)[pixel] = 0;
-		GetRWTexture2DFloat4(NextCompensationIndices.x)[pixel] = 0.0.xxxx;
-		GetRWTexture2DFloat4(NextCompensationIndices.y)[pixel] = 0.0.xxxx;
+		// Define every pending pixel on the first submitted tile. Later tiles use
+		// ReadWrite access and preserve this version until the complete sweep commits.
+		GetRWTexture2DFloat4(NextIndices.x)[pixel] = SampleBegin != 0 ?
+			GetTexture2DFloat4(PreviousIndices.x).Load(int3(pixel, 0)) : 0.0.xxxx;
+		GetRWTexture2DFloat4(NextIndices.y)[pixel] = SampleBegin != 0 ?
+			GetTexture2DFloat4(PreviousIndices.y).Load(int3(pixel, 0)) : 0.0.xxxx;
+		GetRWTexture2DFloat4(NextIndices.z)[pixel] = SampleBegin != 0 ?
+			GetTexture2DFloat4(PreviousIndices.z).Load(int3(pixel, 0)) : 0.0.xxxx;
+		GetRWTexture2DUint(NextIndices.w)[pixel] = SampleBegin != 0 ?
+			GetTexture2DUint(PreviousIndices.w).Load(int3(pixel, 0)) : 0u;
+		GetRWTexture2DFloat4(NextCompensationIndices.x)[pixel] = SampleBegin != 0 ?
+			GetTexture2DFloat4(PreviousCompensationIndices.x).Load(int3(pixel, 0)) : 0.0.xxxx;
+		GetRWTexture2DFloat4(NextCompensationIndices.y)[pixel] = SampleBegin != 0 ?
+			GetTexture2DFloat4(PreviousCompensationIndices.y).Load(int3(pixel, 0)) : 0.0.xxxx;
 	}
 	const float4 face = GetTexture2DFloat4(FaceIndex).Load(int3(pixel, 0));
 	if (face.w == 0.0)
@@ -226,7 +239,9 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 		sunCompensation = GetTexture2DFloat4(PreviousCompensationIndices.x).Load(int3(pixel, 0)).rgb;
 		environmentCompensation = GetTexture2DFloat4(PreviousCompensationIndices.y).Load(int3(pixel, 0)).rgb;
 	}
-	for (uint index = 0; index < SampleCount; ++index)
+	const bool samplePixel = all(pixel >= TileOrigin) && all(pixel - TileOrigin < TileExtent);
+	const uint pixelSamples = samplePixel ? SampleCount : 0u;
+	for (uint index = 0; index < pixelSamples; ++index)
 	{
 		const float u = GIRandom(randomState);
 		const float v = GIRandom(randomState);
@@ -319,7 +334,7 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	}
 	// Scene-referred E: no pre-exposure, receiver albedo, direct receiver sun, TAA,
 	// denoiser or cross-observation reuse. Sums and primary RNG preserve sample order.
-	if (ObservationEnabled != 0 && SampleCount != 0)
+	if (ObservationEnabled != 0 && pixelSamples != 0)
 	{
 		GetRWTexture2DFloat4(NextIndices.x)[pixel] = float4(sunSum, invalidPaths);
 		GetRWTexture2DFloat4(NextIndices.y)[pixel] = float4(environmentSum, truncatedPaths);
@@ -328,8 +343,44 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 		GetRWTexture2DFloat4(NextCompensationIndices.x)[pixel] = float4(sunCompensation, 0.0);
 		GetRWTexture2DFloat4(NextCompensationIndices.y)[pixel] = float4(environmentCompensation, 0.0);
 	}
-	const uint totalSamples = max(SampleBegin + SampleCount, 1u);
-	const float validity = outcomes.w == 0 && invalidPaths == 0.0 ? 1.0 : -3.0;
+	if (ObservationEnabled != 0 && SampleCount != 0)
+	{
+		if (EndSweep != 0 && !samplePixel)
+		{
+			// These pixels were completed by earlier tiles of the same pending sweep.
+			const float4 pendingSun = GetRWTexture2DFloat4(NextIndices.x)[pixel];
+			const float4 pendingEnvironment = GetRWTexture2DFloat4(NextIndices.y)[pixel];
+			sunSum = pendingSun.rgb;
+			environmentSum = pendingEnvironment.rgb;
+			invalidPaths = pendingSun.a;
+			truncatedPaths = pendingEnvironment.a;
+			outcomes = (uint4)(GetRWTexture2DFloat4(NextIndices.z)[pixel]);
+		}
+		else if (EndSweep == 0)
+		{
+			// A partial sweep cannot change the whole-image estimator's denominator.
+			sunSum = 0.0.xxx;
+			environmentSum = 0.0.xxx;
+			invalidPaths = 0.0;
+			truncatedPaths = 0.0;
+			outcomes = 0;
+			if (SampleBegin != 0)
+			{
+				const float4 committedSun = GetTexture2DFloat4(PreviousIndices.x).Load(int3(pixel, 0));
+				const float4 committedEnvironment = GetTexture2DFloat4(PreviousIndices.y).Load(int3(pixel, 0));
+				sunSum = committedSun.rgb;
+				environmentSum = committedEnvironment.rgb;
+				invalidPaths = committedSun.a;
+				truncatedPaths = committedEnvironment.a;
+				outcomes = (uint4)(GetTexture2DFloat4(PreviousIndices.z).Load(int3(pixel, 0)));
+			}
+		}
+	}
+	const uint resolvedSamples = SampleBegin + (EndSweep != 0 ? SampleCount : 0u);
+	const uint totalSamples = max(resolvedSamples, 1u);
+	const float validity = resolvedSamples == 0 ?
+		0.0 :
+		outcomes.w == 0 && invalidPaths == 0.0 ? 1.0 : -3.0;
 	const float weight = 3.14159265358979323846 / (float)(totalSamples);
 	const float3 sunEstimate = sunSum * weight;
 	const float3 environmentEstimate = environmentSum * weight;

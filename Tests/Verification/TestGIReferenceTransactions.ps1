@@ -21,11 +21,12 @@ function Check([bool]$Condition, [string]$Name) {
     $script:checks += $Name
 }
 function Set-Reference([string]$Session, [string]$Run, [uint32]$Depth, [uint32]$Samples,
-    [uint32]$Batch, [uint32]$Seed) {
+    [uint32]$Batch, [uint32]$Seed, [uint32]$TilePixels = 0) {
     $changes = @(@{id='gi_reference.fixture';type='enum';value=8},
         @{id='gi_reference.depth';type='uint';value=$Depth},
         @{id='gi_reference.samples';type='uint';value=$Samples},
         @{id='gi_reference.batch_samples';type='uint';value=$Batch},
+        @{id='gi_reference.tile_pixels';type='uint';value=$TilePixels},
         @{id='gi_reference.seed';type='uint';value=$Seed},
         @{id='gi_reference.secondary_albedo';type='enum';value=1})
     $effect = Invoke-VerificationSession set $Session @{ExpectedRunIdentity=$Run;WaitConsumed=$true;
@@ -68,12 +69,14 @@ try {
             $status = Invoke-VerificationSession status $id @{ExpectedRunIdentity=$run}
             Write-VerificationJson "$directory/control-status.json" $status
 
-            $effect = Set-Reference $id $run 4 1048576 1 61051
+            $effect = Set-Reference $id $run 4 1048576 1 61051 1024
             Write-VerificationJson "$directory/pending-effect.json" $effect
             $pending = Wait-VerificationCondition -Poll {
                 Invoke-VerificationSession status $id @{ExpectedRunIdentity=$run}
             } -Until {param($s) @($s.frame.gates | Where-Object {
-                $_.name -eq 'gi-reference' -and $_.state -eq 'pending' -and $_.detail -match 'D=4,'}).Count -eq 1
+                $_.name -eq 'gi-reference' -and $_.state -eq 'pending' -and $_.detail -match 'D=4,' -and
+                $_.detail -match 'tiles ([1-9][0-9]*)/([0-9]+) submitted' -and
+                [int]$Matches[1] -lt [int]$Matches[2]}).Count -eq 1
             } -TimeoutSeconds $TimeoutSeconds
             Write-VerificationJson "$directory/pending-status.json" $pending
             $waiting = Invoke-VerificationSession capture $id @{ExpectedRunIdentity=$run;NoWait=$true;

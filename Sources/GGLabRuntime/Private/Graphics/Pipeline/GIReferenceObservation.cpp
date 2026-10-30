@@ -20,6 +20,7 @@ namespace gglab
 		m_Exported = false;
 		m_Recorded = false;
 		m_Diagnostics.m_BatchSamples = 0;
+		m_Tile = {};
 		if (m_PendingFence.IsValid())
 		{
 			const auto query = m_Device.QueryFencePoint(m_PendingFence);
@@ -41,20 +42,20 @@ namespace gglab
 	}
 
 	bool GIReferenceObservation::Prepare(const GIReferenceObservationKey& key,
-		uint32_t samplesPerBatch, uint32_t sampleWorkBudget, uint32_t queryWorkBudget) noexcept
+		uint32_t samplesPerBatch, uint32_t sampleWorkBudget, uint32_t queryWorkBudget,
+		uint32_t maximumTilePixels) noexcept
 	{
 		m_Visited = true;
 		const uint64_t pixels = static_cast<uint64_t>(key.m_Width) * key.m_Height;
-		if (m_UnknownCompletion || pixels == 0 || pixels > sampleWorkBudget ||
+		if (m_UnknownCompletion || pixels == 0 || pixels > 8'388'608 || sampleWorkBudget == 0 ||
 			key.m_Samples == 0 || samplesPerBatch == 0 ||
-			key.m_MaximumDepth == 0 || key.m_MaximumDepth > 256)
+			key.m_MaximumDepth == 0 || key.m_MaximumDepth > 256 ||
+			maximumTilePixels > 8'388'608)
 		{
 			return false;
 		}
-		const uint64_t queriesPerSample = pixels * (2ull * key.m_MaximumDepth);
-		// Whole-image batches only. Reject before allocation if one sample cannot fit;
-		// partial tiles must not advance the existing whole-image sample cursor.
-		if (queriesPerSample > queryWorkBudget)
+		const uint64_t queriesPerPixelSample = 2ull * key.m_MaximumDepth;
+		if (queriesPerPixelSample > queryWorkBudget)
 		{
 			return false;
 		}
@@ -95,10 +96,52 @@ namespace gglab
 		}
 		if (!m_PendingFence.IsValid() && m_Diagnostics.m_Status == GIReferenceObservationStatus::Running)
 		{
-			m_Diagnostics.m_BatchSamples = std::min({ samplesPerBatch,
-				static_cast<uint32_t>(sampleWorkBudget / pixels),
-				static_cast<uint32_t>(queryWorkBudget / queriesPerSample),
-				key.m_Samples - m_Diagnostics.m_SubmittedSamples });
+			if (!m_SweepActive)
+			{
+				const auto wholeImageSamples = std::min({ samplesPerBatch,
+					static_cast<uint32_t>(sampleWorkBudget / pixels),
+					static_cast<uint32_t>(queryWorkBudget / (pixels * queriesPerPixelSample)),
+					key.m_Samples - m_Diagnostics.m_SubmittedSamples });
+				m_Diagnostics.m_SweepSamples = std::max(1u, wholeImageSamples);
+				uint64_t tilePixels = std::min(static_cast<uint64_t>(sampleWorkBudget),
+					queryWorkBudget / queriesPerPixelSample) / m_Diagnostics.m_SweepSamples;
+				if (maximumTilePixels != 0)
+				{
+					tilePixels = std::min(tilePixels, static_cast<uint64_t>(maximumTilePixels));
+				}
+				m_TileWidth = static_cast<uint32_t>(std::min(tilePixels,
+					static_cast<uint64_t>(key.m_Width)));
+				if (m_TileWidth < key.m_Width && m_TileWidth >= 8)
+				{
+					m_TileWidth = m_TileWidth / 8 * 8;
+				}
+				m_TileHeight = static_cast<uint32_t>(std::min(tilePixels / m_TileWidth,
+					static_cast<uint64_t>(key.m_Height)));
+				if (m_TileHeight < key.m_Height && m_TileHeight >= 8)
+				{
+					m_TileHeight = m_TileHeight / 8 * 8;
+				}
+				m_Diagnostics.m_TileCount = ((key.m_Width + m_TileWidth - 1) / m_TileWidth) *
+					((key.m_Height + m_TileHeight - 1) / m_TileHeight);
+				m_Diagnostics.m_SubmittedTiles = 0;
+				m_SweepActive = true;
+			}
+			const uint32_t columns = (key.m_Width + m_TileWidth - 1) / m_TileWidth;
+			const uint32_t x = (m_Diagnostics.m_SubmittedTiles % columns) * m_TileWidth;
+			const uint32_t y = (m_Diagnostics.m_SubmittedTiles / columns) * m_TileHeight;
+			const uint32_t width = std::min(m_TileWidth, key.m_Width - x);
+			const uint32_t height = std::min(m_TileHeight, key.m_Height - y);
+			const uint64_t work = static_cast<uint64_t>(width) * height * m_Diagnostics.m_SweepSamples;
+			// A changed execution budget cannot submit an oversized active tile.
+			// Lab budget changes restart safely; partition preferences apply next sweep.
+			if (work > sampleWorkBudget || work * queriesPerPixelSample > queryWorkBudget)
+			{
+				return false;
+			}
+			m_Tile = { .m_X = x, .m_Y = y, .m_Width = width, .m_Height = height,
+				.m_BeginSweep = m_Diagnostics.m_SubmittedTiles == 0,
+				.m_EndSweep = m_Diagnostics.m_SubmittedTiles + 1 == m_Diagnostics.m_TileCount };
+			m_Diagnostics.m_BatchSamples = m_Diagnostics.m_SweepSamples;
 		}
 		return true;
 	}
@@ -116,7 +159,7 @@ namespace gglab
 		for (size_t index = 0; index < surfaces.size(); ++index)
 		{
 			surfaces[index] = m_Textures.Import(builder, index, previous[index], next[index],
-				m_Diagnostics.m_SubmittedSamples != 0, false);
+				m_Diagnostics.m_SubmittedSamples != 0, m_PendingInitialized);
 		}
 		return surfaces;
 	}
@@ -131,9 +174,12 @@ namespace gglab
 			{
 				builder.Export(surface.m_Previous, RGTextureAccess::None);
 			}
-			if (writing)
+			if (writing || m_PendingInitialized)
 			{
-				GGLAB_ASSERT(TemporalHistoryTextures<SurfaceCount>::IsFullyWritten(builder, surface));
+				if (writing)
+				{
+					GGLAB_ASSERT(TemporalHistoryTextures<SurfaceCount>::IsFullyWritten(builder, surface));
+				}
 				builder.Export(surface.m_Next, RGTextureAccess::None);
 			}
 		}
@@ -171,9 +217,17 @@ namespace gglab
 			m_Diagnostics.m_BatchSamples != 0)
 		{
 			GGLAB_ASSERT(outcome.m_Fence.IsValid());
-			m_Textures.Commit();
-			m_Diagnostics.m_SubmittedSamples += m_Diagnostics.m_BatchSamples;
-			++m_Diagnostics.m_CommittedVersion;
+			m_Textures.MarkWriteInitialized();
+			m_PendingInitialized = true;
+			++m_Diagnostics.m_SubmittedTiles;
+			if (m_Diagnostics.m_SubmittedTiles == m_Diagnostics.m_TileCount)
+			{
+				m_Textures.Commit();
+				m_Diagnostics.m_SubmittedSamples += m_Diagnostics.m_SweepSamples;
+				++m_Diagnostics.m_CommittedVersion;
+				m_SweepActive = false;
+				m_PendingInitialized = false;
+			}
 			m_PendingFence = outcome.m_Fence;
 		}
 	}
@@ -184,6 +238,9 @@ namespace gglab
 		m_LastUse.Reset();
 		m_PendingFence.Reset();
 		m_Key = {};
+		m_SweepActive = false;
+		m_PendingInitialized = false;
+		m_Tile = {};
 	}
 	void GIReferenceObservation::Cancel() noexcept
 	{

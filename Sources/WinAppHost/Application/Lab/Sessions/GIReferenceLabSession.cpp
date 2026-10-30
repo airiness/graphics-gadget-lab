@@ -25,6 +25,7 @@ namespace gglab
 		const LabParameterId SamplesId("gi_reference.samples");
 		const LabParameterId BatchSamplesId("gi_reference.batch_samples");
 		const LabParameterId DepthId("gi_reference.depth");
+		const LabParameterId TilePixelsId("gi_reference.tile_pixels");
 		const LabParameterId SeedId("gi_reference.seed");
 		const LabParameterId AlbedoId("gi_reference.albedo");
 		const LabParameterId ExposureId("gi_reference.ev100");
@@ -114,6 +115,9 @@ namespace gglab
 		GGLAB_UNUSED(parameters.Add({ .m_Id = DepthId, .m_Name = "Maximum diffuse queries", .m_Group = "Reference",
 			.m_Type = LabParameterType::UInt, .m_Impact = LabChangeImpact::RestartSession,
 			.m_DefaultValue = uint32_t(1), .m_MinValue = LabValue(uint32_t(1)), .m_MaxValue = LabValue(uint32_t(256)) }));
+		GGLAB_UNUSED(parameters.Add({ .m_Id = TilePixelsId, .m_Name = "Maximum sampled pixels per tile (0 = auto)",
+			.m_Group = "Reference", .m_Type = LabParameterType::UInt, .m_Impact = LabChangeImpact::RestartSession,
+			.m_DefaultValue = uint32_t(0), .m_MinValue = LabValue(uint32_t(0)), .m_MaxValue = LabValue(uint32_t(8388608)) }));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = AlbedoId, .m_Name = "F1 / contract receiver albedo", .m_Group = "Reference",
 			.m_Type = LabParameterType::Enum, .m_Impact = LabChangeImpact::RestartSession,
 			.m_DefaultValue = int32_t(0), .m_EnumItems = { { 0, "White" }, { 1, "Linear (0.2, 0.5, 0.8)" } } }));
@@ -316,6 +320,7 @@ namespace gglab
 			.m_Seed = GetParameters().Get(SeedId, uint32_t(61051)) };
 		reference.m_SamplesPerBatch = GetParameters().Get(BatchSamplesId, uint32_t(64));
 		reference.m_MaximumDepth = GetParameters().Get(DepthId, uint32_t(1));
+		reference.m_MaximumTilePixels = GetParameters().Get(TilePixelsId, uint32_t(0));
 		reference.m_ConstantEnvironment = environment == 0;
 		// The HDR importer decodes RGBE bin centres: (128 + 0.5) / 128.
 		// Match that exact constant in the independent direct-input contract.
