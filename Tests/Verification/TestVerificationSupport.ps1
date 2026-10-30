@@ -448,6 +448,7 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
 '@
     # Keep catalog expectations and leaf fixtures together so their counts cannot drift.
     $gpuLeaves = [ordered]@{
+        'gi-specular-visibility' = 'TestGISpecularVisibility.ps1'
         'gi-reference' = 'TestGIReference.ps1'
         'gi-reference-tiling' = 'TestGIReferenceTiling.ps1'
         'gi-reference-convergence' = 'TestGIReferenceConvergence.ps1'
@@ -476,7 +477,8 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
         'coastal-assets', 'gi-inputs', 'verification-support', 'source-normalization',
         'nonfinite-sites', 'render-graph-schema',
         'resource-export-schema', 'nonfinite-coverage-schema', 'capture-comparison', 'taa-comparison-workflow',
-        'capture-bundle-schema', 'gpu-timing-schema', 'parameter-frames-schema', 'gi-reference-contracts'
+        'capture-bundle-schema', 'gpu-timing-schema', 'parameter-frames-schema', 'gi-reference-contracts',
+        'gi-specular-visibility-contracts'
     )
     foreach ($leaf in $gpuLeaves.Values) {
         [IO.File]::WriteAllText((Join-Path $runnerTests $leaf), $leafSource, (New-Object Text.UTF8Encoding($false)))
@@ -494,7 +496,7 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
     }
     Check (($gpuResult.suites | Where-Object name -eq 'taa-comparison').steps[0].receipt.python -eq
         'fixture-python-path') 'runner-forwards-selected-python-to-taa-workflow'
-    foreach ($suite in @('session-lifecycle', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials')) {
+    foreach ($suite in @('session-lifecycle', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility')) {
         Check (($gpuResult.suites | Where-Object name -eq $suite).steps[0].receipt.python -eq
             'fixture-python-path') "runner-forwards-selected-python-to-$suite"
     }
@@ -538,6 +540,60 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
     $execution = Invoke-VerificationScript $runner @{ Suite='resource-export-schema'; Python=$badPython; OutputDirectory=(Join-Path $output 'failed-run') }
     $result = $execution.output | ConvertFrom-Json
     Check ($execution.exitCode -ne 0 -and -not $result.ok -and $result.suites[0].steps[0].exitCode -eq 7 -and (Test-Path (Join-Path $result.directory 'result.json'))) 'runner-retains-failure-and-log'
+    # Exercise the visibility runner's actual provenance/audit functions without a GPU.
+    & {
+        $tokens = $null; $parseErrors = $null
+        $visibilityScript = Join-Path $root 'Tests/Verification/TestGISpecularVisibility.ps1'
+        $ast = [Management.Automation.Language.Parser]::ParseFile(
+            $visibilityScript, [ref]$tokens, [ref]$parseErrors)
+        Check ($parseErrors.Count -eq 0) 'visibility-runner-parses'
+        foreach ($name in @('Get-VisibilitySourceIdentity','Get-VisibilityBinaryIdentity',
+            'Assert-VisibilityIdentity','Test-VisibilityArtifacts')) {
+            $definition = $ast.Find({ param($node)
+                $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name
+            }, $true)
+            . ([scriptblock]::Create($definition.Extent.Text))
+        }
+        $root = Join-Path $fixtureDirectory 'visibility-provenance'
+        $binaryRoot = Join-Path $root 'Build/Output/x64/Develop'
+        $null = New-Item -ItemType Directory -Path "$root/Sources", $binaryRoot -Force
+        $sourceNames = @('Sources/input.cpp')
+        function git { $global:LASTEXITCODE = 0; return $sourceNames }
+        [IO.File]::WriteAllText("$root/Sources/input.cpp", 'original')
+        $originalSource = Get-VisibilitySourceIdentity
+        Assert-VisibilityIdentity $originalSource (Get-VisibilitySourceIdentity) 'Source'
+        [IO.File]::WriteAllText("$root/Sources/input.cpp", 'modified')
+        Reject { Assert-VisibilityIdentity $originalSource (Get-VisibilitySourceIdentity) 'Source' } `
+            'Source inputs changed' 'visibility-rejects-source-mutation'
+        [IO.File]::WriteAllText("$root/Sources/input.cpp", 'original')
+        [IO.File]::WriteAllText("$root/Sources/added.cpp", 'new')
+        $sourceNames += 'Sources/added.cpp'
+        Reject { Assert-VisibilityIdentity $originalSource (Get-VisibilitySourceIdentity) 'Source' } `
+            'Source inputs changed' 'visibility-rejects-source-addition'
+        $sourceNames = @()
+        Reject { Assert-VisibilityIdentity $originalSource (Get-VisibilitySourceIdentity) 'Source' } `
+            'Source inputs changed' 'visibility-rejects-source-removal'
+        foreach ($file in @('GraphicsGadgetLab.exe','gglab-shaderc.exe','dxcompiler.dll','dxil.dll')) {
+            [IO.File]::WriteAllText((Join-Path $binaryRoot $file), 'original')
+        }
+        $originalBinaries = Get-VisibilityBinaryIdentity Develop
+        Assert-VisibilityIdentity $originalBinaries (Get-VisibilityBinaryIdentity Develop) 'Executable/compiler'
+        [IO.File]::WriteAllText("$binaryRoot/gglab-shaderc.exe", 'modified')
+        Reject { Assert-VisibilityIdentity $originalBinaries (Get-VisibilityBinaryIdentity Develop) 'Executable/compiler' } `
+            'Executable/compiler inputs changed' 'visibility-rejects-compiler-mutation'
+        $audits = [Collections.Generic.List[string]]::new()
+        $rejectAudit = ''
+        function Invoke-PythonCheck([string]$Script, [string[]]$Arguments, [string]$Receipt) {
+            $audits.Add([IO.Path]::GetFileName($Script))
+            if ($Script.EndsWith($rejectAudit) -and $rejectAudit) { throw 'Invalid captured artifact' }
+        }
+        Test-VisibilityArtifacts $root
+        Check ($audits.Count -eq 3 -and
+            @('ValidateCaptureBundles.py','ValidateResourceExports.py','ValidateRenderGraphExports.py' |
+                Where-Object { $_ -notin $audits }).Count -eq 0) 'visibility-audits-all-required-artifact-contracts'
+        $rejectAudit = 'ValidateResourceExports.py'
+        Reject { Test-VisibilityArtifacts $root } 'Invalid captured artifact' 'visibility-rejects-artifact-audit-failure'
+    }
     $result = @{ ok=$true; checks=$checks; directory=$output }
 } catch { $result = @{ ok=$false; checks=$checks; directory=$output; error=$_.Exception.Message } }
 Write-VerificationJson (Join-Path $output 'result.json') $result

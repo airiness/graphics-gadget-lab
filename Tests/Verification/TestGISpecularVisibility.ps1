@@ -9,6 +9,7 @@ param(
     [string]$ShaderCacheDirectory,
     [switch]$Smoke,
     [switch]$SkipCoastal,
+    [switch]$WithDevTools,
     [int]$TimeoutSeconds = 600
 )
 $Configuration = @($Configuration | ForEach-Object { $_ -split ',' })
@@ -18,14 +19,38 @@ Set-StrictMode -Version 3.0
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Import-Module "$root/Scripts/Verification/VerificationSupport.psm1"
 if (-not $OutputDirectory -and -not $RunDirectory) { $OutputDirectory = "$root/Build/Validation/GISpecularVisibility" }
-$output = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory
+$output = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory -RunId ([Guid]::NewGuid().ToString('N').Substring(0,8))
 $previous = $env:GGLAB_GI_VISIBILITY_FIXTURE_ROOT
 $env:GGLAB_GI_VISIBILITY_FIXTURE_ROOT = "$root/Build/Fixtures/GIVisibility"
-function Invoke-Oracle([string[]]$Arguments) {
-    $lines = @(& $Python "$PSScriptRoot/ValidateGISpecularVisibility.py" @Arguments)
+function Invoke-PythonCheck([string]$Script, [string[]]$Arguments, [string]$Receipt) {
+    $lines = @(& $Python $Script @Arguments)
     $code = $LASTEXITCODE
-    Write-VerificationJson "$output/oracle-result.json" @{exitCode=$code;output=($lines -join "`n")}
-    if ($code -ne 0) { throw 'Independent visibility oracle failed (unconverged or invalid).' }
+    Write-VerificationJson $Receipt @{exitCode=$code;output=($lines -join "`n")}
+    if ($code -ne 0) { throw "Visibility verification failed: $Script" }
+}
+function Get-VisibilitySourceIdentity {
+    $names = @(& git -c "safe.directory=$($root.Replace('\','/'))" -C $root ls-files --cached --others --exclude-standard -- Sources Shaders Tests/Verification Scripts/Verification Schemas Projects PropertySheets)
+    if ($LASTEXITCODE -ne 0) { throw 'Source enumeration failed.' }
+    [Array]::Sort($names, [StringComparer]::Ordinal)
+    return @($names | ForEach-Object {
+        [ordered]@{path=$_;sha256=(Get-FileHash -LiteralPath "$root/$_" -Algorithm SHA256).Hash.ToLowerInvariant()}
+    })
+}
+function Get-VisibilityBinaryIdentity([string]$Config) {
+    return @(@('GraphicsGadgetLab.exe','gglab-shaderc.exe','dxcompiler.dll','dxil.dll') | ForEach-Object {
+        [ordered]@{file=$_;sha256=(Get-FileHash -LiteralPath "$root/Build/Output/x64/$Config/$_" -Algorithm SHA256).Hash.ToLowerInvariant()}
+    })
+}
+function Assert-VisibilityIdentity([object[]]$Expected, [object[]]$Actual, [string]$Kind) {
+    if ((ConvertTo-Json -InputObject @($Expected) -Depth 4 -Compress) -cne
+        (ConvertTo-Json -InputObject @($Actual) -Depth 4 -Compress)) {
+        throw "$Kind inputs changed during visibility verification."
+    }
+}
+function Test-VisibilityArtifacts([string]$Directory) {
+    foreach ($validator in @('ValidateCaptureBundles.py','ValidateResourceExports.py','ValidateRenderGraphExports.py')) {
+        Invoke-PythonCheck "$root/Scripts/Verification/$validator" @($Directory) "$Directory/$validator.result.json"
+    }
 }
 function Set-Inputs([string]$Session, [string]$Run, [hashtable]$Values) {
     # Immediate bindings belong to the already active fixture, not a pending
@@ -49,7 +74,9 @@ function Capture-Resources([string]$Session, [string]$Run, [string]$Directory, [
     $receipt = Invoke-VerificationSession capture $Session @{ExpectedRunIdentity=$Run;Timing='after-ready';
         SettleFrames=1;View=$View;Products=$products;OutputDirectory=$Directory;TimeoutSeconds=$TimeoutSeconds}
     Write-VerificationJson "$Directory/capture.json" $receipt
-    if ($receipt.status -ne 'completed' -or $receipt.publication -ne 'Published') { throw 'Visibility publication incomplete.' }
+    if ($receipt.status -ne 'completed' -or $receipt.publication -ne 'Published') {
+        throw "Visibility publication incomplete in ${Directory}: $($receipt.failure)"
+    }
 }
 function Copy-ShaderState([string]$Source, [string]$Target) {
     if (-not $Source) { return }
@@ -59,17 +86,14 @@ function Copy-ShaderState([string]$Source, [string]$Target) {
     }
 }
 try {
-    Invoke-Oracle @('--generate', $env:GGLAB_GI_VISIBILITY_FIXTURE_ROOT, '--self-test')
+    Invoke-PythonCheck "$PSScriptRoot/ValidateGISpecularVisibility.py" @('--generate', $env:GGLAB_GI_VISIBILITY_FIXTURE_ROOT, '--self-test') "$output/oracle-self-test.json"
     Copy-Item -LiteralPath "$env:GGLAB_GI_VISIBILITY_FIXTURE_ROOT/manifest.json" -Destination "$output/fixtures.json"
-    $source = @(& git -c "safe.directory=$($root.Replace('\','/'))" -C $root ls-files --cached --others --exclude-standard -- Sources Shaders Tests/Verification Scripts/Verification)
-    if ($LASTEXITCODE -ne 0) { throw 'Source enumeration failed.' }
-    $identities = @($source | Sort-Object | ForEach-Object {@{path=$_;sha256=(Get-FileHash -LiteralPath "$root/$_" -Algorithm SHA256).Hash.ToLowerInvariant()}})
+    $identities = Get-VisibilitySourceIdentity
     Write-VerificationJson "$output/source-identity.json" $identities
     foreach ($config in $Configuration) {
         $null = New-Item -ItemType Directory -Path "$output/$config" -Force
-        Write-VerificationJson "$output/$config/binaries.json" @(@('GraphicsGadgetLab.exe','dxcompiler.dll','dxil.dll') | ForEach-Object {
-            @{file=$_;sha256=(Get-FileHash -LiteralPath "$root/Build/Output/x64/$config/$_" -Algorithm SHA256).Hash.ToLowerInvariant()}
-        })
+        $binaries = Get-VisibilityBinaryIdentity $config
+        Write-VerificationJson "$output/$config/binaries.json" $binaries
         $cases = @()
         foreach ($backend in $Rhi) {
             $directory = "$output/$config/$backend"
@@ -80,7 +104,7 @@ try {
             $start = $null
             try {
                 $start = Invoke-VerificationSession start $session @{Configuration=$config;Rhi=$backend;
-                    Lab='gglab.lab.gi_reference';WindowSize='129x81';NoDevTools=$true;Validation='standard';
+                    Lab='gglab.lab.gi_reference';WindowSize='129x81';NoDevTools=(-not $WithDevTools);Validation='standard';
                     StateRoot="$directory/state";StartTimeoutSeconds=$TimeoutSeconds}
                 Write-VerificationJson "$directory/start.json" $start
                 if ($start.ownership -ne 'created') { throw 'Visibility verification requires an owned session.' }
@@ -176,7 +200,7 @@ try {
                     Copy-ShaderState "$directory/state" "$directory/coastal-state"
                     $session += '-coastal'
                     $start = Invoke-VerificationSession start $session @{Configuration=$config;Rhi=$backend;
-                        Lab='gglab.lab.gi_reference';WindowSize='1280x800';NoDevTools=$true;Validation='standard';
+                        Lab='gglab.lab.gi_reference';WindowSize='1280x800';NoDevTools=(-not $WithDevTools);Validation='standard';
                         StateRoot="$directory/coastal-state";StartTimeoutSeconds=$TimeoutSeconds}
                     Write-VerificationJson "$directory/coastal-start.json" $start
                     if ($start.ownership -ne 'created') { throw 'Coastal diagnostics require an owned session.' }
@@ -212,10 +236,17 @@ try {
                 Write-VerificationJson "$output/$config/cases.json" @($cases)
             }
         }
-        Invoke-Oracle @('--root', "$output/$config")
+        Test-VisibilityArtifacts "$output/$config"
+        Invoke-PythonCheck "$PSScriptRoot/ValidateGISpecularVisibility.py" @('--root', "$output/$config") "$output/$config/oracle-result.json"
+        $finalBinaries = Get-VisibilityBinaryIdentity $config
+        Write-VerificationJson "$output/$config/binaries-final.json" $finalBinaries
+        Assert-VisibilityIdentity $binaries $finalBinaries 'Executable/compiler'
     }
+    $finalIdentities = Get-VisibilitySourceIdentity
+    Write-VerificationJson "$output/source-identity-final.json" $finalIdentities
+    Assert-VisibilityIdentity $identities $finalIdentities 'Source'
     Write-VerificationJson "$output/result.json" @{status='passed';configuration=$Configuration;rhi=$Rhi;
-        coastal=(-not $SkipCoastal);smoke=[bool]$Smoke;productionS1=$false}
+        coastal=(-not $SkipCoastal);smoke=[bool]$Smoke;developmentTools=[bool]$WithDevTools;productionS1=$false}
     Write-Output (ConvertTo-Json -InputObject @{ok=$true;directory=$output} -Compress)
 }
 catch {

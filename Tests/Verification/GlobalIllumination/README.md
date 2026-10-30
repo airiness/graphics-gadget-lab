@@ -73,7 +73,11 @@ means GPU calculation completed, not numerical convergence; the independent
 Fixture 11 collects Coastal diagnostics at locked C1-C4 views and 1280x800.
 Unmatched pixels remain reported; these outputs are not reference-certified.
 The standalone `TestGISpecularVisibility.ps1` supports `-Smoke` and `-SkipCoastal`;
-neither establishes the full suite. Detailed measurement contracts and
+neither establishes the full suite. `-WithDevTools` keeps ImGui rendering enabled
+for native interop regression checks. Every run audits capture bundles, resource
+exports and RenderGraph exports, then rechecks source and product/compiler binary
+hashes before reporting success. Source additions/removals or modified inputs
+invalidate the run. Detailed measurement contracts and
 qualification records belong to `gglab-docs` GI plan §§11.16–11.17.
 
 ## Irradiance reference
