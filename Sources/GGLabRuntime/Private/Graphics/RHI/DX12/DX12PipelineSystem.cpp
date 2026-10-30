@@ -14,6 +14,7 @@
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
+#include <span>
 #include <utility>
 
 namespace gglab
@@ -109,8 +110,17 @@ namespace gglab
 		RHIBindingLayoutHandle handle;
 		{
 			std::unique_lock lock(m_Mutex);
+			for (const auto& existing : m_BindingLayouts)
+			{
+				if (existing.m_NativeRootSignatureIndex == rootSignature.m_Id.Value() &&
+					HaveSameRHIBindingSlots(std::span(existing.m_Slots).first(existing.m_SlotCount),
+						std::span(desc.m_Slots).first(desc.m_SlotCount)))
+				{
+					return existing.m_Handle;
+				}
+			}
 			// Logical AS and ordinary SRV layouts may share a native root signature.
-			// Their identities and typed binding contracts must remain distinct.
+			// Reuse equal logical layouts, but preserve that typed distinction.
 			handle = { static_cast<uint32_t>(m_BindingLayouts.size()), m_BindingLayoutGeneration };
 			auto& binding = m_BindingLayouts.emplace_back();
 			binding.m_Handle = handle;

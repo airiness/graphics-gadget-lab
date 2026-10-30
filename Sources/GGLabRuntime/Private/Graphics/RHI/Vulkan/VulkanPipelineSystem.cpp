@@ -9,7 +9,9 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstring>
+#include <span>
 
 namespace gglab
 {
@@ -331,6 +333,16 @@ namespace gglab
 		if (!m_Device->RequireOwnerThread("VulkanPipelineSystem::CreateBindingLayout"))
 		{
 			return {};
+		}
+		for (size_t index = 0; index < m_BindingLayouts.size(); ++index)
+		{
+			const auto& existing = m_BindingLayouts[index];
+			if (HaveSameRHIBindingSlots(std::span(existing.m_Slots).first(existing.m_SlotCount),
+				std::span(desc.m_Slots).first(desc.m_SlotCount)))
+			{
+				return { static_cast<RHIBindingLayoutHandle::IndexType>(index),
+					m_BindingLayoutGeneration };
+			}
 		}
 		auto layout = std::make_unique<VulkanBindingLayout>();
 		if (!layout->Create(m_Device, desc,

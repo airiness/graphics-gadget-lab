@@ -838,6 +838,47 @@ namespace gglab
 
 		void RunDX12PipelineIdentityTests(SelfTestContext& context) noexcept
 		{
+			const std::array slots
+			{
+				RHIBindingSlotDesc{ .m_Type = RHIBindingType::AccelerationStructure,
+					.m_Visibility = RHIShaderStage::Compute, .m_Binding = 5 },
+			};
+			auto renamed = slots;
+			renamed[0].m_DebugName = "Another Lab session";
+			context.Check(HaveSameRHIBindingSlots(slots, renamed),
+				"Repeated logical layouts reuse identity independently of diagnostic names");
+			for (uint32_t field = 0; field < 7; ++field)
+			{
+				auto changed = slots;
+				switch (field)
+				{
+				case 0:
+					changed[0].m_Type = RHIBindingType::ReadOnlyStorageBuffer;
+					break;
+				case 1:
+					changed[0].m_Visibility = RHIShaderStage::Pixel;
+					break;
+				case 2:
+					++changed[0].m_Binding;
+					break;
+				case 3:
+					++changed[0].m_Space;
+					break;
+				case 4:
+					++changed[0].m_Count;
+					break;
+				case 5:
+					changed[0].m_SizeInBytes = 16;
+					break;
+				case 6:
+					changed[0].m_BufferBindingMode = RHIBufferBindingMode::Dynamic;
+					break;
+				}
+				context.Check(!HaveSameRHIBindingSlots(slots, changed),
+					"Every logical binding field remains significant even when native roots alias");
+			}
+			context.Check(!HaveSameRHIBindingSlots(slots, {}),
+				"A different root-parameter count cannot reuse the logical layout");
 			for (const bool compute : { false, true })
 			{
 				const DX12PipelineIdentity identity{
