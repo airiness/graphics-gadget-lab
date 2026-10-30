@@ -161,6 +161,8 @@ namespace gglab::shader_programs
 		"gglab.shader.ray-scene", "compute.sun-visibility", ShaderStage::Compute };
 	inline const ShaderProgramRef RaySceneHitMaterialCompute{
 		"gglab.shader.ray-scene", "compute.hit-material", ShaderStage::Compute };
+	inline const ShaderProgramRef GISpecularVisibilityCompute{
+		"gglab.shader.ray-scene", "compute.gi-specular-visibility", ShaderStage::Compute };
 	inline const ShaderProgramRef GIReferenceCompute{
 		"gglab.shader.ray-scene", "compute.gi-reference", ShaderStage::Compute };
 	inline const ShaderProgramRef GIReceiverPixel{

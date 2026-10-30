@@ -32,6 +32,10 @@ namespace gglab
 			const LabParameterId& id, const LabParameterFrameContext& frame) const noexcept override;
 		void BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept override;
 		void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept override;
+		std::optional<FrameCaptureAssetBundle> GetCaptureAssetBundle() const noexcept override
+		{
+			return m_CaptureBundle;
+		}
 		static LabId GetId() noexcept;
 		static LabDescriptor GetDescriptor() noexcept;
 		static std::unique_ptr<LabSessionBase> Create(const LabSessionCreateInfo& info) noexcept;
@@ -39,6 +43,12 @@ namespace gglab
 	private:
 		void ApplyImmediateParameters() noexcept override;
 		void BuildMaterialContract() noexcept;
+		void BuildVisibilityContract() noexcept;
+		void ApplyVisibilityMaterial() noexcept;
+		entt::entity m_VisibilityReceiver = entt::null;
+		std::array<TextureID, 3> m_VisibilityTextures{};
+		ModelID m_VisibilityNormalModel{};
+		std::optional<FrameCaptureAssetBundle> m_CaptureBundle;
 		void UpdateMaterialProgress() noexcept;
 		std::shared_ptr<RayScene> m_RayScene;
 		std::array<TextureID, 8> m_MaterialTextures{};

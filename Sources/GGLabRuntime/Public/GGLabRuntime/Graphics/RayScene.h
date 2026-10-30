@@ -55,10 +55,19 @@ namespace gglab
 		AllocationFailed,
 	};
 
+	// PrimaryReceiver additionally tracks normal, coat and anisotropy texture
+	// identity/residency for diagnostics that consume the production receiver.
+	enum class RaySceneMaterialInputs : uint8_t
+	{
+		ReducedDiffuse,
+		PrimaryReceiver,
+	};
+
 	struct RaySceneMaterialTexture
 	{
 		uint32_t m_MaterialIndex = 0;
-		// Zero is base colour, one is metallic/roughness. Only reduced GI inputs.
+		// 0 base colour, 1 MR, 2 normal, 3 coat, 4 coat roughness, 5 coat normal,
+		// 6 anisotropy. SelectedMip is UINT32_MAX for implicit primary-only sampling.
 		uint32_t m_Slot = 0;
 		TextureContentRef m_Content{};
 		RHITextureHandle m_Resource{};
@@ -93,6 +102,7 @@ namespace gglab
 		float m_BoundsDiagonal = 0.0f;
 		bool m_HasCompleteBounds = false;
 		std::vector<RaySceneMaterialTexture> m_MaterialTextures;
+		bool m_TracksPrimaryMaterials = false;
 	};
 
 	// Graph-local imports. Declare all traversed BLAS reads as well as the TLAS read.
@@ -122,7 +132,8 @@ namespace gglab
 	class RayScene final
 	{
 	public:
-		explicit RayScene(RaySceneCapacity capacity = {}) noexcept;
+		explicit RayScene(RaySceneCapacity capacity = {},
+			RaySceneMaterialInputs materialInputs = RaySceneMaterialInputs::ReducedDiffuse) noexcept;
 		~RayScene();
 		GGLAB_DELETE_COPYABLE_MOVABLE(RayScene);
 		[[nodiscard]] RaySceneStatus Prepare(const World& world, AssetManager& assets,

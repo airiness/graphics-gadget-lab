@@ -1,4 +1,7 @@
 #include "Application/Lab/Sessions/GIReferenceLabSession.h"
+#include "Application/Content/RuntimeAssetBundle.h"
+#include "Application/Demo/CoastalSceneReferenceViews.h"
+#include "Application/Demo/CoastalSceneLightingProfiles.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
@@ -46,6 +49,14 @@ namespace gglab
 		const LabParameterId AtmosphereId("gi_reference.atmosphere");
 		const LabParameterId MaterialCaseId("gi_reference.material_case");
 		constexpr uint32_t MaterialCaseCount = 23;
+		const LabParameterId VisibilityMaterialId("gi_reference.visibility_material");
+		const LabParameterId VisibilityGeometryId("gi_reference.visibility_geometry");
+		constexpr uint32_t VisibilityMaterialCount = 12;
+
+		RuntimeMaterialKey VisibilityMaterialKey(uint32_t value) noexcept
+		{
+			return RuntimeMaterialKey(std::format("gglab.lab.gi_reference.visibility.{}", value));
+		}
 
 		RuntimeMaterialKey MaterialCaseKey(uint32_t value) noexcept
 		{
@@ -58,6 +69,9 @@ namespace gglab
 			GIReferencePipeline(World& world, AssetManager& assets, GIReferenceCreateInfo info) noexcept :
 				m_World(world), m_Assets(assets), m_Scene(info.m_RayScene),
 				m_Raster(CreateRenderPipelineForwardPlus({ .m_GIReference = std::move(info) })) {}
+			GIReferencePipeline(World& world, AssetManager& assets, GISpecularVisibilityCreateInfo info) noexcept :
+				m_World(world), m_Assets(assets), m_Scene(info.m_RayScene),
+				m_Raster(CreateRenderPipelineForwardPlus({ .m_GISpecularVisibility = std::move(info) })) {}
 			std::string_view GetName() const noexcept override { return "GI fixed-depth reference"; }
 			ResolvedTemporalFramePlan ResolveTemporalFramePlan(TemporalFramePlanResolveInfo info) const noexcept override
 			{
@@ -117,7 +131,8 @@ namespace gglab
 				{ 3, "F3 sealed thin-wall room" }, { 4, "F4 sunlit coloured room" },
 				{ 5, "Contract: sun transport" }, { 6, "Contract: off-camera sun blocker" },
 				{ 7, "Contract: published environment sphere" },
-				{ 8, "Contract: coupled diffuse planes" }, { 9, "Contract: reduced hit material and snapshots" } } }));
+				{ 8, "Contract: coupled diffuse planes" }, { 9, "Contract: reduced hit material and snapshots" },
+				{ 10, "Contract: GGX environment visibility" }, { 11, "Coastal: GGX visibility diagnostics" } } }));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = SamplesId, .m_Name = "Samples per pixel", .m_Group = "Reference",
 			.m_Type = LabParameterType::UInt, .m_Impact = LabChangeImpact::RestartSession,
 			.m_DefaultValue = uint32_t(64), .m_MinValue = LabValue(uint32_t(1)), .m_MaxValue = LabValue(uint32_t(1048576)) }));
@@ -166,6 +181,15 @@ namespace gglab
 			.m_Impact = LabChangeImpact::Immediate, .m_DefaultValue = uint32_t(0),
 			.m_MinValue = LabValue(uint32_t(0)),
 			.m_MaxValue = LabValue(uint32_t(MaterialCaseCount - 1)) }));
+		GGLAB_UNUSED(parameters.Add({ .m_Id = VisibilityMaterialId, .m_Name = "Visibility primary material",
+			.m_Group = "Visibility contracts", .m_Type = LabParameterType::UInt,
+			.m_Impact = LabChangeImpact::Immediate, .m_DefaultValue = uint32_t(0),
+			.m_MinValue = LabValue(uint32_t(0)), .m_MaxValue = LabValue(VisibilityMaterialCount - 1) }));
+		GGLAB_UNUSED(parameters.Add({ .m_Id = VisibilityGeometryId, .m_Name = "Visibility geometry",
+			.m_Group = "Visibility contracts", .m_Type = LabParameterType::Enum,
+			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = int32_t(0),
+			.m_EnumItems = { { 0, "Open" }, { 1, "Closed" }, { 2, "Partial blocker" },
+				{ 3, "Off-camera blocker" } } }));
 		auto& profile = GetMutableViewRenderProfile();
 		profile.m_TemporalAA.m_Enabled = false;
 		profile.m_Lighting.m_GTAO.m_Enabled = false;
@@ -205,7 +229,34 @@ namespace gglab
 			.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers, .m_World = &m_World,
 			.m_MaterialInstance = material };
 		std::vector<CameraReferenceView> views;
-		if (fixture == 9)
+		if (fixture == 11)
+		{
+			std::string failure;
+			const auto bundle = LoadRuntimeAssetBundle(
+				m_Services.m_AssetRoot / "Models/GGLabCoastalRetreat/bundle.json", failure);
+			if (!bundle)
+			{
+				m_Progress = { .m_Status = LoadingStatus::Failed, .m_Stage = "Coastal bundle unavailable",
+					.m_Detail = std::move(failure) };
+				return;
+			}
+			m_CaptureBundle = FrameCaptureAssetBundle{ bundle->m_Id, bundle->m_Revision };
+			const auto model = GetAssetOwnerScope().LoadModelAsync(bundle->m_EntryPoint).m_ModelId;
+			const auto entity = m_World.GetRegistry().create();
+			m_World.GetRegistry().emplace<components::TransformComponent>(entity);
+			m_World.GetRegistry().emplace<components::ModelComponent>(entity, model);
+			m_Assets.TrackModel(model, "Coastal visibility geometry");
+			views.assign(CoastalSceneReferenceViews.begin(), CoastalSceneReferenceViews.end());
+		}
+		else if (fixture == 10)
+		{
+			BuildVisibilityContract();
+			views = {
+				View("Contract_VisibilityNormal", { 0, 0, -4 }, { 0, 0, 0 }, 35, exposure),
+				View("Contract_VisibilityGrazing", { -3.8f, 0, -1.2f }, { 0, 0, 0 }, 35, exposure),
+			};
+		}
+		else if (fixture == 9)
 		{
 			BuildMaterialContract();
 			views = {
@@ -319,12 +370,15 @@ namespace gglab
 			}
 		}
 		const bool contract = fixture >= 5;
-		const auto environment = contract ? GetParameters().Get(EnvironmentId, int32_t(0)) : 0;
+		const auto environment = fixture == 11 ?
+			3 : contract ? GetParameters().Get(EnvironmentId, int32_t(0)) : 0;
 		if (fixture == 4 || fixture == 5 || fixture == 6 || fixture == 8 || fixture == 9 || environment == 3)
 		{
 			auto& registry = m_World.GetRegistry();
 			const auto light = registry.create();
-			Vector3 direction = fixture == 4 ? Vector3(0.2f, -1, -1) : Vector3(0, -1, 1);
+			Vector3 direction = fixture == 11 ?
+				CoastalSceneLightingProfiles.front().m_Inputs.m_SunDirection :
+				fixture == 4 ? Vector3(0.2f, -1, -1) : Vector3(0, -1, 1);
 			direction.Normalize();
 			components::TransformComponent transform;
 			transform.m_Rotation = math::RotationFromTo(Vector3::Forward, direction);
@@ -333,6 +387,10 @@ namespace gglab
 			sun.m_WorldSun = WorldSunSettings{
 				.m_PerpendicularIlluminanceLux = fixture == 4 ? 10000.0f :
 					static_cast<float>(GetParameters().Get(SunId, int32_t(10000))) };
+			if (fixture == 11)
+			{
+				sun.m_WorldSun = CoastalSceneLightingProfiles.front().m_Inputs.m_Sun;
+			}
 			registry.emplace<components::LightComponent>(light, sun);
 			if (environment == 3 || (contract && GetParameters().Get(AtmosphereId, false)))
 			{
@@ -343,7 +401,8 @@ namespace gglab
 		const bool registered = GetCameraRig().SetReferenceViews(std::move(views));
 		const bool restored = GetCameraRig().RestoreReferenceView(firstView);
 		GGLAB_ASSERT(registered && restored);
-		m_RayScene = std::make_shared<RayScene>();
+		m_RayScene = std::make_shared<RayScene>(RaySceneCapacity{},
+			fixture >= 10 ? RaySceneMaterialInputs::PrimaryReceiver : RaySceneMaterialInputs::ReducedDiffuse);
 		GIReferenceCreateInfo reference{ .m_RayScene = m_RayScene,
 			.m_SampleCount = GetParameters().Get(SamplesId, uint32_t(64)),
 			.m_Seed = GetParameters().Get(SeedId, uint32_t(61051)) };
@@ -360,11 +419,135 @@ namespace gglab
 		reference.m_ConstantRadiance = { radiance, radiance, radiance };
 		reference.m_EnvironmentFilter = contract && GetParameters().Get(FilterId, int32_t(0)) == 1 ?
 			GIReferenceEnvironmentFilter::MipZero : GIReferenceEnvironmentFilter::Face32;
-		SetRenderPipeline(std::make_unique<GIReferencePipeline>(m_World,
-			*m_Services.m_AssetManager, std::move(reference)));
+		if (fixture >= 10)
+		{
+			GISpecularVisibilityCreateInfo visibility{ .m_RayScene = m_RayScene,
+				.m_SampleCount = reference.m_SampleCount, .m_Seed = reference.m_Seed,
+				.m_SamplesPerBatch = reference.m_SamplesPerBatch,
+				.m_MaximumTilePixels = reference.m_MaximumTilePixels,
+				.m_MaximumDistance = fixture == 11 ? 30000.0f : 1000.0f };
+			SetRenderPipeline(std::make_unique<GIReferencePipeline>(m_World,
+				*m_Services.m_AssetManager, std::move(visibility)));
+		}
+		else
+		{
+			SetRenderPipeline(std::make_unique<GIReferencePipeline>(m_World,
+				*m_Services.m_AssetManager, std::move(reference)));
+		}
 		m_World.MarkLightingAuthoringChanged();
 		m_Progress = m_Assets.BuildProgress(*m_Services.m_AssetManager, "Preparing GI reference fixture");
 		UpdateMaterialProgress();
+	}
+
+	void GIReferenceLabSession::BuildVisibilityContract() noexcept
+	{
+		auto& assets = *m_Services.m_AssetManager;
+		primitive::PrimitiveBase::CreateInfo info{ .m_AssetManager = &assets,
+			.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers, .m_World = &m_World };
+		info.m_Transform.m_Scale = Vector3(2, 2, 1);
+		m_VisibilityReceiver = primitive::Plane::Create(info);
+		m_Assets.TrackModel(ProceduralPlaneModelID, "Visibility receiver");
+		// A curved interpolated normal field on planar geometry gives the CPU
+		// oracle an authored, nonzero specular-AA derivative contract.
+		auto mesh = std::make_unique<Mesh>();
+		mesh->m_Name = StringID("Visibility normal field");
+		AssetManager::MeshUploadData upload;
+		for (const auto uv : std::array<Vector2, 4>{ Vector2(0, 1), Vector2(0, 0),
+			Vector2(1, 0), Vector2(1, 1) })
+		{
+			const float x = uv.m_X * 2 - 1;
+			const float y = 1 - uv.m_Y * 2;
+			upload.m_VerticesData.push_back({ Vector3(x, y, 0), Vector3(x * 2, y * 2, -1),
+				uv, uv, Vector4(1, 0, 0, 1) });
+		}
+		upload.m_IndicesData = { 0, 1, 2, 0, 2, 3 };
+		const auto meshId = assets.AddProceduralMesh(std::move(mesh), upload);
+		auto model = std::make_unique<Model>();
+		model->m_Name = StringID("Visibility normal field");
+		model->m_MeshInstance.push_back({ meshId, ProceduralPrimitiveMaterialID });
+		m_VisibilityNormalModel = assets.AddProceduralModel(std::move(model));
+		const auto* storedModel = assets.GetModel(m_VisibilityNormalModel);
+		const bool retained = storedModel && GetAssetOwnerScope().RetainModel(
+			m_VisibilityNormalModel, storedModel->m_ContentGeneration);
+		GGLAB_ASSERT(retained);
+		m_Assets.TrackModel(m_VisibilityNormalModel, "Visibility normal-field geometry");
+		wchar_t* root = nullptr;
+		size_t length = 0;
+		GGLAB_UNUSED(_wdupenv_s(&root, &length, L"GGLAB_GI_VISIBILITY_FIXTURE_ROOT"));
+		const std::filesystem::path directory = root ? root : L"";
+		std::free(root);
+		constexpr std::array files{ "normal.dds", "coat-normal.dds", "anisotropy.dds" };
+		if (directory.is_absolute())
+		{
+			for (size_t index = 0; index < files.size(); ++index)
+			{
+				m_VisibilityTextures[index] = GetAssetOwnerScope().LoadTextureAsync(directory / files[index],
+					index < 2 ? TextureSemantic::Normal : TextureSemantic::Anisotropy).m_TextureId;
+			}
+		}
+		ApplyVisibilityMaterial();
+		const auto geometry = GetParameters().Get(VisibilityGeometryId, int32_t(0));
+		if (geometry != 0)
+		{
+			// The closed cube is viewed from inside with back-face culling: only
+			// the receiver rasterizes, but all six opaque faces occlude ray misses.
+			info.m_Transform.m_Position = geometry == 1 ?
+				Vector3(0, 0, 0) :
+				geometry == 2 ? Vector3(0.8f, 0, -1.1f) : Vector3(3, 0, -1);
+			info.m_Transform.m_Scale = geometry == 1 ?
+				Vector3(6, 6, 6) :
+				geometry == 2 ? Vector3(0.7f, 1.5f, 0.1f) : Vector3(0.3f, 4, 0.5f);
+			GGLAB_UNUSED(primitive::Cube::Create(info));
+			m_Assets.TrackModel(ProceduralCubeModelID, "Visibility blocker");
+		}
+	}
+
+	void GIReferenceLabSession::ApplyVisibilityMaterial() noexcept
+	{
+		auto& registry = m_World.GetRegistry();
+		if (!registry.valid(m_VisibilityReceiver))
+		{
+			return;
+		}
+		const auto value = GetParameters().Get(VisibilityMaterialId, uint32_t(0));
+		components::MaterialInstanceComponent instance;
+		instance.m_Key = VisibilityMaterialKey(value);
+		auto& material = instance.m_Properties;
+		material.m_BaseColor = Color(0.8f, 0.2f, 0.05f, 1);
+		material.m_MetallicFactor = value == 3 ? 1.0f : 0.0f;
+		material.m_RoughnessFactor = value == 1 ?
+			1.0f :
+			value == 2 || value == 8 || value == 11 ? 0.045f : value >= 4 ? 0.2f : 0.5f;
+		material.m_NormalScale = value == 5 ? 1.0f : 0.0f;
+		material.m_Ior = value == 8 ? 1.0f : value == 9 ? 0.0f : value == 10 ? 2.4f : 1.5f;
+		material.m_ClearcoatFactor = value == 4 || value == 5 || value == 10 ? 0.8f : 0.0f;
+		material.m_ClearcoatRoughness = 0.75f;
+		material.m_AnisotropyStrength = value == 6 || value == 7 ? 0.8f : 0.0f;
+		material.m_AnisotropyRotation = value == 7 ? 1.5707963267948966f : 0.0f;
+		const auto sampler = m_Services.m_RenderServices.m_Samplers->GetPresetSamplerId(SamplerPreset::LinearClamp);
+		if (value == 5)
+		{
+			material.m_NormalBinding.m_TextureId = m_VisibilityTextures[0];
+			material.m_NormalBinding.m_SamplerId = sampler;
+			material.m_ClearcoatNormalBinding.m_TextureId = m_VisibilityTextures[1];
+			material.m_ClearcoatNormalBinding.m_SamplerId = sampler;
+		}
+		if (value == 6 || value == 7)
+		{
+			material.m_AnisotropyBinding.m_TextureId = m_VisibilityTextures[2];
+			material.m_AnisotropyBinding.m_SamplerId = sampler;
+		}
+		if (value == 10)
+		{
+			material.m_ClearcoatBinding.m_TextureId = m_VisibilityTextures[2];
+			material.m_ClearcoatBinding.m_SamplerId = sampler;
+			material.m_ClearcoatRoughnessBinding = material.m_ClearcoatBinding;
+			material.m_ClearcoatNormalBinding.m_TextureId = m_VisibilityTextures[1];
+			material.m_ClearcoatNormalBinding.m_SamplerId = sampler;
+		}
+		registry.get<components::ModelComponent>(m_VisibilityReceiver).m_ModelId =
+			value == 11 ? m_VisibilityNormalModel : ProceduralPlaneModelID;
+		registry.emplace_or_replace<components::MaterialInstanceComponent>(m_VisibilityReceiver, instance);
 	}
 
 	void GIReferenceLabSession::BuildMaterialContract() noexcept
@@ -438,6 +621,25 @@ namespace gglab
 
 	void GIReferenceLabSession::UpdateMaterialProgress() noexcept
 	{
+		if (GetParameters().Get(FixtureId, int32_t(0)) == 10 && !m_Progress.HasFailed())
+		{
+			for (const auto texture : m_VisibilityTextures)
+			{
+				const auto state = m_Services.m_AssetManager->GetTextureState(
+					m_Services.m_AssetManager->GetTextureContentRef(texture));
+				if (!state || *state == AssetState::Failed)
+				{
+					m_Progress = { .m_Status = LoadingStatus::Failed, .m_Stage = "Visibility textures unavailable",
+						.m_Detail = "Generate fixtures and set GGLAB_GI_VISIBILITY_FIXTURE_ROOT." };
+					return;
+				}
+				if (*state != AssetState::Ready)
+				{
+					m_Progress = { .m_Status = LoadingStatus::Preparing, .m_Stage = "Loading visibility textures" };
+				}
+			}
+			return;
+		}
 		if (GetParameters().Get(FixtureId, int32_t(0)) != 9 || m_Progress.HasFailed())
 		{
 			return;
@@ -463,6 +665,7 @@ namespace gglab
 
 	void GIReferenceLabSession::ApplyImmediateParameters() noexcept
 	{
+		ApplyVisibilityMaterial();
 		auto& registry = m_World.GetRegistry();
 		if (!registry.valid(m_MaterialWall))
 		{
@@ -578,21 +781,24 @@ namespace gglab
 
 	bool GIReferenceLabSession::SupportsImmediateParameter(const LabParameterId& id) const noexcept
 	{
-		return id == MaterialCaseId && GetParameters().Get(FixtureId, int32_t(0)) == 9;
+		return (id == MaterialCaseId && GetParameters().Get(FixtureId, int32_t(0)) == 9) ||
+			(id == VisibilityMaterialId && GetParameters().Get(FixtureId, int32_t(0)) == 10);
 	}
 
 	std::optional<LabValue> GIReferenceLabSession::ReadImmediateParameterFrameValue(
 		const LabParameterId& id, const LabParameterFrameContext& frame) const noexcept
 	{
-		if (id != MaterialCaseId || !frame.m_Scene || frame.m_FrameSerial == 0)
+		if ((id != MaterialCaseId && id != VisibilityMaterialId) || !frame.m_Scene || frame.m_FrameSerial == 0)
 		{
 			return std::nullopt;
 		}
 		// Read the frozen material identity actually assigned to this frame's table;
 		// authoring parameter storage is not evidence of consumption.
-		for (uint32_t value = 0; value < MaterialCaseCount; ++value)
+		const auto count = id == VisibilityMaterialId ? VisibilityMaterialCount : MaterialCaseCount;
+		for (uint32_t value = 0; value < count; ++value)
 		{
-			const auto key = RenderMaterialKey::FromRuntime(MaterialCaseKey(value));
+			const auto key = RenderMaterialKey::FromRuntime(id == VisibilityMaterialId ?
+				VisibilityMaterialKey(value) : MaterialCaseKey(value));
 			if (std::ranges::any_of(frame.m_Scene->m_RenderInstances, [key](const auto& instance)
 				{
 					return instance.m_MaterialKey == key;
@@ -648,13 +854,16 @@ namespace gglab
 	{
 		m_LightingOverride = m_Services.m_EnvironmentLightingControl->AcquireOverride();
 		GGLAB_ASSERT(m_LightingOverride);
-		const bool contract = GetParameters().Get(FixtureId, int32_t(0)) >= 5;
-		const auto environment = contract ? GetParameters().Get(EnvironmentId, int32_t(0)) : 0;
+		const auto fixture = GetParameters().Get(FixtureId, int32_t(0));
+		const bool contract = fixture >= 5;
+		const auto environment = fixture == 11 ?
+			3 : contract ? GetParameters().Get(EnvironmentId, int32_t(0)) : 0;
 		m_LightingOverride->Apply({
-			.m_Intensity = environment == 0 ? 0.0f : static_cast<float>(GetParameters().Get(IntensityId, int32_t(1))),
-			.m_RotationRadians = environment == 0 ? 0.0f :
-				static_cast<float>(GetParameters().Get(YawId, int32_t(0))) * 0.017453292519943295f,
-			.m_EnableSkybox = false,
+			.m_Intensity = fixture == 11 ?
+				1.0f : environment == 0 ? 0.0f : static_cast<float>(GetParameters().Get(IntensityId, int32_t(1))),
+			.m_RotationRadians = environment == 0 || fixture == 11 ?
+				0.0f : static_cast<float>(GetParameters().Get(YawId, int32_t(0))) * 0.017453292519943295f,
+			.m_EnableSkybox = fixture == 11,
 			.m_BackgroundMode = environment == 3 ?
 				EnvironmentBackgroundMode::PhysicalSky : EnvironmentBackgroundMode::TextureEnvironment });
 		if (environment == 1 || environment == 2)

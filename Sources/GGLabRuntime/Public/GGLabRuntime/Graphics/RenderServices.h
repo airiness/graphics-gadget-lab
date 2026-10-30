@@ -8,6 +8,7 @@
 #include "GGLabRuntime/Graphics/IBLPreviewTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalHistoryTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIReferenceTypes.h"
+#include "GGLabRuntime/Graphics/Pipeline/GISpecularVisibility.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBindingLayout.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
@@ -31,6 +32,7 @@ namespace gglab
 {
 	class World;
 	class GIReferenceObservation;
+	class GISpecularVisibilityObservation;
 	class ComposedLayout;
 	class AssetUploadScheduling;
 	class RenderFrameCaptureAccess;
@@ -245,6 +247,8 @@ namespace gglab
 		[[nodiscard]] virtual RHIFencePoint GetLastSubmittedFencePoint() const noexcept = 0;
 		[[nodiscard]] virtual GIReferenceObservationDiagnostics GetGIReferenceObservationDiagnostics()
 			const noexcept { return {}; }
+		[[nodiscard]] virtual GISpecularVisibilityProgress GetGISpecularVisibilityProgress()
+			const noexcept { return {}; }
 	};
 
 	class RenderBindingLayoutAccess
@@ -296,6 +300,7 @@ namespace gglab
 		RenderPipelineOverlayExtensionBase* m_OverlayExtension = nullptr;
 		// Runtime-internal pass binding; content reads immutable progress through Presentation.
 		GIReferenceObservation* m_GIReferenceObservation = nullptr;
+		GISpecularVisibilityObservation* m_GISpecularVisibilityObservation = nullptr;
 
 		// Validates the stable owner-provided services. The application-injected
 		// m_TextureAssets is required for pass execution but is not part of this

@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIReference.h"
+#include "GGLabRuntime/Graphics/Pipeline/GISpecularVisibility.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineSceneExtensionBase.h"
 
 #include <memory>
@@ -23,6 +24,8 @@ namespace gglab
 		bool m_EnableGIReceiver = false;
 		// Also enables receivers; records a stateless float reference before TAA.
 		std::optional<GIReferenceCreateInfo> m_GIReference;
+		// Independent pre-temporal diagnostic; never changes production specular IBL.
+		std::optional<GISpecularVisibilityCreateInfo> m_GISpecularVisibility;
 	};
 
 	[[nodiscard]] std::unique_ptr<RenderPipelineBase> CreateRenderPipelineForwardPlus(

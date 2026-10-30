@@ -51,6 +51,8 @@ namespace gglab
 		instance.m_CompositionBindings.m_AssetUpload = renderer->GetAssetUploadScheduler();
 		instance.m_CompositionBindings.m_FrameCapture = renderer->GetFrameCaptureAccess();
 		instance.m_CompositionBindings.m_GIReferenceObservation = renderer->GetGIReferenceObservation();
+		instance.m_CompositionBindings.m_GISpecularVisibilityObservation =
+			renderer->GetGISpecularVisibilityObservation();
 		instance.m_Composition = renderer.get();
 		instance.m_ServiceView = renderer->PublishRenderServices(instance.m_CompositionBindings);
 		instance.m_Host = std::move(renderer);

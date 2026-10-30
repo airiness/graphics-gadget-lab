@@ -245,6 +245,7 @@
     <FxCompile Include="..\..\Shaders\Passes\PassForwardPlusValidation.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassGIReceiver.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassGIReference.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassGISpecularVisibility.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassGTAO.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassIBLBrdfLUT.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassIBLCubemapPreview.hlsl" />

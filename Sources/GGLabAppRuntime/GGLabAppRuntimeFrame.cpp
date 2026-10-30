@@ -759,6 +759,20 @@ namespace gglab
 					reference.m_SubmittedTiles, reference.m_TileCount),
 				"gi-reference", reference.m_Generation);
 		}
+		const auto visibility = services.m_Presentation->GetGISpecularVisibilityProgress();
+		if (visibility.m_Active)
+		{
+			captureFrameState.m_Readiness.Add("gi-specular-visibility",
+				visibility.m_Status == GISpecularVisibilityStatus::Completed ?
+					FrameCaptureGateState::Ready :
+					visibility.m_Status == GISpecularVisibilityStatus::Failed ?
+						FrameCaptureGateState::Failed : FrameCaptureGateState::Pending,
+				std::format("Observation {}: {}/{} completed samples, {} submitted, version {}; sweep {} samples, tiles {}/{} submitted.",
+					visibility.m_Generation, visibility.m_CompletedSamples, visibility.m_TargetSamples,
+					visibility.m_SubmittedSamples, visibility.m_CommittedVersion, visibility.m_SweepSamples,
+					visibility.m_SubmittedTiles, visibility.m_TileCount),
+				"gi-specular-visibility", visibility.m_Generation);
+		}
 		// Select captures only after validation has identified this frame's observation.
 		if (!m_FrameSequence->BeginFrame(captureFrameState, [this](const FrameCaptureGate& gate)
 			{

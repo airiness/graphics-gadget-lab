@@ -56,6 +56,11 @@ independently of the Lab and temporal histories; see [frame settlement](Frame_Ex
 `RenderPresentationAccess` returns immutable progress. AppRuntime selects captures
 after pipeline validation identifies the current observation.
 
+The opt-in `m_GISpecularVisibility` adds a Runtime-owned pre-temporal diagnostic
+with an independent Renderer-owned observation. It requires a
+`RaySceneMaterialInputs::PrimaryReceiver` scene; when both GI diagnostics are
+enabled they must share one RayScene import. Neither changes production IBL.
+
 ## Lab-owned composition
 
 A Lab composes graph work through two Public seams:

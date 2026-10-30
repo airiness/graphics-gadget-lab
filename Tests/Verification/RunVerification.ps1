@@ -48,6 +48,9 @@ $catalog = @(
         @{ path = 'Tests/Verification/ValidateGIReferenceConvergence.py'; arguments = @('--self-test') },
         @{ path = 'Tests/Verification/ValidateGIReferenceMaterials.py'; arguments = @('--self-test') },
         @{ path = 'Tests/Verification/GlobalIllumination/GenerateReferenceEnvironments.py'; arguments = @('--check') }) },
+    @{ name = 'gi-specular-visibility-contracts'; group = 'contracts'; steps = @(
+        @{ path = 'Tests/Verification/ValidateGISpecularVisibility.py'; arguments = @('--self-test') }) },
+    @{ name = 'gi-specular-visibility'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGISpecularVisibility.ps1' }) },
     @{ name = 'gi-reference'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIReference.ps1' }) },
     @{ name = 'gi-reference-materials'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIReferenceMaterials.ps1' }) },
     @{ name = 'gi-reference-tiling'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIReferenceTiling.ps1' }) },
@@ -126,7 +129,7 @@ try {
                     $parameters = @{ OutputDirectory = $directory }
                     if ($item.group -eq 'gpu') {
                         $parameters = @{ RunDirectory = (Join-Path $directory 'run'); Configuration = $config; Rhi = $Rhi }
-                        if ($item.name -in @('taa-comparison', 'session-lifecycle', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials')) { $parameters.Python = $Python }
+                        if ($item.name -in @('taa-comparison', 'session-lifecycle', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility')) { $parameters.Python = $Python }
                     }
                     $execution = Invoke-VerificationScript $path $parameters
                     $text = $execution.output + $execution.error

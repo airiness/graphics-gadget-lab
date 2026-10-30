@@ -85,6 +85,14 @@ namespace gglab
 			}
 			constexpr std::array giRecords
 			{
+				std::pair{ "GI.SpecularVisibility.Visibility", "RGB: base, coat and Rec709-luminance layer-weighted continuous GGX environment visibility. A: 0 background/pending, 1 valid calculated estimate, 2 all lobes inactive, -1 unsupported/unmatched primary, -2 invalid sampling. GPU completion is not numerical qualification. Not radiance, reflection transport, specular GI or production S1." },
+				std::pair{ "GI.SpecularVisibility.Base", "RGBA: base numerator, denominator, below-face count and invalid count, each divided by full submitted samples. Normalize per pixel before ROI area means; do not divide ROI sums." },
+				std::pair{ "GI.SpecularVisibility.Coat", "RGBA: coat numerator, denominator, below-face count and invalid count, each divided by full submitted samples. Inactive lobes have zero sums, not a failed denominator." },
+				std::pair{ "GI.SpecularVisibility.Weights", "RGB: base directional specular albedo times squared coat transmission. A: coat factor times coat directional albedo. Constant-white-environment scalar composite; excludes material AO and arbitrary environment radiance." },
+				std::pair{ "GI.SpecularVisibility.Position", "RGB: committed primary world position in metres. A: snapshot instance index, not raster material index; use receiver coverage and Visibility alpha for validity." },
+				std::pair{ "GI.SpecularVisibility.Diagnostics", "R: primary primitive index, or failure -1 unsupported, -2 nonfinite position, -3 invalid ray hit, -4 face mismatch, -5 bounded primary miss, -6 illegal material input. G: active lobe bits (base=1, coat=2). B: complete-sweep sample count. A: invalid sampling flag. Background zero. Partial sweeps retain the preceding complete estimate." },
+				std::pair{ "GI.SpecularVisibility.F0", "RGB: full primary F0 reconstructed from IOR, raster base color and metallic. A: effective IOR (zero denotes infinite-IOR F0=1). Never inferred from diffuse energy." },
+				std::pair{ "GI.SpecularVisibility.LayerEnergy", "RGBA: coat factor, coat directional albedo, base NoV and coat NoV. Uses the ready published BRDF LUT bound to this observation." },
 				std::pair{ "GI.Reference.Position", "RGB: reconstructed committed-triangle world position in metres. A: 1 matched primary receiver, 0 otherwise." },
 				std::pair{ "GI.Reference.Identity", "R/G: primary snapshot instance and primitive indices; B: oriented geometric normal Y; A: 1 centre-ray match, 2 bounded subpixel silhouette fallback with matching raster face/depth. -1 without receiver." },
 				std::pair{ "GI.Reference.Diagnostics", "RGBA: miss, surface hit, single-sided backface hit and invalid secondary fractions, divided by requested sample count. Below-face directions contribute zero and stay in the denominator." },

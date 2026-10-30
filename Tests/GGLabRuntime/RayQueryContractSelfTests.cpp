@@ -1,6 +1,7 @@
 #include "RayQueryContractSelfTests.h"
 #include "AssetTestServices.h"
 #include "Graphics/Pipeline/GIReferenceObservation.h"
+#include "Graphics/Pipeline/GISpecularVisibilityObservation.h"
 #include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
 #include "GGLabRuntime/Graphics/Pipeline/RaySceneSunVisibility.h"
 #include "GGLabRuntime/Graphics/Pipeline/RaySceneHitMaterial.h"
@@ -348,6 +349,143 @@ namespace gglab
 				textures.GetDiagnostics().m_PendingRetirementTextureCount == 0, "Verified teardown releases every observation surface");
 		}
 
+		void RunSpecularVisibilityTests(SelfTestContext& context) noexcept
+		{
+			GISpecularVisibilityCreateInfo info;
+			RaySceneDiagnostics scene{ .m_Status = RaySceneStatus::Prepared,
+				.m_BoundsDiagonal = 20, .m_HasCompleteBounds = true };
+			context.Check(!ValidateGISpecularVisibilityInputs(info, scene).IsReady(),
+				"Reduced hit identity cannot qualify primary specular inputs");
+			scene.m_TracksPrimaryMaterials = true;
+			context.Check(ValidateGISpecularVisibilityInputs(info, scene).IsReady(),
+				"Primary materials and complete scene bounds admit geometric visibility");
+			info.m_MaximumDistance = 19;
+			context.Check(!ValidateGISpecularVisibilityInputs(info, scene).IsReady(),
+				"Visibility cannot truncate off-camera blockers into environment misses");
+			info.m_MaximumDistance = 20;
+			info.m_QueryWorkPerSubmission = 1;
+			context.Check(!ValidateGISpecularVisibilityInputs(info, scene).IsReady(),
+				"The work budget accounts for both lobes even when a material disables one");
+
+			asset_test::TestRHIDevice device;
+			PersistentTexturePool textures(&device);
+			TransientResourcePool transients(&device);
+			GISpecularVisibilityObservation observation(device, textures);
+			GISpecularVisibilityKey key{ .m_Width = 16, .m_Height = 8, .m_Samples = 2 };
+			const RHIFencePoint fence{ RHIFenceHandle(0, 1), 1 };
+			const auto record = [&]() noexcept
+				{
+					RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &transients });
+					struct Data {};
+					graph.AddPass<Data>("VisibilityTile", RGPassEncoderType::Compute,
+						[&](RenderGraph::RGBuilder& builder, Data&)
+						{
+							auto surfaces = observation.Import(builder);
+							for (auto& surface : surfaces)
+							{
+								if (observation.GetDiagnostics().m_SubmittedSamples != 0)
+								{
+									GGLAB_UNUSED(builder.Read(surface.m_Previous, RGTextureAccess::Sample, RHIStage::ComputeShader));
+								}
+								if (observation.GetDiagnostics().m_BatchSamples != 0)
+								{
+									if (observation.GetTile().m_BeginSweep)
+									{
+										builder.WriteInPlace(surface.m_Next, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+									}
+									else
+									{
+										builder.ReadWriteInPlace(surface.m_Next, RGTextureAccess::StorageReadWrite, RHIStage::ComputeShader);
+									}
+								}
+							}
+							observation.Export(builder, surfaces);
+							builder.SideEffect();
+						});
+					context.Check(graph.Compile(), "Visibility sums have defined graph-owned imports and final states");
+					observation.MarkRecorded();
+				};
+			observation.BeginFrame(1);
+			context.Check(observation.Prepare(key, 64, 128) &&
+				observation.GetDiagnostics().m_TileCount == 2 && observation.GetDiagnostics().m_BatchSamples == 1,
+				"Two-lobe query work tiles without reducing the measurement extent");
+			record();
+			observation.Settle({ RenderFrameOutcomeKind::Discarded, 1, {} });
+			context.Check(observation.GetDiagnostics().m_SubmittedTiles == 0,
+				"Discarded visibility work does not consume sample indices or tiles");
+			observation.BeginFrame(2);
+			GGLAB_UNUSED(observation.Prepare(key, 64, 128));
+			record();
+			device.SetFencesComplete(false);
+			observation.Settle({ RenderFrameOutcomeKind::Submitted, 2, fence });
+			observation.Settle({ RenderFrameOutcomeKind::Submitted, 2, fence });
+			context.Check(observation.GetDiagnostics().m_SubmittedTiles == 1 &&
+				observation.GetDiagnostics().m_CommittedVersion == 0 && observation.GetDiagnostics().m_SubmittedSamples == 0,
+				"Partial visibility sweeps settle exactly once without publishing a complete estimate");
+			observation.BeginFrame(3);
+			GGLAB_UNUSED(observation.Prepare(key, 64, 128));
+			context.Check(observation.GetDiagnostics().m_BatchSamples == 0,
+				"Pending visibility fences prevent overlapping tile writes");
+			observation.Settle({ RenderFrameOutcomeKind::Discarded, 3, {} });
+			device.SetFencesComplete(true);
+			for (uint64_t serial = 4; serial <= 6; ++serial)
+			{
+				observation.BeginFrame(serial);
+				GGLAB_UNUSED(observation.Prepare(key, 64, 128));
+				record();
+				observation.Settle({ RenderFrameOutcomeKind::Submitted, serial, fence });
+			}
+			observation.BeginFrame(7);
+			GGLAB_UNUSED(observation.Prepare(key, 64, 128));
+			context.Check(observation.GetDiagnostics().m_Status == GISpecularVisibilityStatus::Completed &&
+				observation.GetDiagnostics().m_CompletedSamples == 2 && observation.GetDiagnostics().m_CommittedVersion == 2,
+				"GPU completion requires every tile and is distinct from external sampling qualification");
+			const auto generation = observation.GetDiagnostics().m_Generation;
+			++key.m_ReceiverShaderGeneration;
+			GGLAB_UNUSED(observation.Prepare(key, 64, 128));
+			context.Check(observation.GetDiagnostics().m_Generation == generation + 1 &&
+				observation.GetDiagnostics().m_SubmittedSamples == 0,
+				"Receiver shader changes invalidate material reconstruction and sums");
+			record();
+			observation.Settle({ RenderFrameOutcomeKind::Failed, 7, fence });
+			context.Check(observation.GetDiagnostics().m_Status == GISpecularVisibilityStatus::Failed &&
+				observation.GetDiagnostics().m_SubmittedTiles == 0, "Failed visibility writes never publish progress");
+			observation.Cancel();
+			observation.BeginFrame(8);
+			GGLAB_UNUSED(observation.Prepare(key, 64, 128));
+			record();
+			observation.Settle({ RenderFrameOutcomeKind::CompletionUnknown, 8, {} });
+			observation.Cancel();
+			context.Check(textures.GetDiagnostics().m_ActiveTextureCount == 8 && !observation.Prepare(key, 64, 128),
+				"Unknown completion retains all four visibility surface pairs until checked teardown");
+			observation.Shutdown();
+			textures.Tick();
+			observation.BeginFrame(9);
+			GGLAB_UNUSED(observation.Prepare(key, 64, 128));
+			record();
+			device.SetFencesComplete(false);
+			observation.Settle({ RenderFrameOutcomeKind::Submitted, 9, fence });
+			observation.BeginFrame(10);
+			++key.m_BrdfLutRevision;
+			GGLAB_UNUSED(observation.Prepare(key, 64, 128));
+			context.Check(observation.GetDiagnostics().m_SubmittedTiles == 0 &&
+				textures.GetDiagnostics().m_PendingRetirementTextureCount == 8,
+				"LUT replacement resets pending sweeps while retaining old allocations through the fence");
+			observation.Settle({ RenderFrameOutcomeKind::Submitted, 10, fence });
+			context.Check(observation.GetDiagnostics().m_SubmittedTiles == 0,
+				"Unrecorded visibility work cannot advance even on submitted frames");
+			observation.BeginFrame(11);
+			observation.Settle({ RenderFrameOutcomeKind::Submitted, 11, fence });
+			context.Check(observation.GetDiagnostics().m_Status == GISpecularVisibilityStatus::Cancelled,
+				"Lab deactivation cancels visibility independently of diffuse reference");
+			device.SetFencesComplete(true);
+			observation.Shutdown();
+			textures.Tick();
+			context.Check(textures.GetDiagnostics().m_ActiveTextureCount == 0 &&
+				textures.GetDiagnostics().m_PendingRetirementTextureCount == 0,
+				"Visibility teardown releases every allocation after checked completion");
+		}
+
 		void RunGIReferenceTilingTests(SelfTestContext& context) noexcept
 		{
 			asset_test::TestRHIDevice device;
@@ -596,6 +734,21 @@ namespace gglab
 			GGLAB_UNUSED(PlanRayScene({ replaced }, {}, limits, other, reason));
 			context.Check(!HasSameRayInstances(textureBaseline, other),
 				"Metallic texture content is part of the reduced material identity");
+			for (size_t slot = 2; slot < textured.m_TextureContents.size(); ++slot)
+			{
+				replaced = textured;
+				replaced.m_TextureContents[slot] = { TextureID(16), 2 };
+				GGLAB_UNUSED(PlanRayScene({ replaced }, {}, limits, other, reason));
+				context.Check(HasSameRayTransforms(textureBaseline, other) &&
+					!HasSameRayInstances(textureBaseline, other),
+					"Every primary normal/coat/anisotropy texture content participates in observation identity");
+				replaced = textured;
+				replaced.m_TextureResources[slot] = { 8, 2 };
+				GGLAB_UNUSED(PlanRayScene({ replaced }, {}, limits, other, reason));
+				context.Check(HasSameRayTransforms(textureBaseline, other) &&
+					!HasSameRayInstances(textureBaseline, other),
+					"Primary texture resource generation changes invalidate identity without rebuilding geometry");
+			}
 			replaced = textured;
 			replaced.m_EntityIdentity += 1;
 			replaced.m_TextureContents[0].m_Generation += 1;
@@ -1148,6 +1301,7 @@ namespace gglab
 		RunGIReceiverPreparationTests(context);
 		RunGIReferenceInputTests(context);
 		RunGIReferenceObservationTests(context);
+		RunSpecularVisibilityTests(context);
 		RunGIReferenceTilingTests(context);
 		RunTriangleTests(context);
 		RunInstanceTests(context);

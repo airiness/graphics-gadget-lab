@@ -46,6 +46,36 @@ unmatched receivers count against the gate. These exports are unexposed surface
 data, not GI radiance. Run the numerical checker's positive/adversarial self-tests
 without a GPU using `python Tests/Verification/ValidateCoastalGIMaterial.py --self-test`.
 
+## Specular environment visibility
+
+Build WinApp and ShaderCompiler, then run the hidden, dual-RHI suite:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/RunVerification.ps1 -Suite gi-specular-visibility -Configuration Develop -Rhi dx12,vulkan -Python <python-with-numpy-jsonschema-and-pillow>
+```
+
+`gglab.lab.gi_reference` fixture 10 provides dedicated GGX visibility contracts,
+separate from F1-F10. Activate it through RestartSession before assigning the
+Immediate `gi_reference.visibility_material` parameter; `visibility_geometry`
+also requires RestartSession. Other `gi_reference.*` controls are `samples`,
+`seed`, `batch_samples` and `tile_pixels`.
+
+Runtime configuration uses Public
+[GISpecularVisibilityCreateInfo](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GISpecularVisibility.h)
+with a complete `PrimaryReceiver` RayScene. This opt-in diagnostic leaves
+production S0 and diffuse reference sequences unchanged.
+
+Read channel/identity semantics from the `GI.SpecularVisibility.*` export metadata.
+Receiver arrays and `IBL.BrdfLut` use separate bounded groups. Capture readiness
+means GPU calculation completed, not numerical convergence; the independent
+`ValidateGISpecularVisibility.py` checker determines numerical qualification.
+
+Fixture 11 collects Coastal diagnostics at locked C1-C4 views and 1280x800.
+Unmatched pixels remain reported; these outputs are not reference-certified.
+The standalone `TestGISpecularVisibility.ps1` supports `-Smoke` and `-SkipCoastal`;
+neither establishes the full suite. Detailed measurement contracts and
+qualification records belong to `gglab-docs` GI plan §§11.16–11.17.
+
 ## Irradiance reference
 
 After building WinApp and ShaderCompiler, run:

@@ -211,9 +211,12 @@ namespace gglab
 		std::shared_ptr<SceneSnapshot> m_Snapshot;
 	};
 
-	RayScene::RayScene(RaySceneCapacity capacity) noexcept : m_State(std::make_unique<State>())
+	RayScene::RayScene(RaySceneCapacity capacity, RaySceneMaterialInputs materialInputs) noexcept :
+		m_State(std::make_unique<State>())
 	{
 		m_State->m_Capacity = capacity;
+		m_State->m_Diagnostics.m_TracksPrimaryMaterials =
+			materialInputs == RaySceneMaterialInputs::PrimaryReceiver;
 	}
 	RayScene::~RayScene() = default;
 	const RaySceneDiagnostics& RayScene::GetDiagnostics() const noexcept { return m_State->m_Diagnostics; }
@@ -287,12 +290,16 @@ namespace gglab
 				{
 					return fail(RaySceneStatus::InvalidSource, "Ray mesh buffer descriptions are unavailable.");
 				}
-				std::array<TextureContentRef, 2> contents{};
-				std::array<RHITextureHandle, 2> textures{};
-				const std::array bindings{ material->m_BaseColorBinding, material->m_MetallicRoughnessBinding };
+				std::array<TextureContentRef, 7> contents{};
+				std::array<RHITextureHandle, 7> textures{};
+				const std::array bindings{ material->m_BaseColorBinding,
+					material->m_MetallicRoughnessBinding, material->m_NormalBinding,
+					material->m_ClearcoatBinding, material->m_ClearcoatRoughnessBinding,
+					material->m_ClearcoatNormalBinding, material->m_AnisotropyBinding };
+				const size_t slotCount = diagnostics.m_TracksPrimaryMaterials ? bindings.size() : 2;
 				if (material->m_AlphaMode == AlphaMode::Opaque)
 				{
-					for (size_t slot = 0; slot < bindings.size(); ++slot)
+					for (size_t slot = 0; slot < slotCount; ++slot)
 					{
 						if (!bindings[slot].m_TextureId.IsValid())
 						{
@@ -304,7 +311,7 @@ namespace gglab
 						if (!resident)
 						{
 							return fail(RaySceneStatus::NotReady,
-								"A reduced GI material texture is not resident; no fallback snapshot is published.");
+								"A required GI material texture is not resident; no fallback snapshot is published.");
 						}
 						textures[slot] = resident->m_Texture;
 					}
@@ -378,7 +385,7 @@ namespace gglab
 				}
 				materialTextures.push_back({ materialIndex, slot, content, resident->m_Texture,
 					resident->m_SrvIndex, resident->m_ViewFormat, desc.m_Extent.m_Width,
-					desc.m_Extent.m_Height, desc.m_MipLevels, level,
+					desc.m_Extent.m_Height, desc.m_MipLevels, slot < 2 ? level : UINT32_MAX,
 					resident->m_SourceDigest, resident->m_ArtifactContentDigest });
 			}
 		}

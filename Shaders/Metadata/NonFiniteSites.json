@@ -1594,6 +1594,19 @@
         "fp16Maximum": "report"
       },
       "rationale": "Fixed-depth paths reject non-finite geometry, throughput and lighting at every query; a persistent any-depth invalid count also invalidates the reference estimate. Signed positions/normals and FP32 lighting are legitimate."
+    },
+    {
+      "id": "gi-specular-visibility.finite.isfinite",
+      "source": "Passes/PassGISpecularVisibility.hlsl",
+      "function": "VisibilityFinite",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "53da467db2d036ad9212a9554671be25291dfe3a9d12fc8beae40c27e9b77801",
+      "programs": ["gglab.shader.ray-scene"],
+      "kind": "recovery",
+      "evidence": "counter",
+      "policy": { "negative": "report", "fp16Maximum": "report" },
+      "rationale": "Reject invalid receiver, GGX direction, layer energy and accumulated sums before publishing normalized visibility. Signed geometry and FP32 values are not radiance clamps; per-lobe invalid counts independently invalidate the observation."
     }
   ],
   "injectionPoints": [

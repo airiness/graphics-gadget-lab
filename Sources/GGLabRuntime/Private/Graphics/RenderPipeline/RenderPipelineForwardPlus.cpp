@@ -155,8 +155,10 @@ namespace gglab
 		GGLAB_ASSERT_MSG(context.IsRenderSceneReady() && framePlan.m_DepthCoverage.IsValid(),
 			"A Ready Forward+ frame has prepared scene data and a valid depth coverage plan.");
 
-		const auto referenceScene = m_GIReference ?
-			m_GIReference->m_RayScene->AddBuildPasses(rg) : RaySceneGraphResources{};
+		const auto rayScene = m_GIReference ?
+			m_GIReference->m_RayScene :
+			m_GISpecularVisibility ? m_GISpecularVisibility->m_RayScene : nullptr;
+		const auto referenceScene = rayScene ? rayScene->AddBuildPasses(rg) : RaySceneGraphResources{};
 		auto* swapChain = services.m_Presentation->GetSwapChain();
 
 		const uint32_t frameBackBufferIndex = context.m_BackBufferIndex;
@@ -525,6 +527,10 @@ namespace gglab
 		{
 			m_GIReceiverPass.AddPass(rg, context, services);
 		}
+		if (m_GISpecularVisibility)
+		{
+			m_GISpecularVisibilityPass.AddPass(rg, context, services, referenceScene, *m_GISpecularVisibility);
+		}
 		if (m_GIReference)
 		{
 			m_GIReferencePass.AddPass(rg, context, services, referenceScene, *m_GIReference);
@@ -797,6 +803,19 @@ namespace gglab
 			if (m_EnableGIReceiver)
 			{
 				result = m_GIReceiverPass.Prepare(context, services, m_ForwardPBRShaderSet.m_CoverageVertexShader);
+				if (!result.IsReady())
+				{
+					return result;
+				}
+			}
+			if (m_GISpecularVisibility)
+			{
+				if (m_GIReference && m_GIReference->m_RayScene != m_GISpecularVisibility->m_RayScene)
+				{
+					return RenderFrameValidationResult::ContractFailure("GI diagnostics must share one ray scene");
+				}
+				result = m_GISpecularVisibilityPass.Prepare(context, services, *m_GISpecularVisibility,
+					m_ForwardPBRShaderSet.m_CoverageVertexShader);
 				if (!result.IsReady())
 				{
 					return result;

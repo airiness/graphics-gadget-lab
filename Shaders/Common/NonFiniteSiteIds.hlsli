@@ -79,7 +79,8 @@ static const uint NF_SITE_PASS_TEMPORAL_AA_CSMAIN_SANITIZE_HDRCOLOR = 74u;
 static const uint NF_SITE_PASS_TEMPORAL_REFERENCE_CSMAIN_ISFINITE = 75u;
 static const uint NF_SITE_GI_RAY_SCENE_GITRACE_HIT_ISFINITE = 76u;
 static const uint NF_SITE_PASS_GI_REFERENCE_GIPATHFINITE_ISFINITE = 77u;
-static const uint NF_SITE_COUNT = 78u;
+static const uint NF_SITE_GI_SPECULAR_VISIBILITY_FINITE_ISFINITE = 78u;
+static const uint NF_SITE_COUNT = 79u;
 static const uint NF_PROGRAM_COUNT = 29u;
 
 static const uint NF_INJECT_PASS_RENDER_GRAPH_COMPUTE_SMOKE_CSNONFINITEPROBE_PROBE = 0u;
@@ -89,5 +90,5 @@ static const uint NF_INJECT_PASS_GI_REFERENCE_CSMAIN_THROUGHPUT = 3u;
 static const uint NF_INJECTION_POINT_COUNT = 4u;
 
 static const uint NF_ABI_VERSION = 2u;
-static const uint NF_INVENTORY_LOW = 0xbb719afau;
-static const uint NF_INVENTORY_HIGH = 0x5642237eu;
+static const uint NF_INVENTORY_LOW = 0x25a684b1u;
+static const uint NF_INVENTORY_HIGH = 0xc1340cd2u;

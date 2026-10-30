@@ -36,8 +36,8 @@ namespace gglab
 		RenderMaterialKey m_MaterialKey;
 		MaterialGPU m_Material{};
 		// Descriptor indices alone do not identify texture contents or residency.
-		std::array<TextureContentRef, 2> m_TextureContents{};
-		std::array<RHITextureHandle, 2> m_TextureResources{};
+		std::array<TextureContentRef, 7> m_TextureContents{};
+		std::array<RHITextureHandle, 7> m_TextureResources{};
 		AlphaMode m_AlphaMode = AlphaMode::Opaque;
 		std::array<float, 12> m_Transform{};
 	};
