@@ -587,11 +587,7 @@ namespace gglab
 
 	void DX12Context::BindGlobalDescriptorHeaps(DX12CommandList& commandList) noexcept
 	{
-		const DX12DescriptorHeap* heaps[] = {
-			m_DescriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav),
-			m_DescriptorManager->GetHeap(DX12DescriptorManager::HeapType::Sampler),
-		};
-		commandList.SetDescriptorHeaps(heaps);
+		m_Device->BindGlobalDescriptorHeaps(commandList);
 	}
 
 	void DX12Context::FinishFrame(DX12FrameContext& frame, const RHIFencePoint& fencePoint) noexcept

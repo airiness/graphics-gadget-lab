@@ -7,6 +7,7 @@
 #include "Graphics/RHI/DX12/DX12QueueSystem.h"
 #include "Graphics/RHI/DX12/DX12RayQuerySupport.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"
+#include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
 #include "Graphics/RHI/DX12/Cache/DX12DescriptorCache.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
@@ -599,6 +600,17 @@ namespace gglab
 		DX12DescriptorView& descriptor, RHITextureViewKey& key) const noexcept
 	{
 		return m_DescriptorCache && m_DescriptorCache->ResolveTextureViewInfo(view, descriptor, key);
+	}
+
+	void DX12Device::BindGlobalDescriptorHeaps(DX12CommandList& commandList) const noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_DescriptorManager);
+		const DX12DescriptorHeap* heaps[] =
+		{
+			m_DescriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav),
+			m_DescriptorManager->GetHeap(DX12DescriptorManager::HeapType::Sampler),
+		};
+		commandList.SetDescriptorHeaps(heaps);
 	}
 
 	D3D12_GPU_DESCRIPTOR_HANDLE DX12Device::ResolveShaderVisibleDescriptor(

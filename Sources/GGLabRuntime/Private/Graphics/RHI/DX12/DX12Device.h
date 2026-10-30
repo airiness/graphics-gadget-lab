@@ -24,6 +24,7 @@ namespace gglab
 	class DX12FencePoint;
 	class DX12Resource;
 	class DX12DescriptorCache;
+	class DX12CommandList;
 	struct DX12DescriptorView;
 	struct RHITextureViewKey;
 	class DX12Device : public RHIDevice
@@ -165,6 +166,7 @@ namespace gglab
 			RHITextureViewKey& key) const noexcept;
 		D3D12_GPU_DESCRIPTOR_HANDLE ResolveShaderVisibleDescriptor(
 			RHIDescriptorHeapType heapType, uint32_t descriptorIndex) const noexcept;
+		void BindGlobalDescriptorHeaps(DX12CommandList& commandList) const noexcept;
 
 		DX12Texture* ResolveTexture(RHITextureHandle texture) noexcept;
 		const DX12Texture* ResolveTexture(RHITextureHandle texture) const noexcept;

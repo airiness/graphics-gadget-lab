@@ -534,12 +534,12 @@ namespace gglab
 			return;
 		}
 
-		if (m_CurrentRootSignature != rootSignature)
-		{
-			m_Backend.GetCommandList()->SetGraphicsRootSignature(*rootSignature);
-			m_CurrentRootSignature = rootSignature;
-			m_RootParameterPlan = rootSignature->GetParameterPlan();
-		}
+		// Native GUI drawing can replace the root signature and unbind the sampler
+		// heap. Direct indexing requires both heaps before setting either root.
+		m_Backend.GetDevice()->BindGlobalDescriptorHeaps(*m_Backend.GetCommandList());
+		m_Backend.GetCommandList()->SetGraphicsRootSignature(*rootSignature);
+		m_CurrentRootSignature = rootSignature;
+		m_RootParameterPlan = rootSignature->GetParameterPlan();
 		m_Backend.GetCommandList()->SetPipelineState(*pipelineState);
 		if (const auto& binding = GetPassStorageBuffer(); binding)
 		{
@@ -1086,13 +1086,6 @@ namespace gglab
 	{
 		m_RequiredAccelerationStructures = 0;
 		m_BoundAccelerationStructures = 0;
-		for (uint32_t index = 0; index < RHIBindingLayoutDesc::MaxSlots; ++index)
-		{
-			if (m_PipelineSystem->IsAccelerationStructureParameter(pipeline, index))
-			{
-				m_RequiredAccelerationStructures |= 1u << index;
-			}
-		}
 		InvalidatePipelineBindings();
 		DX12PipelineState* pipelineState = nullptr;
 		DX12RootSignature* rootSignature = nullptr;
@@ -1103,12 +1096,19 @@ namespace gglab
 				"DX12ComputeCommandContext::SetPipeline received an invalid pipeline handle.");
 			return;
 		}
-		if (m_CurrentRootSignature != rootSignature)
+		for (uint32_t index = 0; index < RHIBindingLayoutDesc::MaxSlots; ++index)
 		{
-			m_Backend->GetCommandList()->SetComputeRootSignature(*rootSignature);
-			m_CurrentRootSignature = rootSignature;
-			m_RootParameterPlan = rootSignature->GetParameterPlan();
+			if (m_PipelineSystem->IsAccelerationStructureParameter(pipeline, index))
+			{
+				m_RequiredAccelerationStructures |= 1u << index;
+			}
 		}
+		// A direct compute encoder shares the graphics list, including GUI heap
+		// changes. Restore heaps before the root even when its cached pointer matches.
+		m_Backend->GetDevice()->BindGlobalDescriptorHeaps(*m_Backend->GetCommandList());
+		m_Backend->GetCommandList()->SetComputeRootSignature(*rootSignature);
+		m_CurrentRootSignature = rootSignature;
+		m_RootParameterPlan = rootSignature->GetParameterPlan();
 		m_Backend->GetCommandList()->SetPipelineState(*pipelineState);
 		if (const auto& binding = GetPassStorageBuffer(); binding)
 		{
