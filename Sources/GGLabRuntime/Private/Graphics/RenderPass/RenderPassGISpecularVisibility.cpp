@@ -1,6 +1,7 @@
 #include "Graphics/RenderPass/RenderPassGISpecularVisibility.h"
 #include "Graphics/Pipeline/GISpecularVisibilityObservation.h"
 #include "Graphics/RenderPass/GIReceiverGraphResources.h"
+#include "Graphics/RenderPass/GIPreviewGraphResources.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
@@ -237,12 +238,21 @@ namespace gglab
 				data.m_Depth = builder.CreateView<RHITextureViewType::ShaderResource>(
 					builder.Read(depth.m_Texture, RGTextureAccess::Sample, RHIStage::ComputeShader), depth.m_SrvDesc);
 				data.m_BrdfLut = read(builder.GetBlackboard().Get<RGIBLResources>(IBLResourcesName).m_BrdfLut);
+				auto& preview = builder.GetBlackboard().GetOrCreate<RGGIPreviewResources>(GIPreviewResourcesName);
 				for (size_t index = 0; index < data.m_Outputs.size(); ++index)
 				{
 					auto texture = builder.CreateTexture(OutputNames[index],
 						{ .m_Format = RHIFormat::R32G32B32A32Float, .m_Extent = extent });
 					builder.WriteInPlace(texture, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
 					data.m_Outputs[index] = builder.CreateView<RHITextureViewType::UnorderedAccess>(texture);
+					if (index == 0)
+					{
+						preview.m_Visibility = texture;
+					}
+					else if (index == 5)
+					{
+						preview.m_Activity = texture;
+					}
 				}
 				GGLAB_UNUSED(builder.Read(scene.m_TopLevel, RGAccelerationStructureAccess::QueryRead));
 				for (const auto blas : scene.m_BottomLevels)
@@ -258,6 +268,9 @@ namespace gglab
 				auto* observation = services.m_GISpecularVisibilityObservation;
 				const auto progress = observation->GetDiagnostics();
 				const auto tile = observation->GetTile();
+				preview.m_VisibilitySnapshot = { .m_Generation = progress.m_Generation,
+					.m_Samples = progress.m_SubmittedSamples + (tile.m_EndSweep ? progress.m_BatchSamples : 0u),
+					.m_TargetSamples = info.m_SampleCount };
 				data.m_Parameters = { .m_Size = { extent.m_Width, extent.m_Height },
 					.m_TileOrigin = { tile.m_X, tile.m_Y }, .m_TileExtent = { tile.m_Width, tile.m_Height },
 					.m_View = frame.GetRenderQueue(frame.GetDisplayViewId()).m_CoverageRasterDomain.m_ViewBindingId,

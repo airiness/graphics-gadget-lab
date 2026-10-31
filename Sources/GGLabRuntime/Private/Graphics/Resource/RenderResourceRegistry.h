@@ -186,6 +186,13 @@ namespace gglab
 		void PublishPostProcessPreview(PostProcessDebugSelection selection,
 			PostProcessPreviewChannel channel, uint64_t frameSerial,
 			const RenderPreviewRequest& request) noexcept override;
+		void BeginPreviewFrame() noexcept { m_GIPreviewSourceAvailable = false; }
+		void SetGIPreviewSourceAvailable() noexcept override { m_GIPreviewSourceAvailable = true; }
+		void PublishGIPreviewSnapshot(GIPreviewSnapshot snapshot) noexcept override
+		{
+			m_PostProcessPreviewStates[utils::ToIndex(PostProcessPreviewChannel::GlobalIllumination)]
+				.m_GISnapshot = snapshot;
+		}
 		void InvalidatePostProcessPreview(PostProcessDebugSelection selection,
 			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept;
 		[[nodiscard]] bool IsPostProcessPreviewRequested(
@@ -265,6 +272,7 @@ namespace gglab
 		{
 			PostProcessDebugSelection m_Selection{};
 			PostProcessDebugSelection m_PublishedSelection{};
+			GIPreviewSnapshot m_GISnapshot{};
 			float m_ExposureEV = 0.0f;
 			uint64_t m_UpdateCount = 0;
 			uint64_t m_PublishedFrameSerial = 0;
@@ -273,6 +281,7 @@ namespace gglab
 			bool m_HasPublished = false;
 		};
 		std::array<PostProcessPreviewState, utils::EnumCount<PostProcessPreviewChannel>()> m_PostProcessPreviewStates{};
+		bool m_GIPreviewSourceAvailable = false;
 		bool m_ShadowPreviewRequested = false;
 		uint64_t m_ShadowPreviewRequestGeneration = 0;
 

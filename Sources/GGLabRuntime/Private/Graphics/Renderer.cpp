@@ -356,6 +356,7 @@ namespace gglab
 		{
 			profiler->SetRenderFrameSerial(frameSerial);
 		}
+		m_RenderResRegistry->BeginPreviewFrame();
 		m_GIReferenceObservation->BeginFrame(frameSerial);
 		m_GISpecularVisibilityObservation->BeginFrame(frameSerial);
 		m_ActiveFrame = {};

@@ -46,6 +46,7 @@ namespace gglab
 	struct ComputePipelineSlot;
 	struct EnvironmentTextureSource;
 	struct AtmosphereGPU;
+	struct GIPreviewSnapshot;
 	struct TransientResourcePoolSnapshot;
 	struct GraphicsPhysicalPipelineKey;
 	struct GraphicsPipelineSlot;
@@ -161,6 +162,8 @@ namespace gglab
 		virtual void PublishPostProcessPreview(PostProcessDebugSelection selection,
 			PostProcessPreviewChannel channel, uint64_t frameSerial,
 			const RenderPreviewRequest& request) noexcept = 0;
+		virtual void SetGIPreviewSourceAvailable() noexcept = 0;
+		virtual void PublishGIPreviewSnapshot(GIPreviewSnapshot snapshot) noexcept = 0;
 		virtual void InvalidatePostProcessPreview(
 			PostProcessDebugSelection selection,
 			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept = 0;

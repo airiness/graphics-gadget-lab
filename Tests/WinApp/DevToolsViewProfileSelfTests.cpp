@@ -6,6 +6,10 @@
 #include "DevTools/DevelopGui/Panels/TemporalAAInspectorPanel.h"
 #include "DevTools/DevelopGui/Panels/GTAOInspectorPanel.h"
 #include "DevTools/DevelopGui/Panels/PostProcessInspectorPanel.h"
+#include "DevTools/DevelopGui/Panels/GIViewerPanel.h"
+#include "DevTools/DevelopGui/Panels/LabPanel.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
 #include "Parameters/ViewControlSnapshot.h"
 #include "Parameters/ViewControlActions.h"
 #include "Capture/FrameCaptureCoordinator.h"
@@ -24,6 +28,110 @@ namespace gglab
 {
 	namespace
 	{
+		class GIPreviewProbe final : public PostProcessPreviewViewBase, public PostProcessPreviewControlBase
+		{
+		public:
+			PostProcessPreviewDiagnostics m_Preview{};
+			uint32_t m_Requests = 0;
+			PostProcessPreviewDiagnostics GetPostProcessPreviewDiagnostics(PostProcessPreviewChannel) const noexcept override
+			{
+				return m_Preview;
+			}
+			void SetPostProcessPreviewSelection(PostProcessDebugSelection selection, PostProcessPreviewChannel) noexcept override
+			{
+				m_Preview.m_Selected = selection;
+			}
+			void SetPostProcessPreviewExposureEV(float exposure, PostProcessPreviewChannel) noexcept override
+			{
+				m_Preview.m_ExposureEV = exposure;
+			}
+			void RequestPostProcessPreview(PostProcessPreviewChannel) noexcept override { ++m_Requests; }
+		};
+
+		void RunGIViewerPanelChecks(SelfTestContext& context) noexcept
+		{
+			ImGuiContext* previousContext = ImGui::GetCurrentContext();
+			ImGui::CreateContext();
+			auto& io = ImGui::GetIO();
+			io.IniFilename = nullptr;
+			io.LogFilename = nullptr;
+			io.DisplaySize = ImVec2(1600, 1000);
+			unsigned char* pixels = nullptr;
+			int width = 0, height = 0;
+			io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+			GIPreviewProbe probe;
+			probe.m_Preview.m_Selected.m_Tap = PostProcessDebugTap::GIIrradiance;
+			probe.m_Preview.m_Published = probe.m_Preview.m_Selected;
+			probe.m_Preview.m_HasPublished = true;
+			probe.m_Preview.m_GISnapshot = { .m_Generation = 7, .m_Samples = 32,
+				.m_TargetSamples = 64, .m_MaximumDepth = 4 };
+			DevelopGuiContext gui{ .m_PostProcessPreview = &probe, .m_PostProcessPreviewControl = &probe };
+			GIViewerPanel panel;
+			const auto draw = [&](bool toggleFreeze = false)
+				{
+					if (toggleFreeze)
+					{
+						ImGui::ActivateItemByID(ImHashStr("Freeze preview", 0, ImHashStr("GIViewerFixture")));
+					}
+					ImGui::NewFrame();
+					ImGui::Begin("GIViewerFixture");
+					ImGui::LogToBuffer();
+					panel.Draw(gui);
+					const std::string text = ImGui::GetCurrentContext()->LogBuffer.c_str();
+					ImGui::LogFinish();
+					ImGui::End();
+					ImGui::EndFrame();
+					return text;
+				};
+			GGLAB_UNUSED(draw());
+			const auto live = draw();
+			context.Check(probe.m_Requests == 2 && live.find("samples 32 / 64") != std::string::npos && live.find("depth 4") != std::string::npos,
+				"The GI Viewer requests live updates and labels submitted estimator provenance");
+			const auto frozen = draw(true);
+			GGLAB_UNUSED(draw());
+			context.Check(probe.m_Requests == 2 && frozen.find("Frozen") != std::string::npos,
+				"Freezing the real Viewer checkbox stops preview demand across later draws");
+			const auto resumed = draw(true);
+			context.Check(probe.m_Requests == 3 && resumed.find("Live") != std::string::npos,
+				"Unfreezing resumes preview demand without changing reference sampling controls");
+			context.Check(resumed.find("No preview yet") != std::string::npos &&
+				ImGui::FindWindowByName("GIViewerFixture")->Size.x >= 760 &&
+				ImGui::FindWindowByName("GIViewerFixture")->Size.y >= 660,
+				"Unavailable GI has an explanation and the first-use Viewer leaves room for its image");
+			LabSessionLog log;
+			LabSnapshot snapshot;
+			snapshot.m_ActiveLabName = "GI Reference";
+			snapshot.m_IsHostActive = true;
+			const auto drawLog = [&]()
+				{
+					ImGui::NewFrame();
+					ImGui::SetNextWindowSize(ImVec2(500, 600));
+					ImGui::Begin("LabLogFixture");
+					log.Draw(snapshot);
+					const float controlY = ImGui::GetCursorPosY();
+					ImGui::Button("Parameter below log");
+					ImGui::End();
+					ImGui::EndFrame();
+					return controlY;
+				};
+			snapshot.m_State = LabSnapshotRunState::Ready;
+			GGLAB_UNUSED(drawLog());
+			const float readyY = drawLog();
+			snapshot.m_State = LabSnapshotRunState::WarmingUp;
+			snapshot.m_WarmupFramesRemaining = 30;
+			const float warmupY = drawLog();
+			snapshot.m_HasPendingSession = true;
+			snapshot.m_LoadingDetail = std::string(1000, 'x');
+			for (uint32_t entry = 0; entry < 100; ++entry)
+			{
+				log.Append(std::to_string(entry));
+			}
+			context.Check(readyY == warmupY && readyY == drawLog(),
+				"Warm-up, long loading details and scrolling history cannot shift controls below the Lab log");
+			ImGui::DestroyContext();
+			ImGui::SetCurrentContext(previousContext);
+		}
+
 		bool ProfilesMatch(const ViewRenderProfile& left, const ViewRenderProfile& right) noexcept
 		{
 			const auto& leftGTAO = left.m_Lighting.m_GTAO;
@@ -601,5 +709,6 @@ namespace gglab
 			"DevTools reset clears rendering overrides without modifying authoring state");
 		RunRenderingSettingsPanelChecks(context);
 		RunViewControlPanelChecks(context);
+		RunGIViewerPanelChecks(context);
 	}
 }

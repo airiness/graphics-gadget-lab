@@ -614,6 +614,13 @@ namespace gglab
 				FindFrameCaptureDiagnosticTap("temporal-clip-distance") == PostProcessDebugTap::TemporalClipDistance &&
 				FindFrameCaptureDiagnosticTap("temporal-history-relaxation") == PostProcessDebugTap::TemporalHistoryRelaxation &&
 				FindFrameCaptureDiagnosticTap("gtao-history-samples") == PostProcessDebugTap::GTAOHistorySamples &&
+				FindFrameCaptureDiagnosticTap("gi-irradiance") == PostProcessDebugTap::GIIrradiance &&
+				FindFrameCaptureDiagnosticTap("gi-lambert-radiance") == PostProcessDebugTap::GILambertRadiance &&
+				FindFrameCaptureDiagnosticTap("gi-sun-irradiance") == PostProcessDebugTap::GISunIrradiance &&
+				FindFrameCaptureDiagnosticTap("gi-environment-irradiance") == PostProcessDebugTap::GIEnvironmentIrradiance &&
+				FindFrameCaptureDiagnosticTap("gi-base-visibility") == PostProcessDebugTap::GIBaseVisibility &&
+				FindFrameCaptureDiagnosticTap("gi-coat-visibility") == PostProcessDebugTap::GICoatVisibility &&
+				FindFrameCaptureDiagnosticTap("gi-combined-visibility") == PostProcessDebugTap::GICombinedVisibility &&
 				!FindFrameCaptureDiagnosticTap("bloom-result") &&
 				GetFrameCaptureDiagnosticTapName(PostProcessDebugTap::BloomResult).empty(),
 				"Diagnostic taps have stable names; non-diagnostic taps have none");

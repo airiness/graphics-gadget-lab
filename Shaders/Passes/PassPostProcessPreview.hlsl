@@ -14,8 +14,8 @@ struct PostProcessPreviewPassParameters
 	uint SourceMode;
 	float SourcePreExposure;
 	float PreviewExposureScale;
-	float Padding1;
-	float Padding2;
+	uint ValidityTextureIndex;
+	uint ActivityTextureIndex;
 };
 
 ConstantBuffer<PostProcessPreviewPassParameters> g_Pass : register(b2);
@@ -51,6 +51,36 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target
 	const uint viewIndex = g_Scene.ViewBaseIndex + g_Pass.ViewIndex;
 	const ViewData viewData = g_Views[viewIndex];
 	SamplerState pointSampler = GetSamplerState(g_Pass.SourceSamplerIndex);
+	if (g_Pass.SourceMode >= 29 && g_Pass.SourceMode <= 35)
+	{
+		const float4 value = GetTexture2DFloat4(g_Pass.SourceTextureIndex)
+			.SampleLevel(pointSampler, input.UV, 0);
+		const float validity = GetTexture2DFloat4(g_Pass.ValidityTextureIndex)
+			.SampleLevel(pointSampler, input.UV, 0).a;
+		if (!all(isfinite(NonFiniteObserveValue(NF_SITE_PASS_POST_PROCESS_PREVIEW_PSMAIN_ISFINITE, value))) ||
+			!isfinite(NonFiniteObserveValue(NF_SITE_PASS_POST_PROCESS_PREVIEW_PSMAIN_ISFINITE, validity)) || validity < 0.0)
+		{
+			return float4(1, 0, 1, 1);
+		}
+		if (validity == 0.0)
+		{
+			const uint2 cell = (uint2)(input.PositionCS.xy) / 8u;
+			return float4((((cell.x + cell.y) & 1u) != 0u ? 0.12 : 0.18).xxx, 1);
+		}
+		if (g_Pass.SourceMode >= 33)
+		{
+			const uint active = (uint)(GetTexture2DFloat4(g_Pass.ActivityTextureIndex)
+				.SampleLevel(pointSampler, input.UV, 0).g);
+			const uint channel = g_Pass.SourceMode - 33;
+			const bool inactive = validity == 2.0 ||
+				(channel < 2u && (active & (1u << channel)) == 0u);
+			return inactive ? float4(0.12, 0.25, 0.4, 1) : float4(saturate(value[channel]).xxx, 1);
+		}
+		// GI values are scene referred, independent of the camera's exposure/pre-exposure.
+		const float3 color = ACESFitted(max(value.rgb, 0.0) * g_Pass.PreviewExposureScale,
+			NF_SITE_PASS_POST_PROCESS_PREVIEW_PSMAIN_ACESFITTED);
+		return float4(LinearToSRGB(color), 1);
+	}
 	if (g_Pass.SourceMode >= 21 && g_Pass.SourceMode <= 23)
 	{
 		float4 sampleValue = GetTexture2DFloat4(g_Pass.SourceTextureIndex).SampleLevel(pointSampler, input.UV, 0);

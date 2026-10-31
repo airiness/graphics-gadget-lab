@@ -39,6 +39,7 @@ namespace gglab
 			TextureLogicalNameEntry{ "Preview.TemporalAA", "SelectedTap" },
 			TextureLogicalNameEntry{ "Preview.Atmosphere", "SelectedTap" },
 			TextureLogicalNameEntry{ "Preview.SceneDepth", "SelectedTap" },
+			TextureLogicalNameEntry{ "Preview.GlobalIllumination", "SelectedTap" },
 		};
 		static_assert(TextureLogicalNameEntries.size() ==
 			utils::EnumCount<RenderResourceRegistry::TextureIndex>());
@@ -76,6 +77,8 @@ namespace gglab
 			.m_Selection.m_Tap = PostProcessDebugTap::AtmosphereSkyView;
 		m_PostProcessPreviewStates[utils::ToIndex(PostProcessPreviewChannel::SceneDepth)]
 			.m_Selection.m_Tap = PostProcessDebugTap::SceneDepthLinearViewZ;
+		m_PostProcessPreviewStates[utils::ToIndex(PostProcessPreviewChannel::GlobalIllumination)]
+			.m_Selection.m_Tap = PostProcessDebugTap::GIIrradiance;
 	}
 
 	void RenderResourceRegistry::EnsureIblResources(
@@ -444,7 +447,7 @@ namespace gglab
 		uint32_t sourceWidth, uint32_t sourceHeight, const RHIFencePoint* retireFenceOpt,
 		PostProcessPreviewChannel channel) noexcept
 	{
-		constexpr uint32_t MaxPreviewDimension = 512;
+		const uint32_t MaxPreviewDimension = channel == PostProcessPreviewChannel::GlobalIllumination ? 1024u : 512u;
 		const uint32_t safeWidth = std::max(sourceWidth, 1u);
 		const uint32_t safeHeight = std::max(sourceHeight, 1u);
 		const float scale = static_cast<float>(MaxPreviewDimension) /
@@ -762,6 +765,8 @@ namespace gglab
 			return TextureIndex::Preview_TemporalAA;
 		case PostProcessPreviewChannel::Atmosphere:
 			return TextureIndex::Preview_Atmosphere;
+		case PostProcessPreviewChannel::GlobalIllumination:
+			return TextureIndex::Preview_GlobalIllumination;
 		case PostProcessPreviewChannel::SceneDepth:
 			return TextureIndex::Preview_SceneDepth;
 		default:
@@ -779,6 +784,9 @@ namespace gglab
 		preview.m_UpdateCount = GetPostProcessPreviewUpdateCount(channel);
 		preview.m_FrameSerial = m_PostProcessPreviewStates[utils::ToIndex(channel)].m_PublishedFrameSerial;
 		preview.m_ExposureEV = GetPostProcessPreviewExposureEV(channel);
+		preview.m_GISnapshot = m_PostProcessPreviewStates[utils::ToIndex(channel)].m_GISnapshot;
+		preview.m_SourceAvailable = channel != PostProcessPreviewChannel::GlobalIllumination ||
+			m_GIPreviewSourceAvailable;
 		preview.m_Requested = IsPostProcessPreviewRequested(channel);
 		preview.m_HasPublished = HasPublishedPostProcessPreview(channel);
 		const auto index = GetPostProcessPreviewTextureIndex(channel);
@@ -814,7 +822,8 @@ namespace gglab
 		float exposureEV, PostProcessPreviewChannel channel) noexcept
 	{
 		auto& state = m_PostProcessPreviewStates[utils::ToIndex(channel)];
-		const float clamped = std::clamp(exposureEV, -8.0f, 8.0f);
+		const float clamped = std::clamp(exposureEV,
+			channel == PostProcessPreviewChannel::GlobalIllumination ? -20.0f : -8.0f, 8.0f);
 		if (state.m_ExposureEV != clamped)
 		{
 			state.m_ExposureEV = clamped;

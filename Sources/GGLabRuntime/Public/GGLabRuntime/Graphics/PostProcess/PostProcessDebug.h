@@ -15,6 +15,7 @@ namespace gglab
 		TemporalAA,
 		Atmosphere,
 		SceneDepth,
+		GlobalIllumination,
 		Count
 	};
 
@@ -56,7 +57,15 @@ namespace gglab
 		// available only while temporal GTAO keeps that history.
 		GTAOHistorySamples = 28,
 
-		Count = 29
+		GIIrradiance = 29,
+		GILambertRadiance = 30,
+		GISunIrradiance = 31,
+		GIEnvironmentIrradiance = 32,
+		GIBaseVisibility = 33,
+		GICoatVisibility = 34,
+		GICombinedVisibility = 35,
+
+		Count = 36
 	};
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::SceneColor) == 0);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::BloomPrefilter) == 1);
@@ -82,7 +91,7 @@ namespace gglab
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalClipDistance) == 26);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::TemporalHistoryRelaxation) == 27);
 	static_assert(static_cast<uint8_t>(PostProcessDebugTap::GTAOHistorySamples) == 28);
-	static_assert(static_cast<uint8_t>(PostProcessDebugTap::Count) == 29);
+	static_assert(static_cast<uint8_t>(PostProcessDebugTap::Count) == 36);
 
 	struct PostProcessDebugSelection
 	{

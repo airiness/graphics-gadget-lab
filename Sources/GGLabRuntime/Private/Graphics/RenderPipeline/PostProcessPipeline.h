@@ -15,6 +15,9 @@ namespace gglab
 		void AddDiagnosticCapturePass(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services) noexcept;
 
+		// Export persistent previews only after all overlay consumers declare reads.
+		void AddPreviewFinishPass(RenderGraph& rg) noexcept;
+
 	private:
 		RenderPassBloom m_BloomPass;
 		RenderPassPostProcessPreview m_PreviewPass;

@@ -1,6 +1,7 @@
 #include "Graphics/RenderPipeline/PostProcessPipeline.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewGraphResources.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
@@ -27,6 +28,29 @@ namespace gglab
 		capture->FailPendingDiagnosticRequests(std::format(
 			"Diagnostic tap '{}' has no source in this frame; its feature may be disabled.",
 			GetFrameCaptureDiagnosticTapName(*tap)));
+	}
+
+	void PostProcessPipeline::AddPreviewFinishPass(RenderGraph& rg) noexcept
+	{
+		const auto* previews = rg.GetBlackboard().TryGet<RGPostProcessPreviewResources>(
+			PostProcessPreviewResourcesName);
+		if (!previews)
+		{
+			return;
+		}
+		struct FinishData {};
+		rg.AddPass<FinishData>("PostProcess.Preview.Finish",
+			[textures = previews->m_Textures](RenderGraph::RGBuilder& builder, FinishData&)
+			{
+				builder.SideEffect();
+				for (const auto texture : textures)
+				{
+					if (texture.IsValid())
+					{
+						builder.Export(texture, RGTextureAccess::Sample, RHIStage::PixelShader);
+					}
+				}
+			}, [](RGExecuteContext&, FinishData&) {});
 	}
 
 	void PostProcessPipeline::AddPasses(

@@ -602,6 +602,8 @@ namespace gglab
 			services.m_OverlayExtension->AddOverlayPasses(rg, context, services);
 		}
 
+		m_PostProcessPipeline.AddPreviewFinishPass(rg);
+
 		// Return the persistent shadow preview to Common after DevelopGui and other
 		// overlay consumers have declared their reads for this frame.
 		if (context.GetDirectionalShadowFramePlan().m_PreviewRequested)

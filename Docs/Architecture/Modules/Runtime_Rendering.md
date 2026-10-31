@@ -66,6 +66,9 @@ Atlas ID: atlas.runtime.render-pipeline
   recipe owns its Runtime passes and the scene extension it was created with.
 - **Boundary:** [pass ownership](../Runtime_Boundaries_Map.md#pass-ownership); the
   scene extension runs after temporal integration.
+  Runtime owns persistent preview textures; the Host GUI declares sampled reads
+  through [Public preview graph outputs](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/PostProcess/PostProcessPreviewGraphResources.h).
+  The pipeline exports previews after all overlay consumers declare their reads.
 - **Verification:** `GGLabRuntimeTests`, `rendering-contracts`.
 
 ```text

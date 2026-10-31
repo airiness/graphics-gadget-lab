@@ -12,6 +12,7 @@
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/AtmosphereGraphResources.h"
 #include "Graphics/RenderPass/GIReceiverGraphResources.h"
+#include "Graphics/RenderPass/GIPreviewGraphResources.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
 #include <algorithm>
@@ -303,11 +304,16 @@ namespace gglab
 				{
 					data.m_Transmittance = readTexture(atmosphere->m_Luts[0]);
 				}
+				auto& preview = builder.GetBlackboard().GetOrCreate<RGGIPreviewResources>(GIPreviewResourcesName);
 				for (size_t index = 0; index < data.m_Outputs.size(); ++index)
 				{
 					auto output = builder.CreateTexture(OutputNames[index], { .m_Format = RHIFormat::R32G32B32A32Float, .m_Extent = extent });
 					builder.WriteInPlace(output, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
 					data.m_Outputs[index] = builder.CreateView<RHITextureViewType::UnorderedAccess>(output);
+					if (index == 0)
+					{
+						preview.m_Diffuse[0] = output;
+					}
 				}
 				auto radiance = builder.CreateTexture("GI.Reference.LambertRadiance",
 					{ .m_Format = RHIFormat::R32G32B32A32Float, .m_Extent = extent });
@@ -321,6 +327,11 @@ namespace gglab
 					{ .m_Format = RHIFormat::R32G32B32A32Float, .m_Extent = extent });
 				builder.WriteInPlace(environment, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
 				data.m_EnvironmentIrradiance = builder.CreateView<RHITextureViewType::UnorderedAccess>(environment);
+				preview.m_Diffuse[1] = radiance;
+				preview.m_Diffuse[2] = sun;
+				preview.m_Diffuse[3] = environment;
+				preview.m_DiffuseSnapshot = { .m_Samples = info.m_SampleCount,
+					.m_TargetSamples = info.m_SampleCount, .m_MaximumDepth = info.m_MaximumDepth };
 				auto pathDiagnostics = builder.CreateTexture("GI.Reference.PathDiagnostics",
 					{ .m_Format = RHIFormat::R32G32B32A32Float, .m_Extent = extent });
 				builder.WriteInPlace(pathDiagnostics, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
@@ -351,6 +362,9 @@ namespace gglab
 					data.m_Parameters.m_SampleBegin = progress.m_SubmittedSamples;
 					data.m_Parameters.m_SampleCount = progress.m_BatchSamples;
 					const auto tile = observation->GetTile();
+					preview.m_DiffuseSnapshot.m_Generation = progress.m_Generation;
+					preview.m_DiffuseSnapshot.m_Samples = progress.m_SubmittedSamples +
+						(tile.m_EndSweep ? progress.m_BatchSamples : 0u);
 					data.m_Parameters.m_TileOrigin = { tile.m_X, tile.m_Y };
 					data.m_Parameters.m_TileExtent = { tile.m_Width, tile.m_Height };
 					data.m_Parameters.m_BeginSweep = tile.m_BeginSweep ? 1u : 0u;

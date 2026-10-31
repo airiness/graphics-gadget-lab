@@ -1393,8 +1393,8 @@
       "source": "Passes/PassPostProcessPreview.hlsl",
       "function": "PSMain",
       "operation": "isfinite",
-      "count": 2,
-      "bodySha256": "ee643de7a2c2bf9ddd851d95508bd2fb8fdef03375aeb53fc48c21cd82c4f3a6",
+      "count": 4,
+      "bodySha256": "17b0161e0392b79f1ddf8aa1d0dc3912c83e6a90990185066e9dbb44801fe552",
       "programs": [
         "gglab.shader.post-process-preview"
       ],
@@ -1411,8 +1411,8 @@
       "source": "Passes/PassPostProcessPreview.hlsl",
       "function": "PSMain",
       "operation": "ACESFitted",
-      "count": 2,
-      "bodySha256": "ee643de7a2c2bf9ddd851d95508bd2fb8fdef03375aeb53fc48c21cd82c4f3a6",
+      "count": 3,
+      "bodySha256": "72b6c63318a3edd2b58d1e330a6ad39765c47f89309ab43c0075131f307ff146",
       "programs": [
         "gglab.shader.post-process-preview"
       ],
@@ -1430,7 +1430,7 @@
       "function": "PSMain",
       "operation": "SanitizeHDRColor",
       "count": 1,
-      "bodySha256": "bb1e8c0690cea4abaa2c76df613e18ddfd26e87424f90ebec318baa3557c9061",
+      "bodySha256": "32b4e5efff9926033307d4b8559b195e64da9d0e5b890dbb1296aeac9c6b4b5a",
       "programs": [
         "gglab.shader.post-process-preview"
       ],

@@ -3734,6 +3734,27 @@ namespace gglab
 					"The matching preview revision and request generation settle independently");
 			}
 
+			constexpr auto GIChannel = PostProcessPreviewChannel::GlobalIllumination;
+			const GIPreviewSnapshot giSnapshot{ .m_Generation = 19, .m_Samples = 64,
+				.m_TargetSamples = 256, .m_MaximumDepth = 4 };
+			RGDeferredCommitList giDiscarded;
+			RGExecuteContext giExecute(giDiscarded);
+			giExecute.DeferCommit([&registry, giSnapshot](const RGCommitContext&) noexcept
+				{
+					registry.PublishGIPreviewSnapshot(giSnapshot);
+				});
+			giDiscarded.Discard();
+			context.Check(registry.GetPostProcessPreviewDiagnostics(GIChannel).m_GISnapshot.m_Generation == 0,
+				"Discarded GI preview work cannot publish source provenance");
+			registry.PublishGIPreviewSnapshot(giSnapshot);
+			registry.SetGIPreviewSourceAvailable();
+			registry.BeginPreviewFrame();
+			const auto frozen = registry.GetPostProcessPreviewDiagnostics(GIChannel);
+			context.Check(!frozen.m_SourceAvailable && frozen.m_GISnapshot.m_Generation == 19 &&
+				frozen.m_GISnapshot.m_Samples == 64 && frozen.m_GISnapshot.m_MaximumDepth == 4 &&
+				registry.GetPostProcessPreviewDiagnostics().m_GISnapshot.m_Generation == 0,
+				"A pipeline change hides GI without relabeling the retained frozen snapshot or another channel");
+
 			registry.EnsureIblResources();
 			for (uint32_t i = 0; i < static_cast<uint32_t>(IBLPreviewType::Count); ++i)
 			{

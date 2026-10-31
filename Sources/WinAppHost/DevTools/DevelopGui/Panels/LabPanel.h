@@ -4,9 +4,24 @@
 #include "DevTools/DevelopGui/CameraReferenceViewWidgets.h"
 
 #include <optional>
+#include <string>
+#include <vector>
 
 namespace gglab
 {
+	// Bounded, instance-owned session history with a stable layout during restarts.
+	class LabSessionLog
+	{
+	public:
+		void Append(std::string message) noexcept;
+		void Draw(const LabSnapshot& snapshot) noexcept;
+
+	private:
+		std::vector<std::string> m_Entries;
+		std::string m_LastStatus;
+		bool m_Changed = false;
+	};
+
 	class LabRuntimeLocatorBase;
 	class LabPanel final : public DevelopGuiPanelBase
 	{
@@ -33,6 +48,8 @@ namespace gglab
 			LabSnapshotValue m_Value = false;
 		};
 
+		LabSessionLog m_SessionLog;
+		LabIdSnapshot m_ObservedLabId;
 		LabRuntimeLocatorBase* m_RuntimeLocator = nullptr;
 		std::optional<LabRunConfigSnapshot> m_RunConfigDraft;
 		std::vector<DeferredParameterEdit> m_DeferredParameterEdits;
