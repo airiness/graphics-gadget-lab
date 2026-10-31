@@ -7,7 +7,10 @@
 namespace gglab
 {
 	GIReferenceObservation::GIReferenceObservation(RHIDevice& device,
-		PersistentTexturePool& pool) noexcept : m_Device(device), m_Pool(pool) {}
+		PersistentTexturePool& pool) noexcept : m_Device(device), m_Pool(pool),
+		m_ReceiverCache(device, pool, { "GI.Reference.ReceiverCache.PositionError",
+			"GI.Reference.ReceiverCache.FaceMatch", "GI.Reference.ReceiverCache.Instance",
+			"GI.Reference.ReceiverCache.Primitive" }) {}
 	GIReferenceObservation::~GIReferenceObservation()
 	{
 		GGLAB_ASSERT_MSG(!m_Textures.IsAllocated(), "GI reference requires checked renderer teardown.");
@@ -16,6 +19,7 @@ namespace gglab
 	void GIReferenceObservation::BeginFrame(uint64_t serial) noexcept
 	{
 		m_FrameSerial = serial;
+		m_ReceiverCache.BeginFrame(serial);
 		m_Settled = false;
 		m_Visited = false;
 		m_Exported = false;
@@ -44,14 +48,16 @@ namespace gglab
 
 	bool GIReferenceObservation::Prepare(const GIReferenceObservationKey& key,
 		uint32_t samplesPerBatch, uint32_t sampleWorkBudget, uint32_t queryWorkBudget,
-		uint32_t maximumTilePixels) noexcept
+		uint32_t maximumTilePixels, uint32_t receiverQueryBudget) noexcept
 	{
 		m_Visited = true;
 		const uint64_t pixels = static_cast<uint64_t>(key.m_Width) * key.m_Height;
 		if (m_UnknownCompletion || pixels == 0 || pixels > GIObservationLimits::MaximumImagePixels || sampleWorkBudget == 0 ||
 			key.m_Samples == 0 || samplesPerBatch == 0 ||
 			key.m_MaximumDepth == 0 || key.m_MaximumDepth > GIObservationLimits::MaximumDiffuseDepth ||
-			maximumTilePixels > GIObservationLimits::MaximumImagePixels)
+			maximumTilePixels > GIObservationLimits::MaximumImagePixels ||
+			receiverQueryBudget < gi_shader::GIReceiverMaximumQueries ||
+			receiverQueryBudget > GIObservationLimits::MaximumReceiverQueryWorkPerSubmission)
 		{
 			return false;
 		}
@@ -91,9 +97,14 @@ namespace gglab
 				return false;
 			}
 		}
-		if (m_Diagnostics.m_Status == GIReferenceObservationStatus::Failed)
+		if (m_Diagnostics.m_Status == GIReferenceObservationStatus::Failed ||
+			!m_ReceiverCache.Prepare(key.m_Width, key.m_Height, receiverQueryBudget))
 		{
 			return false;
+		}
+		if (!m_ReceiverCache.CanSample())
+		{
+			return true;
 		}
 		if (!m_PendingFence.IsValid() && m_Diagnostics.m_Status == GIReferenceObservationStatus::Running)
 		{
@@ -195,6 +206,7 @@ namespace gglab
 			return;
 		}
 		m_Settled = true;
+		m_ReceiverCache.Settle(outcome);
 		if (outcome.m_Kind == RenderFrameOutcomeKind::CompletionUnknown)
 		{
 			m_UnknownCompletion = true;
@@ -235,6 +247,7 @@ namespace gglab
 
 	void GIReferenceObservation::Release() noexcept
 	{
+		m_ReceiverCache.Release();
 		m_Textures.Release(m_Pool, m_LastUse);
 		m_LastUse.Reset();
 		m_PendingFence.Reset();
@@ -258,6 +271,7 @@ namespace gglab
 	{
 		// Called only after Renderer verifies quiescence or confirms device loss.
 		m_UnknownCompletion = false;
+		m_ReceiverCache.Shutdown();
 		Release();
 	}
 }

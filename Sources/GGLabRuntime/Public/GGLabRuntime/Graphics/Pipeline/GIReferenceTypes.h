@@ -1,4 +1,5 @@
 #pragma once
+#include "GGLabRuntime/Graphics/Pipeline/GIReceiverPreparation.h"
 #include <cstdint>
 
 namespace gglab
@@ -27,5 +28,6 @@ namespace gglab
 		uint32_t m_SubmittedTiles = 0;
 		uint32_t m_TileCount = 0;
 		bool m_Active = false;
+		GIReceiverPreparationProgress m_ReceiverPreparation;
 	};
 }

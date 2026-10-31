@@ -111,6 +111,32 @@ separate claims. Pixel metrics do not determine TAA image-quality acceptance.
 See the [guarded comparison guide](../../.agents/skills/gglab-frame-capture/references/captures.md#guarded-taa-comparison)
 for fixture requirements, attached-session ownership and recovery procedures.
 
+### GI receiver preparation cache
+
+`gi-receiver-cache` checks complete diffuse/visibility arrays, partition invariance,
+repeated resolve-only frames and unchanged persistent sums/compensation/RNG. Its
+small receiver query budget forces multi-submission preparation on both backends.
+The Runtime `ray-query-contracts` suite owns preparation settlement, pending fences,
+replacement, failure and unknown-completion tests.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/RunVerification.ps1 `
+    -Suite gi-receiver-cache -Configuration Develop -Rhi dx12,vulkan -Python $python `
+    -OutputDirectory Build/RCV
+# Optional same-backend, byte-exact comparison with controls collected before a change:
+& ./Tests/Verification/TestGIReceiverCache.ps1 -Configuration Develop `
+    -RunDirectory Build/ReceiverCache/Compared -BaselineDirectory <control-directory> -Python $python
+# Native Coastal coverage, including primary envelope/interpolant matches:
+& ./Tests/Verification/TestGIReceiverCache.ps1 -Configuration Develop -Coastal `
+    -ReceiverQueryWork 16777216 -RunDirectory Build/ReceiverCache/Coastal -Python $python
+```
+
+`-RequireCache:$false -ReceiverQueryWork 0` collects controls from an older binary
+without the cache parameter. Raw logs are retained; a known GameInput-unavailable
+startup diagnostic is reported separately from GPU/runtime validation errors.
+Source/compiler/product binary seals and artifact audits accompany each current run.
+These are correctness observations, not quiet performance or convergence certificates.
+
 ### Probe update
 
 Run the CPU oracle contracts and the numerical/lifecycle experiment:

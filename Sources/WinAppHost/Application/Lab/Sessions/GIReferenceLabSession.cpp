@@ -63,6 +63,7 @@ namespace gglab
 		const LabParameterId BatchSamplesId("gi_reference.batch_samples");
 		const LabParameterId DepthId("gi_reference.depth");
 		const LabParameterId TilePixelsId("gi_reference.tile_pixels");
+		const LabParameterId ReceiverQueryWorkId("gi_reference.receiver_query_work");
 		const LabParameterId SeedId("gi_reference.seed");
 		const LabParameterId AlbedoId("gi_reference.albedo");
 		const LabParameterId ExposureId("gi_reference.ev100");
@@ -217,6 +218,11 @@ namespace gglab
 			.m_Group = "Reference", .m_Type = LabParameterType::UInt, .m_Impact = LabChangeImpact::RestartSession,
 			.m_DefaultValue = uint32_t(0), .m_MinValue = LabValue(uint32_t(0)),
 			.m_MaxValue = LabValue(GIObservationLimits::MaximumImagePixels) }));
+		GGLAB_UNUSED(parameters.Add({ .m_Id = ReceiverQueryWorkId, .m_Name = "Primary matching query-work cap",
+			.m_Group = "Reference", .m_Type = LabParameterType::UInt, .m_Impact = LabChangeImpact::RestartSession,
+			.m_DefaultValue = GIObservationLimits::MaximumQueryWorkPerSubmission,
+			.m_MinValue = LabValue(GIObservationLimits::MaximumReceiverQueriesPerPixel),
+			.m_MaxValue = LabValue(GIObservationLimits::MaximumReceiverQueryWorkPerSubmission) }));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = AlbedoId, .m_Name = "F1 / contract receiver albedo", .m_Group = "Reference",
 			.m_Type = LabParameterType::Enum, .m_Impact = LabChangeImpact::RestartSession,
 			.m_DefaultValue = int32_t(0), .m_EnumItems = { { 0, "White" }, { 1, "Linear (0.2, 0.5, 0.8)" } } }));
@@ -611,6 +617,8 @@ namespace gglab
 		reference.m_MaximumDistance = coastal ? CoastalMaximumRayDistance : ContractMaximumRayDistance;
 		reference.m_HitMaterialDiagnostics = fixture == GIReferenceFixture::HitMaterial;
 		reference.m_MaximumTilePixels = GetParameters().Get(TilePixelsId, uint32_t(0));
+		reference.m_ReceiverQueryWorkPerSubmission = GetParameters().Get(ReceiverQueryWorkId,
+			GIObservationLimits::MaximumQueryWorkPerSubmission);
 		reference.m_ConstantEnvironment = environment == GIReferenceEnvironment::DirectConstant;
 		// The HDR importer decodes RGBE bin centres: (128 + 0.5) / 128.
 		// Match that exact constant in the independent direct-input contract.
@@ -634,6 +642,7 @@ namespace gglab
 				.m_SampleCount = reference.m_SampleCount, .m_Seed = reference.m_Seed,
 				.m_SamplesPerBatch = reference.m_SamplesPerBatch,
 				.m_MaximumTilePixels = reference.m_MaximumTilePixels,
+				.m_ReceiverQueryWorkPerSubmission = reference.m_ReceiverQueryWorkPerSubmission,
 				.m_MaximumDistance = fixture == GIReferenceFixture::CoastalSpecularVisibility ?
 					CoastalMaximumRayDistance :
 					ContractMaximumRayDistance };

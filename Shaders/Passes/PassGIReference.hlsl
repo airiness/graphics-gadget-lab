@@ -4,6 +4,7 @@
 #include <Common/VertexTransform.hlsli>
 #include <Lighting/GIHitLighting.hlsli>
 #include <Lighting/GISampling.hlsli>
+#include <Lighting/GIReceiverCache.hlsli>
 
 cbuffer Parameters : register(b2)
 {
@@ -47,6 +48,11 @@ cbuffer Parameters : register(b2)
 	uint EndSweep;
 	uint RasterPositionIndex;
 	uint TilePadding;
+	uint4 ReceiverCacheIndices;
+	uint ReceiverCacheBegin;
+	uint ReceiverCacheCount;
+	uint ReceiverCacheReady;
+	uint ReceiverCachePadding;
 };
 
 float GISecondaryRandom(uint pixel, uint sampleIndex, uint bounce, uint dimension)
@@ -119,6 +125,11 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	diagnostics[pixel] = 0.0.xxxx;
 	positions[pixel] = 0.0.xxxx;
 	identities[pixel] = -1.0.xxxx;
+	if (ObservationEnabled != 0 && !GIReceiverCacheVisits(pixel, uint2(Width, Height),
+		ReceiverCacheIndices, ReceiverCacheBegin, ReceiverCacheCount, ReceiverCacheReady))
+	{
+		return;
+	}
 	if (ObservationEnabled != 0 && SampleCount != 0 && BeginSweep != 0)
 	{
 		// Define every pending pixel on the first submitted tile. Later tiles use
@@ -141,7 +152,12 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	{
 		return;
 	}
-	irradiance[pixel] = float4(0.0, 0.0, 0.0, -1.0);
+	const bool preparingReceivers = ObservationEnabled != 0 && ReceiverCacheCount != 0 &&
+		ReceiverCacheCount != Width * Height;
+	if (!preparingReceivers)
+	{
+		irradiance[pixel] = float4(0.0, 0.0, 0.0, -1.0);
+	}
 	if (face.w != GIReceiverOpaque)
 	{
 		return;
@@ -151,12 +167,30 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	const float3 positionVS = ReconstructViewPosition(PixelCenterToUV(pixel, uint2(Width, Height)), rawDepth, view.InvProjMat);
 	const float3 position = mul(float4(positionVS, 1.0), view.InvViewMat).xyz;
 	const uint3 counts = uint3(InstanceCount, GeometryCount, MaterialCount);
-	GIHit receiver;
+	GIHit receiver = (GIHit)(0);
 	const float4 rasterPosition = GetTexture2DFloat4(RasterPositionIndex).Load(int3(pixel, 0));
-	const uint receiverMatch = rasterPosition.w == face.w &&
-		GIPathFinite(rasterPosition.xyz) && GIPathFinite(position) && GIPathFinite(face.xyz) ?
-		GIMatchReceiver(pixel, uint2(Width, Height), position, rasterPosition.xyz,
-			face.xyz, view, MaximumDistance, counts, receiver) : GIReceiverMatchInvalid;
+	const bool matchInputsValid = rasterPosition.w == face.w &&
+		GIPathFinite(rasterPosition.xyz) && GIPathFinite(position) && GIPathFinite(face.xyz);
+	uint receiverMatch;
+	if (ObservationEnabled == 0 || ReceiverCacheCount != 0)
+	{
+		receiverMatch = matchInputsValid ?
+			GIMatchReceiver(pixel, uint2(Width, Height), position, rasterPosition.xyz,
+				face.xyz, view, MaximumDistance, counts, receiver) : GIReceiverMatchInvalid;
+		if (ObservationEnabled != 0)
+		{
+			GIStoreReceiverCache(pixel, ReceiverCacheIndices, receiverMatch, receiver);
+			if (ReceiverCacheCount != Width * Height)
+			{
+				return;
+			}
+		}
+	}
+	else
+	{
+		receiverMatch = matchInputsValid ?
+			GILoadReceiverCache(pixel, ReceiverCacheIndices, receiver) : GIReceiverMatchInvalid;
+	}
 	if (!GIReceiverMatched(receiverMatch))
 	{
 		irradiance[pixel] = float4(0.0, 0.0, 0.0, -2.0);

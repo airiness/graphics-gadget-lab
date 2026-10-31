@@ -53,7 +53,8 @@ Atlas ID: atlas.runtime.render-pipeline
   off; receiver records and the paired raster-position tap stay Private. Both
   query diagnostics share the primary-matching helper in `GIRayScene.hlsli`.
 - **GI reference:** the optional reference pass uses the Renderer-owned
-  [observation](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIReferenceObservation.h).
+  [observation](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIReferenceObservation.h) and its
+  [receiver cache](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIReceiverCache.h).
   Sum/RNG pairs commit at settlement and retire by fence; read-only progress uses
   [GIReferenceTypes.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GIReferenceTypes.h).
 - **Probe update:** Public [configuration and diagnostics](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h)

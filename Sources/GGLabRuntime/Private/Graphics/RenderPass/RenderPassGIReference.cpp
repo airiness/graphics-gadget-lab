@@ -81,15 +81,21 @@ namespace gglab
 			uint32_t m_EndSweep = 1;
 			uint32_t m_RasterPosition = 0;
 			uint32_t m_TilePadding = 0;
+			std::array<uint32_t, 4> m_ReceiverCache{};
+			uint32_t m_ReceiverCacheBegin = 0;
+			uint32_t m_ReceiverCacheCount = 0;
+			uint32_t m_ReceiverCacheReady = 0;
+			uint32_t m_ReceiverCachePadding = 0;
 		};
-		static_assert(sizeof(Parameters) == 208 && offsetof(Parameters, m_ConstantRadiance) == 64 &&
+		static_assert(sizeof(Parameters) == 240 && offsetof(Parameters, m_ConstantRadiance) == 64 &&
 			offsetof(Parameters, m_Transmittance) == 80 &&
 			offsetof(Parameters, m_SunIrradiance) == 96 && offsetof(Parameters, m_RowOffset) == 108 &&
 			offsetof(Parameters, m_Previous) == 112 && offsetof(Parameters, m_SampleBegin) == 144 &&
 			offsetof(Parameters, m_MaximumDepth) == 152 && offsetof(Parameters, m_PathDiagnostics) == 156 &&
 			offsetof(Parameters, m_PreviousCompensation) == 160 && offsetof(Parameters, m_NextCompensation) == 168 &&
 			offsetof(Parameters, m_TileOrigin) == 176 && offsetof(Parameters, m_BeginSweep) == 192 &&
-			offsetof(Parameters, m_RasterPosition) == 200);
+			offsetof(Parameters, m_RasterPosition) == 200 && offsetof(Parameters, m_ReceiverCache) == 208 &&
+			offsetof(Parameters, m_ReceiverCacheBegin) == 224 && offsetof(Parameters, m_ReceiverCacheReady) == 232);
 	}
 
 	RenderFrameValidationResult ValidateGIReferenceInputs(
@@ -103,6 +109,8 @@ namespace gglab
 			info.m_MaximumDepth == 0 || info.m_MaximumDepth > GIObservationLimits::MaximumDiffuseDepth ||
 			info.m_QueryWorkPerSubmission == 0 || info.m_QueryWorkPerSubmission > GIObservationLimits::MaximumQueryWorkPerSubmission ||
 			info.m_MaximumTilePixels > GIObservationLimits::MaximumImagePixels ||
+			info.m_ReceiverQueryWorkPerSubmission < gi_shader::GIReceiverMaximumQueries ||
+			info.m_ReceiverQueryWorkPerSubmission > GIObservationLimits::MaximumReceiverQueryWorkPerSubmission ||
 			!std::isfinite(info.m_MaximumDistance) || info.m_MaximumDistance <= 0.0f ||
 			!std::ranges::all_of(info.m_ConstantRadiance,
 				[](float value) { return std::isfinite(value) && value >= 0.0f; }))
@@ -215,6 +223,7 @@ namespace gglab
 				services.m_ShaderPrograms->LoadProgram(shader_programs::GIReceiverPositionPixel)),
 			.m_CameraPosition = { view.m_CameraPosition.m_X, view.m_CameraPosition.m_Y, view.m_CameraPosition.m_Z },
 			.m_ConstantRadiance = info.m_ConstantRadiance, .m_MaximumDistance = info.m_MaximumDistance,
+			.m_TextureLodBias = view.m_TextureLodBias,
 			.m_EnvironmentIntensity = environment.m_Intensity, .m_EnvironmentRotation = environment.m_RotationRadians,
 			.m_Width = view.m_Width, .m_Height = view.m_Height, .m_Samples = info.m_SampleCount,
 			.m_Seed = info.m_Seed, .m_MaximumDepth = info.m_MaximumDepth,
@@ -225,7 +234,8 @@ namespace gglab
 		if (!info.m_Accumulate)
 		{
 			const uint64_t work = uint64_t(view.m_Width) * view.m_Height * info.m_SampleCount;
-			if (work > info.m_SampleWorkPerSubmission ||
+			if (uint64_t(view.m_Width) * view.m_Height * gi_shader::GIReceiverMaximumQueries >
+				info.m_ReceiverQueryWorkPerSubmission || work > info.m_SampleWorkPerSubmission ||
 				work * GIObservationLimits::QueriesPerDiffuseDepth * info.m_MaximumDepth >
 					info.m_QueryWorkPerSubmission)
 			{
@@ -237,7 +247,7 @@ namespace gglab
 		}
 		if (!services.m_GIReferenceObservation->Prepare(key,
 			info.m_SamplesPerBatch, info.m_SampleWorkPerSubmission, info.m_QueryWorkPerSubmission,
-			info.m_MaximumTilePixels))
+			info.m_MaximumTilePixels, info.m_ReceiverQueryWorkPerSubmission))
 		{
 			return RenderFrameValidationResult::ContractFailure("GI reference observation preparation failed");
 		}
@@ -282,6 +292,7 @@ namespace gglab
 			Parameters m_Parameters;
 			std::array<RGTextureViewId, GIReferenceObservation::SurfaceCount> m_Previous{};
 			std::array<RGTextureViewId, GIReferenceObservation::SurfaceCount> m_Next{};
+			GIReceiverCache::Views m_ReceiverCache{};
 		};
 		graph.AddPass<PassData>(PassInfo.m_TypeName.c_str(), RGPassEncoderType::Compute,
 			[&frame, &services, scene, info](RenderGraph::RGBuilder& builder, PassData& data)
@@ -364,7 +375,12 @@ namespace gglab
 				data.m_Parameters.m_TileExtent = { extent.m_Width, extent.m_Height };
 				if (auto* observation = info.m_Accumulate ? services.m_GIReferenceObservation : nullptr)
 				{
+					auto& receiverCache = observation->GetReceiverCache();
+					data.m_ReceiverCache = receiverCache.Import(builder);
 					const auto progress = observation->GetDiagnostics();
+					data.m_Parameters.m_ReceiverCacheBegin = receiverCache.GetBeginPixel();
+					data.m_Parameters.m_ReceiverCacheCount = progress.m_ReceiverPreparation.m_BatchPixels;
+					data.m_Parameters.m_ReceiverCacheReady = progress.m_ReceiverPreparation.m_Ready ? 1u : 0u;
 					data.m_Parameters.m_ObservationEnabled = 1;
 					data.m_Parameters.m_SampleBegin = progress.m_SubmittedSamples;
 					data.m_Parameters.m_SampleCount = progress.m_BatchSamples;
@@ -470,10 +486,19 @@ namespace gglab
 				{
 					parameters.m_Outputs[index] = execute.GetViewDescriptor(data.m_Outputs[index]).m_Index;
 				}
-				// The observation bounds the entire submission; row dispatches also bound
-				// encoder work. Resolve-only frames do not advance samples or RNG.
+				for (size_t index = 0; index < data.m_ReceiverCache.size(); ++index)
+				{
+					if (data.m_ReceiverCache[index].IsValid())
+					{
+						parameters.m_ReceiverCache[index] = execute.GetViewDescriptor(data.m_ReceiverCache[index]).m_Index;
+					}
+				}
+				// Sampling and cold matching have independent submission caps. Include
+				// both in dispatch splitting; cache-only resolves advance neither RNG nor samples.
+				const uint32_t receiverQueries = parameters.m_ObservationEnabled == 0 ||
+					parameters.m_ReceiverCacheCount != 0 ? gi_shader::GIReceiverMaximumQueries : 0u;
 				const auto rows = GIQueryRowsPerDispatch(parameters.m_Width, parameters.m_SampleCount,
-					GIObservationLimits::QueriesPerDiffuseDepth * parameters.m_MaximumDepth);
+					GIObservationLimits::QueriesPerDiffuseDepth * parameters.m_MaximumDepth, receiverQueries);
 				for (uint32_t row = 0; row < parameters.m_Height; row += rows)
 				{
 					parameters.m_RowOffset = row;

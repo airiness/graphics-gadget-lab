@@ -65,6 +65,10 @@ its explicit raster-interpolant match is confined to primary coverage. Secondary
 queries retain their original sidedness and miss semantics. Both observations
 include the position shader generation in their reset identity.
 
+Each observation owns a Private `GIReceiverCache`, with an independent matching
+query-work cap. Tiles and full-image resolves reuse the prepared receivers without
+primary queries; observation reset invalidates the cache with accumulation.
+
 The opt-in `m_GISpecularVisibility` adds a Runtime-owned pre-temporal diagnostic
 with an independent Renderer-owned observation. It requires a
 `RaySceneMaterialInputs::PrimaryReceiver` scene; when both GI diagnostics are

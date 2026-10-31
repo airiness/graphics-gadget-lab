@@ -5,6 +5,7 @@
 #include <Common/Sampling.hlsli>
 #include <Lighting/GIRayScene.hlsli>
 #include <Lighting/GISampling.hlsli>
+#include <Lighting/GIReceiverCache.hlsli>
 #include <PBR/BRDF.hlsli>
 
 cbuffer Parameters : register(b2)
@@ -36,6 +37,11 @@ cbuffer Parameters : register(b2)
 	uint RasterMaterialCapacity;
 	uint RasterPositionIndex;
 	uint3 Padding;
+	uint4 ReceiverCacheIndices;
+	uint ReceiverCacheBegin;
+	uint ReceiverCacheCount;
+	uint ReceiverCacheReady;
+	uint ReceiverCachePadding;
 };
 
 float VisibilityRandom(uint pixel, uint sampleIndex, uint lobe, uint dimension)
@@ -122,6 +128,11 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	diagnostics[pixel] = 0.0.xxxx;
 	f0Output[pixel] = 0.0.xxxx;
 	energyOutput[pixel] = 0.0.xxxx;
+	if (!GIReceiverCacheVisits(pixel, Size, ReceiverCacheIndices,
+		ReceiverCacheBegin, ReceiverCacheCount, ReceiverCacheReady))
+	{
+		return;
+	}
 	float4 sums[GIVisibilitySurfaceCount];
 	[unroll]
 	for (uint surface = 0; surface < GIVisibilitySurfaceCount; ++surface)
@@ -138,8 +149,12 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	{
 		return;
 	}
-	visibility[pixel] = float4(0, 0, 0, -1);
-	diagnostics[pixel] = float4(-1, 0, SubmittedSamples, 0);
+	const bool preparingReceivers = ReceiverCacheCount != 0 && ReceiverCacheCount != Size.x * Size.y;
+	if (!preparingReceivers)
+	{
+		visibility[pixel] = float4(0, 0, 0, -1);
+		diagnostics[pixel] = float4(-1, 0, SubmittedSamples, 0);
+	}
 	if (face.w != GIReceiverOpaque || !VisibilityFinite(face))
 	{
 		return;
@@ -148,16 +163,34 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	const float depth = GetTexture2DFloat(DepthIndex).Load(int3(pixel, 0));
 	const float3 positionVS = ReconstructViewPosition(PixelCenterToUV(pixel, Size), depth, view.InvProjMat);
 	const float3 position = mul(float4(positionVS, 1), view.InvViewMat).xyz;
-	GIHit receiver;
+	GIHit receiver = (GIHit)(0);
 	if (!VisibilityFinite(float4(position, depth)))
 	{
-		diagnostics[pixel] = float4(-2, 0, SubmittedSamples, 0);
+		if (!preparingReceivers)
+		{
+			diagnostics[pixel] = float4(-2, 0, SubmittedSamples, 0);
+		}
 		return;
 	}
 	const float4 rasterPosition = GetTexture2DFloat4(RasterPositionIndex).Load(int3(pixel, 0));
-	const uint match = rasterPosition.w == face.w && VisibilityFinite(rasterPosition) ?
-		GIMatchReceiver(pixel, Size, position, rasterPosition.xyz, face.xyz, view,
-			MaximumDistance, uint3(InstanceCount, GeometryCount, MaterialCount), receiver) : GIReceiverMatchInvalid;
+	const bool matchInputsValid = rasterPosition.w == face.w && VisibilityFinite(rasterPosition);
+	uint match;
+	if (ReceiverCacheCount != 0)
+	{
+		match = matchInputsValid ?
+			GIMatchReceiver(pixel, Size, position, rasterPosition.xyz, face.xyz, view,
+				MaximumDistance, uint3(InstanceCount, GeometryCount, MaterialCount), receiver) : GIReceiverMatchInvalid;
+		GIStoreReceiverCache(pixel, ReceiverCacheIndices, match, receiver);
+		if (ReceiverCacheCount != Size.x * Size.y)
+		{
+			return;
+		}
+	}
+	else
+	{
+		match = matchInputsValid ?
+			GILoadReceiverCache(pixel, ReceiverCacheIndices, receiver) : GIReceiverMatchInvalid;
+	}
 	if (!GIReceiverMatched(match))
 	{
 		diagnostics[pixel] = float4(-(float)(match), 0, SubmittedSamples, 0);

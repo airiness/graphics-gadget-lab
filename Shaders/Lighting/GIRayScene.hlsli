@@ -182,8 +182,8 @@ uint GIMatchReceiver(uint2 pixel, uint2 size, float3 position, float3 rasterPosi
 	const float3 positionVS = mul(float4(position, 1), view.ViewMat).xyz;
 	const float footprint = 2.0 * abs(positionVS.z * view.InvProjMat[1][1]) / (float)(size.y);
 	const float pixelRadius = max(1.0 / 128.0, 2.0e-6 / max(footprint, 1.0e-20));
-	const uint envelopeRadius = 4;
-	const uint envelopeWidth = 2 * envelopeRadius + 1;
+	const uint envelopeRadius = GIReceiverEnvelopeRadius;
+	const uint envelopeWidth = GIReceiverEnvelopeWidth;
 	const uint matchAttempts = 1 + envelopeWidth * envelopeWidth;
 	uint failure = GIReceiverMatchMiss;
 	for (uint attempt = 0; attempt < matchAttempts; ++attempt)

@@ -753,10 +753,15 @@ namespace gglab
 				reference.m_Status == GIReferenceObservationStatus::Completed ? FrameCaptureGateState::Ready :
 					reference.m_Status == GIReferenceObservationStatus::Failed ? FrameCaptureGateState::Failed :
 						FrameCaptureGateState::Pending,
-				std::format("Observation {}: D={}, {}/{} completed samples, {} submitted, version {}; sweep {} samples, tiles {}/{} submitted.",
+				std::format("Observation {}: D={}, {}/{} completed samples, {} submitted, version {}; "
+					"sweep {} samples, tiles {}/{} submitted; "
+					"receiver cache: {}/{} pixels, {} query work (cap {}), {} bytes.",
 					reference.m_Generation, reference.m_MaximumDepth, reference.m_CompletedSamples, reference.m_TargetSamples,
 					reference.m_SubmittedSamples, reference.m_CommittedVersion, reference.m_SweepSamples,
-					reference.m_SubmittedTiles, reference.m_TileCount),
+					reference.m_SubmittedTiles, reference.m_TileCount,
+					reference.m_ReceiverPreparation.m_CompletedPixels, reference.m_ReceiverPreparation.m_TotalPixels,
+					reference.m_ReceiverPreparation.m_BatchQueryWork, reference.m_ReceiverPreparation.m_QueryWorkPerSubmission,
+					reference.m_ReceiverPreparation.m_CacheBytes),
 				"gi-reference", reference.m_Generation);
 		}
 		const auto visibility = services.m_Presentation->GetGISpecularVisibilityProgress();
@@ -767,10 +772,15 @@ namespace gglab
 					FrameCaptureGateState::Ready :
 					visibility.m_Status == GISpecularVisibilityStatus::Failed ?
 						FrameCaptureGateState::Failed : FrameCaptureGateState::Pending,
-				std::format("Observation {}: {}/{} completed samples, {} submitted, version {}; sweep {} samples, tiles {}/{} submitted.",
+				std::format("Observation {}: {}/{} completed samples, {} submitted, version {}; "
+					"sweep {} samples, tiles {}/{} submitted; "
+					"receiver cache: {}/{} pixels, {} query work (cap {}), {} bytes.",
 					visibility.m_Generation, visibility.m_CompletedSamples, visibility.m_TargetSamples,
 					visibility.m_SubmittedSamples, visibility.m_CommittedVersion, visibility.m_SweepSamples,
-					visibility.m_SubmittedTiles, visibility.m_TileCount),
+					visibility.m_SubmittedTiles, visibility.m_TileCount,
+					visibility.m_ReceiverPreparation.m_CompletedPixels, visibility.m_ReceiverPreparation.m_TotalPixels,
+					visibility.m_ReceiverPreparation.m_BatchQueryWork, visibility.m_ReceiverPreparation.m_QueryWorkPerSubmission,
+					visibility.m_ReceiverPreparation.m_CacheBytes),
 				"gi-specular-visibility", visibility.m_Generation);
 		}
 		// Select captures only after validation has identified this frame's observation.

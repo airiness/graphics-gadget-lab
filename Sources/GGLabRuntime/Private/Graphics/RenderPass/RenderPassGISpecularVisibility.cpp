@@ -78,11 +78,18 @@ namespace gglab
 			uint32_t m_RasterMaterialCapacity = 0;
 			uint32_t m_RasterPosition = 0;
 			std::array<uint32_t, 3> m_Padding{};
+			std::array<uint32_t, 4> m_ReceiverCache{};
+			uint32_t m_ReceiverCacheBegin = 0;
+			uint32_t m_ReceiverCacheCount = 0;
+			uint32_t m_ReceiverCacheReady = 0;
+			uint32_t m_ReceiverCachePadding = 0;
 		};
-		static_assert(sizeof(Parameters) == 192 && offsetof(Parameters, m_Outputs) == 32 &&
+		static_assert(sizeof(Parameters) == 224 && offsetof(Parameters, m_Outputs) == 32 &&
 			offsetof(Parameters, m_Previous) == 64 && offsetof(Parameters, m_Size) == 96 &&
 			offsetof(Parameters, m_SampleBegin) == 128 && offsetof(Parameters, m_MaximumDistance) == 152 &&
-			offsetof(Parameters, m_InstanceCount) == 160 && offsetof(Parameters, m_RasterPosition) == 176);
+			offsetof(Parameters, m_InstanceCount) == 160 && offsetof(Parameters, m_RasterPosition) == 176 &&
+			offsetof(Parameters, m_ReceiverCache) == 192 && offsetof(Parameters, m_ReceiverCacheBegin) == 208 &&
+			offsetof(Parameters, m_ReceiverCacheReady) == 216);
 	}
 
 	RenderFrameValidationResult ValidateGISpecularVisibilityInputs(
@@ -92,7 +99,10 @@ namespace gglab
 			info.m_SamplesPerBatch == 0 || info.m_SamplesPerBatch > GIObservationLimits::MaximumBatchSamples ||
 			info.m_QueryWorkPerSubmission < GIObservationLimits::VisibilityQueriesPerSample ||
 			info.m_QueryWorkPerSubmission > GIObservationLimits::MaximumQueryWorkPerSubmission ||
-			info.m_MaximumTilePixels > GIObservationLimits::MaximumImagePixels || !std::isfinite(info.m_MaximumDistance) ||
+			info.m_MaximumTilePixels > GIObservationLimits::MaximumImagePixels ||
+			info.m_ReceiverQueryWorkPerSubmission < gi_shader::GIReceiverMaximumQueries ||
+			info.m_ReceiverQueryWorkPerSubmission > GIObservationLimits::MaximumReceiverQueryWorkPerSubmission ||
+			!std::isfinite(info.m_MaximumDistance) ||
 			info.m_MaximumDistance <= 0)
 		{
 			return RenderFrameValidationResult::ContractFailure("Invalid GGX visibility inputs");
@@ -144,8 +154,11 @@ namespace gglab
 		{
 			const RHITextureDesc desc{ .m_Format = RHIFormat::R32G32B32A32Float,
 				.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::UnorderedAccess | RHITextureUsage::CopySource };
+			const RHITextureDesc identityDesc{ .m_Format = RHIFormat::R32Uint,
+				.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::UnorderedAccess | RHITextureUsage::CopySource };
 			const auto* common = services.m_BindingLayout->GetCommonLayoutContract();
-			if (!common || !services.m_Presentation->GetDevice()->QueryTextureSupport(desc).IsSupported())
+			if (!common || !services.m_Presentation->GetDevice()->QueryTextureSupport(desc).IsSupported() ||
+				!services.m_Presentation->GetDevice()->QueryTextureSupport(identityDesc).IsSupported())
 			{
 				return RenderFrameValidationResult::ContractFailure("GGX visibility layout or format unavailable");
 			}
@@ -201,7 +214,8 @@ namespace gglab
 		static_assert(sizeof(key.m_ViewProjection) == sizeof(view.m_UnjitteredViewProj));
 		std::memcpy(key.m_ViewProjection.data(), &view.m_UnjitteredViewProj, sizeof(key.m_ViewProjection));
 		state.m_ObservationPrepared = services.m_GISpecularVisibilityObservation->Prepare(key,
-			info.m_SamplesPerBatch, info.m_QueryWorkPerSubmission, info.m_MaximumTilePixels);
+			info.m_SamplesPerBatch, info.m_QueryWorkPerSubmission, info.m_MaximumTilePixels,
+			info.m_ReceiverQueryWorkPerSubmission);
 		return state.m_ObservationPrepared ?
 			RenderFrameValidationResult::Ready() :
 			RenderFrameValidationResult::ContractFailure("GGX visibility observation preparation failed");
@@ -224,6 +238,7 @@ namespace gglab
 			std::array<RGTextureViewId, OutputNames.size()> m_Outputs{};
 			std::array<RGTextureViewId, GISpecularVisibilityObservation::SurfaceCount> m_Previous{};
 			std::array<RGTextureViewId, GISpecularVisibilityObservation::SurfaceCount> m_Next{};
+			GIReceiverCache::Views m_ReceiverCache{};
 			Parameters m_Parameters;
 		};
 		graph.AddPass<PassData>(PassInfo.m_TypeName.c_str(), RGPassEncoderType::Compute,
@@ -279,6 +294,8 @@ namespace gglab
 					GGLAB_UNUSED(builder.Read(buffer, RGBufferAccess::StructuredRead, RHIStage::ComputeShader));
 				}
 				auto* observation = services.m_GISpecularVisibilityObservation;
+				auto& receiverCache = observation->GetReceiverCache();
+				data.m_ReceiverCache = receiverCache.Import(builder);
 				const auto progress = observation->GetDiagnostics();
 				const auto tile = observation->GetTile();
 				preview.m_VisibilitySnapshot = { .m_Generation = progress.m_Generation,
@@ -295,6 +312,9 @@ namespace gglab
 					.m_InstanceCount = scene.m_InstanceCount, .m_GeometryCount = scene.m_GeometryCount,
 					.m_MaterialCount = scene.m_MaterialCount,
 					.m_RasterMaterialCapacity = services.m_FrameBuffers->GetMaterialStructuredBuffer()->GetElementCapacity() };
+				data.m_Parameters.m_ReceiverCacheBegin = receiverCache.GetBeginPixel();
+				data.m_Parameters.m_ReceiverCacheCount = progress.m_ReceiverPreparation.m_BatchPixels;
+				data.m_Parameters.m_ReceiverCacheReady = progress.m_ReceiverPreparation.m_Ready ? 1u : 0u;
 				auto surfaces = observation->Import(builder);
 				for (size_t index = 0; index < surfaces.size(); ++index)
 				{
@@ -371,8 +391,17 @@ namespace gglab
 						parameters.m_Next[index] = execute.GetViewDescriptor(data.m_Next[index]).m_Index;
 					}
 				}
+				for (size_t index = 0; index < data.m_ReceiverCache.size(); ++index)
+				{
+					if (data.m_ReceiverCache[index].IsValid())
+					{
+						parameters.m_ReceiverCache[index] = execute.GetViewDescriptor(data.m_ReceiverCache[index]).m_Index;
+					}
+				}
+				const uint32_t receiverQueries = parameters.m_ReceiverCacheCount != 0 ?
+					gi_shader::GIReceiverMaximumQueries : 0u;
 				const auto rows = GIQueryRowsPerDispatch(parameters.m_Size[0], parameters.m_SampleCount,
-					GIObservationLimits::VisibilityQueriesPerSample);
+					GIObservationLimits::VisibilityQueriesPerSample, receiverQueries);
 				for (uint32_t row = 0; row < parameters.m_Size[1]; row += rows)
 				{
 					parameters.m_RowOffset = row;

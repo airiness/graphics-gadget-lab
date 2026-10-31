@@ -32,6 +32,11 @@ static const uint GIReceiverMatchDifferentSurface = 4;
 static const uint GIReceiverMatchMiss = 5;
 static const uint GIReceiverMatchRaster = 6;
 
+static const uint GIReceiverEnvelopeRadius = 4;
+static const uint GIReceiverEnvelopeWidth = 2 * GIReceiverEnvelopeRadius + 1;
+// Centre + envelope + paired-raster fallback. Also bounds cold-cache preparation.
+static const uint GIReceiverMaximumQueries = 1 + GIReceiverEnvelopeWidth * GIReceiverEnvelopeWidth + 1;
+
 static const uint GIVisibilityBaseSum = 0;
 static const uint GIVisibilityCoatSum = 1;
 static const uint GIVisibilityBaseCompensation = 2;

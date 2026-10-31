@@ -68,7 +68,10 @@ try {
                 $values=@{fixture=$(if ($entry.kind -eq 'reference') {12} else {15});probe_enabled=($entry.kind -ne 'off');
                     probe_allocation_diagnostics=$false;probe_rays=$entry.rays;probe_divisor=$entry.divisor;probe_updates=0;
                     probe_refresh_period=0;probe_shared_blend=$entry.shared;probe_rotate=$false;
-                    probe_traversal_only=($entry.kind -eq 'traversal');ev100=15;samples=1;batch_samples=1;depth=1;tile_pixels=8388608;accumulate=$false}
+                    probe_traversal_only=($entry.kind -eq 'traversal');ev100=15;samples=1;batch_samples=1;depth=1;tile_pixels=8388608;accumulate=$false;
+                    # Stateless matching repeats each frame: explicitly admit its complete
+                    # 1920x1080 primary-search bound, separately from sampling work.
+                    receiver_query_work=([uint32](83 * 1920 * 1080))}
                 $effect=Inputs $session $run $values
                 Write-VerificationJson "$path/effect.json" $effect
                 $warmup=Invoke-VerificationSession capture $session @{ExpectedRunIdentity=$run;Timing='after-ready';SettleFrames=120;OutputDirectory="$path/warmup";TimeoutSeconds=$TimeoutSeconds}

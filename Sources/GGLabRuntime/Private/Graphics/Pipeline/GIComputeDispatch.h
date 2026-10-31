@@ -23,9 +23,10 @@ namespace gglab
 	// Resolve-only frames still visit every pixel. Round down to whole workgroups,
 	// retaining at least one group even when one row exceeds the dispatch budget.
 	[[nodiscard]] inline uint32_t GIQueryRowsPerDispatch(uint32_t width,
-		uint32_t samples, uint32_t queriesPerSample) noexcept
+		uint32_t samples, uint32_t queriesPerSample, uint32_t receiverQueriesPerPixel = 0) noexcept
 	{
-		const uint64_t rowWork = uint64_t(width) * std::max(1ull, uint64_t(samples) * queriesPerSample);
+		const uint64_t rowWork = uint64_t(width) *
+			std::max(1ull, uint64_t(samples) * queriesPerSample + receiverQueriesPerPixel);
 		return std::max(GIQueryGroupHeight,
 			static_cast<uint32_t>(GIQueryWorkPerDispatch / rowWork) /
 				GIQueryGroupHeight * GIQueryGroupHeight);

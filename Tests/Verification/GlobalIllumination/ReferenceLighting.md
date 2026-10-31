@@ -56,6 +56,25 @@ and input validation. This bounds sampling work, not execution time.
 Completed means calculated, not converged. Accumulation does not reuse TAA or
 other observations.
 
+Primary receiver matching has a separate `gi_reference.receiver_query_work` cap
+(default 16,777,216). It reserves up to 83 queries per newly prepared pixel, including
+the paired-raster fallback. Each accumulating observation caches position/error,
+face/match and exact uint identities at 40 logical bytes/pixel. Cold preparation
+may span submissions; it never advances samples, compensation or RNG. Until the
+cache is complete, outputs remain defined pending values and readiness stays Pending.
+Later tiles and resolve-only frames read the same prepared receivers without queries.
+The full-image pending initialization and partial/final-sweep resolve rules remain
+unchanged. Camera/projection/extent, scene/material and relevant shader changes
+invalidate cache and estimator together. Execution partitioning is not an identity.
+
+Stateless mode retains per-frame matching and has no persistent cache/certificate.
+Its whole-image worst-case matching must fit the separate cap; explicitly raise it
+for larger stateless views (for example 83 * width * height). This is a work-count
+admission rule, not a millisecond guarantee. Progress reports logical cache bytes;
+native reservation and replacement overlap remain pool/graph diagnostics.
+See the [receiver-cache suite](../README.md#gi-receiver-preparation-cache) for
+byte-exact before/after and sum/compensation/RNG controls.
+
 ## Independent checks and masks
 
 ValidateGIReferenceLighting.py computes the sun contract's rectangle form factor

@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Pipeline/GIObservationLimits.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIReceiverPreparation.h"
 #include <cstdint>
 #include <memory>
 
@@ -20,6 +21,9 @@ namespace gglab
 		uint32_t m_SamplesPerBatch = GIObservationLimits::DefaultBatchSamples;
 		uint32_t m_QueryWorkPerSubmission = GIObservationLimits::DefaultVisibilityQueryWork;
 		uint32_t m_MaximumTilePixels = 0;
+		// Separate from the two-lobe sampling cap. Cold primary matching reserves
+		// up to 83 queries per pixel; subsequent tile/resolve frames use its cache.
+		uint32_t m_ReceiverQueryWorkPerSubmission = GIObservationLimits::MaximumQueryWorkPerSubmission;
 		float m_MaximumDistance = 1000.0f;
 	};
 
@@ -46,6 +50,7 @@ namespace gglab
 		uint32_t m_SubmittedTiles = 0;
 		uint32_t m_TileCount = 0;
 		bool m_Active = false;
+		GIReceiverPreparationProgress m_ReceiverPreparation;
 	};
 
 	[[nodiscard]] RenderFrameValidationResult ValidateGISpecularVisibilityInputs(

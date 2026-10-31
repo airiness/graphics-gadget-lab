@@ -12,6 +12,11 @@ namespace gglab
 		static constexpr uint32_t MaximumImagePixels = 1u << 23;
 		static constexpr uint32_t MaximumSampleWorkPerSubmission = 1u << 23;
 		static constexpr uint32_t MaximumQueryWorkPerSubmission = 1u << 24;
+		// Allows an explicitly requested stateless full image, including its primary
+		// search, while the default preparation budget remains 16,777,216 queries.
+		static constexpr uint32_t MaximumReceiverQueriesPerPixel = 83;
+		static constexpr uint32_t MaximumReceiverQueryWorkPerSubmission =
+			MaximumImagePixels * MaximumReceiverQueriesPerPixel;
 		static constexpr uint32_t MaximumDiffuseDepth = 256;
 		static constexpr uint32_t DefaultSeed = 61051;
 		static constexpr uint32_t DefaultReferenceSamples = 64;

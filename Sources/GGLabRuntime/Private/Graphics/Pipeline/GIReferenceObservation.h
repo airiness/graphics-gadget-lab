@@ -1,5 +1,6 @@
 #pragma once
 #include "Graphics/Pipeline/GIComputeDispatch.h"
+#include "Graphics/Pipeline/GIReceiverCache.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIReference.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIReferenceTypes.h"
 #include "Graphics/Pipeline/TemporalHistoryTextures.h"
@@ -45,6 +46,7 @@ namespace gglab
 		std::array<float, 3> m_CameraPosition{};
 		std::array<float, 3> m_ConstantRadiance{};
 		float m_MaximumDistance = 0;
+		float m_TextureLodBias = 0;
 		float m_EnvironmentIntensity = 0;
 		float m_EnvironmentRotation = 0;
 		uint32_t m_Width = 0;
@@ -83,11 +85,17 @@ namespace gglab
 		[[nodiscard]] bool Prepare(const GIReferenceObservationKey& key,
 			uint32_t samplesPerBatch, uint32_t sampleWorkBudget,
 			uint32_t queryWorkBudget = GIObservationLimits::MaximumQueryWorkPerSubmission,
-			uint32_t maximumTilePixels = 0) noexcept;
+			uint32_t maximumTilePixels = 0,
+			uint32_t receiverQueryBudget = GIObservationLimits::MaximumQueryWorkPerSubmission) noexcept;
 		[[nodiscard]] Tile GetTile() const noexcept { return m_Tile; }
 		[[nodiscard]] std::array<Surface, SurfaceCount> Import(RenderGraph::RGBuilder& builder) noexcept;
 		void Export(RenderGraph::RGBuilder& builder, const std::array<Surface, SurfaceCount>& surfaces) noexcept;
-		void MarkRecorded() noexcept { m_Recorded = true; }
+		[[nodiscard]] GIReceiverCache& GetReceiverCache() noexcept { return m_ReceiverCache; }
+		void MarkRecorded() noexcept
+		{
+			m_Recorded = true;
+			m_ReceiverCache.MarkRecorded();
+		}
 		void Settle(const RenderFrameOutcome& outcome) noexcept;
 		void Cancel() noexcept;
 		void Shutdown() noexcept;
@@ -95,6 +103,7 @@ namespace gglab
 		{
 			auto result = m_Diagnostics;
 			result.m_Active = m_Visited;
+			result.m_ReceiverPreparation = m_ReceiverCache.GetProgress();
 			return result;
 		}
 
@@ -102,6 +111,7 @@ namespace gglab
 		void Release() noexcept;
 		RHIDevice& m_Device;
 		PersistentTexturePool& m_Pool;
+		GIReceiverCache m_ReceiverCache;
 		TemporalHistoryTextures<SurfaceCount> m_Textures;
 		GIReferenceObservationKey m_Key{};
 		GIReferenceObservationDiagnostics m_Diagnostics{};

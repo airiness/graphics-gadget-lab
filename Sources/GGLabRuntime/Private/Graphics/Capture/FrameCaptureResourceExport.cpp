@@ -83,6 +83,14 @@ namespace gglab
 					.m_Space = "Native unjittered render view before temporal integration",
 					.m_Description = "Stateless one-bounce reference. SunIrradiance RGB and EnvironmentIrradiance RGB sum to Irradiance RGB. Sun alpha: atmosphere attenuation bound (0/1); environment alpha: actual cubemap LOD, -1 for direct constant input (background 0). Irradiance excludes receiver albedo and direct receiver sun. LambertRadiance is reduced diffuse albedo * E / pi, not full Forward material or Final. Irradiance alpha: 0 background, 1 valid, -1 unsupported receiver, -2 unmatched/invalid receiver, -3 invalid secondary sample; never drop invalid pixels from metrics." };
 			}
+			if (name.starts_with("GI.Reference.ReceiverCache.") ||
+				name.starts_with("GI.SpecularVisibility.ReceiverCache."))
+			{
+				return ResourceExportSemantics{ .m_Role = "gi.primary-receiver-cache",
+					.m_Units = "metres / unit normal / snapshot-local uint IDs",
+					.m_Space = "Native unjittered observation",
+					.m_Description = "PositionError: world XYZ and geometric origin error. FaceMatch: oriented face XYZ and primary match kind (1 centre, 2 envelope, 6 raster; 3 invalid, 4 different surface, 5 miss). Instance/Primitive: exact uint IDs. Zero marks background or unprocessed pixels. A partially prepared cache is not a complete receiver product; consult receiver preparation progress. Logical storage is 40 bytes/pixel, excluding native alignment and replacement overlap." };
+			}
 			if (name == "GI.ProbeUpdate.UpdateStatus" || name == "GI.Field.UpdateStatus")
 			{
 				return ResourceExportSemantics{ .m_Role = "gi-update-status", .m_Units = "integer error and indices",

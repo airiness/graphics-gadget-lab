@@ -182,6 +182,9 @@ namespace gglab
 				GIQueryRowsPerDispatch(1024, 0, 512) == 8192 &&
 				GIQueryRowsPerDispatch(1u << 23, 4096, 512) == 8,
 				"Query splitting handles sampled, resolve-only and oversized-row dispatches");
+			context.Check(GIQueryRowsPerDispatch(1024, 0, 512, gi_shader::GIReceiverMaximumQueries) == 96 &&
+				GIQueryRowsPerDispatch(1024, 64, 2, gi_shader::GIReceiverMaximumQueries) == 32,
+				"Dispatch splitting includes both cold matching and sampling query work");
 
 			// Parameter order is not a count: inherited layouts may contain gaps.
 			std::vector<LayoutBindingRequirement> bindings
@@ -402,6 +405,10 @@ namespace gglab
 			info.m_QueryWorkPerSubmission = 0;
 			context.Check(!ValidateGIReferenceInputs(info, scene).IsReady(),
 				"An empty query-work budget rejects before submission");
+			info.m_QueryWorkPerSubmission = GIObservationLimits::MaximumQueryWorkPerSubmission;
+			info.m_ReceiverQueryWorkPerSubmission = gi_shader::GIReceiverMaximumQueries - 1;
+			context.Check(!ValidateGIReferenceInputs(info, scene).IsReady(),
+				"Primary receiver preparation has independent admission before allocation");
 		}
 
 		void RunGIReferenceObservationTests(SelfTestContext& context) noexcept
@@ -436,6 +443,7 @@ namespace gglab
 					graph.AddPass<Data>("ObservationBatch", RGPassEncoderType::Compute,
 						[&](RenderGraph::RGBuilder& builder, Data&)
 						{
+							GGLAB_UNUSED(observation.GetReceiverCache().Import(builder));
 							auto surfaces = observation.Import(builder);
 							for (auto& surface : surfaces)
 							{
@@ -507,6 +515,11 @@ namespace gglab
 				observation.GetDiagnostics().m_SubmittedSamples == 0 &&
 				observation.GetDiagnostics().m_CommittedVersion == 0,
 				"Raster-position shader replacement invalidates the reference and resets every published sample");
+			key.m_TextureLodBias = -1.0f;
+			GGLAB_UNUSED(observation.Prepare(key, 4, 256));
+			context.Check(observation.GetDiagnostics().m_Generation == generation + 4 &&
+				observation.GetDiagnostics().m_ReceiverPreparation.m_SubmittedPixels == 0,
+				"Receiver raster footprint changes reset the matching cache with the estimator");
 			record();
 			observation.Settle({ RenderFrameOutcomeKind::Failed, 5, fence });
 			context.Check(observation.GetDiagnostics().m_Status == GIReferenceObservationStatus::Failed &&
@@ -518,7 +531,7 @@ namespace gglab
 			record();
 			observation.Settle({ RenderFrameOutcomeKind::CompletionUnknown, 6, {} });
 			observation.Cancel();
-			context.Check(textures.GetDiagnostics().m_ActiveTextureCount == 12 &&
+			context.Check(textures.GetDiagnostics().m_ActiveTextureCount == 16 &&
 				!observation.Prepare(key, 4, 256), "Unknown completion retains GPU owners and prevents restart");
 			device.SetFencesComplete(true);
 			observation.Shutdown();
@@ -529,10 +542,10 @@ namespace gglab
 			device.SetFencesComplete(false);
 			observation.Settle({ RenderFrameOutcomeKind::Submitted, 7, fence });
 			observation.Cancel();
-			context.Check(textures.GetDiagnostics().m_PendingRetirementTextureCount == 12,
+			context.Check(textures.GetDiagnostics().m_PendingRetirementTextureCount == 16,
 				"Cancellation retains the entire sum/RNG pair through its last-use fence");
 			textures.Tick();
-			context.Check(textures.GetDiagnostics().m_PendingRetirementTextureCount == 12,
+			context.Check(textures.GetDiagnostics().m_PendingRetirementTextureCount == 16,
 				"Pending cancelled resources cannot retire early");
 			observation.BeginFrame(8);
 			GGLAB_UNUSED(observation.Prepare(key, 4, 256));
@@ -563,6 +576,10 @@ namespace gglab
 			info.m_QueryWorkPerSubmission = 1;
 			context.Check(!ValidateGISpecularVisibilityInputs(info, scene).IsReady(),
 				"The work budget accounts for both lobes even when a material disables one");
+			info.m_QueryWorkPerSubmission = GIObservationLimits::VisibilityQueriesPerSample;
+			info.m_ReceiverQueryWorkPerSubmission = gi_shader::GIReceiverMaximumQueries - 1;
+			context.Check(!ValidateGISpecularVisibilityInputs(info, scene).IsReady(),
+				"Visibility sampling cannot conceal an insufficient primary matching budget");
 
 			asset_test::TestRHIDevice device;
 			PersistentTexturePool textures(&device);
@@ -577,6 +594,7 @@ namespace gglab
 					graph.AddPass<Data>("VisibilityTile", RGPassEncoderType::Compute,
 						[&](RenderGraph::RGBuilder& builder, Data&)
 						{
+							GGLAB_UNUSED(observation.GetReceiverCache().Import(builder));
 							auto surfaces = observation.Import(builder);
 							for (auto& surface : surfaces)
 							{
@@ -659,7 +677,7 @@ namespace gglab
 			record();
 			observation.Settle({ RenderFrameOutcomeKind::CompletionUnknown, 8, {} });
 			observation.Cancel();
-			context.Check(textures.GetDiagnostics().m_ActiveTextureCount == 8 && !observation.Prepare(key, 64, 128),
+			context.Check(textures.GetDiagnostics().m_ActiveTextureCount == 12 && !observation.Prepare(key, 64, 128),
 				"Unknown completion retains all four visibility surface pairs until checked teardown");
 			observation.Shutdown();
 			textures.Tick();
@@ -672,7 +690,7 @@ namespace gglab
 			++key.m_BrdfLutRevision;
 			GGLAB_UNUSED(observation.Prepare(key, 64, 128));
 			context.Check(observation.GetDiagnostics().m_SubmittedTiles == 0 &&
-				textures.GetDiagnostics().m_PendingRetirementTextureCount == 8,
+				textures.GetDiagnostics().m_PendingRetirementTextureCount == 12,
 				"LUT replacement resets pending sweeps while retaining old allocations through the fence");
 			observation.Settle({ RenderFrameOutcomeKind::Submitted, 10, fence });
 			context.Check(observation.GetDiagnostics().m_SubmittedTiles == 0,
@@ -705,6 +723,7 @@ namespace gglab
 					graph.AddPass<Data>("ObservationTile", RGPassEncoderType::Compute,
 						[&](RenderGraph::RGBuilder& builder, Data&)
 						{
+							GGLAB_UNUSED(observation.GetReceiverCache().Import(builder));
 							auto surfaces = observation.Import(builder);
 							for (auto& surface : surfaces)
 							{
@@ -798,7 +817,7 @@ namespace gglab
 			record();
 			observation.Settle({ RenderFrameOutcomeKind::CompletionUnknown, 10, {} });
 			observation.Cancel();
-			context.Check(textures.GetDiagnostics().m_ActiveTextureCount == 12 &&
+			context.Check(textures.GetDiagnostics().m_ActiveTextureCount == 16 &&
 				!observation.Prepare(key, 4, 128, 8192), "Unknown partial sweeps retain every owner through checked teardown");
 			observation.Shutdown();
 			textures.Tick();
@@ -811,7 +830,7 @@ namespace gglab
 			// An inactive Lab never visits the observation during this frame.
 			observation.Settle({ RenderFrameOutcomeKind::Submitted, 12, fence });
 			context.Check(observation.GetDiagnostics().m_Status == GIReferenceObservationStatus::Cancelled &&
-				textures.GetDiagnostics().m_PendingRetirementTextureCount == 12,
+				textures.GetDiagnostics().m_PendingRetirementTextureCount == 16,
 				"Lab deactivation retains every partial-sweep owner through its last-use fence");
 			device.SetFencesComplete(true);
 			observation.Shutdown();
@@ -829,13 +848,166 @@ namespace gglab
 				observation.GetDiagnostics().m_SubmittedSamples == 0 &&
 				observation.GetDiagnostics().m_SubmittedTiles == 0 &&
 				observation.GetDiagnostics().m_CommittedVersion == 0 && observation.GetTile().m_BeginSweep &&
-				textures.GetDiagnostics().m_PendingRetirementTextureCount == 12,
+				textures.GetDiagnostics().m_PendingRetirementTextureCount == 16,
 				"A material snapshot revision restarts every partial-sweep cursor and retains old storage through its fence");
 			record();
 			observation.Settle({ RenderFrameOutcomeKind::Discarded, 14, {} });
 			device.SetFencesComplete(true);
 			observation.Shutdown();
 			textures.Tick();
+		}
+
+		void RunGIReceiverCacheTests(SelfTestContext& context) noexcept
+		{
+			asset_test::TestRHIDevice device;
+			device.SetFencesComplete(false);
+			PersistentTexturePool textures(&device);
+			TransientResourcePool transients(&device);
+			GIReceiverCache cache(device, textures, { "Cache.PositionError", "Cache.FaceMatch",
+				"Cache.Instance", "Cache.Primitive" });
+			constexpr uint32_t queries = gi_shader::GIReceiverMaximumQueries;
+			const RHIFencePoint fence{ RHIFenceHandle(0, 1), 1 };
+			const auto record = [&]() noexcept
+				{
+					RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &transients });
+					struct Data {};
+					graph.AddPass<Data>("PrepareOrReadCache", RGPassEncoderType::Compute,
+						[&](RenderGraph::RGBuilder& builder, Data&)
+						{
+							const auto views = cache.Import(builder);
+							context.Check(std::ranges::all_of(views, [](auto view) { return view.IsValid(); }),
+								"Receiver preparation and cache reads declare all four surfaces");
+							builder.SideEffect();
+						});
+					context.Check(graph.Compile(), "Partial receiver preparation preserves graph-defined contents");
+					cache.MarkRecorded();
+				};
+			cache.BeginFrame(1);
+			context.Check(!cache.Prepare(8, 4, queries - 1) && textures.GetDiagnostics().m_ActiveTextureCount == 0,
+				"Even one receiver must fit every possible matching attempt before allocation");
+			context.Check(cache.Prepare(8, 4, queries * 13 + queries - 1) &&
+				cache.GetProgress().m_BatchPixels == 13 && !cache.CanSample() &&
+				cache.GetProgress().m_BatchQueryWork == queries * 13 && cache.GetProgress().m_CacheBytes == 32 * 40,
+				"Cold matching has a separate conservative query cap and 40-byte-per-pixel storage");
+			record();
+			cache.Settle({ RenderFrameOutcomeKind::Discarded, 1, {} });
+			context.Check(cache.GetProgress().m_SubmittedPixels == 0,
+				"Discarded preparation cannot validate or consume any receiver pixels");
+			cache.BeginFrame(2);
+			GGLAB_UNUSED(cache.Prepare(8, 4, queries * 13));
+			record();
+			cache.Settle({ RenderFrameOutcomeKind::Submitted, 2, fence });
+			cache.Settle({ RenderFrameOutcomeKind::Submitted, 2, fence });
+			context.Check(cache.GetProgress().m_SubmittedPixels == 13 && cache.GetProgress().m_CompletedPixels == 0,
+				"Receiver preparation settles once and distinguishes submission from completion");
+			cache.BeginFrame(3);
+			GGLAB_UNUSED(cache.Prepare(8, 4, queries * 13));
+			context.Check(cache.GetProgress().m_BatchPixels == 0 && !cache.CanSample(),
+				"A pending preparation fence prevents overlapping writes and premature sampling");
+			cache.Settle({ RenderFrameOutcomeKind::Discarded, 3, {} });
+			device.SetFencesComplete(true);
+			cache.BeginFrame(4);
+			GGLAB_UNUSED(cache.Prepare(8, 4, queries * 13));
+			context.Check(cache.GetBeginPixel() == 13 && cache.GetProgress().m_CompletedPixels == 13,
+				"Completed preparation resumes at the exact next pixel");
+			record();
+			cache.Settle({ RenderFrameOutcomeKind::Submitted, 4, fence });
+			cache.BeginFrame(5);
+			GGLAB_UNUSED(cache.Prepare(8, 4, queries * 13));
+			context.Check(cache.GetBeginPixel() == 26 && cache.GetProgress().m_BatchPixels == 6,
+				"The final receiver batch includes the non-divisible image remainder");
+			record();
+			device.SetFencesComplete(false);
+			cache.Settle({ RenderFrameOutcomeKind::Submitted, 5, fence });
+			cache.BeginFrame(6);
+			GGLAB_UNUSED(cache.Prepare(8, 4, queries));
+			context.Check(cache.GetProgress().m_Ready && !cache.CanSample() &&
+				cache.GetProgress().m_BatchQueryWork == 0 && cache.GetProgress().m_CompletedPixels == 26,
+				"Submitted complete data may resolve through queue ordering but sampling waits for its fence");
+			record();
+			cache.Settle({ RenderFrameOutcomeKind::Submitted, 6, fence });
+			device.SetFencesComplete(true);
+			cache.BeginFrame(7);
+			GGLAB_UNUSED(cache.Prepare(8, 4, queries * 32));
+			context.Check(cache.CanSample() && cache.GetProgress().m_CompletedPixels == 32 &&
+				cache.GetProgress().m_BatchQueryWork == 0 && textures.GetDiagnostics().m_TotalAcquireCount == 4,
+				"Changing execution budgets cannot invalidate a ready cache or repeat its expensive queries");
+			record();
+			device.SetFencesComplete(false);
+			cache.Settle({ RenderFrameOutcomeKind::Failed, 7, fence });
+			cache.Release();
+			context.Check(textures.GetDiagnostics().m_PendingRetirementTextureCount == 4,
+				"A failed cached read still retains all resources through its real last-use fence");
+			cache.BeginFrame(8);
+			GGLAB_UNUSED(cache.Prepare(8, 4, queries * 32));
+			record();
+			cache.Settle({ RenderFrameOutcomeKind::CompletionUnknown, 8, {} });
+			cache.Release();
+			context.Check(textures.GetDiagnostics().m_ActiveTextureCount == 4 && !cache.Prepare(8, 4, queries * 32),
+				"Unknown completion retains receiver storage and forbids ordinary reuse");
+			device.SetFencesComplete(true);
+			cache.Shutdown();
+			textures.Tick();
+
+			const auto checkObservation = [&]<typename Observation, typename Key>
+				(Observation& observation, Key key, auto prepare) noexcept
+				{
+					const auto recordObservation = [&]() noexcept
+						{
+							RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &transients });
+							struct Data {};
+							graph.AddPass<Data>("ColdObservation", RGPassEncoderType::Compute,
+								[&](RenderGraph::RGBuilder& builder, Data&)
+								{
+									GGLAB_UNUSED(observation.GetReceiverCache().Import(builder));
+									auto surfaces = observation.Import(builder);
+									for (auto& surface : surfaces)
+									{
+										if (observation.GetDiagnostics().m_BatchSamples != 0)
+										{
+											builder.WriteInPlace(surface.m_Next, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+										}
+									}
+									observation.Export(builder, surfaces);
+									builder.SideEffect();
+								});
+							context.Check(graph.Compile(), "Cold observations declare matching without undefined sum reads");
+							observation.MarkRecorded();
+						};
+					for (uint64_t serial = 1; serial <= 2; ++serial)
+					{
+						observation.BeginFrame(serial);
+						context.Check(prepare(key) && observation.GetDiagnostics().m_BatchSamples == 0,
+							"Multi-frame receiver preparation cannot consume sample or tile indices");
+						recordObservation();
+						observation.Settle({ RenderFrameOutcomeKind::Submitted, serial, fence });
+					}
+					observation.BeginFrame(3);
+					context.Check(prepare(key) && observation.GetDiagnostics().m_BatchSamples != 0 &&
+						observation.GetDiagnostics().m_ReceiverPreparation.m_BatchQueryWork == 0 &&
+						observation.GetDiagnostics().m_SubmittedSamples == 0 && observation.GetTile().m_BeginSweep,
+						"The original sample sequence starts only after complete receiver preparation");
+					recordObservation();
+					observation.Settle({ RenderFrameOutcomeKind::Submitted, 3, fence });
+					observation.BeginFrame(4);
+					++key.m_PositionShaderGeneration;
+					context.Check(prepare(key) && observation.GetDiagnostics().m_BatchSamples == 0 &&
+						observation.GetDiagnostics().m_ReceiverPreparation.m_SubmittedPixels == 0 &&
+						observation.GetDiagnostics().m_CommittedVersion == 0,
+						"Matching input replacement invalidates the cache and every accumulated sample together");
+					observation.Settle({ RenderFrameOutcomeKind::Discarded, 4, {} });
+					observation.Shutdown();
+					textures.Tick();
+				};
+			GIReferenceObservation reference(device, textures);
+			checkObservation(reference, GIReferenceObservationKey{ .m_Width = 16, .m_Height = 8, .m_Samples = 2 },
+				[&](const auto& key) { return reference.Prepare(key, 1, 128, 256, 0, queries * 64); });
+			GISpecularVisibilityObservation visibility(device, textures);
+			checkObservation(visibility, GISpecularVisibilityKey{ .m_Width = 16, .m_Height = 8, .m_Samples = 2 },
+				[&](const auto& key) { return visibility.Prepare(key, 1, 256, 0, queries * 64); });
+			context.Check(textures.GetDiagnostics().m_ActiveTextureCount == 0 &&
+				textures.GetDiagnostics().m_PendingRetirementTextureCount == 0,
+				"Receiver preparation teardown releases every cache and observation allocation");
 		}
 
 		void RunGIReceiverPreparationTests(SelfTestContext& context) noexcept
@@ -1550,6 +1722,7 @@ namespace gglab
 		RunGIReferenceObservationTests(context);
 		RunSpecularVisibilityTests(context);
 		RunGIReferenceTilingTests(context);
+		RunGIReceiverCacheTests(context);
 		RunTriangleTests(context);
 		RunInstanceTests(context);
 		RunScratchTests(context);

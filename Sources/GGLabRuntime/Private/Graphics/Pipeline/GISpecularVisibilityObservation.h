@@ -51,12 +51,18 @@ namespace gglab
 		void BeginFrame(uint64_t serial) noexcept;
 		[[nodiscard]] bool Prepare(const GISpecularVisibilityKey& key,
 			uint32_t samplesPerBatch, uint32_t queryWorkBudget,
-			uint32_t maximumTilePixels = 0) noexcept;
+			uint32_t maximumTilePixels = 0,
+			uint32_t receiverQueryBudget = GIObservationLimits::MaximumQueryWorkPerSubmission) noexcept;
 		[[nodiscard]] Tile GetTile() const noexcept { return m_Tile; }
 		[[nodiscard]] std::array<Surface, SurfaceCount> Import(RenderGraph::RGBuilder& builder) noexcept;
 		void Export(RenderGraph::RGBuilder& builder,
 			const std::array<Surface, SurfaceCount>& surfaces) noexcept;
-		void MarkRecorded() noexcept { m_Recorded = true; }
+		[[nodiscard]] GIReceiverCache& GetReceiverCache() noexcept { return m_ReceiverCache; }
+		void MarkRecorded() noexcept
+		{
+			m_Recorded = true;
+			m_ReceiverCache.MarkRecorded();
+		}
 		void Settle(const RenderFrameOutcome& outcome) noexcept;
 		void Cancel() noexcept;
 		void Shutdown() noexcept;
@@ -64,6 +70,7 @@ namespace gglab
 		{
 			auto result = m_Diagnostics;
 			result.m_Active = m_Visited;
+			result.m_ReceiverPreparation = m_ReceiverCache.GetProgress();
 			return result;
 		}
 
@@ -71,6 +78,7 @@ namespace gglab
 		void Release() noexcept;
 		RHIDevice& m_Device;
 		PersistentTexturePool& m_Pool;
+		GIReceiverCache m_ReceiverCache;
 		TemporalHistoryTextures<SurfaceCount> m_Textures;
 		GISpecularVisibilityKey m_Key{};
 		GISpecularVisibilityProgress m_Diagnostics{};
