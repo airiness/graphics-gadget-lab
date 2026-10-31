@@ -86,6 +86,8 @@ namespace gglab
 			.m_FieldLogicalBytes = update.m_FieldLogicalBytes,
 			.m_RayCapacityBytes = update.m_RayCapacityBytes,
 			.m_ProbeCount = update.m_ProbeCount,
+			.m_StatusReadbackSlots = update.m_StatusReadbackSlots,
+			.m_UpdateStatus = update.m_UpdateStatus,
 			.m_Initialized = update.m_Initialized,
 			.m_Invalid = state.m_Update->IsInvalid() || update.m_Failed,
 			.m_Reason = state.m_Update->IsInvalid() ? "GI field submission failed or completion is unknown" : update.m_Reason,

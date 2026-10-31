@@ -7,8 +7,9 @@
 
 StructuredBuffer<float4> ProbeRayInput : register(t11);
 RWStructuredBuffer<float4> ProbeRayOutput : register(u1);
+RWStructuredBuffer<uint4> ProbeUpdateStatus : register(u2);
 
-// Field order matches GIProbeUpdate.cpp::Parameters, including explicit padding.
+// Field order matches GIProbeUpdateWorkload.cpp::Parameters, including explicit padding.
 cbuffer Parameters : register(b2)
 {
 	uint3 GridSize;
@@ -91,9 +92,23 @@ float3 OctahedralDirection(uint2 texel, uint size)
 	return normalize(direction);
 }
 
+void InvalidateUpdate(uint error, uint probe, uint element)
+{
+	uint previous;
+	InterlockedCompareExchange(ProbeUpdateStatus[0].x, GIUpdateErrorNone, error, previous);
+	if (previous == GIUpdateErrorNone)
+	{
+		ProbeUpdateStatus[0].yzw = uint3(probe, UpdateIndex, element);
+	}
+}
+
 [numthreads(GIQueryGroupWidth, GIQueryGroupHeight, 1)]
 void Initialize(uint3 id : SV_DispatchThreadID)
 {
+	if (all(id == 0))
+	{
+		ProbeUpdateStatus[0] = uint4(GIUpdateErrorNone, 0xffffffffu, 0xffffffffu, 0xffffffffu);
+	}
 	if (id.x < GridSize.x * GIProbeIrradianceTileWidth &&
 		id.y < GridSize.z * GIProbeIrradianceTileWidth && id.z < GridSize.y)
 	{
@@ -120,9 +135,25 @@ void Initialize(uint3 id : SV_DispatchThreadID)
 }
 
 groupshared uint4 QueryCounts[GIProbeGroupThreads];
+groupshared uint UpdateBlocked;
+bool IsUpdateBlocked(uint thread)
+{
+	if (thread == 0)
+	{
+		UpdateBlocked = ProbeUpdateStatus[0].x;
+	}
+	// Every thread must take the same return path before subsequent group barriers.
+	GroupMemoryBarrierWithGroupSync();
+	return UpdateBlocked != GIUpdateErrorNone;
+}
 [numthreads(GIProbeGroupThreads, 1, 1)]
 void Trace(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 {
+	// The sticky status blocks later updates without destroying the first failure's rays.
+	if (IsUpdateBlocked(thread))
+	{
+		return;
+	}
 	const uint probe = FirstProbe + group.x;
 	const uint3 coordinate = ProbeCoordinate(probe);
 	const float3 origin = GridMinimum + ProbeSpacing * (float3)(coordinate.xzy);
@@ -175,10 +206,15 @@ void Trace(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 				}
 			}
 		}
+		const float4 sampled = NonFiniteInject(NF_INJECT_PASS_GI_PROBE_UPDATE_TRACE_SAMPLE,
+			uint2(probe, index), float4(radiance, distance));
+		radiance = sampled.xyz;
+		distance = sampled.w;
 		if (outcome == GIHitInvalid || !all(isfinite(NonFiniteObserveValue(
 			NF_SITE_GI_PROBE_UPDATE_TRACE_ISFINITE, float4(radiance, distance)))))
 		{
-			// Invalid samples remain visible in state and poison the numerical export.
+			// Keep the raw diagnostic; no part of this update may become valid history.
+			InvalidateUpdate(GIUpdateErrorInvalidRay, probe, index);
 			radiance = asfloat(0x7fc00000u).xxx;
 			distance = asfloat(0x7fc00000u);
 			counts.w++;
@@ -245,21 +281,50 @@ void StoreTexel(uint probe, uint texel, float4 value)
 	{
 		const uint3 target = uint3(coordinate.xy * GIProbeIrradianceTileWidth + GIProbeBorderWidth +
 			uint2(texel % GIProbeIrradianceInteriorWidth, texel / GIProbeIrradianceInteriorWidth), coordinate.z);
-		const float4 previous = IrradianceAtlas()[target];
-		IrradianceAtlas()[target] = float4(lerp(value.xyz, previous.xyz, Hysteresis), 1);
+		const float4 previous = NonFiniteInject(NF_INJECT_PASS_GI_PROBE_UPDATE_STORETEXEL_HISTORY,
+			uint2(probe, texel), IrradianceAtlas()[target]);
+		if (!all(isfinite(NonFiniteObserveValue(NF_SITE_GI_PROBE_UPDATE_STORETEXEL_ISFINITE, previous))))
+		{
+			InvalidateUpdate(GIUpdateErrorInvalidHistory, probe, texel);
+			return;
+		}
+		const float3 blended = lerp(value.xyz, previous.xyz, Hysteresis);
+		if (!all(isfinite(NonFiniteObserveValue(NF_SITE_GI_PROBE_UPDATE_STORETEXEL_ISFINITE, blended))))
+		{
+			InvalidateUpdate(GIUpdateErrorInvalidBlend, probe, texel);
+			return;
+		}
+		IrradianceAtlas()[target] = float4(blended, 1);
 	}
 	else
 	{
 		const uint index = texel - GIProbeIrradianceInteriorTexels;
 		const uint3 target = uint3(coordinate.xy * GIProbeDistanceTileWidth + GIProbeBorderWidth +
 			uint2(index % GIProbeDistanceInteriorWidth, index / GIProbeDistanceInteriorWidth), coordinate.z);
-		const float2 previous = DistanceAtlas()[target];
-		DistanceAtlas()[target] = lerp(value.xy, previous, Hysteresis);
+		const float2 previous = NonFiniteInject(NF_INJECT_PASS_GI_PROBE_UPDATE_STORETEXEL_HISTORY,
+			uint2(probe, texel), DistanceAtlas()[target]);
+		if (!all(isfinite(NonFiniteObserveValue(NF_SITE_GI_PROBE_UPDATE_STORETEXEL_ISFINITE, previous))))
+		{
+			InvalidateUpdate(GIUpdateErrorInvalidHistory, probe, texel);
+			return;
+		}
+		const float2 blended = lerp(value.xy, previous, Hysteresis);
+		if (!all(isfinite(NonFiniteObserveValue(NF_SITE_GI_PROBE_UPDATE_STORETEXEL_ISFINITE, blended))))
+		{
+			InvalidateUpdate(GIUpdateErrorInvalidBlend, probe, texel);
+			return;
+		}
+		DistanceAtlas()[target] = blended;
 	}
 }
 [numthreads(GIProbeGroupThreads, 1, 1)]
 void BlendDirect(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 {
+	// Trace and blend publish a sticky GPU verdict before any later consumer.
+	if (IsUpdateBlocked(thread))
+	{
+		return;
+	}
 	const uint probe = FirstProbe + group.x;
 	for (uint ray = thread; ray < RaysPerProbe; ray += GIProbeGroupThreads)
 	{
@@ -274,6 +339,11 @@ void BlendDirect(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 [numthreads(GIProbeGroupThreads, 1, 1)]
 void BlendShared(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 {
+	// Trace and blend publish a sticky GPU verdict before any later consumer.
+	if (IsUpdateBlocked(thread))
+	{
+		return;
+	}
 	const uint probe = FirstProbe + group.x;
 	for (uint ray = thread; ray < RaysPerProbe; ray += GIProbeGroupThreads)
 	{
@@ -314,6 +384,11 @@ uint2 BorderSource(uint2 pixel, uint side)
 [numthreads(GIProbeGroupThreads, 1, 1)]
 void Borders(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 {
+	// Trace and blend publish a sticky GPU verdict before any later consumer.
+	if (IsUpdateBlocked(thread))
+	{
+		return;
+	}
 	const uint probe = FirstProbe + group.x;
 	const uint3 coordinate = ProbeCoordinate(probe);
 	for (uint index = thread; index < GIProbeTileTexels; index += GIProbeGroupThreads)

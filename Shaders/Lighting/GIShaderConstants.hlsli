@@ -52,6 +52,11 @@ static const uint GIProbeIrradianceTileTexels = GIProbeIrradianceTileWidth * GIP
 static const uint GIProbeTileTexels = GIProbeIrradianceTileTexels + GIProbeDistanceTileWidth * GIProbeDistanceTileWidth;
 static const uint GIProbeGroupThreads = 64;
 static const uint GIProbeMaximumRays = 256;
+static const uint GIUpdateErrorNone = 0;
+static const uint GIUpdateErrorInvalidRay = 1;
+static const uint GIUpdateErrorInvalidHistory = 2;
+static const uint GIUpdateErrorInvalidBlend = 3;
+static const uint GIUpdateStatusBytes = 16;
 static const uint GIProbeRayStride = 4 * 4; // float4: scene radiance and signed hit distance.
 
 static const uint GIPreviewIrradiance = 29;

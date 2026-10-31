@@ -211,8 +211,8 @@ def memory(directory, case=None):
         require(p["failed"] == 0 and p["initialized"] == 1 and p["submitted"] == p["completed"] == case["updates"],
                 "Bounded workload did not settle exactly")
         require(p["probes"] == (12870 if case["fixture"] == 15 else 8) and p["rayCapacity"] == p["probes"]*case["rays"]*16 and
-                p["fieldLogical"] == p["probes"]*3088, "Logical capacity diagnostic drift")
-        require(len([n for n,r in rows if n.startswith("Probe ")]) == 4 and totals["RayScene"] > 0 and totals["Scratch"] > 0,
+                p["fieldLogical"] == p["probes"]*3088+16, "Logical capacity diagnostic drift")
+        require(len([n for n,r in rows if n.startswith("Probe ")]) == 5+p["statusReadbacks"] and totals["RayScene"] > 0 and totals["Scratch"] > 0,
                 "Memory ledger omits workload, ray scene or cached build scratch")
         require(int(metrics["Live ray snapshots"]) == 1, "Settled frame retained replaced snapshots")
         require(p["allocationMs"] > 0 and p["shaderLookupMs"] >= 0 and p["pipelineMs"] > 0 and

@@ -13,10 +13,10 @@ namespace gglab::nonfinite
 	inline constexpr uint32_t CounterMagic = 0x4e464354;
 	inline constexpr uint32_t HeaderBytes = 32;
 	inline constexpr uint32_t RecordBytes = 32;
-	inline constexpr uint32_t InventoryLow = 0x03c3472f;
-	inline constexpr uint32_t InventoryHigh = 0x3554810f;
-	inline constexpr std::string_view VariantSuffix = ".nonfinite-counters.03c3472f3554810fed44f4bd1d8002989dd3fddda1a60d01772984933ddd1909";
-	inline constexpr uint32_t SiteCount = 80;
+	inline constexpr uint32_t InventoryLow = 0x0084a3d7;
+	inline constexpr uint32_t InventoryHigh = 0xbf1452d3;
+	inline constexpr std::string_view VariantSuffix = ".nonfinite-counters.0084a3d7bf1452d38fe39de8108a0af3f4bfcc30b72cbd45fc43c5df24dafa7a";
+	inline constexpr uint32_t SiteCount = 81;
 	inline constexpr uint32_t ProgramCount = 30;
 	// The frame injection block follows the site records: point + 1 (zero is none),
 	// IEEE bits, x, y, component, applied count and two reserved words.
@@ -105,13 +105,16 @@ namespace gglab::nonfinite
 		Site{ "pass-gi-reference.gipathfinite.isfinite", "report", "report" },
 		Site{ "gi-specular-visibility.finite.isfinite", "report", "report" },
 		Site{ "gi-probe-update.trace.isfinite", "expected", "report" },
+		Site{ "gi-probe-update.storetexel.isfinite", "expected", "report" },
 	};
 	struct InjectionPoint { std::string_view m_Id; std::string_view m_Claim; };
-	inline constexpr std::array<InjectionPoint, 4> InjectionPoints{
+	inline constexpr std::array<InjectionPoint, 6> InjectionPoints{
 		InjectionPoint{ "pass-render-graph-compute-smoke.csnonfiniteprobe.probe", "boundary" },
 		InjectionPoint{ "pass-render-graph-compute-smoke.psmain.preview", "production" },
 		InjectionPoint{ "pass-temporal-aa.csmain.history", "production" },
 		InjectionPoint{ "pass-gi-reference.csmain.throughput", "production" },
+		InjectionPoint{ "pass-gi-probe-update.trace.sample", "production" },
+		InjectionPoint{ "pass-gi-probe-update.storetexel.history", "production" },
 	};
 	inline constexpr std::array<std::string_view, ProgramCount> Programs{
 		"gglab.shader.aerial-perspective",

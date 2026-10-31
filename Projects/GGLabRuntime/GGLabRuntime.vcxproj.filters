@@ -2213,6 +2213,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GISpecularVisibility.h">
       <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIUpdateStatus.h">
+      <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GTAO.h">
       <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
     </ClInclude>

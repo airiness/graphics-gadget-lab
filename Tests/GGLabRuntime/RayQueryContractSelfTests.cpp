@@ -202,6 +202,31 @@ namespace gglab
 
 		void RunGIFieldTests(SelfTestContext& context) noexcept
 		{
+			GIUpdateStatus status;
+			context.Check(IsGIUpdateStatusValid(status, 8, 256, 1),
+				"Clean GPU status has no stale error coordinates");
+			status.m_Probe = 0;
+			context.Check(!IsGIUpdateStatusValid(status, 8, 256, 1),
+				"A partially initialized clean status cannot publish a field");
+			status = { GIUpdateError::InvalidRay, 7, 2, 255 };
+			context.Check(IsGIUpdateStatusValid(status, 8, 256, 3) &&
+				!IsGIUpdateStatusValid(status, 8, 256, 2) &&
+				!IsGIUpdateStatusValid(status, 7, 256, 3) &&
+				!IsGIUpdateStatusValid(status, 8, 255, 3),
+				"Error records must belong to this owner's completed readback and ray capacity");
+			for (const auto error : { GIUpdateError::InvalidHistory, GIUpdateError::InvalidBlend })
+			{
+				status = { error, 0, 0, gi_shader::GIProbeInteriorTexels - 1 };
+				context.Check(IsGIUpdateStatusValid(status, 8, 64, 1),
+					"Atlas errors address both irradiance and distance interiors independently of ray count");
+				++status.m_Element;
+				context.Check(!IsGIUpdateStatusValid(status, 8, 256, 1),
+					"An out-of-range atlas error is a corrupt readback");
+			}
+			status = { static_cast<GIUpdateError>(UINT32_MAX), 0, 0, 0 };
+			context.Check(!IsGIUpdateStatusValid(status, 8, 256, 1),
+				"Unknown GPU status codes never become clean completion");
+
 			GIFieldCreateInfo info;
 			context.Check(!ValidateGIFieldCreateInfo(info), "A field cannot prepare without a scene owner");
 			info.m_RayScene = std::make_shared<RayScene>();

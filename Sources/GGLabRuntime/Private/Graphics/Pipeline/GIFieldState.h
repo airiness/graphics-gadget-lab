@@ -1,11 +1,26 @@
 #pragma once
 #include "Graphics/RenderFrameOutcome.h"
+#include "Graphics/GIShaderConstants.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIUpdateStatus.h"
 
 #include <cstdint>
 #include <memory>
 
 namespace gglab
 {
+	[[nodiscard]] inline bool IsGIUpdateStatusValid(const GIUpdateStatus& status,
+		uint32_t probes, uint32_t rays, uint64_t submittedUpdates) noexcept
+	{
+		if (status.m_Error == GIUpdateError::None)
+		{
+			return status.m_Probe == UINT32_MAX && status.m_Update == UINT32_MAX && status.m_Element == UINT32_MAX;
+		}
+		const bool known = status.m_Error == GIUpdateError::InvalidRay ||
+			status.m_Error == GIUpdateError::InvalidHistory || status.m_Error == GIUpdateError::InvalidBlend;
+		return known && status.m_Probe < probes && status.m_Update < submittedUpdates &&
+			status.m_Element < (status.m_Error == GIUpdateError::InvalidRay ? rays : gi_shader::GIProbeInteriorTexels);
+	}
+
 	// CPU state only: neither deferred commits nor Renderer settlement own GPU objects.
 	// In-place GPU writes cannot be rolled back after a failed/unknown submission.
 	class GIFieldUpdateState final

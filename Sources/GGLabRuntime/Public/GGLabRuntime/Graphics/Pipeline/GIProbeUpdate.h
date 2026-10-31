@@ -2,6 +2,7 @@
 
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIObservationLimits.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIUpdateStatus.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 
@@ -63,6 +64,8 @@ namespace gglab
 		uint64_t m_SubmittedUpdates = 0;
 		uint64_t m_CompletedUpdates = 0;
 		uint32_t m_ProbeCount = 0;
+		uint32_t m_StatusReadbackSlots = 0;
+		GIUpdateStatus m_UpdateStatus;
 		uint64_t m_RayCapacityBytes = 0;
 		uint64_t m_FieldLogicalBytes = 0;
 		uint64_t m_WorldLightingGeneration = 0;

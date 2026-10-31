@@ -65,10 +65,10 @@ def check_active(directory, fixture):
     progress = fields(m["GI field"])
     require(progress["initialized"] == 1 and progress["invalid"] == 0 and
             progress["submitted"] >= progress["completed"] > 0 and progress["probes"] == probes and
-            progress["rays"] == probes*256*16 and progress["field"] == probes*3088,
+            progress["rays"] == probes*256*16 and progress["field"] == probes*3088+16,
             "Field progress/capacity is invalid")
     allocations = {n: fields(v) for n, v in m.items() if n.startswith("GI field allocation ")}
-    require(len(allocations) == 4 and all(v["allocated"] >= v["logical"] > 0 for v in allocations.values()),
+    require(len(allocations) == 5+progress["statusReadbacks"] and all(v["allocated"] >= v["logical"] > 0 for v in allocations.values()),
             "Missing field allocation facts")
     return progress, allocations
 

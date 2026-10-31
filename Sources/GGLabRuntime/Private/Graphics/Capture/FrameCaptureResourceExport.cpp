@@ -83,6 +83,12 @@ namespace gglab
 					.m_Space = "Native unjittered render view before temporal integration",
 					.m_Description = "Stateless one-bounce reference. SunIrradiance RGB and EnvironmentIrradiance RGB sum to Irradiance RGB. Sun alpha: atmosphere attenuation bound (0/1); environment alpha: actual cubemap LOD, -1 for direct constant input (background 0). Irradiance excludes receiver albedo and direct receiver sun. LambertRadiance is reduced diffuse albedo * E / pi, not full Forward material or Final. Irradiance alpha: 0 background, 1 valid, -1 unsupported receiver, -2 unmatched/invalid receiver, -3 invalid secondary sample; never drop invalid pixels from metrics." };
 			}
+			if (name == "GI.ProbeUpdate.UpdateStatus" || name == "GI.Field.UpdateStatus")
+			{
+				return ResourceExportSemantics{ .m_Role = "gi-update-status", .m_Units = "integer error and indices",
+					.m_Space = "field generation",
+					.m_Description = "First numerical error: 0 none, 1 invalid ray, 2 invalid history, 3 invalid blend. Probe, zero-based update and ray/interior-texel indices follow. No-error indices are UINT32_MAX. Nonzero status invalidates the whole field until safe replacement; raw diagnostics remain available." };
+			}
 			if (name == "GI.ProbeUpdate.Rays" || name == "GI.Field.Rays")
 			{
 				return ResourceExportSemantics{ .m_Role = name.starts_with("GI.Field.") ? "gi-field" : "gi-probe-update", .m_Units = "scene-linear radiance / metres / fractions as described",
@@ -246,6 +252,17 @@ namespace gglab
 				{
 					static constexpr std::array fields{ GpuBufferFieldLayout{ "radianceDistance", 0, GpuBufferScalar::Float32, 4 } };
 					layout = { 16, fields };
+				}
+				if (target.m_Address.m_Resource == "GI.ProbeUpdate.UpdateStatus" ||
+					target.m_Address.m_Resource == "GI.Field.UpdateStatus")
+				{
+					static constexpr std::array statusFields
+					{
+						GpuBufferFieldLayout{ "error", 0, GpuBufferScalar::Uint32, 1 },
+						GpuBufferFieldLayout{ "probe", 4, GpuBufferScalar::Uint32, 1 },
+						GpuBufferFieldLayout{ "update", 8, GpuBufferScalar::Uint32, 1 },
+						GpuBufferFieldLayout{ "element", 12, GpuBufferScalar::Uint32, 1 } };
+					layout = { 16, statusFields };
 				}
 				if (layout.m_Stride == stride && !layout.m_Fields.empty())
 				{

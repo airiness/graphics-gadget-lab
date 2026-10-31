@@ -1224,11 +1224,14 @@ namespace gglab
 			const auto field = m_Field->GetDiagnostics(true);
 			diagnostics.m_Metrics.push_back({ "GI field", std::format(
 				"generation={};submitted={};completed={};scene={};lighting={};environment={};"
-				"probes={};rays={};field={};initialized={};invalid={}",
+				"probes={};rays={};field={};initialized={};invalid={};statusReadbacks={}",
 				field.m_Generation, field.m_SubmittedUpdates, field.m_CompletedUpdates,
 				field.m_SceneRevision, field.m_LightingGeneration, field.m_EnvironmentGeneration,
 				field.m_ProbeCount, field.m_RayCapacityBytes, field.m_FieldLogicalBytes,
-				field.m_Initialized ? 1 : 0, field.m_Invalid ? 1 : 0) });
+				field.m_Initialized ? 1 : 0, field.m_Invalid ? 1 : 0, field.m_StatusReadbackSlots) });
+			diagnostics.m_Metrics.push_back({ "GI field update status", std::format(
+				"error={};probe={};update={};element={}", uint32_t(field.m_UpdateStatus.m_Error),
+				field.m_UpdateStatus.m_Probe, field.m_UpdateStatus.m_Update, field.m_UpdateStatus.m_Element) });
 			for (size_t index = 0; index < field.m_Allocations.size(); ++index)
 			{
 				const auto& allocation = field.m_Allocations[index];
@@ -1272,12 +1275,15 @@ namespace gglab
 				const auto progress = m_ProbeUpdate->GetDiagnostics(allocations);
 				diagnostics.m_Metrics.push_back({ "Probe progress", std::format(
 					"submitted={};completed={};probes={};rayCapacity={};fieldLogical={};prepareMs={};"
-					"allocationMs={};shaderLookupMs={};pipelineMs={};initialized={};failed={}",
+					"allocationMs={};shaderLookupMs={};pipelineMs={};initialized={};failed={};statusReadbacks={}",
 					progress.m_SubmittedUpdates, progress.m_CompletedUpdates, progress.m_ProbeCount,
 					progress.m_RayCapacityBytes, progress.m_FieldLogicalBytes, progress.m_PreparationMilliseconds,
 					progress.m_AllocationMilliseconds, progress.m_ShaderLookupMilliseconds,
 					progress.m_PipelineMilliseconds,
-					progress.m_Initialized ? 1 : 0, progress.m_Failed ? 1 : 0) });
+					progress.m_Initialized ? 1 : 0, progress.m_Failed ? 1 : 0, progress.m_StatusReadbackSlots) });
+				diagnostics.m_Metrics.push_back({ "Probe update status", std::format(
+					"error={};probe={};update={};element={}", uint32_t(progress.m_UpdateStatus.m_Error),
+					progress.m_UpdateStatus.m_Probe, progress.m_UpdateStatus.m_Update, progress.m_UpdateStatus.m_Element) });
 				diagnostics.m_Metrics.push_back({ "Probe inputs", std::format(
 					"lightingGeneration={};environmentGeneration={};atmosphereAttenuation={}",
 					progress.m_WorldLightingGeneration, progress.m_EnvironmentGeneration,

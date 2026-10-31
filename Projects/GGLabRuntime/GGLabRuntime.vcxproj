@@ -669,6 +669,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIReference.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIProbeUpdate.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIField.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIUpdateStatus.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIProbeUpdateWorkload.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIFieldState.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetManager.h" />

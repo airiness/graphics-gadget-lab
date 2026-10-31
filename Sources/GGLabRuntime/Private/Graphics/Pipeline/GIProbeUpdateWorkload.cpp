@@ -22,7 +22,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstddef>
-#include <deque>
+#include <cstring>
 #include <limits>
 #include <numbers>
 #include <utility>
@@ -70,9 +70,15 @@ namespace gglab
 
 		constexpr LayoutBindingKey RayInputKey{ 0x906 };
 		constexpr LayoutBindingKey RayOutputKey{ 0x907 };
+		constexpr LayoutBindingKey StatusOutputKey{ 0x908 };
+		constexpr uint32_t StatusOutputRegister = 2; // u2.
 		constexpr uint32_t RayInputRegister = 11; // t11; ray-scene records occupy t5-t10.
 		constexpr uint32_t RayOutputRegister = 1; // u1.
 		static_assert(GIProbeUpdateLimits::MaximumRaysPerProbe == gi_shader::GIProbeMaximumRays);
+		static_assert(sizeof(GIUpdateStatus) == gi_shader::GIUpdateStatusBytes);
+		static_assert(uint32_t(GIUpdateError::InvalidRay) == gi_shader::GIUpdateErrorInvalidRay &&
+			uint32_t(GIUpdateError::InvalidHistory) == gi_shader::GIUpdateErrorInvalidHistory &&
+			uint32_t(GIUpdateError::InvalidBlend) == gi_shader::GIUpdateErrorInvalidBlend);
 		const std::array ProgramRefs
 		{
 			shader_programs::GIProbeInitializeCompute, shader_programs::GIProbeTraceCompute,
@@ -124,29 +130,75 @@ namespace gglab
 		static_assert(sizeof(Parameters) == 144 && offsetof(Parameters, m_Targets) == 80 &&
 			offsetof(Parameters, m_Rotation) == 112 && offsetof(Parameters, m_Hysteresis) == 128);
 
-		// Only CPU progress is captured by deferred commits. GPU owners are separate.
+		// Borrowed handles only: submissions and the workload retain the actual buffers.
+		struct StatusReadback
+		{
+			RHIBufferHandle m_Buffer;
+			RHIFencePoint m_Fence;
+			uint64_t m_Update = 0;
+		};
 		struct Progress
 		{
 			RHIDevice* m_Device = nullptr;
-			std::deque<std::pair<uint64_t, RHIFencePoint>> m_Pending;
+			std::vector<StatusReadback> m_Readbacks;
 			GIProbeUpdateDiagnostics m_Diagnostics;
+			// Submitted storage must survive until its numerical verdict is read after completion.
+			bool m_StorageInitialized = false;
+			bool m_CompletionFailed = false;
+			uint32_t m_RaysPerProbe = 0;
 			void Poll() noexcept
 			{
-				while (!m_Pending.empty())
+				for (auto& slot : m_Readbacks)
 				{
-					const auto query = m_Device->QueryFencePoint(m_Pending.front().second);
+					if (!slot.m_Fence.IsValid())
+					{
+						continue;
+					}
+					const auto query = m_Device->QueryFencePoint(slot.m_Fence);
 					if (query == RHIFenceQueryResult::Pending)
 					{
-						break;
+						continue;
 					}
 					if (query != RHIFenceQueryResult::Completed)
 					{
+						m_CompletionFailed = true;
 						m_Diagnostics.m_Failed = true;
 						m_Diagnostics.m_Reason = "Probe workload completion is unknown or failed";
-						break;
+						return;
 					}
-					m_Diagnostics.m_CompletedUpdates = m_Pending.front().first;
-					m_Pending.pop_front();
+					const void* mapped = m_Device->MapBuffer(slot.m_Buffer, { 0, sizeof(GIUpdateStatus) });
+					if (!mapped)
+					{
+						m_CompletionFailed = true;
+						m_Diagnostics.m_Failed = true;
+						m_Diagnostics.m_Reason = "Probe update status readback mapping failed";
+						return;
+					}
+					GIUpdateStatus status;
+					std::memcpy(&status, mapped, sizeof(status));
+					m_Device->UnmapBuffer(slot.m_Buffer, {});
+					if (!IsGIUpdateStatusValid(status, m_Diagnostics.m_ProbeCount, m_RaysPerProbe, slot.m_Update))
+					{
+						m_CompletionFailed = true;
+						m_Diagnostics.m_Failed = true;
+						m_Diagnostics.m_Reason = "Probe update status readback contains an invalid record";
+						return;
+					}
+					if (status.m_Error != GIUpdateError::None)
+					{
+						if (m_Diagnostics.m_UpdateStatus.m_Error == GIUpdateError::None)
+						{
+							m_Diagnostics.m_UpdateStatus = status;
+						}
+						m_Diagnostics.m_Failed = true;
+						m_Diagnostics.m_Reason = "Probe update contains invalid numerical data; replace the owner";
+					}
+					else
+					{
+						m_Diagnostics.m_CompletedUpdates = std::max(m_Diagnostics.m_CompletedUpdates, slot.m_Update);
+					}
+					m_Diagnostics.m_Initialized = m_Diagnostics.m_CompletedUpdates != 0 && !m_Diagnostics.m_Failed;
+					slot.m_Fence.Reset();
 				}
 			}
 		};
@@ -154,6 +206,9 @@ namespace gglab
 		{
 			RHIDevice* m_Device = nullptr;
 			RHIBufferOwner m_Rays;
+			RHIBufferOwner m_Status;
+			std::vector<RHIBufferOwner> m_Readbacks;
+			RHIBufferDesc m_StatusDesc;
 			RHIBufferDesc m_RayDesc;
 			std::array<RHITextureOwner, Surfaces.size()> m_Textures;
 			std::array<RHITextureDesc, Surfaces.size()> m_Descriptions;
@@ -189,6 +244,8 @@ namespace gglab
 		ResolvedBindingRef<AtmosphereGPU> m_Atmosphere;
 		std::array<uint32_t, ray_scene_bindings::Count> m_Bindings{};
 		uint32_t m_RayOutput = 0;
+		uint32_t m_StatusOutput = 0;
+		uint32_t m_DataStatusOutput = 0;
 		std::array<ComputePipelineSlot, ProgramRefs.size()> m_Slots;
 		std::array<ResolvedRenderPipeline, ProgramRefs.size()> m_Pipelines;
 		std::array<uint64_t, ProgramRefs.size()> m_Generations{};
@@ -219,6 +276,13 @@ namespace gglab
 				const auto logicalBytes = LogicalSurfaceBytes(result.m_ProbeCount, surface);
 				result.m_Allocations.push_back({ logicalBytes,
 					resources->m_Device->QueryTextureAllocationFacts(resources->m_Textures[index].Get()) });
+			}
+			result.m_Allocations.push_back({ sizeof(GIUpdateStatus),
+				resources->m_Device->QueryBufferAllocationFacts(resources->m_Status.Get()) });
+			for (const auto& readback : resources->m_Readbacks)
+			{
+				result.m_Allocations.push_back({ sizeof(GIUpdateStatus),
+					resources->m_Device->QueryBufferAllocationFacts(readback.Get()) });
 			}
 		}
 		return result;
@@ -251,7 +315,7 @@ namespace gglab
 		{
 			return RenderFrameValidationResult::ContractFailure("Probe update index exhausted; replace the owner");
 		}
-		if (state.m_Progress->m_Diagnostics.m_Failed)
+		if (state.m_Progress->m_CompletionFailed)
 		{
 			return RenderFrameValidationResult::ContractFailure(state.m_Progress->m_Diagnostics.m_Reason);
 		}
@@ -277,6 +341,11 @@ namespace gglab
 					.m_Visibility = RHIShaderStage::Compute, .m_Binding = RayOutputRegister, .m_Count = 1 },
 				.m_ParameterOrder = ray_scene_bindings::NextParameterOrder(bindings) };
 			bindings.push_back(rayOutput);
+			const LayoutBindingRequirement statusOutput{ .m_Key = StatusOutputKey,
+				.m_Slot = { .m_Type = RHIBindingType::ReadWriteStorageBuffer,
+					.m_Visibility = RHIShaderStage::Compute, .m_Binding = StatusOutputRegister, .m_Count = 1 },
+				.m_ParameterOrder = ray_scene_bindings::NextParameterOrder(bindings) };
+			bindings.push_back(statusOutput);
 			const std::array fragments{ LayoutFragment{ "GIProbeUpdate", bindings } };
 			const auto composed = ComposeLayoutFragments(fragments);
 			if (!composed.IsSuccess())
@@ -295,17 +364,20 @@ namespace gglab
 				state.m_Bindings[index] = *parameter;
 			}
 			const auto outputParameter = composed.m_Layout->FindParameterIndex(RayOutputKey);
-			if (!outputParameter)
+			const auto statusParameter = composed.m_Layout->FindParameterIndex(StatusOutputKey);
+			if (!outputParameter || !statusParameter)
 			{
 				return RenderFrameValidationResult::ContractFailure("Probe ray output binding unavailable");
 			}
 			state.m_RayOutput = *outputParameter;
+			state.m_StatusOutput = *statusParameter;
 			// Non-tracing kernels must not inherit a TLAS reservation: the encoders
 			// require every declared AS at dispatch, even when a shader does not use it.
 			std::vector<LayoutBindingRequirement> dataBindings(atmosphere.m_Layout->GetBindings().begin(),
 				atmosphere.m_Layout->GetBindings().end());
 			dataBindings.push_back(rayInput);
 			dataBindings.push_back(rayOutput);
+			dataBindings.push_back(statusOutput);
 			const std::array dataFragments{ LayoutFragment{ "GIProbeUpdateData", dataBindings } };
 			const auto dataLayout = ComposeLayoutFragments(dataFragments);
 			if (!dataLayout.IsSuccess())
@@ -316,12 +388,14 @@ namespace gglab
 				*dataLayout.m_Layout, "GI.ProbeUpdate.Data");
 			const auto dataInput = dataLayout.m_Layout->FindParameterIndex(RayInputKey);
 			const auto dataOutput = dataLayout.m_Layout->FindParameterIndex(RayOutputKey);
-			if (!dataInput || !dataOutput)
+			const auto dataStatus = dataLayout.m_Layout->FindParameterIndex(StatusOutputKey);
+			if (!dataInput || !dataOutput || !dataStatus)
 			{
 				return RenderFrameValidationResult::ContractFailure("Probe data binding unavailable");
 			}
 			state.m_DataRayInput = *dataInput;
 			state.m_DataRayOutput = *dataOutput;
+			state.m_DataStatusOutput = *dataStatus;
 			state.m_DataScene = ResolvedBindingRef<SceneGPU>::Resolve(state.m_DataLayout, scene_bindings::SceneConstants);
 			state.m_DataAtmosphere = ResolvedBindingRef<AtmosphereGPU>::Resolve(state.m_DataLayout, scene_bindings::AtmosphereConstants);
 			state.m_SceneBinding = ResolvedBindingRef<SceneGPU>::Resolve(state.m_Layout, scene_bindings::SceneConstants);
@@ -361,6 +435,32 @@ namespace gglab
 				}
 				diagnostics.m_FieldLogicalBytes += LogicalSurfaceBytes(probes, surface);
 			}
+			resources->m_StatusDesc = { .m_SizeInBytes = sizeof(GIUpdateStatus),
+				.m_StrideInBytes = sizeof(GIUpdateStatus),
+				.m_Usage = RHIBufferUsage::Structured | RHIBufferUsage::UnorderedAccess | RHIBufferUsage::CopySource,
+				.m_DebugName = state.m_Field ? "GI.Field.UpdateStatus" : "GI.ProbeUpdate.UpdateStatus" };
+			resources->m_Status = RHIBufferOwner(&device, device.CreateBuffer(resources->m_StatusDesc));
+			const uint32_t slots = services.m_Presentation->GetRHIContext()->GetFrameSlotCount();
+			if (!resources->m_Status || slots == 0)
+			{
+				return RenderFrameValidationResult::ContractFailure("Probe update status allocation failed");
+			}
+			state.m_Progress->m_Readbacks.resize(slots);
+			for (uint32_t index = 0; index < slots; ++index)
+			{
+				RHIBufferOwner readback(&device, device.CreateBuffer({
+					.m_SizeInBytes = sizeof(GIUpdateStatus), .m_Usage = RHIBufferUsage::CopyDest,
+					.m_MemoryUsage = RHIMemoryUsage::GpuToCpu, .m_DebugName = "GI.UpdateStatus.Readback" }));
+				if (!readback)
+				{
+					return RenderFrameValidationResult::ContractFailure("Probe update status readback allocation failed");
+				}
+				state.m_Progress->m_Readbacks[index].m_Buffer = readback.Get();
+				resources->m_Readbacks.push_back(std::move(readback));
+			}
+			diagnostics.m_StatusReadbackSlots = slots;
+			state.m_Progress->m_RaysPerProbe = profile.m_RaysPerProbe;
+			diagnostics.m_FieldLogicalBytes += sizeof(GIUpdateStatus);
 			state.m_Progress->m_Device = &device;
 			state.m_Resources = std::move(resources);
 		}
@@ -404,7 +504,11 @@ namespace gglab
 			state.m_Progress->m_Diagnostics.m_PreparationMilliseconds =
 				std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - prepareBegin).count();
 		}
-		GGLAB_UNUSED(frame);
+		if (frame.m_FrameSlotIndex >= state.m_Progress->m_Readbacks.size() ||
+			state.m_Progress->m_Readbacks[frame.m_FrameSlotIndex].m_Fence.IsValid())
+		{
+			return RenderFrameValidationResult::ContractFailure("Probe status readback slot is still in flight");
+		}
 		return RenderFrameValidationResult::Ready();
 	}
 
@@ -425,16 +529,18 @@ namespace gglab
 		const auto resources = state.m_Resources;
 		const auto progress = state.m_Progress;
 		const auto profile = state.m_Profile;
-		const bool initialized = progress->m_Diagnostics.m_Initialized;
+		const bool initialized = progress->m_StorageInitialized;
 		const uint32_t update = static_cast<uint32_t>(progress->m_Diagnostics.m_SubmittedUpdates);
 		const uint32_t total = progress->m_Diagnostics.m_ProbeCount;
-		const bool record = profile.m_MaximumUpdates == 0 || update < profile.m_MaximumUpdates;
+		const bool record = !progress->m_Diagnostics.m_Failed &&
+			(profile.m_MaximumUpdates == 0 || update < profile.m_MaximumUpdates);
 		const auto range = GetGIProbeUpdateRange(profile, update);
 		const uint32_t begin = range.m_First;
 		const uint32_t count = range.m_Count;
 		struct Imported
 		{
 			RGBufferId m_Rays;
+			RGBufferId m_Status;
 			std::array<RGTextureId, Surfaces.size()> m_Textures;
 		};
 		auto imported = std::make_shared<Imported>();
@@ -444,6 +550,10 @@ namespace gglab
 			{
 				imported->m_Rays = builder.ImportBuffer(field ? "GI.Field.Rays" : "GI.ProbeUpdate.Rays", resources->m_Rays.Get(),
 					resources->m_RayDesc, initialized ? RGBufferAccess::StructuredRead : RGBufferAccess::None,
+					initialized ? RGContentValidity::Defined : RGContentValidity::Undefined);
+				imported->m_Status = builder.ImportBuffer(field ? "GI.Field.UpdateStatus" : "GI.ProbeUpdate.UpdateStatus",
+					resources->m_Status.Get(), resources->m_StatusDesc,
+					initialized ? RGBufferAccess::StructuredRead : RGBufferAccess::None,
 					initialized ? RGContentValidity::Defined : RGContentValidity::Undefined);
 				for (size_t index = 0; index < imported->m_Textures.size(); ++index)
 				{
@@ -479,6 +589,14 @@ namespace gglab
 				graph.AddPass<PassData>(name, RGPassEncoderType::Compute,
 					[=, &frame](RenderGraph::RGBuilder& builder, PassData& data)
 					{
+						if (stage == ProbeStage::Initialize)
+						{
+							builder.WriteInPlace(imported->m_Status, RGBufferAccess::StorageWrite, RHIStage::ComputeShader);
+						}
+						else
+						{
+							builder.ReadWriteInPlace(imported->m_Status, RGBufferAccess::StorageReadWrite, RHIStage::ComputeShader);
+						}
 						for (size_t index = 0; index < Surfaces.size(); ++index)
 						{
 							const bool probeState = index == static_cast<size_t>(ProbeSurface::State);
@@ -565,6 +683,8 @@ namespace gglab
 						{
 							return;
 						}
+						commands->SetReadWriteBuffer(tracing ? current.m_StatusOutput : current.m_DataStatusOutput,
+							resources->m_Status.Get());
 						if (tracing)
 						{
 							// The composed layout cannot inherit a prior pass/frame's light table.
@@ -642,7 +762,7 @@ namespace gglab
 								fieldUpdate->MarkRecorded(frame.m_FrameSerial);
 							}
 							execute.DeferCommit([progress, update, fieldUpdate, serial = frame.m_FrameSerial]
-								(const RGCommitContext& commit) noexcept
+								(const RGCommitContext&) noexcept
 								{
 									if (fieldUpdate)
 									{
@@ -653,19 +773,50 @@ namespace gglab
 											return;
 										}
 									}
-									progress->m_Diagnostics.m_Initialized = true;
+									progress->m_StorageInitialized = true;
 									progress->m_Diagnostics.m_SubmittedUpdates = uint64_t(update) + 1;
-									progress->m_Pending.emplace_back(uint64_t(update) + 1, commit.m_Fence);
 								});
 						}
 					});
 			}
+			struct ReadbackData
+			{
+				RGBufferId m_Source;
+				RGBufferId m_Destination;
+			};
+			const auto slot = frame.m_FrameSlotIndex;
+			graph.AddPass<ReadbackData>(state.m_Field ? "GI.Field.ReadStatus" : "GI.ProbeUpdate.ReadStatus",
+				[=](RenderGraph::RGBuilder& builder, ReadbackData& data)
+				{
+					data.m_Source = builder.Read(imported->m_Status, RGBufferAccess::CopySource, RHIStage::Copy);
+					data.m_Destination = builder.ImportBuffer("GI.UpdateStatus.Readback", resources->m_Readbacks[slot].Get(),
+						{ .m_SizeInBytes = sizeof(GIUpdateStatus), .m_Usage = RHIBufferUsage::CopyDest,
+							.m_MemoryUsage = RHIMemoryUsage::GpuToCpu }, RGBufferAccess::CopyDest, RGContentValidity::Undefined);
+					builder.WriteInPlace(data.m_Destination, RGBufferAccess::CopyDest, RHIStage::Copy);
+					builder.SideEffect();
+				},
+				[=](RGExecuteContext& execute, ReadbackData& data)
+				{
+					auto* commands = execute.GetGraphicsCommandContext();
+					if (!commands->RetainForSubmission(resources))
+					{
+						return;
+					}
+					commands->CopyBuffer(execute.GetBufferHandle(data.m_Destination), 0,
+						execute.GetBufferHandle(data.m_Source), 0, sizeof(GIUpdateStatus));
+					execute.DeferCommit([progress, slot, update](const RGCommitContext& commit) noexcept
+						{
+							progress->m_Readbacks[slot].m_Fence = commit.m_Fence;
+							progress->m_Readbacks[slot].m_Update = uint64_t(update) + 1;
+						});
+				});
 		}
 		graph.AddPass<Empty>(state.m_Field ? "GI.Field.Publish" : "GI.ProbeUpdate.Publish",
 			[imported](RenderGraph::RGBuilder& builder, Empty&)
 			{
 				// The next frame imports these persistent resources in the exported states.
 				builder.Export(imported->m_Rays, RGBufferAccess::StructuredRead);
+				builder.Export(imported->m_Status, RGBufferAccess::StructuredRead);
 				for (const auto texture : imported->m_Textures)
 				{
 					builder.Export(texture, RGTextureAccess::Sample);

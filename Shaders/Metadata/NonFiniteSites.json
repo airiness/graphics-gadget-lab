@@ -1629,7 +1629,7 @@
       "function": "Trace",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "5e6156b0b8b142b4fb1262074c1826803f0b41302cc5301af5aef7d7bf6b443b",
+      "bodySha256": "aae321ecc4a2ac98d7a6afaf53616057342e656f96eb28f775da99abd7a092db",
       "programs": [
         "gglab.shader.gi-probe-update"
       ],
@@ -1639,7 +1639,25 @@
         "negative": "expected",
         "fp16Maximum": "report"
       },
-      "rationale": "Invalid probe radiance/distance writes an explicit non-finite sample and increments the per-probe invalid fraction; numerical qualification rejects the entire export. Negative distances encode single-sided backface hits rather than environment misses."
+      "rationale": "Invalid ray radiance/distance persists in raw diagnostics and sets a sticky update error; the atlas blend rejects that update. Negative distances encode single-sided backface hits."
+    },
+    {
+      "id": "gi-probe-update.storetexel.isfinite",
+      "source": "Passes/PassGIProbeUpdate.hlsl",
+      "function": "StoreTexel",
+      "operation": "isfinite",
+      "count": 4,
+      "bodySha256": "cdc2b1f6acb77b1392c53182d1d986d896ed1aab65176bca4364ad3eea155348",
+      "programs": [
+        "gglab.shader.gi-probe-update"
+      ],
+      "kind": "recovery",
+      "evidence": "counter",
+      "policy": {
+        "negative": "expected",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Reject non-finite history or blend results before any persistent atlas store; retain a sticky field-generation failure instead of substituting or dropping the sample."
     }
   ],
   "injectionPoints": [
@@ -1686,6 +1704,28 @@
       ],
       "claim": "production",
       "rationale": "Debug qualification replaces throughput after the first valid secondary hit and sun NEE. The next bounce must reject it, persist any-depth invalidity independently of first-query outcomes, and report the original non-finite operand through production counters."
+    },
+    {
+      "id": "pass-gi-probe-update.trace.sample",
+      "source": "Passes/PassGIProbeUpdate.hlsl",
+      "function": "Trace",
+      "count": 1,
+      "programs": [
+        "gglab.shader.gi-probe-update"
+      ],
+      "claim": "production",
+      "rationale": "Qualify persistent GI history isolation and sticky failure propagation at a selected probe and ray/interior texel."
+    },
+    {
+      "id": "pass-gi-probe-update.storetexel.history",
+      "source": "Passes/PassGIProbeUpdate.hlsl",
+      "function": "StoreTexel",
+      "count": 2,
+      "programs": [
+        "gglab.shader.gi-probe-update"
+      ],
+      "claim": "production",
+      "rationale": "Qualify persistent GI history isolation and sticky failure propagation at a selected probe and ray/interior texel."
     }
   ]
 }
