@@ -6,14 +6,17 @@
 #include "Application/Lab/Sessions/AtmosphereRangeLabSession.h"
 #include "Application/Lab/Sessions/CoordinateConformanceLabSession.h"
 #include "Application/Lab/Sessions/CullingLabSession.h"
+#include "Application/Lab/Sessions/CoastalRaySceneLabSession.h"
 #include "Application/Lab/Sessions/ForwardPlusLabSession.h"
 #include "Application/Lab/Sessions/GTAOLabSession.h"
+#include "Application/Lab/Sessions/GIReferenceLabSession.h"
 #include "Application/Lab/Sessions/LightingContractLabSession.h"
 #include "Application/Lab/Sessions/MathFoundationLabSession.h"
 #include "Application/Lab/Sessions/MiniPBRGridLabSession.h"
 #include "Application/Lab/Sessions/NapaVoxelLabSession.h"
 #include "Application/Lab/Sessions/PostProcessLabSession.h"
 #include "Application/Lab/Sessions/RenderGraphComputeLabSession.h"
+#include "Application/Lab/Sessions/RayQueryLabSession.h"
 #include "Application/Lab/Sessions/SampleableDepthLabSession.h"
 #include "Application/Lab/Sessions/SurfaceProbeLabSession.h"
 #include "Application/Lab/Sessions/TemporalAALabSession.h"
@@ -84,6 +87,21 @@ namespace gglab
 			},
 		};
 		registration.m_Labs = {
+			{ GIReferenceLabSession::GetDescriptor(), &GIReferenceLabSession::Create,
+				{ shader_programs::GIReceiverPixel, shader_programs::GIReceiverPositionPixel,
+					shader_programs::GIReferenceCompute,
+					shader_programs::GIProbeInitializeCompute, shader_programs::GIProbeTraceCompute,
+					shader_programs::GIProbeBlendDirectCompute, shader_programs::GIProbeBlendSharedCompute,
+					shader_programs::GIProbeBordersCompute,
+					shader_programs::GISpecularVisibilityCompute,
+					shader_programs::RaySceneHitMaterialCompute } },
+			{ CoastalRaySceneLabSession::GetDescriptor(), &CoastalRaySceneLabSession::Create,
+				{ shader_programs::RaySceneProbeCompute, shader_programs::RaySceneSunVisibilityCompute,
+					shader_programs::RaySceneHitMaterialCompute, shader_programs::GIReceiverPixel,
+					shader_programs::GIReceiverPositionPixel } },
+			{ RayQueryLabSession::GetDescriptor(), &RayQueryLabSession::Create,
+				{ shader_programs::RayQueryCompute, shader_programs::RayQueryVertex, shader_programs::RayQueryPixel,
+					shader_programs::NonFiniteScanClearCompute } },
 			{ CullingLabSession::GetDescriptor(), &CullingLabSession::Create },
 			{ MiniPBRGridLabSession::GetDescriptor(), &MiniPBRGridLabSession::Create },
 			{ TextureContractLabSession::GetDescriptor(), &TextureContractLabSession::Create },

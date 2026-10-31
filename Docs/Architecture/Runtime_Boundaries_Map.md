@@ -47,6 +47,50 @@ A Runtime pass is a stage of a Runtime recipe:
 `RenderPassForwardPlusCull` shows transient records and a fenced readback;
 `RenderPassGTAO` shows temporal history.
 
+The opt-in `RenderPipelineForwardPlusCreateInfo::m_GIReference` configures the
+Runtime-owned `RenderPassGIReference` immediately after GI receiver production and
+before the temporal boundary. Its Public `GIReferenceCreateInfo` retains a
+Lab-prepared, complete `RayScene`; the Runtime recipe imports that scene once and
+owns its queries. Renderer owns the bounded observation and its accumulation,
+independently of the Lab and temporal histories; see [frame settlement](Frame_Execution_Map.md#frame-settlement).
+`GIReferenceCreateInfo::m_Accumulate=false` instead selects stateless whole-frame
+sampling without the Renderer-owned observation.
+`RenderPresentationAccess` returns immutable progress. AppRuntime selects captures
+after pipeline validation identifies the current observation.
+
+`GI.Receiver` also produces a paired raster-position pass through the same
+coverage draws and read-only depth. The eight original surface records retain
+their meanings. Reference and visibility use one Private primary-matching helper;
+its explicit raster-interpolant match is confined to primary coverage. Secondary
+queries retain their original sidedness and miss semantics. Both observations
+include the position shader generation in their reset identity.
+
+The opt-in `m_GISpecularVisibility` adds a Runtime-owned pre-temporal diagnostic
+with an independent Renderer-owned observation. It requires a
+`RaySceneMaterialInputs::PrimaryReceiver` scene; when both GI diagnostics are
+enabled they must share one RayScene import. Neither changes production IBL.
+
+The opt-in `m_GIProbeUpdate` adds the Runtime-owned `GIProbeUpdateExperiment`
+before the temporal boundary. The experiment owns its persistent ray/probe
+resources and shares the recipe's single `RayScene` import without screen
+receiver passes. Exported read states remain the next frame's import contract,
+including after bounded updates stop. Non-constant environments require the
+requested IBL publication. This diagnostic workload installs no production
+field lookup or history.
+
+`m_GIField` composes the Runtime-owned `GIField` before ForwardOpaque, exclusively
+of `m_GIProbeUpdate`. The field owns persistent atlases and ray storage and shares
+the recipe's RayScene import. Changes to sealed scene, lighting or shader identities
+require replacement through the safe pipeline path. See
+[field settlement](Frame_Execution_Map.md#frame-settlement) and
+[verification](../../Tests/Verification/README.md#static-field-update).
+
+Memory diagnostics use [`RayScene::GetMemorySnapshot`](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RayScene.h)
+and [`RenderPresentationAccess::CaptureTransientResourcePool`](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderServices.h)
+without retaining the observed resources.
+
+Verification: [probe update checks and measurements](../../Tests/Verification/README.md#probe-update).
+
 ## Lab-owned composition
 
 A Lab composes graph work through two Public seams:
@@ -66,8 +110,10 @@ with the Lab.
 A pass that uses a new shader program:
 
 1. References it as a `shader_programs` entry in `GGLabShaderPrograms.h`.
-2. Adds its build record in `Sources/Tools/ShaderCompiler/GGLabRuntimeShaderBuild.cpp`;
-   a new shader source also needs `Scripts/SyncShadersToVS.ps1`.
+2. Adds its build record in `Sources/Tools/ShaderCompiler/GGLabRuntimeShaderBuild.cpp`.
+   New shader sources also need `Scripts/SyncShadersToVS.ps1`, which registers them
+   in their [feature-domain project](Repository_Module_Map.md#shader-source-ownership),
+   independently of recipe ownership and deployment.
 3. Registers demand: production programs in `GetRendererInitialShaderProgramDemand`,
    Lab programs in its `LabRegistration::m_ShaderPrograms`.
 4. Loads it through `RenderServices::m_ShaderPrograms` and resolves pipelines through

@@ -1,0 +1,280 @@
+#include <Common/Common.hlsli>
+#include <Common/ApplicationBinding.hlsli>
+#include <Common/DepthReconstruction.hlsli>
+#include <Common/VertexTransform.hlsli>
+#include <Common/Sampling.hlsli>
+#include <Lighting/GIRayScene.hlsli>
+#include <Lighting/GISampling.hlsli>
+#include <PBR/BRDF.hlsli>
+
+cbuffer Parameters : register(b2)
+{
+	uint4 ReceiverIndices;
+	uint2 ReflectionIndices;
+	uint DepthIndex;
+	uint BrdfLutIndex;
+	uint4 OutputIndices;
+	uint4 DiagnosticIndices;
+	uint4 PreviousIndices;
+	uint4 NextIndices;
+	uint2 Size;
+	uint2 TileOrigin;
+	uint2 TileExtent;
+	uint ViewIndex;
+	uint Seed;
+	uint SampleBegin;
+	uint SampleCount;
+	uint SubmittedSamples;
+	uint BeginSweep;
+	uint EndSweep;
+	uint RowOffset;
+	float MaximumDistance;
+	uint BrdfSampler;
+	uint InstanceCount;
+	uint GeometryCount;
+	uint MaterialCount;
+	uint RasterMaterialCapacity;
+	uint RasterPositionIndex;
+	uint3 Padding;
+};
+
+float VisibilityRandom(uint pixel, uint sampleIndex, uint lobe, uint dimension)
+{
+	const uint visibilityStream = 0x681b923du;
+	uint state = GIHash(Seed ^ visibilityStream);
+	state = GIHash(state ^ GIHash(pixel));
+	state = GIHash(state ^ GIHash(sampleIndex));
+	state = GIHash(state ^ GIHash(lobe));
+	state = GIHash(state ^ GIHash(dimension));
+	return GIUniformOpenInterval(state);
+}
+
+bool VisibilityFinite(float4 value)
+{
+	return all(isfinite(NonFiniteObserveValue(NF_SITE_GI_SPECULAR_VISIBILITY_FINITE_ISFINITE, value)));
+}
+
+void VisibilityAccumulate(float4 value, inout float4 sum, inout float4 compensation)
+{
+	precise float4 adjusted = value - compensation;
+	precise float4 next = sum + adjusted;
+	precise float4 error = (next - sum) - adjusted;
+	compensation = error;
+	sum = next;
+}
+
+float4 VisibilitySample(GIHit receiver, float3 reflection, float roughness,
+	uint pixel, uint sampleIndex, uint lobe)
+{
+	const float2 xi = float2(VisibilityRandom(pixel, sampleIndex, lobe, 0),
+		VisibilityRandom(pixel, sampleIndex, lobe, 1));
+	const float3 halfVector = TangentToWorld(
+		ImportanceSampleGGX(xi, PerceptualRoughnessToAlpha(roughness)), reflection);
+	const float3 direction = normalize(2.0 * dot(reflection, halfVector) * halfVector - reflection);
+	const float weight = saturate(dot(reflection, direction));
+	if (!VisibilityFinite(float4(direction, weight)))
+	{
+		return float4(0, 0, 0, 1);
+	}
+	if (weight == 0.0)
+	{
+		return 0.0.xxxx;
+	}
+	if (dot(receiver.FaceNormal, direction) <= 0.0)
+	{
+		// Keep the prefilter kernel denominator, even below the geometric face.
+		return float4(0, weight, 1, 0);
+	}
+	RayDesc ray;
+	ray.Origin = GIHitOrigin(receiver);
+	ray.Direction = direction;
+	ray.TMin = 0;
+	ray.TMax = MaximumDistance;
+	RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> query;
+	query.TraceRayInline(GIRayScene, RAY_FLAG_NONE, RaySceneOpaqueMask, ray);
+	while (query.Proceed())
+	{
+	}
+	return float4(query.CommittedStatus() == COMMITTED_NOTHING ? weight : 0.0, weight, 0, 0);
+}
+
+[numthreads(GIQueryGroupWidth, GIQueryGroupHeight, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+	const uint2 pixel = uint2(id.x, id.y + RowOffset);
+	if (any(pixel >= Size))
+	{
+		return;
+	}
+	RWTexture2D<float4> visibility = GetRWTexture2DFloat4(OutputIndices.x);
+	RWTexture2D<float4> baseOutput = GetRWTexture2DFloat4(OutputIndices.y);
+	RWTexture2D<float4> coatOutput = GetRWTexture2DFloat4(OutputIndices.z);
+	RWTexture2D<float4> weightsOutput = GetRWTexture2DFloat4(OutputIndices.w);
+	RWTexture2D<float4> positions = GetRWTexture2DFloat4(DiagnosticIndices.x);
+	RWTexture2D<float4> diagnostics = GetRWTexture2DFloat4(DiagnosticIndices.y);
+	RWTexture2D<float4> f0Output = GetRWTexture2DFloat4(DiagnosticIndices.z);
+	RWTexture2D<float4> energyOutput = GetRWTexture2DFloat4(DiagnosticIndices.w);
+	visibility[pixel] = 0.0.xxxx;
+	baseOutput[pixel] = 0.0.xxxx;
+	coatOutput[pixel] = 0.0.xxxx;
+	weightsOutput[pixel] = 0.0.xxxx;
+	positions[pixel] = 0.0.xxxx;
+	diagnostics[pixel] = 0.0.xxxx;
+	f0Output[pixel] = 0.0.xxxx;
+	energyOutput[pixel] = 0.0.xxxx;
+	float4 sums[GIVisibilitySurfaceCount];
+	[unroll]
+	for (uint surface = 0; surface < GIVisibilitySurfaceCount; ++surface)
+	{
+		sums[surface] = SubmittedSamples != 0 ?
+			GetTexture2DFloat4(PreviousIndices[surface]).Load(int3(pixel, 0)) : 0.0.xxxx;
+		if (SampleCount != 0 && BeginSweep != 0)
+		{
+			GetRWTexture2DFloat4(NextIndices[surface])[pixel] = sums[surface];
+		}
+	}
+	const float4 face = GetTexture2DFloat4(ReceiverIndices.x).Load(int3(pixel, 0));
+	if (face.w == 0)
+	{
+		return;
+	}
+	visibility[pixel] = float4(0, 0, 0, -1);
+	diagnostics[pixel] = float4(-1, 0, SubmittedSamples, 0);
+	if (face.w != GIReceiverOpaque || !VisibilityFinite(face))
+	{
+		return;
+	}
+	const ViewData view = LoadViewData(ViewIndex);
+	const float depth = GetTexture2DFloat(DepthIndex).Load(int3(pixel, 0));
+	const float3 positionVS = ReconstructViewPosition(PixelCenterToUV(pixel, Size), depth, view.InvProjMat);
+	const float3 position = mul(float4(positionVS, 1), view.InvViewMat).xyz;
+	GIHit receiver;
+	if (!VisibilityFinite(float4(position, depth)))
+	{
+		diagnostics[pixel] = float4(-2, 0, SubmittedSamples, 0);
+		return;
+	}
+	const float4 rasterPosition = GetTexture2DFloat4(RasterPositionIndex).Load(int3(pixel, 0));
+	const uint match = rasterPosition.w == face.w && VisibilityFinite(rasterPosition) ?
+		GIMatchReceiver(pixel, Size, position, rasterPosition.xyz, face.xyz, view,
+			MaximumDistance, uint3(InstanceCount, GeometryCount, MaterialCount), receiver) : GIReceiverMatchInvalid;
+	if (!GIReceiverMatched(match))
+	{
+		diagnostics[pixel] = float4(-(float)(match), 0, SubmittedSamples, 0);
+		return;
+	}
+	const float4 shading = GetTexture2DFloat4(ReceiverIndices.y).Load(int3(pixel, 0));
+	const float4 diffuse = GetTexture2DFloat4(ReceiverIndices.z).Load(int3(pixel, 0));
+	const float4 baseColor = GetTexture2DFloat4(ReceiverIndices.w).Load(int3(pixel, 0));
+	const float4 base = GetTexture2DFloat4(ReflectionIndices.x).Load(int3(pixel, 0));
+	const float4 coat = GetTexture2DFloat4(ReflectionIndices.y).Load(int3(pixel, 0));
+	// DX12 root SRVs do not carry a queryable structured-buffer capacity.
+	// The raster table is sparse: live count is not an index bound. Use the
+	// capacity of the very buffer bound for this frame, not RayScene slots.
+	// sqrt(alpha) in production specular AA may round the clamped minimum
+	// one ULP down. Admit that representation without modifying the kernel.
+	const float minimumRoughness = asfloat(asuint(MIN_PERCEPTUAL_ROUGHNESS) - 1u);
+	if (!VisibilityFinite(shading) || !VisibilityFinite(diffuse) || !VisibilityFinite(baseColor) ||
+		!VisibilityFinite(base) || !VisibilityFinite(coat) ||
+		baseColor.w < (float)(g_Scene.MaterialBaseIndex) ||
+		baseColor.w >= (float)(RasterMaterialCapacity) || baseColor.w != floor(baseColor.w) ||
+		dot(base.xyz, base.xyz) < 0.5 || dot(coat.xyz, coat.xyz) < 0.5 ||
+		dot(shading.xyz, shading.xyz) < 0.5 || shading.w < 0 || shading.w > 1 ||
+		diffuse.w < 0 || diffuse.w > 1 || base.w < minimumRoughness ||
+		coat.w < minimumRoughness || base.w > 1 || coat.w > 1)
+	{
+		diagnostics[pixel] = float4(-6, 0, SubmittedSamples, 0);
+		return;
+	}
+	const MaterialData material = g_Materials[(uint)(baseColor.w)];
+	const float ior = material.Ior == 0 ? 0 : max(material.Ior, 1.0);
+	const float reflectance = (ior - 1.0) / (ior + 1.0);
+	const float3 f0 = lerp((reflectance * reflectance).xxx, baseColor.rgb, shading.w);
+	const float3 viewDirection = normalize(view.CameraPos.xyz - position);
+	const float noV = saturate(dot(shading.xyz, viewDirection));
+	const float coatNoV = saturate(dot(coat.xyz, viewDirection));
+	Texture2D<float2> lut = GetTexture2DFloat2(BrdfLutIndex);
+	const float2 baseLut = lut.SampleLevel(GetSamplerState(BrdfSampler), float2(noV, base.w), 0);
+	const float2 coatLut = lut.SampleLevel(GetSamplerState(BrdfSampler), float2(coatNoV, coat.w), 0);
+	const float3 baseAlbedo = saturate((f0 * baseLut.x + baseLut.y) * GGXEnergyCompensation(f0, baseLut));
+	const float coatAlbedo = diffuse.w > 0 ?
+		saturate((0.04 * coatLut.x + coatLut.y) * GGXEnergyCompensation(0.04.xxx, coatLut).x) : 0;
+	const float coatWeight = diffuse.w * coatAlbedo;
+	const float transmission = 1.0 - coatWeight;
+	const float3 baseWeight = baseAlbedo * transmission * transmission;
+	const float baseY = dot(baseWeight, float3(0.2126, 0.7152, 0.0722));
+	if (!VisibilityFinite(float4(f0, ior)) || !VisibilityFinite(float4(baseLut, coatLut)) ||
+		!VisibilityFinite(float4(baseWeight, coatWeight)))
+	{
+		return;
+	}
+	const uint active = (baseY > 0 ? GIVisibilityBaseActive : 0u) |
+		(coatWeight > 0 ? GIVisibilityCoatActive : 0u);
+	weightsOutput[pixel] = float4(baseWeight, coatWeight);
+	positions[pixel] = float4(receiver.Position, (float)(receiver.Instance));
+	f0Output[pixel] = float4(f0, ior);
+	energyOutput[pixel] = float4(diffuse.w, coatAlbedo, noV, coatNoV);
+	float4 pending[GIVisibilitySurfaceCount];
+	[unroll]
+	for (uint index = 0; index < GIVisibilitySurfaceCount; ++index)
+	{
+		pending[index] = SampleCount != 0 ? GetRWTexture2DFloat4(NextIndices[index])[pixel] : sums[index];
+	}
+	const bool samplePixel = all(pixel >= TileOrigin) && all(pixel - TileOrigin < TileExtent);
+	const uint count = samplePixel ? SampleCount : 0u;
+	for (uint sample = 0; sample < count; ++sample)
+	{
+		const uint pixelIndex = pixel.x + Size.x * pixel.y;
+		if ((active & GIVisibilityBaseActive) != 0)
+		{
+			VisibilityAccumulate(VisibilitySample(receiver, normalize(base.xyz), base.w,
+				pixelIndex, SampleBegin + sample, GIVisibilityBaseSum),
+				pending[GIVisibilityBaseSum], pending[GIVisibilityBaseCompensation]);
+		}
+		if ((active & GIVisibilityCoatActive) != 0)
+		{
+			VisibilityAccumulate(VisibilitySample(receiver, reflect(-viewDirection, normalize(coat.xyz)),
+				coat.w, pixelIndex, SampleBegin + sample, GIVisibilityCoatSum),
+				pending[GIVisibilityCoatSum], pending[GIVisibilityCoatCompensation]);
+		}
+	}
+	if (SampleCount != 0)
+	{
+		[unroll]
+		for (uint index = 0; index < GIVisibilitySurfaceCount; ++index)
+		{
+			if (samplePixel)
+			{
+				GetRWTexture2DFloat4(NextIndices[index])[pixel] = pending[index];
+			}
+			if (EndSweep != 0)
+			{
+				sums[index] = pending[index];
+			}
+		}
+	}
+	const uint samples = SampleCount != 0 && EndSweep != 0 ? SampleBegin + SampleCount : SubmittedSamples;
+	const float4 baseSum = sums[GIVisibilityBaseSum];
+	const float4 coatSum = sums[GIVisibilityCoatSum];
+	if (samples != 0)
+	{
+		baseOutput[pixel] = baseSum / (float)(samples);
+		coatOutput[pixel] = coatSum / (float)(samples);
+	}
+	diagnostics[pixel] = float4((float)(receiver.Primitive), (float)(active), (float)(samples), 0);
+	if (baseSum.w != 0 || coatSum.w != 0 || !VisibilityFinite(baseSum) || !VisibilityFinite(coatSum) ||
+		(samples != 0 && (((active & GIVisibilityBaseActive) != 0 && baseSum.y <= 0) ||
+			((active & GIVisibilityCoatActive) != 0 && coatSum.y <= 0))))
+	{
+		visibility[pixel] = float4(0, 0, 0, -2);
+		diagnostics[pixel] = float4((float)(receiver.Primitive), (float)(active), (float)(samples), 1);
+		return;
+	}
+	const float baseVisibility = baseSum.y > 0 ? baseSum.x / baseSum.y : 0;
+	const float coatVisibility = coatSum.y > 0 ? coatSum.x / coatSum.y : 0;
+	const float totalWeight = baseY + coatWeight;
+	const float combined = totalWeight > 0 ?
+		(baseY * baseVisibility + coatWeight * coatVisibility) / totalWeight : 0;
+	visibility[pixel] = float4(baseVisibility, coatVisibility, combined,
+		active == 0 ? 2 : samples != 0 ? 1 : 0);
+}

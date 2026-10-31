@@ -2,6 +2,7 @@
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/VulkanBackendSnapshot.h"
+#include "GGLabRuntime/Graphics/RHI/RHIAccelerationStructure.h"
 
 #include <imgui.h>
 #include <vulkan/vulkan.h>
@@ -178,6 +179,15 @@ namespace gglab
 			allowedTypes.empty() ? "none" : allowedTypes.c_str());
 
 		ImGui::SeparatorText("Descriptors");
+		const auto& rayQuery = snapshot->m_RayQueryCapabilities;
+		ImGui::Text("Inline ray queries: supported %s | device %s",
+			rayQuery.m_Supported ? "yes" : "no", EnabledText(rayQuery.m_Enabled));
+		const auto reason = GetRHIRayQueryUnavailableReasonName(rayQuery.m_UnavailableReason);
+		ImGui::TextDisabled("Ray query reason: %.*s | scratch alignment %llu B | primitives %llu | instances %llu",
+			static_cast<int>(reason.size()), reason.data(),
+			static_cast<unsigned long long>(rayQuery.m_BuildLimits.m_ScratchAlignmentInBytes),
+			static_cast<unsigned long long>(rayQuery.m_BuildLimits.m_MaxPrimitiveCount),
+			static_cast<unsigned long long>(rayQuery.m_BuildLimits.m_MaxInstanceCount));
 		DrawDescriptorSummary("Resources", snapshot->m_Resources);
 		DrawDescriptorSummary("Samplers", snapshot->m_Samplers);
 

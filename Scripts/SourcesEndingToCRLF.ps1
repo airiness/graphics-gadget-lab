@@ -38,25 +38,11 @@ $ExcludeDirs = @(
     "out"
 )
 
-function Test-IsExcludedPath {
-    param([string]$Path)
-
-    $fullPath = [System.IO.Path]::GetFullPath($Path)
-
-    foreach ($dir in $ExcludeDirs) {
-        $pattern = "[\\/]" + [regex]::Escape($dir) + "[\\/]"
-        if ($fullPath -match $pattern) {
-            return $true
-        }
-    }
-
-    return $false
-}
-
-function Test-IsBytePinnedGeneratedFixture {
+function Test-IsBytePinnedFixture {
     param(
         [string]$Path,
-        [string]$FixtureDirectory
+        [string]$FixtureDirectory,
+        [string]$NativeGICaptureDirectory
     )
 
     # Imported ShaderGraphCore emissions are byte-pinned fixtures. Their
@@ -65,7 +51,7 @@ function Test-IsBytePinnedGeneratedFixture {
     $fullPath = [System.IO.Path]::GetFullPath($Path)
     $directory = [System.IO.Path]::GetDirectoryName($fullPath)
 
-    return [System.IO.Path]::GetExtension($fullPath).Equals(
+    $isGeneratedShader = [System.IO.Path]::GetExtension($fullPath).Equals(
         ".hlsli",
         [System.StringComparison]::OrdinalIgnoreCase
     ) -and [string]::Equals(
@@ -73,6 +59,18 @@ function Test-IsBytePinnedGeneratedFixture {
         $FixtureDirectory,
         [System.StringComparison]::OrdinalIgnoreCase
     )
+
+    # Native capture logs and bundle manifests retain their recorded mixed/LF bytes.
+    # Sidecars, indexes and authored documentation keep the normal text policy.
+    $captureParent = [System.IO.Path]::GetDirectoryName($directory)
+    $name = [System.IO.Path]::GetFileName($fullPath)
+    $isNativeCapture = [string]::Equals(
+        $captureParent, $NativeGICaptureDirectory,
+        [System.StringComparison]::OrdinalIgnoreCase
+    ) -and ($name.Equals('output.txt', [System.StringComparison]::OrdinalIgnoreCase) -or
+        $name.EndsWith('.capture-bundle.json', [System.StringComparison]::OrdinalIgnoreCase))
+
+    return $isGeneratedShader -or $isNativeCapture
 }
 
 function Convert-BytesToUtf8WithoutBomCRLF {
@@ -145,6 +143,9 @@ $Root = [System.IO.Path]::GetFullPath($Root)
 $bytePinnedGeneratedFixtureDirectory = [System.IO.Path]::GetFullPath(
     (Join-Path $Root "Shaders\Tests\Generated")
 )
+$bytePinnedNativeGICaptureDirectory = [System.IO.Path]::GetFullPath(
+    (Join-Path $Root "Assets\Media\GGLabCoastalRetreat\GI\Daylight")
+)
 
 Write-Host "Root: $Root"
 Write-Host "Mode: " -NoNewline
@@ -155,13 +156,31 @@ else {
     Write-Host "Normalize UTF-8 without BOM/CRLF"
 }
 
-$files = Get-ChildItem -Path $Root -Recurse -File |
-    Where-Object {
-        ($TargetExtensions -contains $_.Extension.ToLowerInvariant() -or
-            $TargetFileNames -contains $_.Name.ToLowerInvariant()) -and
-        -not (Test-IsExcludedPath $_.FullName) -and
-        -not (Test-IsBytePinnedGeneratedFixture $_.FullName $bytePinnedGeneratedFixtureDirectory)
+# Prune before recursion: ignored build/cache trees can contain hundreds of
+# thousands of entries even when no source file needs normalization.
+$directories = New-Object 'System.Collections.Generic.Stack[string]'
+$directories.Push($Root)
+$files = New-Object 'System.Collections.Generic.List[System.IO.FileInfo]'
+while ($directories.Count -gt 0) {
+    $directory = $directories.Pop()
+    foreach ($entry in Get-ChildItem -LiteralPath $directory) {
+        if ($entry.PSIsContainer) {
+            # Keep traversal within ordinary directories; do not follow directory links.
+            if ($ExcludeDirs -notcontains $entry.Name -and
+                ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0) {
+                $directories.Push($entry.FullName)
+            }
+            continue
+        }
+
+        if (($TargetExtensions -contains $entry.Extension.ToLowerInvariant() -or
+                $TargetFileNames -contains $entry.Name.ToLowerInvariant()) -and
+            -not (Test-IsBytePinnedFixture $entry.FullName $bytePinnedGeneratedFixtureDirectory `
+                $bytePinnedNativeGICaptureDirectory)) {
+            $files.Add($entry)
+        }
     }
+}
 
 $total = 0
 $changed = 0

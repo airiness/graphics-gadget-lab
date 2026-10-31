@@ -109,7 +109,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Sources\Tools\ShaderCompiler\Main.cpp" />
-	<ClCompile Include="..\..\Sources\Tools\ShaderCompiler\GGLabRuntimeShaderBuild.cpp" />
+    <ClCompile Include="..\..\Sources\Tools\ShaderCompiler\GGLabRuntimeShaderBuild.cpp" />
     <ClCompile Include="..\..\Sources\Tools\ShaderCompiler\ShaderCompilerCommandLine.cpp" />
     <ClCompile Include="..\..\Sources\Tools\ShaderCompiler\Testing\ShaderCompilerCliTestAccess.cpp" />
   </ItemGroup>
@@ -126,6 +126,9 @@
       <Project>{B4E9D7A2-6C1F-4E8D-9B3A-5F7E2D9C4A61}</Project>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup Label="ShaderSources" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'">
+    <None Include="..\..\Shaders\shadertoolsconfig.json" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

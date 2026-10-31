@@ -47,6 +47,7 @@ namespace gglab
 		[[nodiscard]] bool CanUseRootDescriptor(const RHIBindingSlotDesc& slot) noexcept
 		{
 			return slot.m_Count == 1 && (slot.m_Type == RHIBindingType::ConstantBuffer ||
+				slot.m_Type == RHIBindingType::AccelerationStructure ||
 				slot.m_Type == RHIBindingType::ReadOnlyStorageBuffer ||
 				slot.m_Type == RHIBindingType::ReadWriteStorageBuffer);
 		}
@@ -87,6 +88,22 @@ namespace gglab
 		const RHIBindingLayoutDesc& rhiDesc, DX12BindingLayoutBuildResult& outDesc) noexcept
 	{
 		outDesc = {};
+		if (rhiDesc.m_SlotCount > RHIBindingLayoutDesc::MaxSlots)
+		{
+			outDesc.m_Error = DX12BindingLayoutError::TooManySlots;
+			return;
+		}
+		for (uint32_t index = 0; index < rhiDesc.m_SlotCount; ++index)
+		{
+			const auto& slot = rhiDesc.m_Slots[index];
+			if (slot.m_Type == RHIBindingType::AccelerationStructure &&
+				(slot.m_Count != 1 || slot.m_Space != 0 || slot.m_SizeInBytes != 0 ||
+					slot.m_BufferBindingMode != RHIBufferBindingMode::Fixed))
+			{
+				outDesc.m_Error = DX12BindingLayoutError::InvalidAccelerationStructureBinding;
+				return;
+			}
+		}
 
 		D3D12_ROOT_SIGNATURE_FLAGS flags =
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
@@ -128,6 +145,7 @@ namespace gglab
 						slot.m_Binding, slot.m_Space, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, visibility);
 					break;
 				case RHIBindingType::ReadOnlyStorageBuffer:
+				case RHIBindingType::AccelerationStructure:
 					rootParameter.InitAsShaderResourceView(
 						slot.m_Binding, slot.m_Space, D3D12_ROOT_DESCRIPTOR_FLAG_NONE, visibility);
 					break;

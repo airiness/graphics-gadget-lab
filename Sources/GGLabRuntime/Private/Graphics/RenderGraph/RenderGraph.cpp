@@ -191,7 +191,9 @@ namespace gglab
 		RGTextureContentValidity writtenValidity{};
 		for (const RGPassNode::Access& access : m_PassNodes[passNodeIndex.Value()].m_Accesses)
 		{
-			if (access.m_ResourceNodeIndex == slot.m_ResourceNodeIndex &&
+			// ReadWrite reads the preceding node and writes a new node. Definition
+			// checks must follow the written version, just as dependency compilation does.
+			if (access.m_WrittenResourceNodeIndex == slot.m_ResourceNodeIndex &&
 				access.m_ResourceType == RGResourceType::RGTexture &&
 				(access.m_DependencyAccess == RGDependencyAccess::Write ||
 					access.m_DependencyAccess == RGDependencyAccess::ReadWrite))

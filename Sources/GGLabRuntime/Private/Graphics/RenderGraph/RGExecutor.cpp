@@ -17,6 +17,11 @@ namespace gglab
 {
 	namespace
 	{
+		RHIAccelerationStructureHandle ResolveAccelerationStructureHandle(const RGCompiledResource& resource) noexcept
+		{
+			const auto* acceleration = static_cast<const RGVirtualResource<RGAccelerationStructureResource>*>(resource.m_Resource);
+			return acceleration->m_ImportedHandle;
+		}
 		RHITextureHandle ResolveTextureHandle(const RGCompiledResource& resource) noexcept
 		{
 			GGLAB_ASSERT_MSG(resource.m_ResourceType == RGResourceType::RGTexture,
@@ -52,7 +57,15 @@ namespace gglab
 				.m_Imported = resource.m_Imported,
 			};
 			RHIAllocationFacts facts{ .m_Status = RHIAllocationFactsStatus::Unowned };
-			if (resource.m_ResourceType == RGResourceType::RGTexture)
+			if (resource.m_ResourceType == RGResourceType::RGAccelerationStructure)
+			{
+				const auto handle = ResolveAccelerationStructureHandle(resource);
+				allocation.m_HasPhysicalHandle = handle.IsValid();
+				allocation.m_PhysicalHandleIndex = handle.Index();
+				allocation.m_PhysicalHandleGeneration = handle.Generation();
+				facts = device.QueryAccelerationStructureAllocationFacts(handle);
+			}
+			else if (resource.m_ResourceType == RGResourceType::RGTexture)
 			{
 				const auto* texture =
 					static_cast<const RGVirtualResource<RGTextureResource>*>(resource.m_Resource);
@@ -132,7 +145,11 @@ namespace gglab
 			for (const auto& access : pass.m_Accesses)
 			{
 				const auto& resource = plan.GetResources()[access.m_Resource.Value()];
-				if (resource.m_ResourceType == RGResourceType::RGTexture)
+				if (resource.m_ResourceType == RGResourceType::RGAccelerationStructure)
+				{
+					commandContext->TrackAccelerationStructureUse(ResolveAccelerationStructureHandle(resource));
+				}
+				else if (resource.m_ResourceType == RGResourceType::RGTexture)
 				{
 					const RHITextureHandle handle = ResolveTextureHandle(resource);
 					GGLAB_ASSERT_MSG(
@@ -188,7 +205,15 @@ namespace gglab
 				intent.m_HasResolvedPhysicalHandle = false;
 				intent.m_ResolvedPhysicalHandleIndex = 0;
 				intent.m_ResolvedPhysicalHandleGeneration = 0;
-				if (resource.m_ResourceType == RGResourceType::RGTexture)
+				if (resource.m_ResourceType == RGResourceType::RGAccelerationStructure)
+				{
+					const auto handle = ResolveAccelerationStructureHandle(resource);
+					intent.m_HasResolvedPhysicalHandle = handle.IsValid();
+					intent.m_ResolvedPhysicalHandleIndex = handle.Index();
+					intent.m_ResolvedPhysicalHandleGeneration = handle.Generation();
+					commandContext->AccelerationStructureBarrier(handle, intent.m_Before, intent.m_After);
+				}
+				else if (resource.m_ResourceType == RGResourceType::RGTexture)
 				{
 					const RHITextureHandle handle = ResolveTextureHandle(resource);
 					GGLAB_ASSERT_MSG(handle.IsValid(),
@@ -275,6 +300,17 @@ namespace gglab
 		return descriptorPublished ?
 			m_Device->GetTextureViewDescriptor(view) :
 			RHIDescriptorHandle{};
+	}
+
+	RHIAccelerationStructureHandle RGExecuteContext::GetAccelerationStructureHandle(RGAccelerationStructureId id) const noexcept
+	{
+		if (!m_ExecutionPlan || !id.IsValid() || id.GetHandle().Value() >= m_ExecutionPlan->GetResources().size())
+		{
+			return {};
+		}
+		const auto& resource = m_ExecutionPlan->GetResources()[id.GetHandle().Value()];
+		return resource.m_ResourceType == RGResourceType::RGAccelerationStructure ?
+			ResolveAccelerationStructureHandle(resource) : RHIAccelerationStructureHandle{};
 	}
 
 	RHIBufferHandle RGExecuteContext::GetBufferHandle(RGBufferId bufferId) const noexcept

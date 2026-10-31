@@ -98,7 +98,9 @@ namespace gglab
 				{ "ordering", RGEnumId(access.m_Ordering) },
 				{ "access", access.m_ResourceType == RGResourceType::RGTexture ?
 					RGEnumId(static_cast<RGTextureAccess>(access.m_AccessValue)) :
-					RGEnumId(static_cast<RGBufferAccess>(access.m_AccessValue)) },
+					access.m_ResourceType == RGResourceType::RGAccelerationStructure ?
+						RGEnumId(static_cast<RGAccelerationStructureAccess>(access.m_AccessValue)) :
+						RGEnumId(static_cast<RGBufferAccess>(access.m_AccessValue)) },
 				{ "accessBits", access.m_AccessValue },
 				{ "stages", RGFlagsId(access.m_Stages) },
 				{ "stageBits", static_cast<uint64_t>(access.m_Stages) },
@@ -390,7 +392,13 @@ namespace gglab
 					{ "exportPass", resource.m_ExportPassIndex },
 					{ "logicalBytes", resource.m_LogicalBytes ? Json(*resource.m_LogicalBytes) : Json(nullptr) },
 					{ "logicalBytesReason", LogicalBytesReason(resource) } };
-				if (resource.m_ResourceType == RGResourceType::RGTexture)
+				if (resource.m_ResourceType == RGResourceType::RGAccelerationStructure)
+				{
+					item["accelerationStructure"] = {
+						{ "type", resource.m_AccelerationStructureType == RHIAccelerationStructureType::BottomLevel ? "bottom-level" : "top-level" },
+						{ "storageBytes", resource.m_LogicalBytes.value_or(0) } };
+				}
+				else if (resource.m_ResourceType == RGResourceType::RGTexture)
 				{
 					item["texture"] = {
 						{ "dimension", Dimension(resource.m_TextureDimension) },
@@ -400,7 +408,7 @@ namespace gglab
 						{ "slices", resource.m_TextureArraySize },
 						{ "samples", resource.m_TextureSampleCount } };
 				}
-				else
+				else if (resource.m_ResourceType == RGResourceType::RGBuffer)
 				{
 					item["buffer"] = {
 						{ "sizeBytes", resource.m_BufferSizeInBytes },

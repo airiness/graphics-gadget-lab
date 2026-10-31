@@ -2,6 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "Graphics/RHI/Vulkan/VulkanAdapter.h"
+#include "Graphics/RHI/Vulkan/VulkanRayQuerySupport.h"
 #include "Graphics/RHI/Vulkan/VulkanDescriptorManager.h"
 #include "Graphics/RHI/Vulkan/VulkanResourceManager.h"
 
@@ -14,6 +15,7 @@
 
 namespace gglab
 {
+	class VulkanAccelerationStructureManager;
 	class VulkanTimelineFence;
 
 	struct VulkanQueueSelection final
@@ -79,14 +81,24 @@ namespace gglab
 	{
 	public:
 		bool SupportsPixelStorageAtomics() const noexcept override { return m_PixelStorageAtomics; }
+		[[nodiscard]] RHIRayQueryCapabilities GetRayQueryCapabilities() const noexcept override
+		{
+			return m_RayQueryCapabilities;
+		}
 		struct CreateInfo
 		{
 			VkInstance m_Instance = VK_NULL_HANDLE;
 			VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
 			const VulkanAdapterIdentity* m_AdapterIdentity = nullptr;
-			// Feature availability captured by the capability snapshot; only
-			// profile-required features are enabled on the device.
+			// Raster feature availability captured by the capability snapshot.
+			// Optional RT uses the separate complete-set policy below.
 			const VulkanDeviceProfileCapabilities* m_ProfileCapabilities = nullptr;
+			// Optional RT set, separate from raster adapter acceptance. The complete
+			// available set is enabled together; partial availability stays raster-only.
+			const VulkanRayQueryAvailability* m_RayQueryAvailability = nullptr;
+			// Temporary layout probes validate only the raster profile. Optional RT
+			// creation failure must not change adapter selection or trigger a fallback.
+			bool m_LayoutProbeOnly = false;
 			// Hardware-available conditional portability capabilities
 			// (diagnostics and policy input); they never gate device
 			// creation. The device reduces them through
@@ -211,6 +223,15 @@ namespace gglab
 		RHISamplerHandle CreateSampler(const RHISamplerDesc& desc) noexcept override;
 		void DestroyTexture(RHITextureHandle texture) noexcept override;
 		void DestroyBuffer(RHIBufferHandle buffer) noexcept override;
+		[[nodiscard]] std::optional<RHIASBuildSizes> QueryAccelerationStructureBuildSizes(
+			const RHIASBuildInputs& inputs) noexcept override;
+		[[nodiscard]] RHIAccelerationStructureHandle CreateAccelerationStructure(
+			const RHIAccelerationStructureDesc& desc) noexcept override;
+		void DestroyAccelerationStructure(RHIAccelerationStructureHandle handle) noexcept override;
+		VulkanAccelerationStructureManager& GetAccelerationStructureManager() noexcept;
+		bool IsAlive(RHIAccelerationStructureHandle handle) const noexcept override;
+		RHIAllocationFacts QueryAccelerationStructureAllocationFacts(
+			RHIAccelerationStructureHandle handle) const noexcept override;
 		void DestroyTextureView(RHITextureViewHandle view) noexcept override;
 		void DestroyBufferView(RHIBufferViewHandle view) noexcept override;
 		void DestroySampler(RHISamplerHandle sampler) noexcept override;
@@ -230,6 +251,7 @@ namespace gglab
 			RHIBufferHandle buffer, RHIMappedBufferRange writtenRange) noexcept override;
 		bool IsAlive(RHITextureHandle texture) const noexcept override;
 		bool IsAlive(RHIBufferHandle buffer) const noexcept override;
+		std::optional<RHIBufferDesc> QueryBufferDescription(RHIBufferHandle buffer) const noexcept override;
 		bool IsAlive(RHISamplerHandle sampler) const noexcept override;
 		RHIAllocationFacts QueryTextureAllocationFacts(
 			RHITextureHandle texture) const noexcept override;
@@ -301,10 +323,12 @@ namespace gglab
 		std::thread::id m_OwnerThreadId{};
 		std::string m_AdapterCompatibilityIdentity;
 		RHIShaderWaveCapabilities m_ShaderWaveCapabilities{};
+		RHIRayQueryCapabilities m_RayQueryCapabilities{};
 		VkPhysicalDeviceLimits m_PhysicalDeviceLimits{};
 
 		VmaAllocator m_MemAllocator = VK_NULL_HANDLE;
 		VulkanDescriptorManager m_DescriptorManager;
 		VulkanResourceManager m_ResourceManager;
+		std::unique_ptr<VulkanAccelerationStructureManager> m_AccelerationStructures;
 	};
 }

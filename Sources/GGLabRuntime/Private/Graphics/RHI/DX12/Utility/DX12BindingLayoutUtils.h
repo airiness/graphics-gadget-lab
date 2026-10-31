@@ -18,6 +18,13 @@ namespace gglab
 	[[nodiscard]] DX12RootParameterPlan BuildDX12RootParameterPlan(
 		std::span<const D3D12_ROOT_PARAMETER1> parameters) noexcept;
 
+	enum class DX12BindingLayoutError : uint8_t
+	{
+		None,
+		TooManySlots,
+		InvalidAccelerationStructureBinding,
+	};
+
 	struct DX12BindingLayoutBuildResult
 	{
 		std::array<CD3DX12_ROOT_PARAMETER1, RHIBindingLayoutDesc::MaxSlots> m_RootParameters{};
@@ -25,6 +32,12 @@ namespace gglab
 		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC m_Desc{};
 		uint32_t m_RootParameterCount = 0;
 		uint32_t m_DescriptorRangeCount = 0;
+		DX12BindingLayoutError m_Error = DX12BindingLayoutError::None;
+
+		[[nodiscard]] bool IsValid() const noexcept
+		{
+			return m_Error == DX12BindingLayoutError::None;
+		}
 	};
 
 	void BuildDX12RootSignatureDesc(

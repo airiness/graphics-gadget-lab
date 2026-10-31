@@ -7,6 +7,7 @@
 #include "Capture/NonFiniteWatchCoordinator.h"
 #include "Parameters/HostViewParameters.h"
 #include "GGLabAppRuntime.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 
 #include <cstdint>
 #include <memory>
@@ -116,6 +117,8 @@ namespace gglab
 		std::string m_LightingProfileError;
 		// Live control state; the frame carries the stamp it was planned with.
 		HostViewControlStamp m_HostViewControl;
+		// Owner-thread immutable snapshot captured for this query only.
+		std::optional<LabSnapshot> m_Lab;
 	};
 
 	// Response serializers. Every response carries the protocol version, the

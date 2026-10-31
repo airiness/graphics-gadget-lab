@@ -586,6 +586,7 @@ namespace gglab
 			{
 				return sampler.IsValid();
 			}
+			bool IsAlive(RHIAccelerationStructureHandle handle) const noexcept override { return handle.IsValid(); }
 			using RHIDevice::ObserveGpuWaitResult;
 			RHIFenceQueryResult QueryFencePointImpl(const RHIFencePoint& fencePoint) const noexcept override
 			{
@@ -2503,8 +2504,130 @@ namespace gglab
 				"Data uploads require an explicit recording scope outside the RenderGraph too");
 		}
 
+		void RunSubmissionRetentionContractTests(SelfTestContext& context) noexcept
+		{
+			for (uint32_t scenario = 0; scenario < 5; ++scenario)
+			{
+				RecordingDevice device;
+				device.m_UseControlledFenceCompletion = true;
+				RHIUploadPool pool(device);
+				auto batch = pool.BeginBatch();
+				auto original = std::make_shared<uint32_t>(73);
+				std::weak_ptr<uint32_t> originalWeak = original;
+				context.Check(batch->RetainForSubmission(std::move(original)),
+					"A recording batch accepts native backing before publication");
+				if (scenario < 3)
+				{
+					context.Check(batch->Publish(), "Native retention publication succeeds before a late-lease probe");
+					if (scenario == 1)
+					{
+						batch->RecordAcceptedSubmission();
+						context.Check(batch->Submitted({ { 0, 1 }, 7 }),
+							"A submitted retention probe transfers its original backing to the fence owner");
+					}
+					else if (scenario == 2)
+					{
+						batch->RecordAcceptedSubmission();
+						batch->SubmittedWithoutCompletionFence();
+					}
+				}
+				else if (scenario == 3)
+				{
+					batch->Cancel();
+				}
+				else
+				{
+					batch->Fail();
+				}
+				auto late = std::make_shared<uint32_t>(91);
+				std::weak_ptr<uint32_t> lateWeak = late;
+				context.Check(!batch->RetainForSubmission(std::move(late)) &&
+					lateWeak.expired() && batch->HasFailed(),
+					"Published, submitted, quarantined, cancelled and failed batches reject new native leases");
+				context.Check(originalWeak.expired() == (scenario == 3),
+					"Rejecting a late lease preserves the original backing's existing retention state");
+				if (scenario == 1)
+				{
+					batch.reset();
+					pool.ReclaimCompleted();
+					context.Check(!originalWeak.expired(),
+						"Late-lease rejection does not release submitted backing before its fence");
+					device.m_CompletedFenceValue = 7;
+					pool.ReclaimCompleted();
+				}
+				else if (scenario == 2)
+				{
+					batch.reset();
+					pool.ReleaseQuarantinedAfterVerifiedIdle();
+				}
+				else if (scenario != 3)
+				{
+					batch->Cancel();
+				}
+				context.Check(originalWeak.expired(),
+					"The original backing still releases through cancellation, completion or verified idle");
+			}
+			RecordingDevice device;
+			RHIUploadPool pool(device);
+			auto batch = pool.BeginBatch();
+			context.Check(!batch->RetainForSubmission({}) && batch->HasFailed(),
+				"A null owner-thread native lease fails the recording");
+			batch->Cancel();
+		}
+
 		void RunUploadStorageContractTests(SelfTestContext& context) noexcept
 		{
+			for (uint32_t scenario = 0; scenario < 4; ++scenario)
+			{
+				RecordingDevice retentionDevice;
+				retentionDevice.m_UseControlledFenceCompletion = true;
+				RHIUploadPool retentionPool(retentionDevice);
+				auto retainedBatch = retentionPool.BeginBatch();
+				RHIUploadWriter retentionWriter;
+				retainedBatch->Attach(retentionWriter);
+				auto nativeBacking = std::make_shared<uint32_t>(73);
+				std::weak_ptr<uint32_t> weakBacking = nativeBacking;
+				context.Check(retentionWriter.RetainForSubmission(nativeBacking),
+					"A recording batch pins native backing before any stream can be submitted");
+				nativeBacking.reset();
+				retainedBatch->Detach(retentionWriter);
+				if (scenario == 0)
+				{
+					retainedBatch->Cancel();
+					context.Check(weakBacking.expired(), "Cancellation without accepted work releases native backing immediately");
+					continue;
+				}
+				context.Check(retainedBatch->Publish(), "Submission backing does not require an upload-page allocation");
+				retainedBatch->RecordAcceptedSubmission();
+				if (scenario == 1)
+				{
+					context.Check(retainedBatch->Submitted({ { 0, 1 }, 7 }), "Fenced backing joins the complete submission point");
+					retainedBatch.reset();
+					retentionDevice.m_CompletedFenceValue = 6;
+					retentionPool.ReclaimCompleted();
+					context.Check(!weakBacking.expired(), "Native backing survives batch destruction and an earlier fence value");
+					retentionDevice.m_CompletedFenceValue = 7;
+					retentionPool.ReclaimCompleted();
+					context.Check(weakBacking.expired(), "Verified completion releases the submission's native backing");
+				}
+				else
+				{
+					retainedBatch->SubmittedWithoutCompletionFence();
+					retainedBatch.reset();
+					retentionDevice.m_UseControlledFenceCompletion = false;
+					retentionPool.ReclaimCompleted();
+					context.Check(!weakBacking.expired(), "Completion-unknown backing cannot be reclaimed by unrelated completed fences");
+					if (scenario == 2)
+					{
+						retentionPool.ReleaseQuarantinedAfterVerifiedIdle();
+					}
+					else
+					{
+						retentionPool.ReleaseQuarantinedAfterDeviceLoss();
+					}
+					context.Check(weakBacking.expired(), "Verified idle or confirmed device loss ends native-backing quarantine");
+				}
+			}
 			RecordingDevice device;
 			device.m_PassConstantsEnabled = true;
 			device.m_UseControlledFenceCompletion = true;
@@ -2816,10 +2939,16 @@ namespace gglab
 			const std::array<uint32_t, 4> payload{ 1, 2, 3, 4 };
 			RHIConstantBufferBinding foreignConstants{};
 			RHIReadOnlyBufferBinding foreignStructured{};
+			RecordingGraphicsCommandContext graphics;
+			graphics.BeginRecordingScope(writer);
+			auto foreignBacking = std::make_shared<uint32_t>(73);
+			std::weak_ptr<uint32_t> foreignWeak = foreignBacking;
+			bool foreignRetained = true;
 			std::thread foreign([&]()
 				{
 					foreignConstants = uploads.UploadConstants(payload);
 					foreignStructured = uploads.UploadStructured(std::span<const uint32_t>(payload));
+					foreignRetained = graphics.RetainForSubmission(std::move(foreignBacking));
 				});
 			foreign.join();
 			// A foreign thread is rejected without touching batch state; only the encoder that
@@ -2827,9 +2956,16 @@ namespace gglab
 			context.Check(!foreignConstants.IsValid() && !foreignStructured.IsValid() &&
 				!batch->HasFailed() && batch->GetPageCount() == 0 && pool.GetPageCount() == 0,
 				"Off-owner uploads return invalid bindings without touching the batch");
+			context.Check(!foreignRetained && foreignWeak.expired() &&
+				!graphics.HasRecordingError() && !batch->HasFailed(),
+				"Off-owner native retention rejects without mutating the batch or encoder");
+			context.Check(graphics.RetainForSubmission(std::make_shared<uint32_t>(91)) &&
+				!graphics.HasRecordingError(),
+				"The owner encoder still retains native backing after a rejected foreign call");
 			const RHIConstantBufferBinding owned = uploads.UploadConstants(payload);
 			context.Check(owned.IsValid() && writer.Owns(owned) && !batch->HasFailed(),
 				"The owner thread still uploads into a batch after a rejected foreign upload");
+			graphics.EndRecordingScope();
 			batch->Detach(writer);
 			batch->Cancel();
 		}
@@ -3240,6 +3376,110 @@ namespace gglab
 			}
 		}
 
+		void RunAccelerationStructureGraphTests(SelfTestContext& context) noexcept
+		{
+			RecordingDevice device;
+			TransientResourcePool pool(&device);
+			RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			struct Data
+			{
+			};
+			RGAccelerationStructureId bottom;
+			RGAccelerationStructureId top;
+			RGAccelerationStructureId unused;
+			RGBufferId scratch;
+			graph.AddPass<Data>("AS.Setup", [&](RenderGraph::RGBuilder& builder, Data&)
+				{
+					bottom = builder.Import<RGAccelerationStructureResource>("AS.Bottom", { 1, 1 },
+						{ .m_SizeInBytes = 4096 }, RGAccelerationStructureAccess::QueryRead, RGContentValidity::Undefined);
+					top = builder.Import<RGAccelerationStructureResource>("AS.Top", { 2, 1 },
+						{ .m_Type = RHIAccelerationStructureType::TopLevel, .m_SizeInBytes = 4096 },
+						RGAccelerationStructureAccess::QueryRead, RGContentValidity::Undefined);
+					unused = builder.Import<RGAccelerationStructureResource>("AS.Unused", { 3, 1 },
+						{ .m_SizeInBytes = 4096 }, RGAccelerationStructureAccess::QueryRead, RGContentValidity::Undefined);
+					scratch = builder.CreateBuffer("AS.Scratch", { .m_SizeInBytes = 1024 });
+				});
+			graph.AddPass<Data>("AS.FirstBuild", [&](RenderGraph::RGBuilder& builder, Data&)
+				{
+					builder.SideEffect();
+					builder.WriteInPlace(bottom, RGAccelerationStructureAccess::BuildWrite);
+					builder.WriteInPlace(scratch, RGBufferAccess::AccelerationStructureScratch);
+				});
+			graph.AddPass<Data>("AS.FinalBuild", [&](RenderGraph::RGBuilder& builder, Data&)
+				{
+					builder.WriteInPlace(bottom, RGAccelerationStructureAccess::BuildWrite);
+					builder.WriteInPlace(scratch, RGBufferAccess::AccelerationStructureScratch, RHIStage::All);
+				});
+			graph.AddPass<Data>("AS.TopBuild", [&](RenderGraph::RGBuilder& builder, Data&)
+				{
+					GGLAB_UNUSED(builder.Read(bottom, RGAccelerationStructureAccess::BuildRead));
+					builder.WriteInPlace(top, RGAccelerationStructureAccess::BuildWrite);
+					builder.WriteInPlace(scratch, RGBufferAccess::AccelerationStructureScratch,
+						RHIStage::AccelerationStructureBuild | RHIStage::ComputeShader);
+				});
+			graph.AddPass<Data>("AS.Query", [&](RenderGraph::RGBuilder& builder, Data&)
+				{
+					builder.SideEffect();
+					GGLAB_UNUSED(builder.Read(bottom, RGAccelerationStructureAccess::QueryRead));
+					GGLAB_UNUSED(builder.Read(top, RGAccelerationStructureAccess::QueryRead));
+				});
+			graph.AddPass<Data>("AS.UnusedBuild", [&](RenderGraph::RGBuilder& builder, Data&)
+					{ builder.WriteInPlace(unused, RGAccelerationStructureAccess::BuildWrite); });
+			graph.AddPass<Data>("AS.Unrelated", [](RenderGraph::RGBuilder&, Data&) {});
+			const bool compiled = graph.Compile();
+			context.Check(compiled, "Imported AS resources compile through normal versioned dependency analysis");
+			if (compiled)
+			{
+				const auto& passes = graph.GetExecutionPlan()->GetPasses();
+				context.Check(!passes[1].m_Culled && !passes[2].m_Culled && !passes[3].m_Culled &&
+					!passes[4].m_Culled && !passes[5].m_Culled && passes[6].m_Culled,
+					"Imported AS writes retain their external side effects while an unrelated pass is culled");
+				context.Check(std::ranges::any_of(passes[2].m_PreBarriers, [](const auto& barrier)
+					{
+						return barrier.m_Kind == RGBarrierKind::AccelerationStructure;
+					}), "Consecutive live AS writers receive an explicit ordered AS memory barrier");
+				for (const uint32_t passIndex : { 2u, 3u })
+				{
+					context.Check(std::ranges::any_of(passes[passIndex].m_PreBarriers, [](const auto& barrier)
+						{
+							return barrier.m_Kind == RGBarrierKind::Uav &&
+								barrier.m_Before.m_Access == RHIAccess::AccelerationStructureScratch &&
+								barrier.m_After.m_Access == RHIAccess::AccelerationStructureScratch;
+						}), "Scratch writes keep their explicit access and ordered hazard across stage changes");
+				}
+				context.Check(std::ranges::any_of(passes[3].m_PreBarriers, [](const auto& barrier)
+					{
+						return barrier.m_Before.m_Access == RHIAccess::AccelerationStructureWrite &&
+							barrier.m_After.m_Access == RHIAccess::AccelerationStructureRead;
+					}), "TLAS construction declares and synchronizes its BLAS build reads");
+				context.Check(std::ranges::any_of(passes[4].m_PreBarriers, [](const auto& barrier)
+					{
+						return barrier.m_After.m_Stages == RHIStage::ComputeShader;
+					}), "The graph carries AS availability to the compute ray-query stage");
+				RGSnapshot snapshot;
+				BuildRenderGraphSnapshot(graph, snapshot);
+				const auto serialized = SerializeRenderGraphSnapshot(snapshot, false);
+				context.Check(serialized.find("AccelerationStructure") != std::string::npos &&
+					serialized.find("BuildRead") != std::string::npos && serialized.find("QueryRead") != std::string::npos,
+					"Graph exports preserve typed AS resources and access semantics");
+				context.Check(graph.ResolveObservation({ .m_Resource = "AS.Top" }, RGObservationKind::ResourceExport).m_Failure ==
+					RGObservationFailure::UnsupportedResource,
+					"Opaque AS storage cannot be reinterpreted by ordinary buffer resource exports");
+			}
+			RenderGraph undefined({ .m_Device = &device, .m_TransientResourcePool = &pool });
+			undefined.AddPass<Data>("AS.UnbuiltRead", [&](RenderGraph::RGBuilder& builder, Data&)
+				{
+					builder.SideEffect();
+					const auto unbuilt = builder.Import<RGAccelerationStructureResource>("AS.Unbuilt", { 4, 1 },
+						{ .m_SizeInBytes = 4096 }, RGAccelerationStructureAccess::QueryRead, RGContentValidity::Undefined);
+					GGLAB_UNUSED(builder.Read(unbuilt));
+				});
+			context.Check(!undefined.Compile(), "A declared AS query cannot consume an unbuilt imported structure");
+			context.Check(!IsRGAccessCompatible(RGAccelerationStructureAccess::BuildRead,
+				RGDependencyAccess::Read, RGOrderingRequirement::Unordered),
+				"AS accesses cannot opt out of dependency ordering");
+		}
+
 		void RunPassProfileIdentityContractTests(SelfTestContext& context) noexcept
 		{
 			RecordingDevice device;
@@ -3493,6 +3733,27 @@ namespace gglab
 				context.Check(!registry.IsPostProcessPreviewRequested(channel) && !registry.IsDirty(index),
 					"The matching preview revision and request generation settle independently");
 			}
+
+			constexpr auto GIChannel = PostProcessPreviewChannel::GlobalIllumination;
+			const GIPreviewSnapshot giSnapshot{ .m_Generation = 19, .m_Samples = 64,
+				.m_TargetSamples = 256, .m_MaximumDepth = 4 };
+			RGDeferredCommitList giDiscarded;
+			RGExecuteContext giExecute(giDiscarded);
+			giExecute.DeferCommit([&registry, giSnapshot](const RGCommitContext&) noexcept
+				{
+					registry.PublishGIPreviewSnapshot(giSnapshot);
+				});
+			giDiscarded.Discard();
+			context.Check(registry.GetPostProcessPreviewDiagnostics(GIChannel).m_GISnapshot.m_Generation == 0,
+				"Discarded GI preview work cannot publish source provenance");
+			registry.PublishGIPreviewSnapshot(giSnapshot);
+			registry.SetGIPreviewSourceAvailable();
+			registry.BeginPreviewFrame();
+			const auto frozen = registry.GetPostProcessPreviewDiagnostics(GIChannel);
+			context.Check(!frozen.m_SourceAvailable && frozen.m_GISnapshot.m_Generation == 19 &&
+				frozen.m_GISnapshot.m_Samples == 64 && frozen.m_GISnapshot.m_MaximumDepth == 4 &&
+				registry.GetPostProcessPreviewDiagnostics().m_GISnapshot.m_Generation == 0,
+				"A pipeline change hides GI without relabeling the retained frozen snapshot or another channel");
 
 			registry.EnsureIblResources();
 			for (uint32_t i = 0; i < static_cast<uint32_t>(IBLPreviewType::Count); ++i)
@@ -13656,6 +13917,7 @@ namespace gglab
 		RunPassParameterContractTests(context);
 		RunUploadWriterContractTests(context);
 		RunUploadStorageContractTests(context);
+		RunSubmissionRetentionContractTests(context);
 		RunUploadBudgetTests(context);
 		RunUploadTeardownContractTests(context);
 		RunUploadOwnerThreadContractTests(context);
@@ -13665,6 +13927,7 @@ namespace gglab
 		RunRenderFrameOutcomeContractTests(context);
 		RunDeferredCommitContractTests(context);
 		RunPassProfileIdentityContractTests(context);
+		RunAccelerationStructureGraphTests(context);
 		RunPreviewSubmissionContractTests(context);
 		RunPreviewPassContractTests(context);
 		RunFrameConstantUploadTests(context);

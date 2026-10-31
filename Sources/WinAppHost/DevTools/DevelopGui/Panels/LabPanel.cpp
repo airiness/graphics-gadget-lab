@@ -1,5 +1,6 @@
 #include "DevTools/DevelopGui/Panels/LabPanel.h"
 #include "Lab/LabInterfaces.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 #include "Lab/LabRuntime.h"
 #include "GGLabRuntime/Graphics/CameraTooling.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
@@ -7,6 +8,11 @@
 #include "DevTools/EnumText/EnumTextLab.h"
 #include "DevTools/EnumText/EnumTextGraphics.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
+#include "DevTools/DevelopGui/DevelopGuiRegistry.h"
+
+#include <algorithm>
+#include <format>
+#include <utility>
 
 #include <imgui.h>
 
@@ -144,8 +150,63 @@ namespace gglab
 		}
 	}
 
+	void LabSessionLog::Append(std::string message) noexcept
+	{
+		if (!m_Entries.empty() && m_Entries.back() == message)
+		{
+			return;
+		}
+		constexpr size_t MaximumEntries = 64;
+		if (m_Entries.size() == MaximumEntries)
+		{
+			m_Entries.erase(m_Entries.begin());
+		}
+		m_Entries.push_back(std::move(message));
+		m_Changed = true;
+	}
+
+	void LabSessionLog::Draw(const LabSnapshot& snapshot) noexcept
+	{
+		const std::string runState = devtools::EnumText(snapshot.m_State);
+		// Countdown/progress stays live inside the fixed viewport. History records
+		// transitions, not one entry per warm-up frame or changing percentage.
+		const std::string status = std::format("{}: {}{}{}{}", snapshot.m_ActiveLabName, runState,
+			snapshot.m_HasPendingSession ? " -> " + snapshot.m_PendingLabName + " | " + snapshot.m_LoadingStage : "",
+			snapshot.m_IsHostActive ? "" : " | LabHost inactive",
+			snapshot.m_LastError.empty() ? "" : " | Error: " + snapshot.m_LastError);
+		if (status != m_LastStatus)
+		{
+			Append(status);
+			m_LastStatus = status;
+		}
+		ImGui::SeparatorText("Session Log");
+		ImGui::BeginChild("LabSessionLog", ImVec2(0, ImGui::GetTextLineHeightWithSpacing() * 8),
+			ImGuiChildFlags_Borders);
+		const bool atBottom = ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 1.0f;
+		for (const auto& entry : m_Entries)
+		{
+			ImGui::TextWrapped("%s", entry.c_str());
+		}
+		if (snapshot.m_HasPendingSession)
+		{
+			ImGui::ProgressBar(std::clamp(snapshot.m_LoadingFraction, 0.0f, 1.0f), ImVec2(-FLT_MIN, 0));
+			ImGui::TextWrapped("%s", snapshot.m_LoadingDetail.c_str());
+		}
+		if (snapshot.m_State == LabSnapshotRunState::WarmingUp)
+		{
+			ImGui::Text("Warm-up remaining: %u", snapshot.m_WarmupFramesRemaining);
+		}
+		if (atBottom && m_Changed)
+		{
+			ImGui::SetScrollHereY(1.0f);
+		}
+		m_Changed = false;
+		ImGui::EndChild();
+	}
+
 	void LabPanel::Draw(DevelopGuiContext& context) noexcept
 	{
+		ImGui::SetWindowSize(ImVec2(390, 640), ImGuiCond_FirstUseEver);
 		if (!m_RuntimeLocator)
 		{
 			ImGui::TextDisabled("Lab runtime is not available.");
@@ -198,33 +259,21 @@ namespace gglab
 			ImGui::EndCombo();
 		}
 
-		const std::string runState = devtools::EnumText(snapshot.m_State);
-		ImGui::Text("State: %s", runState.c_str());
-		if (snapshot.m_HasPendingSession)
+		if (m_ObservedLabId != snapshot.m_ActiveLabId)
 		{
-			ImGui::Text("Pending Lab: %s", snapshot.m_PendingLabName.c_str());
-			const float fraction = std::clamp(snapshot.m_LoadingFraction, 0.0f, 1.0f);
-			const std::string percentage =
-				std::format("{}%", static_cast<int32_t>(std::round(fraction * 100.0f)));
-			ImGui::ProgressBar(fraction, ImVec2(-FLT_MIN, 0.0f), percentage.c_str());
-			if (!snapshot.m_LoadingStage.empty())
+			m_ObservedLabId = snapshot.m_ActiveLabId;
+			if (m_ObservedLabId.m_Name == "gglab.lab.gi_reference" && context.m_PanelRegistry)
 			{
-				ImGui::TextUnformatted(snapshot.m_LoadingStage.c_str());
-			}
-			if (!snapshot.m_LoadingDetail.empty())
-			{
-				ImGui::TextWrapped("%s", snapshot.m_LoadingDetail.c_str());
+				GGLAB_UNUSED(context.m_PanelRegistry->OpenPanel("Rendering/GI Viewer"));
 			}
 		}
-		if (snapshot.m_State == LabSnapshotRunState::WarmingUp)
+		if (snapshot.m_ActiveLabId.m_Name == "gglab.lab.gi_reference" &&
+			ImGui::Button("Open GI Viewer") && context.m_PanelRegistry)
 		{
-			ImGui::Text("Warm-up remaining: %u", snapshot.m_WarmupFramesRemaining);
+			GGLAB_UNUSED(context.m_PanelRegistry->OpenPanel("Rendering/GI Viewer"));
 		}
-		if (!snapshot.m_IsHostActive)
-		{
-			ImGui::TextDisabled(
-				"Demo.LabHost is inactive; commands will apply when it becomes active.");
-		}
+
+		m_SessionLog.Draw(snapshot);
 		if (ImGui::CollapsingHeader("Diagnostics: Session"))
 		{
 			ImGui::Text("Session frame: %llu | delta %.6f s",
@@ -251,7 +300,13 @@ namespace gglab
 			ImGui::SeparatorText("Culling Statistics");
 			DrawCullingLabStatistics(context);
 		}
-		DrawLabDiagnostics(snapshot.m_Diagnostics);
+		if (ImGui::CollapsingHeader("Diagnostics: Measurements"))
+		{
+			ImGui::BeginChild("LabMeasurements", ImVec2(0, ImGui::GetTextLineHeightWithSpacing() * 12),
+				ImGuiChildFlags_Borders);
+			DrawLabDiagnostics(snapshot.m_Diagnostics);
+			ImGui::EndChild();
+		}
 
 		if (ImGui::Button("Reset Parameters"))
 		{
@@ -318,13 +373,9 @@ namespace gglab
 			ImGui::EndDisabled();
 		}
 
-		if (snapshot.m_HasPendingCommands || commandQueued)
+		if (commandQueued)
 		{
-			ImGui::TextDisabled("Pending changes will apply at the next LabHost frame boundary.");
-		}
-		if (!snapshot.m_LastError.empty())
-		{
-			ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.3f, 1.0f), "%s", snapshot.m_LastError.c_str());
+			m_SessionLog.Append("Changes queued for the next LabHost frame boundary.");
 		}
 	}
 

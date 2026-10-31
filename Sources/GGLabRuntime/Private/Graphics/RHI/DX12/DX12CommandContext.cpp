@@ -1,4 +1,5 @@
 #include "Graphics/RHI/DX12/DX12CommandContext.h"
+#include "Graphics/RHI/DX12/DX12AccelerationStructureManager.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"
@@ -24,6 +25,100 @@
 
 namespace gglab
 {
+
+	void DX12GraphicsCommandContext::TrackAccelerationStructureUse(RHIAccelerationStructureHandle handle) noexcept
+	{
+		GGLAB_UNUSED(m_Backend.GetDevice()->GetAccelerationStructureManager().ResolveResource(*this, handle));
+	}
+
+	void DX12ComputeCommandContext::TrackAccelerationStructureUse(RHIAccelerationStructureHandle handle) noexcept
+	{
+		GGLAB_UNUSED(m_Backend->GetDevice()->GetAccelerationStructureManager().ResolveResource(*this, handle));
+	}
+
+	bool DX12GraphicsCommandContext::BuildAccelerationStructure(RHIAccelerationStructureHandle destination,
+		const RHIASBuildInputs& inputs, const RHIASBufferRange& scratch) noexcept
+	{
+		if (HasRecordingError() || IsRendering())
+		{
+			RejectRecording();
+			return false;
+		}
+		FlushBarriers();
+		auto& device = *m_Backend.GetDevice();
+		return device.GetAccelerationStructureManager().Build(*this, *Get(),
+			destination, inputs, scratch);
+	}
+
+	void DX12GraphicsCommandContext::AccelerationStructureBarrier(RHIAccelerationStructureHandle handle,
+		RHIResourceState before, RHIResourceState after) noexcept
+	{
+		// Keep the build writer in the availability scope when a later reader changes stage.
+		before.m_Stages |= RHIStage::AccelerationStructureBuild;
+		before.m_Access |= RHIAccess::AccelerationStructureWrite;
+		FlushBarriers();
+		auto& device = *m_Backend.GetDevice();
+		if (!device.GetAccelerationStructureManager().ResolveResource(*this, handle))
+		{
+			return;
+		}
+		ComPtr<ID3D12GraphicsCommandList7> commands;
+		if (FAILED(Get()->QueryInterface(IID_PPV_ARGS(&commands))))
+		{
+			RejectRecording();
+			return;
+		}
+		const D3D12_GLOBAL_BARRIER barrier{ ToD3D12BarrierSync(before.m_Stages),
+			ToD3D12BarrierSync(after.m_Stages), ToD3D12BarrierAccess(before.m_Access),
+			ToD3D12BarrierAccess(after.m_Access) };
+		D3D12_BARRIER_GROUP group{};
+		group.Type = D3D12_BARRIER_TYPE_GLOBAL;
+		group.NumBarriers = 1;
+		group.pGlobalBarriers = &barrier;
+		commands->Barrier(1, &group);
+	}
+
+	bool DX12ComputeCommandContext::BuildAccelerationStructure(RHIAccelerationStructureHandle destination,
+		const RHIASBuildInputs& inputs, const RHIASBufferRange& scratch) noexcept
+	{
+		if (HasRecordingError() || m_Backend->IsRendering())
+		{
+			RejectRecording();
+			return false;
+		}
+		FlushBarriers();
+		auto& device = *m_Backend->GetDevice();
+		return device.GetAccelerationStructureManager().Build(*this, *m_Backend->Get(),
+			destination, inputs, scratch);
+	}
+
+	void DX12ComputeCommandContext::AccelerationStructureBarrier(RHIAccelerationStructureHandle handle,
+		RHIResourceState before, RHIResourceState after) noexcept
+	{
+		// Keep the build writer in the availability scope when a later reader changes stage.
+		before.m_Stages |= RHIStage::AccelerationStructureBuild;
+		before.m_Access |= RHIAccess::AccelerationStructureWrite;
+		FlushBarriers();
+		auto& device = *m_Backend->GetDevice();
+		if (!device.GetAccelerationStructureManager().ResolveResource(*this, handle))
+		{
+			return;
+		}
+		ComPtr<ID3D12GraphicsCommandList7> commands;
+		if (FAILED(m_Backend->Get()->QueryInterface(IID_PPV_ARGS(&commands))))
+		{
+			RejectRecording();
+			return;
+		}
+		const D3D12_GLOBAL_BARRIER barrier{ ToD3D12BarrierSync(before.m_Stages),
+			ToD3D12BarrierSync(after.m_Stages), ToD3D12BarrierAccess(before.m_Access),
+			ToD3D12BarrierAccess(after.m_Access) };
+		D3D12_BARRIER_GROUP group{};
+		group.Type = D3D12_BARRIER_TYPE_GLOBAL;
+		group.NumBarriers = 1;
+		group.pGlobalBarriers = &barrier;
+		commands->Barrier(1, &group);
+	}
 	namespace
 	{
 		struct RenderingAttachmentProperties
@@ -439,12 +534,12 @@ namespace gglab
 			return;
 		}
 
-		if (m_CurrentRootSignature != rootSignature)
-		{
-			m_Backend.GetCommandList()->SetGraphicsRootSignature(*rootSignature);
-			m_CurrentRootSignature = rootSignature;
-			m_RootParameterPlan = rootSignature->GetParameterPlan();
-		}
+		// Native GUI drawing can replace the root signature and unbind the sampler
+		// heap. Direct indexing requires both heaps before setting either root.
+		m_Backend.GetDevice()->BindGlobalDescriptorHeaps(*m_Backend.GetCommandList());
+		m_Backend.GetCommandList()->SetGraphicsRootSignature(*rootSignature);
+		m_CurrentRootSignature = rootSignature;
+		m_RootParameterPlan = rootSignature->GetParameterPlan();
 		m_Backend.GetCommandList()->SetPipelineState(*pipelineState);
 		if (const auto& binding = GetPassStorageBuffer(); binding)
 		{
@@ -713,6 +808,11 @@ namespace gglab
 	void DX12GraphicsCommandContext::SetReadOnlyBuffer(
 		uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset) noexcept
 	{
+		if (m_PipelineSystem->IsAccelerationStructureParameter(GetSelectedBindingPipeline(), parameterIndex))
+		{
+			FailRecording();
+			return;
+		}
 		if (m_Backend.GetDevice()->IsUploadStorage(buffer))
 		{
 			FailRecording();
@@ -723,8 +823,10 @@ namespace gglab
 		DX12Buffer* nativeBuffer = m_Backend.GetDevice()->ResolveBuffer(buffer);
 		if (!nativeBuffer || offset >= nativeBuffer->SizeInBytes())
 		{
-			GGLAB_LOG_GRAPHICS_WARN(
+			// A skipped root descriptor would leave the draw reading a stale or unset address.
+			GGLAB_LOG_GRAPHICS_ERROR(
 				"DX12GraphicsCommandContext::SetReadOnlyBuffer received an invalid buffer binding.");
+			FailRecording();
 			return;
 		}
 		m_Backend.Get()->SetGraphicsRootShaderResourceView(
@@ -735,6 +837,11 @@ namespace gglab
 	bool DX12GraphicsCommandContext::SetReadOnlyBufferBinding(uint32_t parameterIndex,
 		const RHIReadOnlyBufferBinding& binding) noexcept
 	{
+		if (m_PipelineSystem->IsAccelerationStructureParameter(GetSelectedBindingPipeline(), parameterIndex))
+		{
+			FailRecording();
+			return false;
+		}
 		auto& device = *m_Backend.GetDevice();
 		const auto* desc = device.GetResourceManager()->ResolveBufferDesc(binding.m_Buffer);
 		DX12Buffer* buffer = device.ResolveBuffer(binding.m_Buffer);
@@ -959,8 +1066,28 @@ namespace gglab
 		m_Backend->BufferBarrier(barriers);
 	}
 
+	bool DX12ComputeCommandContext::SetAccelerationStructure(uint32_t parameterIndex,
+		RHIAccelerationStructureHandle handle) noexcept
+	{
+		if (!m_PipelineSystem->IsAccelerationStructureParameter(GetSelectedBindingPipeline(), parameterIndex))
+		{
+			FailRecording();
+			return false;
+		}
+		const auto address = m_Backend->GetDevice()->GetAccelerationStructureManager().Bind(*this, handle);
+		if (!address)
+		{
+			return false;
+		}
+		m_Backend->GetCommandList()->SetComputeReadOnlyBuffer(parameterIndex, address);
+		m_BoundAccelerationStructures |= 1u << parameterIndex;
+		return true;
+	}
+
 	void DX12ComputeCommandContext::SetPipeline(RHIPipelineHandle pipeline) noexcept
 	{
+		m_RequiredAccelerationStructures = 0;
+		m_BoundAccelerationStructures = 0;
 		InvalidatePipelineBindings();
 		DX12PipelineState* pipelineState = nullptr;
 		DX12RootSignature* rootSignature = nullptr;
@@ -971,12 +1098,19 @@ namespace gglab
 				"DX12ComputeCommandContext::SetPipeline received an invalid pipeline handle.");
 			return;
 		}
-		if (m_CurrentRootSignature != rootSignature)
+		for (uint32_t index = 0; index < RHIBindingLayoutDesc::MaxSlots; ++index)
 		{
-			m_Backend->GetCommandList()->SetComputeRootSignature(*rootSignature);
-			m_CurrentRootSignature = rootSignature;
-			m_RootParameterPlan = rootSignature->GetParameterPlan();
+			if (m_PipelineSystem->IsAccelerationStructureParameter(pipeline, index))
+			{
+				m_RequiredAccelerationStructures |= 1u << index;
+			}
 		}
+		// A direct compute encoder shares the graphics list, including GUI heap
+		// changes. Restore heaps before the root even when its cached pointer matches.
+		m_Backend->GetDevice()->BindGlobalDescriptorHeaps(*m_Backend->GetCommandList());
+		m_Backend->GetCommandList()->SetComputeRootSignature(*rootSignature);
+		m_CurrentRootSignature = rootSignature;
+		m_RootParameterPlan = rootSignature->GetParameterPlan();
 		m_Backend->GetCommandList()->SetPipelineState(*pipelineState);
 		if (const auto& binding = GetPassStorageBuffer(); binding)
 		{
@@ -1041,6 +1175,11 @@ namespace gglab
 	void DX12ComputeCommandContext::SetReadOnlyBuffer(
 		uint32_t parameterIndex, RHIBufferHandle buffer, uint64_t offset) noexcept
 	{
+		if (m_PipelineSystem->IsAccelerationStructureParameter(GetSelectedBindingPipeline(), parameterIndex))
+		{
+			FailRecording();
+			return;
+		}
 		if (m_Backend->GetDevice()->IsUploadStorage(buffer))
 		{
 			FailRecording();
@@ -1049,8 +1188,9 @@ namespace gglab
 		DX12Buffer* nativeBuffer = m_Backend->GetDevice()->ResolveBuffer(buffer);
 		if (!nativeBuffer || offset >= nativeBuffer->SizeInBytes())
 		{
-			GGLAB_LOG_GRAPHICS_WARN(
+			GGLAB_LOG_GRAPHICS_ERROR(
 				"DX12ComputeCommandContext::SetReadOnlyBuffer received an invalid buffer binding.");
+			FailRecording();
 			return;
 		}
 		m_Backend->GetCommandList()->SetComputeReadOnlyBuffer(
@@ -1061,6 +1201,11 @@ namespace gglab
 	bool DX12ComputeCommandContext::SetReadOnlyBufferBinding(uint32_t parameterIndex,
 		const RHIReadOnlyBufferBinding& binding) noexcept
 	{
+		if (m_PipelineSystem->IsAccelerationStructureParameter(GetSelectedBindingPipeline(), parameterIndex))
+		{
+			FailRecording();
+			return false;
+		}
 		auto& device = *m_Backend->GetDevice();
 		const auto* desc = device.GetResourceManager()->ResolveBufferDesc(binding.m_Buffer);
 		DX12Buffer* buffer = device.ResolveBuffer(binding.m_Buffer);
@@ -1090,8 +1235,9 @@ namespace gglab
 		DX12Buffer* nativeBuffer = m_Backend->GetDevice()->ResolveBuffer(buffer);
 		if (!nativeBuffer || offset >= nativeBuffer->SizeInBytes())
 		{
-			GGLAB_LOG_GRAPHICS_WARN(
+			GGLAB_LOG_GRAPHICS_ERROR(
 				"DX12ComputeCommandContext::SetReadWriteBuffer received an invalid buffer binding.");
+			FailRecording();
 			return;
 		}
 		m_Backend->GetCommandList()->SetComputeReadWriteBuffer(
@@ -1117,6 +1263,11 @@ namespace gglab
 	void DX12ComputeCommandContext::Dispatch(
 		uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) noexcept
 	{
+		if (m_BoundAccelerationStructures != m_RequiredAccelerationStructures)
+		{
+			FailRecording();
+			return;
+		}
 		if (!ValidateConstantBindingReadiness())
 		{
 			return;

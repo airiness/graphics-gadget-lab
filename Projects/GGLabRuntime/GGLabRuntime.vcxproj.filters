@@ -202,6 +202,21 @@
     <Filter Include="Public\GGLabRuntime\Scene">
       <UniqueIdentifier>{8F0CB072-67B4-0338-CA0D-7818EA01ADD1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{9391D990-096F-7C1A-25E4-EDC2D6E59F46}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Common">
+      <UniqueIdentifier>{35424CEE-0DCD-4EB5-783C-4D2CAF5869A7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Lighting">
+      <UniqueIdentifier>{8A466D91-ADA6-8141-A121-32FAF9187053}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Passes">
+      <UniqueIdentifier>{C78B232B-5772-A24A-AB7D-E56C8230C7EF}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\PBR">
+      <UniqueIdentifier>{B4FB2A79-F3B9-9C99-FE2B-6375FD983B31}</UniqueIdentifier>
+    </Filter>
     <Filter Include="ThirdParty">
       <UniqueIdentifier>{40265C81-FE76-4393-686B-E1945C246E69}</UniqueIdentifier>
     </Filter>
@@ -555,6 +570,21 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\ForwardPlusDebugReadback.cpp">
       <Filter>Private\Graphics\Pipeline</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIField.cpp">
+      <Filter>Private\Graphics\Pipeline</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIProbeUpdate.cpp">
+      <Filter>Private\Graphics\Pipeline</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIProbeUpdateWorkload.cpp">
+      <Filter>Private\Graphics\Pipeline</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIReferenceObservation.cpp">
+      <Filter>Private\Graphics\Pipeline</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GISpecularVisibilityObservation.cpp">
+      <Filter>Private\Graphics\Pipeline</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GTAOTemporalHistory.cpp">
       <Filter>Private\Graphics\Pipeline</Filter>
     </ClCompile>
@@ -578,6 +608,12 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\TemporalReferenceAccumulator.cpp">
       <Filter>Private\Graphics\Pipeline</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RayScene.cpp">
+      <Filter>Private\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RayScenePlan.cpp">
+      <Filter>Private\Graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Renderer.cpp">
       <Filter>Private\Graphics</Filter>
@@ -624,6 +660,12 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\ForwardShadingCommon.cpp">
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RaySceneHitMaterial.cpp">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RaySceneSunVisibility.cpp">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassAerialPerspective.cpp">
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClCompile>
@@ -661,6 +703,15 @@
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassFrameCapture.cpp">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGIReceiver.cpp">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGIReference.cpp">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGISpecularVisibility.cpp">
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGTAO.cpp">
@@ -789,6 +840,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Diagnostics\DX12SnapshotProviders.cpp">
       <Filter>Private\Graphics\RHI\DX12\Diagnostics</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12AccelerationStructureManager.cpp">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Buffer.cpp">
       <Filter>Private\Graphics\RHI\DX12</Filter>
     </ClCompile>
@@ -876,6 +930,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Utility\DX12ViewDescUtils.cpp">
       <Filter>Private\Graphics\RHI\DX12\Utility</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIAccelerationStructure.cpp">
+      <Filter>Private\Graphics\RHI</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIContext.cpp">
       <Filter>Private\Graphics\RHI</Filter>
     </ClCompile>
@@ -902,6 +959,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\Diagnostics\VulkanSnapshotProviders.cpp">
       <Filter>Private\Graphics\RHI\Vulkan\Diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanAccelerationStructureManager.cpp">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanAdapter.cpp">
       <Filter>Private\Graphics\RHI\Vulkan</Filter>
@@ -1238,11 +1298,29 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\EnvironmentLightingSystem.h">
       <Filter>Private\Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\GIShaderConstants.h">
+      <Filter>Private\Graphics</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\IBLBakeScheduler.h">
       <Filter>Private\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\MaterialGpuEncoder.h">
       <Filter>Private\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIComputeDispatch.h">
+      <Filter>Private\Graphics\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIFieldState.h">
+      <Filter>Private\Graphics\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIProbeUpdateWorkload.h">
+      <Filter>Private\Graphics\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIReferenceObservation.h">
+      <Filter>Private\Graphics\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GISpecularVisibilityObservation.h">
+      <Filter>Private\Graphics\Pipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GTAOCapability.h">
       <Filter>Private\Graphics\Pipeline</Filter>
@@ -1251,6 +1329,9 @@
       <Filter>Private\Graphics\Pipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\PipelineCache.h">
+      <Filter>Private\Graphics\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\RaySceneShaderBindings.h">
       <Filter>Private\Graphics\Pipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\RHIPipelineRecipeAdapter.h">
@@ -1285,6 +1366,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Profiling\GpuProfiler.h">
       <Filter>Private\Graphics\Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RayScenePlan.h">
+      <Filter>Private\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Renderer.h">
       <Filter>Private\Graphics</Filter>
@@ -1337,6 +1421,12 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\ForwardShadingCommon.h">
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\GIPreviewGraphResources.h">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\GIReceiverGraphResources.h">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\GTAOGraphResources.h">
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClInclude>
@@ -1377,6 +1467,15 @@
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassFrameCapture.h">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGIReceiver.h">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGIReference.h">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGISpecularVisibility.h">
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGTAO.h">
@@ -1448,6 +1547,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Resource\RenderResourceRegistry.h">
       <Filter>Private\Graphics\Resource</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\AccelerationStructureStore.h">
+      <Filter>Private\Graphics\RHI</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Cache\DX12DescriptorCache.h">
       <Filter>Private\Graphics\RHI\DX12\Cache</Filter>
     </ClInclude>
@@ -1496,6 +1598,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Diagnostics\DX12SnapshotProviders.h">
       <Filter>Private\Graphics\RHI\DX12\Diagnostics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12AccelerationStructureManager.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Buffer.h">
       <Filter>Private\Graphics\RHI\DX12</Filter>
     </ClInclude>
@@ -1536,6 +1641,9 @@
       <Filter>Private\Graphics\RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12QueueSystem.h">
+      <Filter>Private\Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12RayQuerySupport.h">
       <Filter>Private\Graphics\RHI\DX12</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Resource.h">
@@ -1607,6 +1715,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\Diagnostics\VulkanSnapshotProviders.h">
       <Filter>Private\Graphics\RHI\Vulkan\Diagnostics</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanAccelerationStructureManager.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanAdapter.h">
       <Filter>Private\Graphics\RHI\Vulkan</Filter>
     </ClInclude>
@@ -1659,6 +1770,9 @@
       <Filter>Private\Graphics\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanPipelineSystem.h">
+      <Filter>Private\Graphics\RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanRayQuerySupport.h">
       <Filter>Private\Graphics\RHI\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanResource.h">
@@ -2081,6 +2195,27 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\ForwardPlusTypes.h">
       <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIField.h">
+      <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIObservationLimits.h">
+      <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIProbeUpdate.h">
+      <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIReference.h">
+      <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIReferenceTypes.h">
+      <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GISpecularVisibility.h">
+      <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIUpdateStatus.h">
+      <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GTAO.h">
       <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
     </ClInclude>
@@ -2094,6 +2229,12 @@
       <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\PipelineTypes.h">
+      <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\RaySceneHitMaterial.h">
+      <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\RaySceneSunVisibility.h">
       <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\SceneBindingLayouts.h">
@@ -2138,6 +2279,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\PostProcess\PostProcessPreviewDiagnostics.h">
       <Filter>Public\GGLabRuntime\Graphics\PostProcess</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\PostProcess\PostProcessPreviewGraphResources.h">
+      <Filter>Public\GGLabRuntime\Graphics\PostProcess</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\PostProcess\PostProcessPreviewViewBase.h">
       <Filter>Public\GGLabRuntime\Graphics\PostProcess</Filter>
     </ClInclude>
@@ -2149,6 +2293,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Profiling\GpuProfilingViewBase.h">
       <Filter>Public\GGLabRuntime\Graphics\Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RayScene.h">
+      <Filter>Public\GGLabRuntime\Graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderCompositionAccess.h">
       <Filter>Public\GGLabRuntime\Graphics</Filter>
@@ -2278,6 +2425,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\DX12\DX12ResourceLifecycleTools.h">
       <Filter>Public\GGLabRuntime\Graphics\RHI\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIAccelerationStructure.h">
+      <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIBindingLayout.h">
       <Filter>Public\GGLabRuntime\Graphics\RHI</Filter>
@@ -2420,5 +2570,261 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Scene\WorldTooling.h">
       <Filter>Public\GGLabRuntime\Scene</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="..\..\Shaders\Passes\PassAerialPerspective.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassAtmosphere.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassBloom.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassDebugDraw.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassDepthPrepass.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassDirectionalShadowMap.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassFinalColor.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassForwardCoverage.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassForwardPBR.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassForwardPlusCull.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassForwardPlusValidation.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassGIProbeUpdate.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassGIReceiver.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassGIReference.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassGISpecularVisibility.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassGTAO.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLBrdfLUT.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLCubemapPreview.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLEnvironment.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLEnvironmentMip.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLImportance.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLIrradiance.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLPrefilteredSpecular.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassNonFiniteCounters.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassNonFiniteScan.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassPhysicalSky.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassPostProcessPreview.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassRaySceneHitMaterial.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassRaySceneSunVisibility.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassShadowMapPreview.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassSkybox.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalAA.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalAADepthHistory.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalAADisplayDepth.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalReference.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\Shaders\Common\ApplicationBinding.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\BindlessResources.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\BufferLayout.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\Common.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\Cubemap.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\DepthReconstruction.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\DisplayColor.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\EnvironmentSampling.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\ForwardCoverageVaryings.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\FullscreenTriangle.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\HDRColorMath.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\MaterialSampling.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\MaterialUtils.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\NonFiniteCounters.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\NonFiniteScan.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\Sampling.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\ScreenSpace.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\SurfaceEvaluation.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\Temporal.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\TemporalAA.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\TemporalMotion.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\VertexInput.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\VertexTransform.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\AmbientOcclusion.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\Atmosphere.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\AtmosphereBinding.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\DirectionalShadowData.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\DirectionalShadowVisibility.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\EnvironmentImportanceSampling.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\ForwardPlus.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\GIHitLighting.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\GIHitMaterial.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\GIRayScene.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\GISampling.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\GIShaderConstants.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\GTAO.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\IrradianceIntegrationMath.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\RaySceneGeometry.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\ShadowReceiverPlaneMath.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\ShadowSampling.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\SpecularIntegrationMath.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\WorldSunTransmittance.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\AnisotropicIBL.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\BRDF.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\DirectLighting.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\IndirectLighting.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\MaterialDiagnostics.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\MaterialShading.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\SpecularAA.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
   </ItemGroup>
 </Project>

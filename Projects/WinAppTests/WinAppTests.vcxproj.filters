@@ -7,6 +7,7 @@
     <ClCompile Include="..\..\Tests\WinApp\ApplicationHostConfigurationSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\ApplicationInputSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\ApplicationLifecycleSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\CoastalRaySceneOracleSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\DevelopGuiVulkanPresentationContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\DevelopmentShaderBuildProcessClientSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\DevelopmentShaderHotReloadSelfTests.cpp" />
@@ -19,6 +20,7 @@
     <ClCompile Include="..\..\Tests\WinApp\NapaVoxelRaycastEditSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\NapaVoxelSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\ProductRuntimeInspection.cpp" />
+    <ClCompile Include="..\..\Tests\WinApp\RenderGraphDiagnosticsSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\RuntimePathSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\TemporalAALabDiagnosticsSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\WinApp\TemporalAALabGpuTimingSelfTests.cpp" />
@@ -32,6 +34,7 @@
     <ClInclude Include="..\..\Tests\WinApp\ApplicationHostConfigurationSelfTests.h" />
     <ClInclude Include="..\..\Tests\WinApp\ApplicationInputSelfTests.h" />
     <ClInclude Include="..\..\Tests\WinApp\ApplicationLifecycleSelfTests.h" />
+    <ClInclude Include="..\..\Tests\WinApp\CoastalRaySceneOracleSelfTests.h" />
     <ClInclude Include="..\..\Tests\WinApp\DevelopGuiVulkanPresentationContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\WinApp\DevelopmentShaderBuildProcessClientSelfTests.h" />
     <ClInclude Include="..\..\Tests\WinApp\DevelopmentShaderHotReloadSelfTests.h" />
@@ -41,6 +44,7 @@
     <ClInclude Include="..\..\Tests\WinApp\NapaVoxelSelfTestCases.h" />
     <ClInclude Include="..\..\Tests\WinApp\NapaVoxelSelfTests.h" />
     <ClInclude Include="..\..\Tests\WinApp\ProductRuntimeInspection.h" />
+    <ClInclude Include="..\..\Tests\WinApp\RenderGraphDiagnosticsSelfTests.h" />
     <ClInclude Include="..\..\Tests\WinApp\RuntimePathSelfTests.h" />
     <ClInclude Include="..\..\Tests\WinApp\TemporalAALabDiagnosticsSelfTests.h" />
     <ClInclude Include="..\..\Tests\WinApp\TemporalAALabGpuTimingSelfTests.h" />

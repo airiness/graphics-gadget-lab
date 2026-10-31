@@ -8,6 +8,7 @@ namespace gglab
 	{
 		RGTexture,
 		RGBuffer,
+		RGAccelerationStructure,
 	};
 
 	// Underlying-resource usage in a compiled plan, independent of GPU completion.
@@ -56,6 +57,7 @@ namespace gglab
 	{
 		Transition,
 		Uav,
+		AccelerationStructure,
 	};
 
 	enum class RGBarrierReason : uint8_t

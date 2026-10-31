@@ -25,6 +25,9 @@
     <Filter Include="Application\Lab\Sessions">
       <UniqueIdentifier>{CE948C73-7329-E59F-1B1F-65941625DB0B}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Application\Lab\Validation">
+      <UniqueIdentifier>{6FBBB30D-0B34-ABCE-1A0D-BFEF6D11729F}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Application\Platform">
       <UniqueIdentifier>{8C4118A3-A03C-D41F-2AAA-9F5304BB7DBF}</UniqueIdentifier>
     </Filter>
@@ -63,6 +66,12 @@
     </Filter>
     <Filter Include="DevTools\EnumText">
       <UniqueIdentifier>{5CC851E9-C8F0-E203-FBB1-41C995C19353}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{2407D494-11CF-8C34-C873-6C93EAC27388}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Passes">
+      <UniqueIdentifier>{9F5C1023-4D95-BDB4-F5F8-4A7EF548A139}</UniqueIdentifier>
     </Filter>
     <Filter Include="ThirdParty">
       <UniqueIdentifier>{6A8F12C3-D4D3-C968-0534-4156FE54BBAE}</UniqueIdentifier>
@@ -171,6 +180,9 @@
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\AtmosphereRangeLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CoastalRaySceneLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CoordinateConformanceLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
@@ -178,6 +190,9 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\ForwardPlusLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\GIReferenceLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\GTAOLabSession.cpp">
@@ -196,6 +211,9 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\PostProcessLabSession.cpp">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\RayQueryLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\RenderGraphComputeLabSession.cpp">
@@ -218,6 +236,9 @@
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\TextureContractLabSession.cpp">
       <Filter>Application\Lab\Sessions</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Validation\CoastalRaySceneOracle.cpp">
+      <Filter>Application\Lab\Validation</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Input\InputBase.cpp">
       <Filter>Application\Platform\Windows\Input</Filter>
@@ -328,6 +349,9 @@
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\FrameCapturePanel.cpp">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\GIViewerPanel.cpp">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\GTAOInspectorPanel.cpp">
@@ -503,6 +527,9 @@
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\AtmosphereRangeLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CoastalRaySceneLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CoordinateConformanceLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
@@ -510,6 +537,12 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\ForwardPlusLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\GIReferenceLabFixture.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\GIReferenceLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\GTAOLabSession.h">
@@ -528,6 +561,9 @@
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\PostProcessLabSession.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\RayQueryLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\RenderGraphComputeLabSession.h">
@@ -550,6 +586,9 @@
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\TextureContractLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Validation\CoastalRaySceneOracle.h">
+      <Filter>Application\Lab\Validation</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\PlatformHost.h">
       <Filter>Application\Platform</Filter>
@@ -692,6 +731,9 @@
     <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\FrameCapturePanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\GIViewerPanel.h">
+      <Filter>DevTools\DevelopGui\Panels</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinAppHost\DevTools\DevelopGui\Panels\GTAOInspectorPanel.h">
       <Filter>DevTools\DevelopGui\Panels</Filter>
     </ClInclude>
@@ -779,5 +821,22 @@
     <ClInclude Include="..\..\Sources\WinAppHost\DevTools\RHIText.h">
       <Filter>DevTools</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="..\..\Shaders\Passes\PassCoordinateConformance.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassNapaVoxel.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassRayQuery.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassRaySceneProbe.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassRenderGraphComputeSmoke.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

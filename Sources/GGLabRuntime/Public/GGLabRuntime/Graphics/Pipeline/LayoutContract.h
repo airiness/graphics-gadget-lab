@@ -72,6 +72,7 @@ namespace gglab
 		DuplicateGlobalNamespace,
 		InvalidReservation,
 		ReservedBindingConflict,
+		InvalidRegisterSpace,
 	};
 
 	struct LayoutDeclarationSite

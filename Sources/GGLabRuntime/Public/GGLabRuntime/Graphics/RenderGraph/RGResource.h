@@ -2,6 +2,7 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraphTypes.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGResourceHandle.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
+#include "GGLabRuntime/Graphics/RHI/RHIAccelerationStructure.h"
 #include "GGLabRuntime/Graphics/RHI/RHITexture.h"
 
 #include <unordered_set>
@@ -65,7 +66,34 @@ namespace gglab
 		CopySource,
 		CopyDest,
 		IndirectArgument,
+		AccelerationStructureInput,
+		AccelerationStructureScratch,
 	};
+
+	enum class RGAccelerationStructureAccess : uint8_t
+	{
+		BuildRead,
+		BuildWrite,
+		QueryRead,
+	};
+
+	[[nodiscard]] constexpr bool IsRGAccessCompatible(RGAccelerationStructureAccess access,
+		RGDependencyAccess dependencyAccess, RGOrderingRequirement ordering) noexcept
+	{
+		if (ordering != RGOrderingRequirement::Ordered)
+		{
+			return false;
+		}
+		switch (access)
+		{
+		case RGAccelerationStructureAccess::BuildWrite:
+			return dependencyAccess == RGDependencyAccess::Write;
+		case RGAccelerationStructureAccess::BuildRead:
+		case RGAccelerationStructureAccess::QueryRead:
+			return dependencyAccess == RGDependencyAccess::Read;
+		}
+		return false;
+	}
 
 	[[nodiscard]] constexpr inline bool IsStorageAccess(RGTextureAccess access) noexcept
 	{
@@ -129,9 +157,11 @@ namespace gglab
 		case RGBufferAccess::CopySource:
 		case RGBufferAccess::IndirectArgument:
 		case RGBufferAccess::StorageRead:
+		case RGBufferAccess::AccelerationStructureInput:
 			return dependencyAccess == RGDependencyAccess::Read;
 		case RGBufferAccess::CopyDest:
 		case RGBufferAccess::StorageWrite:
+		case RGBufferAccess::AccelerationStructureScratch:
 			return dependencyAccess == RGDependencyAccess::Write;
 		case RGBufferAccess::StorageReadWrite:
 			return dependencyAccess == RGDependencyAccess::ReadWrite;
@@ -162,6 +192,25 @@ namespace gglab
 		static constexpr RGBufferAccess DefaultWriteAccess = RGBufferAccess::StorageWrite;
 	};
 	using RGBufferId = RGResourceId<RGBufferResource>;
+
+	struct RGAccelerationStructureResource
+	{
+		using Descriptor = RHIAccelerationStructureDesc;
+		using SubresourceDescriptor = std::monostate;
+		using Access = RGAccelerationStructureAccess;
+		static constexpr Access DefaultReadAccess = Access::QueryRead;
+		static constexpr Access DefaultWriteAccess = Access::BuildWrite;
+	};
+	using RGAccelerationStructureId = RGResourceId<RGAccelerationStructureResource>;
+
+	template <> struct RGResourceTraits<RGAccelerationStructureResource>
+	{
+		using Access = RGAccelerationStructureAccess;
+		using Handle = RHIAccelerationStructureHandle;
+		// AS resources are persistent imports; graph-transient AS allocation is not supported.
+		using PhysicalAllocation = std::monostate;
+		static constexpr RGResourceType ResourceType = RGResourceType::RGAccelerationStructure;
+	};
 
 	template <> struct RGResourceTraits<RGTextureResource>
 	{

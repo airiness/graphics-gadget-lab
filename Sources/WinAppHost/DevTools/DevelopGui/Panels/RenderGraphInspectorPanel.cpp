@@ -110,16 +110,6 @@ namespace gglab
 				static_cast<std::underlying_type_t<RHIBufferUsage>>(bits));
 		}
 
-		static std::string AccessText(uint64_t value, RGResourceType resourceType) noexcept
-		{
-			if (resourceType == RGResourceType::RGTexture)
-			{
-				return std::string(devtools::EnumText(static_cast<RGTextureAccess>(value)));
-			}
-
-			return std::string(devtools::EnumText(static_cast<RGBufferAccess>(value)));
-		}
-
 		static std::string PassIndexToString(int32_t passIndex) noexcept
 		{
 			return passIndex >= 0 ? std::format("{}", passIndex) : "-";
@@ -877,7 +867,7 @@ namespace gglab
 				for (const auto& access : pass.m_Accesses)
 				{
 					const std::string accessText =
-						AccessText(access.m_AccessValue, access.m_ResourceType);
+						devtools::RenderGraphAccessText(access.m_AccessValue, access.m_ResourceType);
 
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);

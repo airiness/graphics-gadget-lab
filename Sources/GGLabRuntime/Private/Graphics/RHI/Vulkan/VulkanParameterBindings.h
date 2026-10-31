@@ -23,6 +23,7 @@ namespace gglab
 		VkBuffer m_Buffer = VK_NULL_HANDLE;
 		VkDeviceSize m_Offset = 0;
 		VkDeviceSize m_Range = 0;
+		VkAccelerationStructureKHR m_AccelerationStructure = VK_NULL_HANDLE;
 
 		bool operator==(const VulkanSet0BufferBinding&) const noexcept = default;
 	};

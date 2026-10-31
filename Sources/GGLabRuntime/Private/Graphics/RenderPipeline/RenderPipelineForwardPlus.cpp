@@ -4,6 +4,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlus.h"
+#include "GGLabRuntime/Graphics/RayScene.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlusDebugReadback.h"
 #include "Graphics/Pipeline/TemporalMotion.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFrameTransaction.h"
@@ -154,6 +155,12 @@ namespace gglab
 		GGLAB_ASSERT_MSG(context.IsRenderSceneReady() && framePlan.m_DepthCoverage.IsValid(),
 			"A Ready Forward+ frame has prepared scene data and a valid depth coverage plan.");
 
+		const auto rayScene = m_GIReference ?
+			m_GIReference->m_RayScene :
+			m_GISpecularVisibility ? m_GISpecularVisibility->m_RayScene :
+				m_GIProbeUpdate ? m_GIProbeUpdate->GetRayScene() :
+					m_GIField ? m_GIField->GetRayScene() : nullptr;
+		const auto referenceScene = rayScene ? rayScene->AddBuildPasses(rg) : RaySceneGraphResources{};
 		auto* swapChain = services.m_Presentation->GetSwapChain();
 
 		const uint32_t frameBackBufferIndex = context.m_BackBufferIndex;
@@ -475,6 +482,12 @@ namespace gglab
 		// IBL Pass
 		m_IBLPass.AddPass(rg, context, services);
 
+		// Full field writes precede opaque consumers; lookup joins these dependencies later.
+		if (m_GIField)
+		{
+			m_GIField->AddPasses(rg, context, services, referenceScene);
+		}
+
 		// Directional Shadow Map
 		m_DirectionalShadowMapPass.AddPass(rg, context, services);
 
@@ -518,6 +531,22 @@ namespace gglab
 			}
 		}
 
+		if (m_EnableGIReceiver)
+		{
+			m_GIReceiverPass.AddPass(rg, context, services);
+		}
+		if (m_GIProbeUpdate)
+		{
+			m_GIProbeUpdate->AddPasses(rg, context, services, referenceScene);
+		}
+		if (m_GISpecularVisibility)
+		{
+			m_GISpecularVisibilityPass.AddPass(rg, context, services, referenceScene, *m_GISpecularVisibility);
+		}
+		if (m_GIReference)
+		{
+			m_GIReferencePass.AddPass(rg, context, services, referenceScene, *m_GIReference);
+		}
 		if (depthCoverageFramePlan.AddsForwardOpaquePass())
 		{
 			m_AerialPerspectivePass.AddPass(rg, context, services);
@@ -579,6 +608,8 @@ namespace gglab
 		{
 			services.m_OverlayExtension->AddOverlayPasses(rg, context, services);
 		}
+
+		m_PostProcessPipeline.AddPreviewFinishPass(rg);
 
 		// Return the persistent shadow preview to Common after DevelopGui and other
 		// overlay consumers have declared their reads for this frame.
@@ -783,6 +814,64 @@ namespace gglab
 		}
 		if (result.IsReady())
 		{
+			if (m_EnableGIReceiver)
+			{
+				result = m_GIReceiverPass.Prepare(context, services, m_ForwardPBRShaderSet.m_CoverageVertexShader);
+				if (!result.IsReady())
+				{
+					return result;
+				}
+			}
+			if (m_GISpecularVisibility)
+			{
+				if (m_GIReference && m_GIReference->m_RayScene != m_GISpecularVisibility->m_RayScene)
+				{
+					return RenderFrameValidationResult::ContractFailure("GI diagnostics must share one ray scene");
+				}
+				result = m_GISpecularVisibilityPass.Prepare(context, services, *m_GISpecularVisibility,
+					m_ForwardPBRShaderSet.m_CoverageVertexShader);
+				if (!result.IsReady())
+				{
+					return result;
+				}
+			}
+			if (m_GIReference)
+			{
+				result = m_GIReferencePass.Prepare(context, services, *m_GIReference,
+					m_ForwardPBRShaderSet.m_CoverageVertexShader);
+				if (!result.IsReady())
+				{
+					return result;
+				}
+			}
+			if (m_GIField)
+			{
+				const auto scene = m_GIField->GetRayScene();
+				if (m_GIProbeUpdate || (m_GIReference && scene != m_GIReference->m_RayScene) ||
+					(m_GISpecularVisibility && scene != m_GISpecularVisibility->m_RayScene))
+				{
+					return RenderFrameValidationResult::ContractFailure("GI field requires one shared scene and an exclusive update workload");
+				}
+				result = m_GIField->Prepare(context, services);
+				if (!result.IsReady())
+				{
+					return result;
+				}
+			}
+			if (m_GIProbeUpdate)
+			{
+				const auto scene = m_GIProbeUpdate->GetRayScene();
+				if ((m_GIReference && scene != m_GIReference->m_RayScene) ||
+					(m_GISpecularVisibility && scene != m_GISpecularVisibility->m_RayScene))
+				{
+					return RenderFrameValidationResult::ContractFailure("GI workloads must share one ray scene");
+				}
+				result = m_GIProbeUpdate->Prepare(context, services);
+				if (!result.IsReady())
+				{
+					return result;
+				}
+			}
 			m_FramePlan = std::move(plan);
 		}
 		return result;

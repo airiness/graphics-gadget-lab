@@ -24,13 +24,16 @@ namespace gglab
 
 	constexpr inline bool HasUavAccess(const RHIResourceState& state) noexcept
 	{
-		return Test(state.m_Access, RHIAccess::UnorderedAccess);
+		return Test(state.m_Access, RHIAccess::UnorderedAccess |
+			RHIAccess::AccelerationStructureWrite | RHIAccess::AccelerationStructureScratch);
 	}
 
 	constexpr inline bool NeedsRHIResourceTransition(
 		const RHIResourceState& before, const RHIResourceState& after) noexcept
 	{
-		return before.m_Access != after.m_Access || before.m_Layout != after.m_Layout;
+		return before.m_Access != after.m_Access || before.m_Layout != after.m_Layout ||
+			(Test(after.m_Access, RHIAccess::AccelerationStructureRead | RHIAccess::AccelerationStructureWrite) &&
+				before.m_Stages != after.m_Stages);
 	}
 
 	constexpr inline bool NeedsOrderedUavBarrier(RGDependencyAccess beforeAccess,
@@ -73,6 +76,9 @@ namespace gglab
 	{
 		switch (access)
 		{
+		case RGBufferAccess::AccelerationStructureInput:
+		case RGBufferAccess::AccelerationStructureScratch:
+			return RHIStage::AccelerationStructureBuild;
 		case RGBufferAccess::None:
 			return RHIStage::All;
 		case RGBufferAccess::Vertex:
@@ -125,6 +131,10 @@ namespace gglab
 	{
 		switch (access)
 		{
+		case RGBufferAccess::AccelerationStructureInput:
+			return RHIBufferUsage::AccelerationStructureInput;
+		case RGBufferAccess::AccelerationStructureScratch:
+			return RHIBufferUsage::AccelerationStructureScratch | RHIBufferUsage::UnorderedAccess;
 		case RGBufferAccess::None:
 			return RHIBufferUsage::None;
 		case RGBufferAccess::Vertex:
@@ -214,6 +224,10 @@ namespace gglab
 	{
 		switch (access)
 		{
+		case RGBufferAccess::AccelerationStructureInput:
+			return { RHIStage::AccelerationStructureBuild, RHIAccess::ShaderResource, RHILayout::Common };
+		case RGBufferAccess::AccelerationStructureScratch:
+			return { RHIStage::AccelerationStructureBuild, RHIAccess::AccelerationStructureScratch, RHILayout::Common };
 		case RGBufferAccess::None:
 			return CommonRHIResourceState();
 		case RGBufferAccess::Vertex:
@@ -277,6 +291,26 @@ namespace gglab
 		return state;
 	}
 
+	constexpr inline RHIStage ToRHIStages(RGAccelerationStructureAccess access) noexcept
+	{
+		return access == RGAccelerationStructureAccess::QueryRead ?
+			RHIStage::ComputeShader : RHIStage::AccelerationStructureBuild;
+	}
+
+	constexpr inline RHIResourceState ToRHIResourceState(RGAccelerationStructureAccess access) noexcept
+	{
+		return { ToRHIStages(access), access == RGAccelerationStructureAccess::BuildWrite ?
+			RHIAccess::AccelerationStructureWrite : RHIAccess::AccelerationStructureRead, RHILayout::Common };
+	}
+
+	constexpr inline RHIResourceState ToRHIResourceState(
+		RGAccelerationStructureAccess access, RHIStage stages) noexcept
+	{
+		auto state = ToRHIResourceState(access);
+		state.m_Stages = stages;
+		return state;
+	}
+
 	constexpr inline RHIResourceState ToRHIResourceState(
 		uint64_t accessValue, RGResourceType resourceType) noexcept
 	{
@@ -286,6 +320,8 @@ namespace gglab
 			return ToRHIResourceState(static_cast<RGTextureAccess>(accessValue));
 		case RGResourceType::RGBuffer:
 			return ToRHIResourceState(static_cast<RGBufferAccess>(accessValue));
+		case RGResourceType::RGAccelerationStructure:
+			return ToRHIResourceState(static_cast<RGAccelerationStructureAccess>(accessValue));
 		}
 
 		GGLAB_UNREACHABLE("Unhandled RGResourceType.");

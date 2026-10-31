@@ -28,7 +28,17 @@ namespace gglab
 
 	VkPipelineStageFlags2 ToVulkanPipelineStages(RHIStage stages) noexcept
 	{
+		if (stages == RHIStage::All)
+		{
+			// Queue-supported commands include AS builds when enabled, without
+			// requiring an explicit extension stage on raster-only devices.
+			return VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+		}
 		VkPipelineStageFlags2 result = VK_PIPELINE_STAGE_2_NONE;
+		if (Test(stages, RHIStage::AccelerationStructureBuild))
+		{
+			result |= VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
+		}
 		if (Test(stages, RHIStage::DrawIndirect))
 		{
 			result |= VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
@@ -73,6 +83,19 @@ namespace gglab
 	VkAccessFlags2 ToVulkanAccessFlags(RHIAccess access) noexcept
 	{
 		VkAccessFlags2 result = VK_ACCESS_2_NONE;
+		if (Test(access, RHIAccess::AccelerationStructureScratch))
+		{
+			result |= VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR |
+				VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+		}
+		if (Test(access, RHIAccess::AccelerationStructureRead))
+		{
+			result |= VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR;
+		}
+		if (Test(access, RHIAccess::AccelerationStructureWrite))
+		{
+			result |= VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+		}
 		if (Test(access, RHIAccess::Common))
 		{
 			result |= VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;

@@ -448,6 +448,14 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
 '@
     # Keep catalog expectations and leaf fixtures together so their counts cannot drift.
     $gpuLeaves = [ordered]@{
+        'gi-field' = 'TestGIField.ps1'
+        'gi-probe-update' = 'TestGIProbeUpdate.ps1'
+        'gi-specular-visibility' = 'TestGISpecularVisibility.ps1'
+        'gi-reference' = 'TestGIReference.ps1'
+        'gi-reference-tiling' = 'TestGIReferenceTiling.ps1'
+        'gi-reference-convergence' = 'TestGIReferenceConvergence.ps1'
+        'gi-reference-materials' = 'TestGIReferenceMaterials.ps1'
+        'coastal-ray-scene' = 'TestCoastalRayScene.ps1'
         'lighting-profiles' = 'TestLightingProfiles.ps1'
         'sequence-parameter-events' = 'TestSequenceParameterEvents.ps1'
         'sequence-deferred-events' = 'TestDeferredSequenceEvents.ps1'
@@ -468,9 +476,11 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
         'temporal-aa-counters' = 'TestTemporalAACounters.ps1'
     }
     $contractSuites = @(
-        'coastal-assets', 'verification-support', 'nonfinite-sites', 'render-graph-schema',
+        'coastal-assets', 'gi-inputs', 'verification-support', 'source-normalization', 'shader-project-ownership',
+        'nonfinite-sites', 'render-graph-schema',
         'resource-export-schema', 'nonfinite-coverage-schema', 'capture-comparison', 'taa-comparison-workflow',
-        'capture-bundle-schema', 'gpu-timing-schema', 'parameter-frames-schema'
+        'capture-bundle-schema', 'gpu-timing-schema', 'parameter-frames-schema', 'gi-reference-contracts',
+        'gi-specular-visibility-contracts', 'gi-probe-update-contracts'
     )
     foreach ($leaf in $gpuLeaves.Values) {
         [IO.File]::WriteAllText((Join-Path $runnerTests $leaf), $leafSource, (New-Object Text.UTF8Encoding($false)))
@@ -488,8 +498,70 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
     }
     Check (($gpuResult.suites | Where-Object name -eq 'taa-comparison').steps[0].receipt.python -eq
         'fixture-python-path') 'runner-forwards-selected-python-to-taa-workflow'
-    Check (($gpuResult.suites | Where-Object name -eq 'session-lifecycle').steps[0].receipt.python -eq
-        'fixture-python-path') 'runner-forwards-selected-python-to-session-lifecycle'
+    foreach ($suite in @('session-lifecycle', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field')) {
+        Check (($gpuResult.suites | Where-Object name -eq $suite).steps[0].receipt.python -eq
+            'fixture-python-path') "runner-forwards-selected-python-to-$suite"
+    }
+    # Run the real probe producer through the catalog with GPU transport stubbed.
+    # Generic leaf fixtures cannot detect stdout contamination or missing receipts.
+    & {
+        Copy-Item -LiteralPath (Join-Path $root 'Tests/Verification/TestGIProbeUpdate.ps1') -Destination $runnerTests
+        $supportPath = Join-Path $runnerTools 'VerificationSupport.psm1'
+        $originalSupport = [IO.File]::ReadAllText($supportPath)
+        $stub = @'
+function git { $global:LASTEXITCODE = 0; return 'Sources/probe-input.cpp' }
+function Invoke-VerificationSession {
+    param([string]$Command, [string]$Session, [hashtable]$Parameters = @{})
+    switch ($Command) {
+        'start' { return @{ownership='created';runIdentity='probe-fixture';outputLog=(Join-Path $PSScriptRoot 'probe.log')} }
+        'set' { return @{batch=@{succeeded=$true}} }
+        'capture' {
+            $null = New-Item -ItemType Directory -Path $Parameters.OutputDirectory -Force
+            return @{status='completed';publication='Published'}
+        }
+        'status' { return @{ok=$true} }
+        'stop' { return @{ok=$true;exitCode=0} }
+        default { throw "Unexpected probe fixture command: $Command" }
+    }
+}
+Export-ModuleMember -Function git, Invoke-VerificationSession
+'@
+        $null = New-Item -ItemType Directory -Path (Join-Path $runnerRepository 'Sources') -Force
+        [IO.File]::WriteAllText((Join-Path $runnerRepository 'Sources/probe-input.cpp'), 'input')
+        [IO.File]::WriteAllText((Join-Path $runnerTools 'probe.log'), 'clean native fixture')
+        foreach ($name in @('gglab-shaderc.exe','dxcompiler.dll','dxil.dll')) {
+            [IO.File]::WriteAllText((Join-Path $runnerBin $name), 'binary')
+        }
+        $probePython = Join-Path $runnerRepository 'probe-python.cmd'
+        [IO.File]::WriteAllText($probePython, "@echo oracle fixture passed`r`n@exit /b 0`r`n")
+        try {
+            [IO.File]::WriteAllText($supportPath, $originalSupport + "`r`n" + $stub,
+                (New-Object Text.UTF8Encoding($false)))
+            $execution = Invoke-VerificationScript (Join-Path $runnerTests 'RunVerification.ps1') @{
+                Suite='gi-probe-update';Python=$probePython;OutputDirectory=(Join-Path $output 'real-probe') }
+            $probeResult = $execution.output | ConvertFrom-Json
+            $step = $probeResult.suites[0].steps[0]
+            Check ($execution.exitCode -eq 0 -and $probeResult.ok -and $step.receipt -and
+                $step.receipt.ok) 'real-probe-producer-emits-one-catalog-receipt'
+            $disk = Get-Content (Join-Path $step.receipt.directory 'result.json') -Raw | ConvertFrom-Json
+            Check ($disk.status -eq 'passed' -and $disk.observations -gt 0 -and
+                -not $disk.productionFieldQualified) 'real-probe-retains-status-result-and-scope'
+            [IO.File]::WriteAllText($probePython,
+                "@if `"%~2`"==`"--root`" exit /b 7`r`n@exit /b 0`r`n")
+            $execution = Invoke-VerificationScript (Join-Path $runnerTests 'RunVerification.ps1') @{
+                Suite='gi-probe-update';Python=$probePython;OutputDirectory=(Join-Path $output 'failed-probe') }
+            $probeResult = $execution.output | ConvertFrom-Json
+            $step = $probeResult.suites[0].steps[0]
+            Check ($execution.exitCode -ne 0 -and -not $probeResult.ok -and $step.receipt -and
+                -not $step.receipt.ok -and $step.receipt.error -match 'Probe verification failed') `
+                'real-probe-oracle-failure-cannot-report-success'
+            $disk = Get-Content (Join-Path $step.receipt.directory 'result.json') -Raw | ConvertFrom-Json
+            Check ($disk.status -eq 'failed') 'real-probe-failure-retains-disk-result'
+        } finally {
+            [IO.File]::WriteAllText($supportPath, $originalSupport,
+                (New-Object Text.UTF8Encoding($false)))
+        }
+    }
     $unused = Join-Path $output 'must-not-create'
     $list = Invoke-VerificationScript $runner @{ List=$true; OutputDirectory=$unused }
     $items = $list.output | ConvertFrom-Json
@@ -530,6 +602,60 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
     $execution = Invoke-VerificationScript $runner @{ Suite='resource-export-schema'; Python=$badPython; OutputDirectory=(Join-Path $output 'failed-run') }
     $result = $execution.output | ConvertFrom-Json
     Check ($execution.exitCode -ne 0 -and -not $result.ok -and $result.suites[0].steps[0].exitCode -eq 7 -and (Test-Path (Join-Path $result.directory 'result.json'))) 'runner-retains-failure-and-log'
+    # Exercise the visibility runner's actual provenance/audit functions without a GPU.
+    & {
+        $tokens = $null; $parseErrors = $null
+        $visibilityScript = Join-Path $root 'Tests/Verification/TestGISpecularVisibility.ps1'
+        $ast = [Management.Automation.Language.Parser]::ParseFile(
+            $visibilityScript, [ref]$tokens, [ref]$parseErrors)
+        Check ($parseErrors.Count -eq 0) 'visibility-runner-parses'
+        foreach ($name in @('Get-VisibilitySourceIdentity','Get-VisibilityBinaryIdentity',
+            'Assert-VisibilityIdentity','Test-VisibilityArtifacts')) {
+            $definition = $ast.Find({ param($node)
+                $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name
+            }, $true)
+            . ([scriptblock]::Create($definition.Extent.Text))
+        }
+        $root = Join-Path $fixtureDirectory 'visibility-provenance'
+        $binaryRoot = Join-Path $root 'Build/Output/x64/Develop'
+        $null = New-Item -ItemType Directory -Path "$root/Sources", $binaryRoot -Force
+        $sourceNames = @('Sources/input.cpp')
+        function git { $global:LASTEXITCODE = 0; return $sourceNames }
+        [IO.File]::WriteAllText("$root/Sources/input.cpp", 'original')
+        $originalSource = Get-VisibilitySourceIdentity
+        Assert-VisibilityIdentity $originalSource (Get-VisibilitySourceIdentity) 'Source'
+        [IO.File]::WriteAllText("$root/Sources/input.cpp", 'modified')
+        Reject { Assert-VisibilityIdentity $originalSource (Get-VisibilitySourceIdentity) 'Source' } `
+            'Source inputs changed' 'visibility-rejects-source-mutation'
+        [IO.File]::WriteAllText("$root/Sources/input.cpp", 'original')
+        [IO.File]::WriteAllText("$root/Sources/added.cpp", 'new')
+        $sourceNames += 'Sources/added.cpp'
+        Reject { Assert-VisibilityIdentity $originalSource (Get-VisibilitySourceIdentity) 'Source' } `
+            'Source inputs changed' 'visibility-rejects-source-addition'
+        $sourceNames = @()
+        Reject { Assert-VisibilityIdentity $originalSource (Get-VisibilitySourceIdentity) 'Source' } `
+            'Source inputs changed' 'visibility-rejects-source-removal'
+        foreach ($file in @('GraphicsGadgetLab.exe','gglab-shaderc.exe','dxcompiler.dll','dxil.dll')) {
+            [IO.File]::WriteAllText((Join-Path $binaryRoot $file), 'original')
+        }
+        $originalBinaries = Get-VisibilityBinaryIdentity Develop
+        Assert-VisibilityIdentity $originalBinaries (Get-VisibilityBinaryIdentity Develop) 'Executable/compiler'
+        [IO.File]::WriteAllText("$binaryRoot/gglab-shaderc.exe", 'modified')
+        Reject { Assert-VisibilityIdentity $originalBinaries (Get-VisibilityBinaryIdentity Develop) 'Executable/compiler' } `
+            'Executable/compiler inputs changed' 'visibility-rejects-compiler-mutation'
+        $audits = [Collections.Generic.List[string]]::new()
+        $rejectAudit = ''
+        function Invoke-PythonCheck([string]$Script, [string[]]$Arguments, [string]$Receipt) {
+            $audits.Add([IO.Path]::GetFileName($Script))
+            if ($Script.EndsWith($rejectAudit) -and $rejectAudit) { throw 'Invalid captured artifact' }
+        }
+        Test-VisibilityArtifacts $root
+        Check ($audits.Count -eq 3 -and
+            @('ValidateCaptureBundles.py','ValidateResourceExports.py','ValidateRenderGraphExports.py' |
+                Where-Object { $_ -notin $audits }).Count -eq 0) 'visibility-audits-all-required-artifact-contracts'
+        $rejectAudit = 'ValidateResourceExports.py'
+        Reject { Test-VisibilityArtifacts $root } 'Invalid captured artifact' 'visibility-rejects-artifact-audit-failure'
+    }
     $result = @{ ok=$true; checks=$checks; directory=$output }
 } catch { $result = @{ ok=$false; checks=$checks; directory=$output; error=$_.Exception.Message } }
 Write-VerificationJson (Join-Path $output 'result.json') $result

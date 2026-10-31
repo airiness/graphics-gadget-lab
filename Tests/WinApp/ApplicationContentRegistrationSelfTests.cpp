@@ -5,6 +5,7 @@
 #include "Application/Demo/CoastalSceneCameraPaths.h"
 #include "Application/Demo/CoastalSceneReferenceViews.h"
 #include "Application/Lab/LightingContractReferenceViews.h"
+#include "Application/Lab/Sessions/GIReferenceLabFixture.h"
 #include "Application/Lab/AtmosphereRangeReferenceViews.h"
 #include "GGLabFoundation/Platform/Win/Win32TaskWorkerLifecycle.h"
 #include "GGLabTestCore/SelfTest.h"
@@ -1655,15 +1656,38 @@ namespace gglab
 
 	void RunApplicationContentRegistrationSelfTests(SelfTestContext& context) noexcept
 	{
+		// Frozen IDs are an external verification protocol, not enum ordinal capabilities.
+		context.Check(GIReferenceFixtures.size() == 17, "All persisted GI fixtures remain registered");
+		for (size_t index = 0; index < GIReferenceFixtures.size(); ++index)
+		{
+			const auto fixture = GIReferenceFixtures[index].m_Id;
+			context.Check(static_cast<size_t>(fixture) == index &&
+				IsCoastalGIFixture(fixture) == (index == 11 || index == 12 || index == 15) &&
+				IsGIProbeFixture(fixture) == (index == 14 || index == 15 || index == 16) &&
+				UsesGIPrimaryReceiverMaterials(fixture) == (index >= 10 && index <= 13) &&
+				UsesGIStaticCostPath(fixture) == (index >= 12) &&
+				IsGIContractFixture(fixture) == (index >= 5),
+				"Named fixture capabilities preserve frozen IDs without ordering-based dispatch");
+		}
+		constexpr std::array expectedTextures
+		{
+			-1, -1, 0, 0, 0, 0, 0, 0, 2, 3, 4, 5, 0, -1, -1, -1, -1, -1, -1, 0, -1, 6, -1,
+		};
+		for (size_t index = 0; index < expectedTextures.size(); ++index)
+		{
+			const auto texture = GetGIBaseColorTexture(static_cast<GIHitMaterialCase>(index));
+			context.Check((texture ? static_cast<int>(*texture) : -1) == expectedTextures[index],
+				"Material texture selection preserves UV, mip, ignored-input and replacement fixtures");
+		}
 		const ApplicationContentRegistration desktop = CreateDesktopApplicationContent();
 		const ApplicationContentSelection desktopSelection = ResolveApplicationContentSelection(desktop, DesktopLabHostDemoId, DesktopDefaultLabId);
 		context.Check(desktop.IsValid() && desktop.m_Demos.size() == 4 &&
-			desktop.m_Labs.size() == 16 && desktopSelection.Succeeded() &&
+			desktop.m_Labs.size() == 19 && desktopSelection.Succeeded() &&
 			std::ranges::any_of(desktop.m_Labs, [](const LabRegistration& lab) noexcept
 				{
 					return lab.m_Descriptor.m_Id == LabId("gglab.lab.temporal_aa");
 				}),
-			"Windows desktop composition includes four Demo entries and sixteen Labs");
+			"Windows desktop composition includes four Demo entries and nineteen Labs");
 		for (const std::string_view retiredLabId : {
 			"gglab.lab.task_system",
 				"gglab.lab.asset_publication",
@@ -1716,6 +1740,22 @@ namespace gglab
 #endif
 		checkSelectedDemand("gglab.lab.coordinate_conformance", 54,
 			"Coordinate conformance selection contributes four stable shader demands");
+		checkSelectedDemand("gglab.lab.ray_query", 54,
+			"Ray-query selection contributes query, preview and pipeline-identity artifacts without changing raster startup demand");
+		checkSelectedDemand("gglab.lab.gi_reference", 60,
+			"GI diagnostics opt into receiver/reference/visibility/material shaders without changing ordinary raster startup demand");
+		for (const auto& lab : desktop.m_Labs)
+		{
+			if (lab.m_Descriptor.m_Id == LabId("gglab.lab.gi_reference"))
+			{
+				ShaderProgramDemandSet unique;
+				context.Check(unique.AddRange(lab.m_ShaderPrograms) &&
+					unique.GetPrograms().size() == lab.m_ShaderPrograms.size(),
+					"GI diagnostics declare each optional shader demand once before set deduplication");
+			}
+		}
+		checkSelectedDemand("gglab.lab.coastal_ray_scene", 55,
+			"Coastal ray-scene selection contributes its membership and sun-visibility programs to raster startup demand");
 		checkSelectedDemand("gglab.lab.napa_voxel", 52,
 			"Napa voxel selection contributes two stable shader demands");
 		checkSelectedDemand("gglab.lab.texture_contract", 50,

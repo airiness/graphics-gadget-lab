@@ -1,10 +1,13 @@
 #include "Graphics/RHI/DX12/DX12Device.h"
+#include "Graphics/RHI/DX12/DX12AccelerationStructureManager.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabFoundation/Platform/Win/HResult.h"
 #include "GGLabFoundation/Platform/Win/Win32StringUtils.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/RHI/DX12/DX12QueueSystem.h"
+#include "Graphics/RHI/DX12/DX12RayQuerySupport.h"
 #include "Graphics/RHI/DX12/DX12Buffer.h"
+#include "Graphics/RHI/DX12/DX12CommandList.h"
 #include "Graphics/RHI/DX12/DX12Texture.h"
 #include "Graphics/RHI/DX12/Cache/DX12DescriptorCache.h"
 #include "Graphics/RHI/DX12/Descriptor/DX12DescriptorFreeListAllocator.h"
@@ -118,6 +121,7 @@ namespace gglab
 
 		RetireCompletedRHIResources();
 		SetDescriptorManager(nullptr);
+		m_AccelerationStructures.reset();
 		m_ResourceManager.Finalize();
 
 		m_MemAllocator.Reset();
@@ -127,6 +131,7 @@ namespace gglab
 		m_AdapterCompatibilityIdentity.clear();
 		m_AdapterName.clear();
 		m_DeviceIdentity = {};
+		m_FeatureSupport.m_RayQueryCapabilities = {};
 		m_DxgiFactory.Reset();
 
 		m_IsInitialized = false;
@@ -495,6 +500,18 @@ namespace gglab
 		return m_ResourceManager.IsAlive(buffer);
 	}
 
+	std::optional<RHIBufferDesc> DX12Device::QueryBufferDescription(RHIBufferHandle buffer) const noexcept
+	{
+		const auto* desc = m_ResourceManager.ResolveBufferDesc(buffer);
+		if (!desc)
+		{
+			return std::nullopt;
+		}
+		auto result = *desc;
+		result.m_DebugName = nullptr;
+		return result;
+	}
+
 	bool DX12Device::IsAlive(RHISamplerHandle sampler) const noexcept
 	{
 		return m_DescriptorCache && m_DescriptorCache->IsSamplerAlive(sampler);
@@ -583,6 +600,17 @@ namespace gglab
 		DX12DescriptorView& descriptor, RHITextureViewKey& key) const noexcept
 	{
 		return m_DescriptorCache && m_DescriptorCache->ResolveTextureViewInfo(view, descriptor, key);
+	}
+
+	void DX12Device::BindGlobalDescriptorHeaps(DX12CommandList& commandList) const noexcept
+	{
+		GGLAB_ASSERT_NOT_NULL(m_DescriptorManager);
+		const DX12DescriptorHeap* heaps[] =
+		{
+			m_DescriptorManager->GetHeap(DX12DescriptorManager::HeapType::CbvSrvUav),
+			m_DescriptorManager->GetHeap(DX12DescriptorManager::HeapType::Sampler),
+		};
+		commandList.SetDescriptorHeaps(heaps);
 	}
 
 	D3D12_GPU_DESCRIPTOR_HANDLE DX12Device::ResolveShaderVisibleDescriptor(
@@ -836,9 +864,21 @@ namespace gglab
 		CD3DX12FeatureSupport featureSupport;
 		featureSupport.Init(m_D3D12Device.Get());
 
-		// RatTracing support
+		// Legacy ray-tracing support includes tier 1.0; inline queries require 1.1.
 		m_FeatureSupport.m_RayTracingSupported =
 			featureSupport.RaytracingTier() != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
+		m_FeatureSupport.m_RayQueryCapabilities = EvaluateDX12RayQuerySupport(
+			featureSupport.RaytracingTier(), featureSupport.HighestShaderModel());
+		// DX12 exposes the supported set on the created device without an opt-in feature chain.
+		m_FeatureSupport.m_RayQueryCapabilities.m_Enabled =
+			m_FeatureSupport.m_RayQueryCapabilities.m_Supported;
+		const auto& rayQuery = m_FeatureSupport.m_RayQueryCapabilities;
+		GGLAB_LOG_GRAPHICS_INFO_ALWAYS("DX12 ray queries: supported={}, enabled={}, reason={}, "
+			"scratchAlignment={}, maxPrimitives={}, maxInstances={}",
+			rayQuery.m_Supported, rayQuery.m_Enabled,
+			GetRHIRayQueryUnavailableReasonName(rayQuery.m_UnavailableReason),
+			rayQuery.m_BuildLimits.m_ScratchAlignmentInBytes,
+			rayQuery.m_BuildLimits.m_MaxPrimitiveCount, rayQuery.m_BuildLimits.m_MaxInstanceCount);
 
 		// MeshShader support
 		m_FeatureSupport.m_MeshShaderSupported =

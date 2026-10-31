@@ -26,18 +26,8 @@ commit; documentation-only edits do not advance it.
 
 ## Checks
 
-From the repository root:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/CheckArchitectureAtlas.ps1 -RootDir . -BaseRef origin/main
-powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/CheckArchitectureAtlas.ps1 -SelfTest
-powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/ValidateProjectBoundaries.ps1 -RootDir .
-```
-
-The Atlas helper reports local link/anchor errors, baseline ancestry, external
-design-document dependencies and affected entries. Inspect the report: exit 0
-means a report was produced. `-AsJson` returns the same data for tools. The boundary
-validator separately checks project ownership and include rules.
+Commands and report interpretation are in the
+[repository verification checks](../../Tests/Verification/README.md#repository-checks).
 
 ```text
 Anchors:

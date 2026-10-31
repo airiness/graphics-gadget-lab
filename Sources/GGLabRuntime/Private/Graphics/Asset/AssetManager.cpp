@@ -3,6 +3,7 @@
 #include "GGLabRuntime/Graphics/Asset/AssetPaths.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
+#include "GGLabRuntime/Core/Math/MathFunctions.h"
 #include "GGLabFoundation/Task/TaskSystem.h"
 #include "GGLabFoundation/IO/PathUtils.h"
 #include "GGLabFoundation/Base/TypeUtils.h"
@@ -16,6 +17,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -325,6 +327,24 @@ namespace gglab
 		return request;
 	}
 
+	bool AssetOwnerScope::RetainModel(ModelID modelId, uint64_t generation, TaskPriority priority) noexcept
+	{
+		const auto* model = m_Manager ? m_Manager->GetModel(modelId) : nullptr;
+		if (!model || !m_Owner.IsValid() || generation == 0 ||
+			model->m_ContentGeneration != generation || priority == TaskPriority::Count)
+		{
+			return false;
+		}
+		AssetLease lease = m_Manager->AcquireAssetLease(
+			m_Owner, AssetKind::Model, modelId.Value(), generation, priority);
+		if (!lease.IsValid())
+		{
+			return false;
+		}
+		m_Leases.emplace_back(std::move(lease));
+		return true;
+	}
+
 	bool AssetOwnerScope::RetainTexture(TextureContentRef content, TaskPriority priority) noexcept
 	{
 		if (!m_Manager || !m_Owner.IsValid() || !content.IsValid() ||
@@ -463,13 +483,11 @@ namespace gglab
 				// drain time, not merely the operation that was current when queued.
 				operationLifecycle = textureOperation ?
 					nullptr :
-					FindResidencyLifecycle(
-						event.m_Status.m_ContentVersion.m_Key);
-				const bool currentOperation =
-					textureOperation ?
-						m_State->m_TextureAssets->IsCurrentResidencyOperation(*event.m_Operation) :
-						operationLifecycle && AssetResidencyController::IsCurrentOperation(
-							*operationLifecycle, *event.m_Operation);
+					FindResidencyLifecycle(event.m_Status.m_ContentVersion.m_Key);
+				const bool currentOperation = textureOperation ?
+					m_State->m_TextureAssets->IsCurrentResidencyOperation(*event.m_Operation) :
+					operationLifecycle && AssetResidencyController::IsCurrentOperation(
+						*operationLifecycle, *event.m_Operation);
 				if (!currentOperation)
 				{
 					m_State->m_AssetResidencyCoordinator.Controller().RecordStaleStateEvent();
@@ -555,11 +573,9 @@ namespace gglab
 			AssetLifecycle* lifecycle = contentVersion.m_Key.m_Kind == AssetKind::Texture ?
 				nullptr :
 				FindResidencyLifecycle(contentVersion.m_Key);
-			const bool currentOperation =
-				contentVersion.m_Key.m_Kind == AssetKind::Texture ?
-					m_State->m_TextureAssets->IsCurrentResidencyOperation(operation) :
-					lifecycle &&
-						AssetResidencyController::IsCurrentOperation(*lifecycle, operation);
+			const bool currentOperation = contentVersion.m_Key.m_Kind == AssetKind::Texture ?
+				m_State->m_TextureAssets->IsCurrentResidencyOperation(operation) :
+				lifecycle && AssetResidencyController::IsCurrentOperation(*lifecycle, operation);
 			if (!currentOperation)
 			{
 				m_State->m_AssetResidencyCoordinator.Controller().RecordStaleCompletion();
@@ -1395,10 +1411,9 @@ namespace gglab
 			AssetState::GpuProcessing :
 			AssetState::Cancelled);
 		ProgressReporter(mesh->m_LoadProgress)
-			.Report(0.96f,
-				mesh->m_VertexBuffer ?
-					"Mesh cancellation pending GPU completion" :
-					"Mesh upload cancelled",
+			.Report(0.96f, mesh->m_VertexBuffer ?
+				"Mesh cancellation pending GPU completion" :
+				"Mesh upload cancelled",
 				std::format("Mesh {} has no active owners", meshId.Value()));
 	}
 
@@ -1676,11 +1691,9 @@ namespace gglab
 			bool cancelled = protectedByInterest;
 			AssetLifecycle* lifecycle =
 				key.m_Kind == AssetKind::Texture ? nullptr : FindResidencyLifecycle(key);
-			const bool currentOperation =
-				key.m_Kind == AssetKind::Texture ?
-					m_State->m_TextureAssets->IsCurrentResidencyOperation(operation) :
-					lifecycle &&
-						AssetResidencyController::IsCurrentOperation(*lifecycle, operation);
+			const bool currentOperation = key.m_Kind == AssetKind::Texture ?
+				m_State->m_TextureAssets->IsCurrentResidencyOperation(operation) :
+				lifecycle && AssetResidencyController::IsCurrentOperation(*lifecycle, operation);
 			if (!currentOperation)
 			{
 				m_State->m_AssetResidencyCoordinator.Controller().RecordStaleCompletion();
@@ -1748,11 +1761,10 @@ namespace gglab
 		AssetLifecycle* lifecycle = contentVersion.m_Key.m_Kind == AssetKind::Texture ?
 			nullptr :
 			FindResidencyLifecycle(contentVersion.m_Key);
-		const bool assetExists =
-			contentVersion.m_Key.m_Kind == AssetKind::Texture ?
-				m_State->m_TextureAssets->GetTexture(
-					TextureID{ static_cast<uint32_t>(contentVersion.m_Key.m_StableId) }) != nullptr :
-				lifecycle != nullptr;
+		const bool assetExists = contentVersion.m_Key.m_Kind == AssetKind::Texture ?
+			m_State->m_TextureAssets->GetTexture(
+				TextureID{ static_cast<uint32_t>(contentVersion.m_Key.m_StableId) }) != nullptr :
+			lifecycle != nullptr;
 		AssetResidencyInventoryEntry currentEntry;
 		if (!assetExists || !BuildResidencyInventoryEntry(contentVersion.m_Key, currentEntry) ||
 			!m_State->m_AssetResidencyCoordinator.Controller().StillEligible(
@@ -1762,12 +1774,11 @@ namespace gglab
 			return false;
 		}
 
-		const AssetResidencyOperation operation =
-			contentVersion.m_Key.m_Kind == AssetKind::Texture ?
-				m_State->m_TextureAssets->BeginResidencyOperation(contentVersion,
-					AssetResidencyOperationKind::Evict, m_State->m_AssetResidencyCoordinator.Controller()) :
-				m_State->m_AssetResidencyCoordinator.Controller().BeginResidencyOperation(
-					*lifecycle, contentVersion, AssetResidencyOperationKind::Evict);
+		const AssetResidencyOperation operation = contentVersion.m_Key.m_Kind == AssetKind::Texture ?
+			m_State->m_TextureAssets->BeginResidencyOperation(contentVersion,
+				AssetResidencyOperationKind::Evict, m_State->m_AssetResidencyCoordinator.Controller()) :
+			m_State->m_AssetResidencyCoordinator.Controller().BeginResidencyOperation(
+				*lifecycle, contentVersion, AssetResidencyOperationKind::Evict);
 		if (!operation.IsValid())
 		{
 			m_State->m_AssetResidencyCoordinator.Controller().RecordRevalidationRejection();
@@ -2433,6 +2444,22 @@ namespace gglab
 		mesh->m_VertexCount = vertexCount;
 		mesh->m_IndexCount = indexCount;
 
+		const auto underVertexCount = std::all_of(indicesData.begin(), indicesData.end(), [vertexCount](uint32_t index)
+			{
+				return index < vertexCount;
+			});
+
+		const auto verticesDataFinite = std::all_of(verticesData.begin(), verticesData.end(), [](const Vertex& vertex)
+			{
+				return math::IsFinite(vertex.m_Position);
+			});
+
+		mesh->m_IsRayGeometryValid =
+			indexCount != 0 &&
+			indexCount % 3 == 0 &&
+			underVertexCount &&
+			verticesDataFinite;
+
 		const auto vertexBufferSize = static_cast<uint64_t>(vertexCount) * sizeof(Vertex);
 		const auto indexBufferSize = static_cast<uint64_t>(indexCount) * sizeof(uint32_t);
 
@@ -2454,12 +2481,12 @@ namespace gglab
 		RHIBufferDesc vertexBufferDesc{};
 		vertexBufferDesc.m_SizeInBytes = vertexBufferSize;
 		vertexBufferDesc.m_StrideInBytes = sizeof(Vertex);
-		vertexBufferDesc.m_Usage = RHIBufferUsage::Vertex | RHIBufferUsage::CopyDest;
+		vertexBufferDesc.m_Usage = RHIBufferUsage::Vertex | RHIBufferUsage::CopyDest | RHIBufferUsage::CopySource;
 
 		RHIBufferDesc indexBufferDesc{};
 		indexBufferDesc.m_SizeInBytes = indexBufferSize;
 		indexBufferDesc.m_StrideInBytes = sizeof(uint32_t);
-		indexBufferDesc.m_Usage = RHIBufferUsage::Index | RHIBufferUsage::CopyDest;
+		indexBufferDesc.m_Usage = RHIBufferUsage::Index | RHIBufferUsage::CopyDest | RHIBufferUsage::CopySource;
 
 		const std::string_view meshName =
 			mesh->m_Name.Name().empty() ? std::string_view("UnnamedMesh") : mesh->m_Name.Name();

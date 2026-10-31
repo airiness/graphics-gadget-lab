@@ -58,7 +58,10 @@ def validate_allocations(document):
 
 
 def validate(document, validator):
-	parameters.validate_export(document["frame"], document["schemaVersion"], 6, document["frameSerial"])
+	version = document["schemaVersion"]
+	# Since v7, AS exports permit both existing parameter-provenance forms.
+	parameter_version = 5 if version >= 7 and document["frame"].get("parameters") is None else version
+	parameters.validate_export(document["frame"], parameter_version, 6, document["frameSerial"])
 	validator.validate(document)
 	passes = document["compile"]["passes"]
 	if document["frameSerial"] != document["frame"]["frame"]["serial"]:
@@ -240,7 +243,43 @@ def self_test(validator):
 	unsized5["execution"]["totals"].update(logicalBytes=0, unavailableLogicalResources=1)
 	validate(unsized5, validator)
 
+	acceleration7 = copy.deepcopy(buffer5)
+	acceleration7["schemaVersion"] = 7
+	resource7 = acceleration7["compile"]["resources"][0]
+	resource7.update(type="AccelerationStructure", accelerationStructure=dict(type="top-level", storageBytes=65536))
+	del resource7["buffer"]
+	build_state7 = dict(stages="AccelerationStructureBuild", stageBits=1024,
+		access="AccelerationStructureWrite", accessBits=16384, layout="Common")
+	query_state7 = dict(stages="ComputeShader", stageBits=16,
+		access="AccelerationStructureRead", accessBits=8192, layout="Common")
+	resource7["initialState"] = query_state7
+	for barrier7 in acceleration7["compile"]["passes"][0]["preBarriers"] + acceleration7["execution"]["resolvedBarriers"]:
+		barrier7.update(type="AccelerationStructure", before=build_state7, after=query_state7, subresources=None)
+	for node in acceleration7["compile"]["versions"]:
+		node["type"] = "AccelerationStructure"
+	access7 = acceleration7["compile"]["passes"][0]["accesses"][0]
+	access7.update(type="AccelerationStructure", dependencyAccess="Read", writtenResourceNodeIndex=None,
+		writtenVersion=None, access="QueryRead", accessBits=2, stages="ComputeShader", stageBits=16, subresources=None)
+	validate(acceleration7, validator)
+
+	scratch8 = copy.deepcopy(buffer5)
+	scratch8["schemaVersion"] = 8
+	scratch_state8 = dict(stages="AccelerationStructureBuild | ComputeShader", stageBits=1040,
+		access="AccelerationStructureScratch", accessBits=32768, layout="Common")
+	scratch8["compile"]["resources"][0].update(initialState=scratch_state8, finalState=scratch_state8)
+	for barrier8 in scratch8["compile"]["passes"][0]["preBarriers"] + scratch8["execution"]["resolvedBarriers"]:
+		barrier8.update(before=scratch_state8, after=scratch_state8)
+	scratch8["compile"]["passes"][0]["postBarriers"] = copy.deepcopy(scratch8["compile"]["passes"][0]["preBarriers"])
+	validate(scratch8, validator)
+	acceleration8 = copy.deepcopy(acceleration7)
+	acceleration8["schemaVersion"] = 8
+	validate(acceleration8, validator)
+
 	cases = [
+		(scratch8, ("schemaVersion",), 7),
+		(acceleration7, ("schemaVersion",), 5),
+		(acceleration7, ("compile", "passes", 0, "accesses", 0, "ordering"), "Unordered"),
+		(acceleration7, ("compile", "passes", 0, "accesses", 0, "access"), "StructuredRead"),
 		(counters, ("schemaVersion",), 3),
 		(counters, ("observation", "nonFiniteWatch"), False),
 		(scanned, ("schemaVersion",), 2),
@@ -294,6 +333,21 @@ def self_test(validator):
 		(full5, ("compile", "resources", 0, "texture", "dimension"), "Cube"),
 		(buffer5, ("compile", "resources", 0, "logicalBytes"), 64),
 	]
+	# Reject new scratch semantics in every persisted state location under v7.
+	for path in [
+		("compile", "resources", 0, "initialState"),
+		("compile", "resources", 0, "finalState"),
+		("compile", "passes", 0, "preBarriers", 0, "before"),
+		("compile", "passes", 0, "preBarriers", 0, "after"),
+		("compile", "passes", 0, "postBarriers", 0, "before"),
+		("compile", "passes", 0, "postBarriers", 0, "after"),
+		("execution", "resolvedBarriers", 0, "before"),
+		("execution", "resolvedBarriers", 0, "after"),
+	]:
+		legacy = copy.deepcopy(buffer5)
+		legacy["schemaVersion"] = 7
+		legacy["compile"]["passes"][0]["postBarriers"] = copy.deepcopy(legacy["compile"]["passes"][0]["preBarriers"])
+		cases.append((legacy, path, scratch_state8))
 	for fixture, path, value in cases:
 		invalid = copy.deepcopy(fixture)
 		target = invalid

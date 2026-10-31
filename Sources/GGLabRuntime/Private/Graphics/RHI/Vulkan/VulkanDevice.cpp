@@ -1,4 +1,5 @@
 #include "Graphics/RHI/Vulkan/VulkanDevice.h"
+#include "Graphics/RHI/Vulkan/VulkanAccelerationStructureManager.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/RHI/Vulkan/VulkanResultClassification.h"
 #include "Graphics/RHI/Vulkan/VulkanTimelineFence.h"
@@ -50,10 +51,21 @@ namespace gglab
 		const RHIPortabilityCapabilities enabledCapabilities =
 			ApplyVulkanPortabilityPolicy(createInfo.m_PortabilityCapabilities);
 
-		std::array<const char*, 2> enabledExtensions{
+		const RHIRayQueryCapabilities rayQueryCapabilities = createInfo.m_RayQueryAvailability ?
+			EvaluateVulkanRayQuerySupport(*createInfo.m_RayQueryAvailability) :
+			RHIRayQueryCapabilities{};
+		const bool enableRayQueries = rayQueryCapabilities.m_Supported && !createInfo.m_LayoutProbeOnly;
+		std::vector<const char*> enabledExtensions
+		{
 			SwapchainExtensionName.data(),
 			MutableDescriptorTypeExtensionName.data(),
 		};
+		if (enableRayQueries)
+		{
+			enabledExtensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+			enabledExtensions.push_back(VK_KHR_RAY_QUERY_EXTENSION_NAME);
+			enabledExtensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+		}
 
 		VkPhysicalDeviceFeatures2 features2{};
 		features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -111,6 +123,18 @@ namespace gglab
 		mutableDescriptorFeatures.mutableDescriptorType =
 			capabilities.m_MutableDescriptorType ? VK_TRUE : VK_FALSE;
 		vulkan12Features.pNext = &mutableDescriptorFeatures;
+		VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationFeatures{
+			VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
+		VkPhysicalDeviceRayQueryFeaturesKHR rayQueryFeatures{
+			VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR };
+		if (enableRayQueries)
+		{
+			vulkan12Features.bufferDeviceAddress = VK_TRUE;
+			accelerationFeatures.accelerationStructure = VK_TRUE;
+			rayQueryFeatures.rayQuery = VK_TRUE;
+			mutableDescriptorFeatures.pNext = &accelerationFeatures;
+			accelerationFeatures.pNext = &rayQueryFeatures;
+		}
 
 		const VulkanQueueSelection queueSelection =
 			SelectVulkanQueues(createInfo.m_GraphicsPresentQueueCount);
@@ -171,6 +195,24 @@ namespace gglab
 			result.m_Error = std::format("vkCreateDevice failed with {}.", ToString(createResult));
 			return result;
 		}
+		if (enableRayQueries)
+		{
+			constexpr std::array<const char*, 6> requiredEntryPoints
+			{
+				"vkGetBufferDeviceAddress", "vkCreateAccelerationStructureKHR",
+				"vkDestroyAccelerationStructureKHR", "vkGetAccelerationStructureBuildSizesKHR",
+				"vkGetAccelerationStructureDeviceAddressKHR", "vkCmdBuildAccelerationStructuresKHR",
+			};
+			for (const char* name : requiredEntryPoints)
+			{
+				if (!vkGetDeviceProcAddr(device->m_Device, name))
+				{
+					result.m_Result = VK_ERROR_INITIALIZATION_FAILED;
+					result.m_Error = std::format("Enabled Vulkan ray-query device is missing {}.", name);
+					return result;
+				}
+			}
+		}
 		device->m_QueueFamilyIndex = createInfo.m_GraphicsPresentQueueFamilyIndex;
 		device->m_QueueSelection = queueSelection;
 
@@ -208,6 +250,8 @@ namespace gglab
 		// VMA owns raw memory allocation only; the resource manager owns
 		// every GGLab handle, native object, view and lifetime decision.
 		VmaAllocatorCreateInfo allocatorCreateInfo{};
+		allocatorCreateInfo.flags = enableRayQueries ?
+			VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT : 0;
 		allocatorCreateInfo.physicalDevice = createInfo.m_PhysicalDevice;
 		allocatorCreateInfo.device = device->m_Device;
 		allocatorCreateInfo.instance = createInfo.m_Instance;
@@ -228,6 +272,15 @@ namespace gglab
 			return result;
 		}
 		device->m_ResourceManager.Initialize(device.get());
+		device->m_RayQueryCapabilities = rayQueryCapabilities;
+		device->m_RayQueryCapabilities.m_Enabled = enableRayQueries;
+		GGLAB_LOG_GRAPHICS_INFO_ALWAYS("Vulkan ray queries: supported={}, enabled={}, reason={}, "
+			"scratchAlignment={}, maxPrimitives={}, maxInstances={}",
+			device->m_RayQueryCapabilities.m_Supported, device->m_RayQueryCapabilities.m_Enabled,
+			GetRHIRayQueryUnavailableReasonName(device->m_RayQueryCapabilities.m_UnavailableReason),
+			device->m_RayQueryCapabilities.m_BuildLimits.m_ScratchAlignmentInBytes,
+			device->m_RayQueryCapabilities.m_BuildLimits.m_MaxPrimitiveCount,
+			device->m_RayQueryCapabilities.m_BuildLimits.m_MaxInstanceCount);
 
 		result.m_Device = std::move(device);
 		return result;
@@ -475,6 +528,22 @@ namespace gglab
 			m_ResourceManager.IsAlive(buffer);
 	}
 
+	std::optional<RHIBufferDesc> VulkanDevice::QueryBufferDescription(RHIBufferHandle buffer) const noexcept
+	{
+		if (!RequireOwnerThread("VulkanDevice::QueryBufferDescription"))
+		{
+			return std::nullopt;
+		}
+		const auto* desc = m_ResourceManager.ResolveBufferDesc(buffer);
+		if (!desc)
+		{
+			return std::nullopt;
+		}
+		auto result = *desc;
+		result.m_DebugName = nullptr;
+		return result;
+	}
+
 	bool VulkanDevice::IsAlive(RHISamplerHandle sampler) const noexcept
 	{
 		return RequireOwnerThread("VulkanDevice::IsAlive(sampler)") &&
@@ -649,6 +718,7 @@ namespace gglab
 		// this device only borrows).
 		if (m_MemAllocator != VK_NULL_HANDLE)
 		{
+			m_AccelerationStructures.reset();
 			m_ResourceManager.Finalize();
 			m_DescriptorManager.Finalize();
 			vmaDestroyAllocator(m_MemAllocator);
@@ -664,5 +734,6 @@ namespace gglab
 		m_GraphicsQueue = VK_NULL_HANDLE;
 		m_TransferQueue = VK_NULL_HANDLE;
 		m_QueueSelection = {};
+		m_RayQueryCapabilities = {};
 	}
 }

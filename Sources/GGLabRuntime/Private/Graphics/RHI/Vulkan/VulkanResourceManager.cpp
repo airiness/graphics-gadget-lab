@@ -29,6 +29,23 @@ namespace gglab
 		[[nodiscard]] VkBufferUsageFlags ToVkBufferUsageFlags(RHIBufferUsage usage) noexcept
 		{
 			VkBufferUsageFlags flags = 0;
+			if (Test(usage, RHIBufferUsage::AccelerationStructureInput))
+			{
+				flags |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
+			}
+			if (Test(usage, RHIBufferUsage::AccelerationStructureStorage))
+			{
+				flags |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR;
+			}
+			if (Test(usage, RHIBufferUsage::AccelerationStructureScratch))
+			{
+				flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+			}
+			if (Test(usage, RHIBufferUsage::AccelerationStructureInput |
+				RHIBufferUsage::AccelerationStructureStorage | RHIBufferUsage::AccelerationStructureScratch))
+			{
+				flags |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+			}
 			if (Test(usage, RHIBufferUsage::Vertex))
 			{
 				flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
@@ -374,6 +391,15 @@ namespace gglab
 		GGLAB_ASSERT_MSG(m_Device != nullptr,
 			"VulkanResourceManager must be initialized before creating buffers.");
 
+		if ((Test(desc.m_Usage, RHIBufferUsage::AccelerationStructureInput |
+			RHIBufferUsage::AccelerationStructureStorage | RHIBufferUsage::AccelerationStructureScratch) &&
+			!m_Device->GetRayQueryCapabilities().m_Enabled) ||
+			(Test(desc.m_Usage, RHIBufferUsage::AccelerationStructureStorage | RHIBufferUsage::AccelerationStructureScratch) &&
+				desc.m_MemoryUsage != RHIMemoryUsage::GpuOnly))
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("Vulkan rejected buffer usages whose AS capability or memory contract is unavailable.");
+			return {};
+		}
 		if (desc.m_SizeInBytes == 0)
 		{
 			++m_Diagnostics.m_CreateFailureCount;
@@ -410,6 +436,8 @@ namespace gglab
 				.m_Layout = RHILayout::Common,
 			},
 			.m_MemoryUsage = desc.m_MemoryUsage,
+			.m_MinimumAlignment = Test(desc.m_Usage, RHIBufferUsage::AccelerationStructureScratch) ?
+				m_Device->GetRayQueryCapabilities().m_BuildLimits.m_ScratchAlignmentInBytes : 1,
 			});
 		if (!buffer->IsValid())
 		{

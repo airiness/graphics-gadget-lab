@@ -12,6 +12,7 @@
 #include "ShaderArtifactRuntime/VulkanShaderRuntimeABI.h"
 
 #include <dxcapi.h>
+#include <d3d12shader.h>
 
 #include <algorithm>
 #include <array>
@@ -28,6 +29,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_set>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -41,6 +43,128 @@ namespace gglab
 
 	namespace
 	{
+		// AS bindings share the fixed t-register namespace on both targets. Reflection
+		// belongs to the compiler; no DXC or SPIR-V implementation types reach Runtime.
+		[[nodiscard]] bool ValidateSpirvAccelerationStructureBindings(IDxcBlob& object) noexcept
+		{
+			if (object.GetBufferSize() < 20 || object.GetBufferSize() % sizeof(uint32_t) != 0)
+			{
+				return false;
+			}
+			std::vector<uint32_t> words(object.GetBufferSize() / sizeof(uint32_t));
+			std::memcpy(words.data(), object.GetBufferPointer(), object.GetBufferSize());
+			std::unordered_set<uint32_t> accelerationTypes;
+			std::unordered_map<uint32_t, uint32_t> elementTypes, arrayLengths, constants;
+			std::unordered_set<uint32_t> runtimeArrays;
+			std::unordered_map<uint32_t, std::array<uint32_t, 2>> decorations;
+			std::vector<std::pair<uint32_t, uint32_t>> variables;
+			for (size_t offset = 5; offset < words.size();)
+			{
+				const uint32_t count = words[offset] >> 16;
+				const uint32_t opcode = words[offset] & 0xffff;
+				if (count == 0 || count > words.size() - offset)
+				{
+					return false;
+				}
+				const auto* instruction = words.data() + offset;
+				if (opcode == 5341 && count == 2) // OpTypeAccelerationStructureKHR
+				{
+					accelerationTypes.insert(instruction[1]);
+				}
+				else if (opcode == 32 && count == 4) // OpTypePointer
+				{
+					elementTypes[instruction[1]] = instruction[3];
+				}
+				else if ((opcode == 28 && count == 4) || (opcode == 29 && count == 3))
+				{
+					elementTypes[instruction[1]] = instruction[2];
+					if (opcode == 28)
+					{
+						arrayLengths[instruction[1]] = instruction[3];
+					}
+					else
+					{
+						runtimeArrays.insert(instruction[1]);
+					}
+				}
+				else if (opcode == 43 && count == 4) // OpConstant, 32-bit array length
+				{
+					constants[instruction[2]] = instruction[3];
+				}
+				else if (opcode == 59 && count >= 4) // OpVariable: result type, result ID
+				{
+					variables.emplace_back(instruction[1], instruction[2]);
+				}
+				else if (opcode == 71 && count == 4 && (instruction[2] == 33 || instruction[2] == 34))
+				{
+					auto [entry, inserted] = decorations.try_emplace(instruction[1], std::array<uint32_t, 2>{ UINT32_MAX, UINT32_MAX });
+					entry->second[instruction[2] == 34 ? 0 : 1] = instruction[3];
+				}
+				offset += count;
+			}
+			std::unordered_set<uint32_t> usedBindings;
+			for (const auto& [type, variable] : variables)
+			{
+				uint32_t base = type;
+				bool single = true;
+				for (size_t depth = 0; depth <= elementTypes.size() && elementTypes.contains(base); ++depth)
+				{
+					if (arrayLengths.contains(base))
+					{
+						const auto length = constants.find(arrayLengths.at(base));
+						single = single && length != constants.end() && length->second == 1;
+					}
+					single = single && !runtimeArrays.contains(base);
+					base = elementTypes.at(base);
+				}
+				if (!accelerationTypes.contains(base))
+				{
+					continue;
+				}
+				const auto location = decorations.find(variable);
+				const auto range = GGLabVulkanShaderRuntimeABI.m_ShaderResourceRange;
+				if (!single || location == decorations.end() ||
+					location->second[0] != GGLabVulkanShaderRuntimeABI.m_FixedDescriptorSet ||
+					location->second[1] < range.m_BindingShift ||
+					location->second[1] - range.m_BindingShift >= range.m_RegisterCount ||
+					!usedBindings.insert(location->second[1]).second)
+				{
+					return false;
+				}
+			}
+			return true;
+		}
+
+		[[nodiscard]] bool ValidateDxilAccelerationStructureBindings(IDxcUtils& utils, IDxcResult& result) noexcept
+		{
+			ComPtr<IDxcBlob> reflectionData;
+			if (FAILED(result.GetOutput(DXC_OUT_REFLECTION, IID_PPV_ARGS(&reflectionData), nullptr)) || !reflectionData)
+			{
+				return false;
+			}
+			const DxcBuffer buffer{ reflectionData->GetBufferPointer(), reflectionData->GetBufferSize(), 0 };
+			ComPtr<ID3D12ShaderReflection> reflection;
+			D3D12_SHADER_DESC desc{};
+			if (FAILED(utils.CreateReflection(&buffer, IID_PPV_ARGS(&reflection))) || FAILED(reflection->GetDesc(&desc)))
+			{
+				return false;
+			}
+			for (uint32_t index = 0; index < desc.BoundResources; ++index)
+			{
+				D3D12_SHADER_INPUT_BIND_DESC binding{};
+				if (FAILED(reflection->GetResourceBindingDesc(index, &binding)))
+				{
+					return false;
+				}
+				if (binding.Type == D3D_SIT_RTACCELERATIONSTRUCTURE &&
+					(binding.BindCount != 1 || binding.Space != 0 ||
+						binding.BindPoint >= GGLabVulkanShaderRuntimeABI.m_ShaderResourceRange.m_RegisterCount))
+				{
+					return false;
+				}
+			}
+			return true;
+		}
 		inline constexpr LogTag ShaderCompilerLogTag{ "SHADER_COMPILER" };
 
 		[[nodiscard]] bool IsCompilerOwnedExtraArgument(std::wstring_view argument) noexcept
@@ -1084,6 +1208,16 @@ namespace gglab
 			return {};
 		}
 
+		const bool validAccelerationBindings = recipe.m_Request.m_Target.m_BinaryFormat == ShaderBinaryFormat::SpirV ?
+			ValidateSpirvAccelerationStructureBindings(*dxilBlob.Get()) :
+			ValidateDxilAccelerationStructureBindings(*m_Impl->m_Utils.Get(), *result.Get());
+		if (!validAccelerationBindings)
+		{
+			outDiagnostics.m_Status = ShaderCompileStatus::CompileFailed;
+			outDiagnostics.m_Message = L"Shader reflection rejected its fixed acceleration-structure bindings.";
+			outDiagnostics.m_SourceIdentity = recipe.m_Request.m_SourcePath.wstring();
+			return {};
+		}
 		return CopyShaderBinary(dxilBlob.Get());
 	}
 

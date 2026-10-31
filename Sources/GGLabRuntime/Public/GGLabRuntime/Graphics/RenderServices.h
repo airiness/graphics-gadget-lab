@@ -7,6 +7,8 @@
 #include "GGLabRuntime/Graphics/IBLBakeTypes.h"
 #include "GGLabRuntime/Graphics/IBLPreviewTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalHistoryTypes.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIReferenceTypes.h"
+#include "GGLabRuntime/Graphics/Pipeline/GISpecularVisibility.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBindingLayout.h"
 #include "GGLabRuntime/Graphics/RHI/RHIContext.h"
@@ -29,6 +31,9 @@
 namespace gglab
 {
 	class World;
+	class GIReferenceObservation;
+	class GIFieldFrameState;
+	class GISpecularVisibilityObservation;
 	class ComposedLayout;
 	class AssetUploadScheduling;
 	class RenderFrameCaptureAccess;
@@ -42,6 +47,8 @@ namespace gglab
 	struct ComputePipelineSlot;
 	struct EnvironmentTextureSource;
 	struct AtmosphereGPU;
+	struct GIPreviewSnapshot;
+	struct TransientResourcePoolSnapshot;
 	struct GraphicsPhysicalPipelineKey;
 	struct GraphicsPipelineSlot;
 
@@ -156,6 +163,8 @@ namespace gglab
 		virtual void PublishPostProcessPreview(PostProcessDebugSelection selection,
 			PostProcessPreviewChannel channel, uint64_t frameSerial,
 			const RenderPreviewRequest& request) noexcept = 0;
+		virtual void SetGIPreviewSourceAvailable() noexcept = 0;
+		virtual void PublishGIPreviewSnapshot(GIPreviewSnapshot snapshot) noexcept = 0;
 		virtual void InvalidatePostProcessPreview(
 			PostProcessDebugSelection selection,
 			PostProcessPreviewChannel channel = PostProcessPreviewChannel::PostProcessing) noexcept = 0;
@@ -241,6 +250,15 @@ namespace gglab
 		[[nodiscard]] virtual const std::array<float, 4>& GetBackBufferClearColor()
 			const noexcept = 0;
 		[[nodiscard]] virtual RHIFencePoint GetLastSubmittedFencePoint() const noexcept = 0;
+		[[nodiscard]] virtual GIReferenceObservationDiagnostics GetGIReferenceObservationDiagnostics()
+			const noexcept { return {}; }
+		[[nodiscard]] virtual GISpecularVisibilityProgress GetGISpecularVisibilityProgress()
+			const noexcept { return {}; }
+		// Immutable owner-thread inventory, including cached and pending pool slots.
+		virtual void CaptureTransientResourcePool(TransientResourcePoolSnapshot& snapshot) const noexcept
+		{
+			GGLAB_UNUSED(snapshot);
+		}
 	};
 
 	class RenderBindingLayoutAccess
@@ -290,6 +308,10 @@ namespace gglab
 		// Deliberate per-frame application injection; null when no developer
 		// overlay pass participates in the frame.
 		RenderPipelineOverlayExtensionBase* m_OverlayExtension = nullptr;
+		// Runtime-internal pass binding; content reads immutable progress through Presentation.
+		GIReferenceObservation* m_GIReferenceObservation = nullptr;
+		GIFieldFrameState* m_GIFieldFrameState = nullptr;
+		GISpecularVisibilityObservation* m_GISpecularVisibilityObservation = nullptr;
 
 		// Validates the stable owner-provided services. The application-injected
 		// m_TextureAssets is required for pass execution but is not part of this

@@ -614,6 +614,13 @@ namespace gglab
 				FindFrameCaptureDiagnosticTap("temporal-clip-distance") == PostProcessDebugTap::TemporalClipDistance &&
 				FindFrameCaptureDiagnosticTap("temporal-history-relaxation") == PostProcessDebugTap::TemporalHistoryRelaxation &&
 				FindFrameCaptureDiagnosticTap("gtao-history-samples") == PostProcessDebugTap::GTAOHistorySamples &&
+				FindFrameCaptureDiagnosticTap("gi-irradiance") == PostProcessDebugTap::GIIrradiance &&
+				FindFrameCaptureDiagnosticTap("gi-lambert-radiance") == PostProcessDebugTap::GILambertRadiance &&
+				FindFrameCaptureDiagnosticTap("gi-sun-irradiance") == PostProcessDebugTap::GISunIrradiance &&
+				FindFrameCaptureDiagnosticTap("gi-environment-irradiance") == PostProcessDebugTap::GIEnvironmentIrradiance &&
+				FindFrameCaptureDiagnosticTap("gi-base-visibility") == PostProcessDebugTap::GIBaseVisibility &&
+				FindFrameCaptureDiagnosticTap("gi-coat-visibility") == PostProcessDebugTap::GICoatVisibility &&
+				FindFrameCaptureDiagnosticTap("gi-combined-visibility") == PostProcessDebugTap::GICombinedVisibility &&
 				!FindFrameCaptureDiagnosticTap("bloom-result") &&
 				GetFrameCaptureDiagnosticTapName(PostProcessDebugTap::BloomResult).empty(),
 				"Diagnostic taps have stable names; non-diagnostic taps have none");
@@ -1587,26 +1594,27 @@ namespace gglab
 		void RunGraphEnumTests(SelfTestContext& context) noexcept
 		{
 			CheckGraphEnumIds<RGPassEncoderType>(context, "Graphics,Compute,Copy");
-			CheckGraphEnumIds<RGResourceType>(context, "Texture,Buffer");
+			CheckGraphEnumIds<RGResourceType>(context, "Texture,Buffer,AccelerationStructure");
 			CheckGraphEnumIds<RGOrderingRequirement>(context, "Ordered,Unordered");
 			CheckGraphEnumIds<RGDependencyAccess>(context, "Read,Write,ReadWrite");
 			CheckGraphEnumIds<RGDependencyReason>(context,
 				"WriterToReader,PreviousWriterToWriter,PreviousReaderToWriter,ExportWriterToExport,ExportReaderToExport,ObservationOrder");
-			CheckGraphEnumIds<RGBarrierKind>(context, "Transition,Uav");
+			CheckGraphEnumIds<RGBarrierKind>(context, "Transition,Uav,AccelerationStructure");
 			CheckGraphEnumIds<RGBarrierReason>(context, "AccessTransition,OrderedStorageHazard,FinalStateTransition");
 			CheckGraphEnumIds<RGTextureAccess>(context,
 				"None,Sample,RenderTarget,DepthStencilWrite,DepthStencilRead,StorageRead,StorageWrite,StorageReadWrite,CopySource,CopyDest,Present");
 			CheckGraphEnumIds<RGBufferAccess>(context,
-				"None,Vertex,Index,Constant,StructuredRead,StorageRead,StorageWrite,StorageReadWrite,CopySource,CopyDest,IndirectArgument");
+				"None,Vertex,Index,Constant,StructuredRead,StorageRead,StorageWrite,StorageReadWrite,CopySource,CopyDest,IndirectArgument,AccelerationStructureInput,AccelerationStructureScratch");
+			CheckGraphEnumIds<RGAccelerationStructureAccess>(context, "BuildRead,BuildWrite,QueryRead");
 			CheckGraphEnumIds<RHITextureUsage>(context,
 				"Sampled,RenderTarget,DepthStencil,UnorderedAccess,CopySource,CopyDest,Present");
 			CheckGraphEnumIds<RHIBufferUsage>(context,
-				"Vertex,Index,Constant,Structured,UnorderedAccess,IndirectArgument,CopySource,CopyDest");
+				"Vertex,Index,Constant,Structured,UnorderedAccess,IndirectArgument,CopySource,CopyDest,AccelerationStructureInput,AccelerationStructureStorage,AccelerationStructureScratch");
 			CheckGraphEnumIds<RHIStage>(context,
-				"DrawIndirect,IndexInput,VertexShader,PixelShader,ComputeShader,RenderTarget,DepthStencil,Copy,Resolve,Present");
+				"DrawIndirect,AccelerationStructureBuild,IndexInput,VertexShader,PixelShader,ComputeShader,RenderTarget,DepthStencil,Copy,Resolve,Present");
 			CheckGraphEnumIds<RHITextureAspect>(context, "Color,Depth,Stencil");
 			CheckGraphEnumIds<RHIAccess>(context,
-				"Common,ShaderResource,RenderTarget,DepthStencilRead,DepthStencilWrite,UnorderedAccess,CopySource,CopyDest,VertexBuffer,IndexBuffer,ConstantBuffer,IndirectArgument,Present");
+				"Common,ShaderResource,RenderTarget,DepthStencilRead,DepthStencilWrite,UnorderedAccess,AccelerationStructureRead,AccelerationStructureWrite,AccelerationStructureScratch,CopySource,CopyDest,VertexBuffer,IndexBuffer,ConstantBuffer,IndirectArgument,Present");
 			CheckGraphEnumIds<RHILayout>(context,
 				"Unknown,Common,ShaderResource,RenderTarget,DepthStencilRead,DepthStencilWrite,UnorderedAccess,CopySource,CopyDest,Present,Undefined");
 			context.Check(diagnostics::RGFlagsId(RHIStage::VertexShader | RHIStage::PixelShader) ==

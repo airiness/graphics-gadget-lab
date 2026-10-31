@@ -134,6 +134,12 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardPlusValidation.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassFrameCapture.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGTAO.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RaySceneSunVisibility.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RaySceneHitMaterial.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGIReceiver.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGIReference.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGISpecularVisibility.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GISpecularVisibilityObservation.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassTemporalAA.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassTemporalReference.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassIBL.cpp" />
@@ -149,12 +155,19 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\CameraController.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\CameraPath.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\TemporalReferenceAccumulator.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIReferenceObservation.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIProbeUpdate.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIProbeUpdateWorkload.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIField.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GTAOTemporalHistory.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\CameraRig.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\RenderQueueSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12TransferContext.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIResource.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHITextureValidation.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIAccelerationStructure.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12AccelerationStructureManager.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanAccelerationStructureManager.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIContext.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIUpload.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIUploadPool.cpp" />
@@ -265,6 +278,8 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Resource\TransientResourcePool.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Geometry.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\MaterialGpuEncoder.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RayScene.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RayScenePlan.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetLoadProgress.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Renderer.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Capture\CapturePayloadBudget.cpp" />
@@ -321,9 +336,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanSwapChain.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanTimelineFence.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanFrameRuntime.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-	<ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanBootstrap.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-	<ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanContext.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-	<ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanGpuProfiler.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanBootstrap.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanContext.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanGpuProfiler.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanBarrier.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanFormat.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanDescriptorManager.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
@@ -338,6 +353,8 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanTransferContext.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\PostProcess\PostProcessPreviewGraphResources.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\GIPreviewGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\AllocatorBase.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\FreeListSpanAllocator.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\RingSpanAllocator.h" />
@@ -382,6 +399,15 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\CameraPath.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\TemporalReference.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\TemporalReferenceAccumulator.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\GIShaderConstants.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIComputeDispatch.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\RaySceneShaderBindings.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIReferenceObservation.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GISpecularVisibilityObservation.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGISpecularVisibility.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GISpecularVisibility.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIReferenceTypes.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIObservationLimits.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\TemporalHistoryTextures.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GTAOTemporalHistory.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\CameraTooling.h" />
@@ -417,6 +443,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIFrameSubmission.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIUploadPool.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\RHIHandleTable.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\AccelerationStructureStore.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12AccelerationStructureManager.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanAccelerationStructureManager.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIHandles.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIPipeline.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIPipelineSystem.h" />
@@ -427,10 +456,12 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIFormat.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITexture.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITextureValidation.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHIAccelerationStructure.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITextureViewDescUtils.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RHI\RHITypes.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanCoordinatePolicy.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanDeviceProfile.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanRayQuerySupport.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanShaderBindingABI.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanUtility.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanInstance.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
@@ -442,9 +473,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanTimelineFence.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanFrameRuntime.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanResultClassification.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-	<ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanBootstrap.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-	<ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanContext.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
-	<ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanGpuProfiler.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanBootstrap.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanContext.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanGpuProfiler.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanBarrier.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanFormat.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\Vulkan\VulkanDescriptorManager.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
@@ -470,6 +501,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorAllocatorBase.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorRingAllocator.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Device.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12RayQuerySupport.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12HResult.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12QueueSystem.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\DX12Context.h" />
@@ -518,6 +550,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassForwardPlusValidation.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassFrameCapture.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGTAO.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGIReceiver.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassGIReference.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\GIReceiverGraphResources.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassTemporalAA.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\RenderPassTemporalReference.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\ForwardPBRShaderSet.h" />
@@ -627,6 +662,16 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RenderParameters.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Geometry.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\MaterialGpuEncoder.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RayScenePlan.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\RayScene.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\RaySceneSunVisibility.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\RaySceneHitMaterial.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIReference.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIProbeUpdate.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIField.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIUpdateStatus.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIProbeUpdateWorkload.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIFieldState.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Asset\AssetManager.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\AssetManagerState.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Asset\TextureDerivedDataCoordinator.h" />
@@ -757,7 +802,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\BackendSnapshotProviders.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\BuiltinSnapshotProviders.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\ForwardPlusDiagnosticsSnapshotBuilder.cpp" />
-	<ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\GTAODiagnosticsSnapshotBuilder.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\GTAODiagnosticsSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\TemporalAADiagnosticsSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\LabSnapshotProvider.cpp" />
@@ -793,7 +838,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\BuiltinSnapshotProviders.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\BackendSnapshotProviders.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\ForwardPlusDiagnosticsSnapshotBuilder.h" />
-	<ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\GTAODiagnosticsSnapshotBuilder.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\GTAODiagnosticsSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\TemporalAADiagnosticsSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\IBLDiagnosticsSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Diagnostics\Builders\LabSnapshotProvider.h" />
@@ -840,7 +885,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\ShadowDiagnosticsSnapshot.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\ShadowPreviewViewBase.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\TransientResourcePoolSnapshot.h" />
-	<ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\VulkanBackendSnapshot.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Diagnostics\Snapshots\VulkanBackendSnapshot.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Diagnostics\DX12BackendSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Diagnostics\DX12PipelineSystemSnapshotBuilder.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Diagnostics\DX12ResourceManagerSnapshotBuilder.h" />
@@ -861,6 +906,94 @@
       <Project>{371b9fa9-4c90-4ac6-a123-aced756d6c77}</Project>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup Label="ShaderSources" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'">
+    <None Include="..\..\Shaders\Common\ApplicationBinding.hlsli" />
+    <None Include="..\..\Shaders\Common\BindlessResources.hlsli" />
+    <None Include="..\..\Shaders\Common\BufferLayout.hlsli" />
+    <None Include="..\..\Shaders\Common\Common.hlsli" />
+    <None Include="..\..\Shaders\Common\Cubemap.hlsli" />
+    <None Include="..\..\Shaders\Common\DepthReconstruction.hlsli" />
+    <None Include="..\..\Shaders\Common\DisplayColor.hlsli" />
+    <None Include="..\..\Shaders\Common\EnvironmentSampling.hlsli" />
+    <None Include="..\..\Shaders\Common\ForwardCoverageVaryings.hlsli" />
+    <None Include="..\..\Shaders\Common\FullscreenTriangle.hlsli" />
+    <None Include="..\..\Shaders\Common\HDRColorMath.hlsli" />
+    <None Include="..\..\Shaders\Common\MaterialSampling.hlsli" />
+    <None Include="..\..\Shaders\Common\MaterialUtils.hlsli" />
+    <None Include="..\..\Shaders\Common\NonFiniteCounters.hlsli" />
+    <None Include="..\..\Shaders\Common\NonFiniteScan.hlsli" />
+    <None Include="..\..\Shaders\Common\Sampling.hlsli" />
+    <None Include="..\..\Shaders\Common\ScreenSpace.hlsli" />
+    <None Include="..\..\Shaders\Common\SurfaceEvaluation.hlsli" />
+    <None Include="..\..\Shaders\Common\Temporal.hlsli" />
+    <None Include="..\..\Shaders\Common\TemporalAA.hlsli" />
+    <None Include="..\..\Shaders\Common\TemporalMotion.hlsli" />
+    <None Include="..\..\Shaders\Common\VertexInput.hlsli" />
+    <None Include="..\..\Shaders\Common\VertexTransform.hlsli" />
+    <None Include="..\..\Shaders\Lighting\AmbientOcclusion.hlsli" />
+    <None Include="..\..\Shaders\Lighting\Atmosphere.hlsli" />
+    <None Include="..\..\Shaders\Lighting\AtmosphereBinding.hlsli" />
+    <None Include="..\..\Shaders\Lighting\DirectionalShadowData.hlsli" />
+    <None Include="..\..\Shaders\Lighting\DirectionalShadowVisibility.hlsli" />
+    <None Include="..\..\Shaders\Lighting\EnvironmentImportanceSampling.hlsli" />
+    <None Include="..\..\Shaders\Lighting\ForwardPlus.hlsli" />
+    <None Include="..\..\Shaders\Lighting\GIHitLighting.hlsli" />
+    <None Include="..\..\Shaders\Lighting\GIHitMaterial.hlsli" />
+    <None Include="..\..\Shaders\Lighting\GIRayScene.hlsli" />
+    <None Include="..\..\Shaders\Lighting\GISampling.hlsli" />
+    <None Include="..\..\Shaders\Lighting\GIShaderConstants.hlsli" />
+    <None Include="..\..\Shaders\Lighting\GTAO.hlsli" />
+    <None Include="..\..\Shaders\Lighting\IrradianceIntegrationMath.hlsli" />
+    <None Include="..\..\Shaders\Lighting\RaySceneGeometry.hlsli" />
+    <None Include="..\..\Shaders\Lighting\ShadowReceiverPlaneMath.hlsli" />
+    <None Include="..\..\Shaders\Lighting\ShadowSampling.hlsli" />
+    <None Include="..\..\Shaders\Lighting\SpecularIntegrationMath.hlsli" />
+    <None Include="..\..\Shaders\Lighting\WorldSunTransmittance.hlsli" />
+    <None Include="..\..\Shaders\PBR\AnisotropicIBL.hlsli" />
+    <None Include="..\..\Shaders\PBR\BRDF.hlsli" />
+    <None Include="..\..\Shaders\PBR\DirectLighting.hlsli" />
+    <None Include="..\..\Shaders\PBR\IndirectLighting.hlsli" />
+    <None Include="..\..\Shaders\PBR\MaterialDiagnostics.hlsli" />
+    <None Include="..\..\Shaders\PBR\MaterialShading.hlsli" />
+    <None Include="..\..\Shaders\PBR\SpecularAA.hlsli" />
+  </ItemGroup>
+  <ItemGroup Label="ShaderSources" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'">
+    <FxCompile Include="..\..\Shaders\Passes\PassAerialPerspective.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassAtmosphere.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassBloom.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassDebugDraw.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassDepthPrepass.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassDirectionalShadowMap.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassFinalColor.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassForwardCoverage.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassForwardPBR.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassForwardPlusCull.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassForwardPlusValidation.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassGIProbeUpdate.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassGIReceiver.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassGIReference.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassGISpecularVisibility.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassGTAO.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLBrdfLUT.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLCubemapPreview.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLEnvironment.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLEnvironmentMip.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLImportance.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLIrradiance.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLPrefilteredSpecular.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassNonFiniteCounters.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassNonFiniteScan.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassPhysicalSky.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassPostProcessPreview.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassRaySceneHitMaterial.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassRaySceneSunVisibility.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassShadowMapPreview.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassSkybox.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalAA.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalAADepthHistory.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalAADisplayDepth.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalReference.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

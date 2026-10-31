@@ -1,8 +1,13 @@
 #pragma once
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIReference.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIField.h"
+#include "GGLabRuntime/Graphics/Pipeline/GISpecularVisibility.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineSceneExtensionBase.h"
 
 #include <memory>
+#include <optional>
 
 namespace gglab
 {
@@ -16,6 +21,15 @@ namespace gglab
 		// the HDR-diff validation recipe; production compositions leave it empty.
 		std::shared_ptr<ForwardPlusDebugReadback> m_ForwardPlusDebugReadback;
 		std::unique_ptr<RenderPipelineSceneExtensionBase> m_SceneExtension;
+		// Runtime-owned receiver diagnostics before the temporal boundary. Requires
+		// Native, unjittered rendering with TAA off; ordinary compositions leave this off.
+		bool m_EnableGIReceiver = false;
+		// Also enables receivers; records a stateless float reference before TAA.
+		std::optional<GIReferenceCreateInfo> m_GIReference;
+		// Independent pre-temporal diagnostic; never changes production specular IBL.
+		std::optional<GISpecularVisibilityCreateInfo> m_GISpecularVisibility;
+		std::shared_ptr<GIProbeUpdateExperiment> m_GIProbeUpdate;
+		std::shared_ptr<GIField> m_GIField;
 	};
 
 	[[nodiscard]] std::unique_ptr<RenderPipelineBase> CreateRenderPipelineForwardPlus(

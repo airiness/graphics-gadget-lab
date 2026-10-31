@@ -11,6 +11,9 @@
 #include "Graphics/RenderPass/RenderPassForwardTransparent.h"
 #include "Graphics/RenderPass/RenderPassFrameCapture.h"
 #include "Graphics/RenderPass/RenderPassGTAO.h"
+#include "Graphics/RenderPass/RenderPassGIReceiver.h"
+#include "Graphics/RenderPass/RenderPassGIReference.h"
+#include "Graphics/RenderPass/RenderPassGISpecularVisibility.h"
 #include "Graphics/RenderPass/RenderPassAtmosphere.h"
 #include "Graphics/RenderPass/RenderPassAerialPerspective.h"
 #include "Graphics/RenderPass/RenderPassIBL.h"
@@ -23,6 +26,8 @@
 #include "GGLabRuntime/Graphics/RenderPipeline/DepthCoverageFramePlan.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlusTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIField.h"
 
 #include <cstdint>
 #include <memory>
@@ -42,6 +47,11 @@ namespace gglab
 			// tile readback and the HDR-diff validation recipe.
 			std::shared_ptr<ForwardPlusDebugReadback> m_ForwardPlusDebugReadback;
 			std::unique_ptr<RenderPipelineSceneExtensionBase> m_SceneExtension;
+			bool m_EnableGIReceiver = false;
+			std::optional<GIReferenceCreateInfo> m_GIReference;
+			std::optional<GISpecularVisibilityCreateInfo> m_GISpecularVisibility;
+			std::shared_ptr<GIProbeUpdateExperiment> m_GIProbeUpdate;
+			std::shared_ptr<GIField> m_GIField;
 		};
 
 		explicit RenderPipelineForwardPlus(
@@ -54,6 +64,12 @@ namespace gglab
 		explicit RenderPipelineForwardPlus(CreateInfo createInfo) noexcept :
 			m_ForwardPlusDebugReadback(std::move(createInfo.m_ForwardPlusDebugReadback)),
 			m_SceneExtension(std::move(createInfo.m_SceneExtension)),
+			m_EnableGIReceiver(createInfo.m_EnableGIReceiver || createInfo.m_GIReference.has_value() ||
+				createInfo.m_GISpecularVisibility.has_value()),
+			m_GIReference(std::move(createInfo.m_GIReference)),
+			m_GISpecularVisibility(std::move(createInfo.m_GISpecularVisibility)),
+			m_GIProbeUpdate(std::move(createInfo.m_GIProbeUpdate)),
+			m_GIField(std::move(createInfo.m_GIField)),
 			m_ForwardPlusCullPass(m_ForwardPlusDebugReadback),
 			m_ForwardPlusValidationPass(m_ForwardPlusDebugReadback)
 		{
@@ -92,6 +108,14 @@ namespace gglab
 
 		std::shared_ptr<ForwardPlusDebugReadback> m_ForwardPlusDebugReadback;
 		std::unique_ptr<RenderPipelineSceneExtensionBase> m_SceneExtension;
+		bool m_EnableGIReceiver = false;
+		std::optional<GIReferenceCreateInfo> m_GIReference;
+		std::optional<GISpecularVisibilityCreateInfo> m_GISpecularVisibility;
+		std::shared_ptr<GIProbeUpdateExperiment> m_GIProbeUpdate;
+		std::shared_ptr<GIField> m_GIField;
+		RenderPassGISpecularVisibility m_GISpecularVisibilityPass;
+		RenderPassGIReference m_GIReferencePass;
+		RenderPassGIReceiver m_GIReceiverPass;
 		RenderPassDirectionalShadowMap m_DirectionalShadowMapPass;
 		RenderPassShadowMapPreview m_ShadowMapPreviewPass;
 		RenderPassClearViewTargets m_ClearViewTargetsPass;

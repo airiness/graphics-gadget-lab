@@ -15,6 +15,9 @@ param(
 #   Source ownership - every first-party source item must live below its owning
 #                      project's source roots, and every physical source file must
 #                      belong to exactly one owning project.
+#   Shader ownership - shader sources, shared headers and metadata have exactly
+#                      one feature-domain project owner; IDE items never enable
+#                      MSBuild shader compilation.
 #   Include visibility - Foundation and NapaVoxelCore see only their owned
 #                        Public/Private roots, while ordinary consumers receive
 #                        only the corresponding Public root.
@@ -1029,6 +1032,10 @@ foreach ($reference in Get-ProjectItemPaths $winAppTestsProject $winAppTestsName
 }
 
 $projectContractFindings = New-Object System.Collections.Generic.List[object]
+Import-Module (Join-Path $PSScriptRoot 'ShaderProjectOwnership.psm1') -Force
+foreach ($finding in (Get-ShaderProjectOwnershipFindings $root)) {
+    $projectContractFindings.Add($finding)
+}
 
 function Test-ProjectIncludeVisibility {
     param(

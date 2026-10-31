@@ -18,6 +18,8 @@
         "gglab.shader.final-color",
         "gglab.shader.forward-coverage",
         "gglab.shader.forward-pbr",
+        "gglab.shader.gi-probe-update",
+        "gglab.shader.gi-receiver",
         "gglab.shader.gtao",
         "gglab.shader.ibl-brdf-lut",
         "gglab.shader.ibl-cubemap-preview",
@@ -29,6 +31,7 @@
         "gglab.shader.napa-voxel",
         "gglab.shader.physical-sky-preview",
         "gglab.shader.post-process-preview",
+        "gglab.shader.ray-scene",
         "gglab.shader.render-graph-compute",
         "gglab.shader.shadow-map-preview",
         "gglab.shader.skybox",
@@ -58,6 +61,8 @@
         "gglab.shader.final-color",
         "gglab.shader.forward-coverage",
         "gglab.shader.forward-pbr",
+        "gglab.shader.gi-probe-update",
+        "gglab.shader.gi-receiver",
         "gglab.shader.gtao",
         "gglab.shader.ibl-brdf-lut",
         "gglab.shader.ibl-cubemap-preview",
@@ -69,6 +74,7 @@
         "gglab.shader.napa-voxel",
         "gglab.shader.physical-sky-preview",
         "gglab.shader.post-process-preview",
+        "gglab.shader.ray-scene",
         "gglab.shader.render-graph-compute",
         "gglab.shader.shadow-map-preview",
         "gglab.shader.skybox",
@@ -98,6 +104,8 @@
         "gglab.shader.final-color",
         "gglab.shader.forward-coverage",
         "gglab.shader.forward-pbr",
+        "gglab.shader.gi-probe-update",
+        "gglab.shader.gi-receiver",
         "gglab.shader.gtao",
         "gglab.shader.ibl-brdf-lut",
         "gglab.shader.ibl-cubemap-preview",
@@ -109,6 +117,7 @@
         "gglab.shader.napa-voxel",
         "gglab.shader.physical-sky-preview",
         "gglab.shader.post-process-preview",
+        "gglab.shader.ray-scene",
         "gglab.shader.render-graph-compute",
         "gglab.shader.shadow-map-preview",
         "gglab.shader.skybox",
@@ -138,6 +147,8 @@
         "gglab.shader.final-color",
         "gglab.shader.forward-coverage",
         "gglab.shader.forward-pbr",
+        "gglab.shader.gi-probe-update",
+        "gglab.shader.gi-receiver",
         "gglab.shader.gtao",
         "gglab.shader.ibl-brdf-lut",
         "gglab.shader.ibl-cubemap-preview",
@@ -149,6 +160,7 @@
         "gglab.shader.napa-voxel",
         "gglab.shader.physical-sky-preview",
         "gglab.shader.post-process-preview",
+        "gglab.shader.ray-scene",
         "gglab.shader.render-graph-compute",
         "gglab.shader.shadow-map-preview",
         "gglab.shader.skybox",
@@ -173,9 +185,11 @@
         "gglab.shader.aerial-perspective",
         "gglab.shader.forward-plus-cull",
         "gglab.shader.forward-plus-validation",
+        "gglab.shader.gi-probe-update",
         "gglab.shader.gtao",
         "gglab.shader.physical-sky-preview",
         "gglab.shader.post-process-preview",
+        "gglab.shader.ray-scene",
         "gglab.shader.skybox",
         "gglab.shader.temporal-aa"
       ],
@@ -221,6 +235,8 @@
         "gglab.shader.final-color",
         "gglab.shader.forward-coverage",
         "gglab.shader.forward-pbr",
+        "gglab.shader.gi-probe-update",
+        "gglab.shader.gi-receiver",
         "gglab.shader.gtao",
         "gglab.shader.ibl-brdf-lut",
         "gglab.shader.ibl-cubemap-preview",
@@ -232,6 +248,7 @@
         "gglab.shader.napa-voxel",
         "gglab.shader.physical-sky-preview",
         "gglab.shader.post-process-preview",
+        "gglab.shader.ray-scene",
         "gglab.shader.render-graph-compute",
         "gglab.shader.shadow-map-preview",
         "gglab.shader.skybox",
@@ -261,6 +278,8 @@
         "gglab.shader.final-color",
         "gglab.shader.forward-coverage",
         "gglab.shader.forward-pbr",
+        "gglab.shader.gi-probe-update",
+        "gglab.shader.gi-receiver",
         "gglab.shader.gtao",
         "gglab.shader.ibl-brdf-lut",
         "gglab.shader.ibl-cubemap-preview",
@@ -272,6 +291,7 @@
         "gglab.shader.napa-voxel",
         "gglab.shader.physical-sky-preview",
         "gglab.shader.post-process-preview",
+        "gglab.shader.ray-scene",
         "gglab.shader.render-graph-compute",
         "gglab.shader.shadow-map-preview",
         "gglab.shader.skybox",
@@ -301,6 +321,8 @@
         "gglab.shader.final-color",
         "gglab.shader.forward-coverage",
         "gglab.shader.forward-pbr",
+        "gglab.shader.gi-probe-update",
+        "gglab.shader.gi-receiver",
         "gglab.shader.gtao",
         "gglab.shader.ibl-brdf-lut",
         "gglab.shader.ibl-cubemap-preview",
@@ -312,6 +334,7 @@
         "gglab.shader.napa-voxel",
         "gglab.shader.physical-sky-preview",
         "gglab.shader.post-process-preview",
+        "gglab.shader.ray-scene",
         "gglab.shader.render-graph-compute",
         "gglab.shader.shadow-map-preview",
         "gglab.shader.skybox",
@@ -336,9 +359,11 @@
         "gglab.shader.aerial-perspective",
         "gglab.shader.forward-plus-cull",
         "gglab.shader.forward-plus-validation",
+        "gglab.shader.gi-probe-update",
         "gglab.shader.gtao",
         "gglab.shader.physical-sky-preview",
         "gglab.shader.post-process-preview",
+        "gglab.shader.ray-scene",
         "gglab.shader.skybox",
         "gglab.shader.temporal-aa"
       ],
@@ -1027,7 +1052,7 @@
       "function": "global",
       "operation": "SanitizeHDRColor",
       "count": 2,
-      "bodySha256": "b59d2cee8330cab901feae4f89b9392e1246922ab642b0a8be6e4bef80bf63ea",
+      "bodySha256": "f4aab9b93da966e17950f4b4c756d05103bcabaa86fd4da1f9f6c7b93dd32deb",
       "programs": [
         "gglab.shader.forward-pbr"
       ],
@@ -1368,8 +1393,8 @@
       "source": "Passes/PassPostProcessPreview.hlsl",
       "function": "PSMain",
       "operation": "isfinite",
-      "count": 2,
-      "bodySha256": "ee643de7a2c2bf9ddd851d95508bd2fb8fdef03375aeb53fc48c21cd82c4f3a6",
+      "count": 4,
+      "bodySha256": "7ff525a855f048b1f058763bd8fcdeb9292368b7c0da523f8dfc82b773e519ef",
       "programs": [
         "gglab.shader.post-process-preview"
       ],
@@ -1386,8 +1411,8 @@
       "source": "Passes/PassPostProcessPreview.hlsl",
       "function": "PSMain",
       "operation": "ACESFitted",
-      "count": 2,
-      "bodySha256": "ee643de7a2c2bf9ddd851d95508bd2fb8fdef03375aeb53fc48c21cd82c4f3a6",
+      "count": 3,
+      "bodySha256": "3aaa4ac479d798887022a98bbf9d01a476c237cf296b48e6fa26757a4d40a038",
       "programs": [
         "gglab.shader.post-process-preview"
       ],
@@ -1405,7 +1430,7 @@
       "function": "PSMain",
       "operation": "SanitizeHDRColor",
       "count": 1,
-      "bodySha256": "bb1e8c0690cea4abaa2c76df613e18ddfd26e87424f90ebec318baa3557c9061",
+      "bodySha256": "7027f6774ac2e60cc02dccba819e738087f88247ff701fbab7bded5a858b6234",
       "programs": [
         "gglab.shader.post-process-preview"
       ],
@@ -1542,6 +1567,97 @@
         "fp16Maximum": "report"
       },
       "rationale": "A guarded fallback/rejection can hide non-finite state and needs counter evidence before production coverage is available."
+    },
+    {
+      "id": "gi-ray-scene.gitrace-hit.isfinite",
+      "source": "Lighting/GIRayScene.hlsli",
+      "function": "GITraceHit",
+      "operation": "isfinite",
+      "count": 7,
+      "bodySha256": "ad762544054c32e7606c94e9d54f72b63aff199ee523cec18f0ca3209d949678",
+      "programs": [
+        "gglab.shader.gi-probe-update",
+        "gglab.shader.ray-scene"
+      ],
+      "kind": "recovery",
+      "evidence": "counter",
+      "policy": {
+        "negative": "error",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Invalid transformed triangle normals, positions, reconstruction errors, vertex normals, UVs and reduced albedo reject the sample explicitly before fallback or texture sampling can hide a deep-path non-finite input. Signed geometry and FP32 values are not radiance clamps."
+    },
+    {
+      "id": "pass-gi-reference.gipathfinite.isfinite",
+      "source": "Passes/PassGIReference.hlsl",
+      "function": "GIPathFinite",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "e85390e419bba7c89881ae4b023c9a713d4b74c9e24baaef6bf4d5195eb73b6f",
+      "programs": [
+        "gglab.shader.ray-scene"
+      ],
+      "kind": "recovery",
+      "evidence": "counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Fixed-depth paths reject non-finite geometry, throughput and lighting at every query; a persistent any-depth invalid count also invalidates the reference estimate. Signed positions/normals and FP32 lighting are legitimate."
+    },
+    {
+      "id": "gi-specular-visibility.finite.isfinite",
+      "source": "Passes/PassGISpecularVisibility.hlsl",
+      "function": "VisibilityFinite",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "53da467db2d036ad9212a9554671be25291dfe3a9d12fc8beae40c27e9b77801",
+      "programs": [
+        "gglab.shader.ray-scene"
+      ],
+      "kind": "recovery",
+      "evidence": "counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Reject invalid receiver, GGX direction, layer energy and accumulated sums before publishing normalized visibility. Signed geometry and FP32 values are not radiance clamps; per-lobe invalid counts independently invalidate the observation."
+    },
+    {
+      "id": "gi-probe-update.trace.isfinite",
+      "source": "Passes/PassGIProbeUpdate.hlsl",
+      "function": "Trace",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "aae321ecc4a2ac98d7a6afaf53616057342e656f96eb28f775da99abd7a092db",
+      "programs": [
+        "gglab.shader.gi-probe-update"
+      ],
+      "kind": "recovery",
+      "evidence": "counter",
+      "policy": {
+        "negative": "expected",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Invalid ray radiance/distance persists in raw diagnostics and sets a sticky update error; the atlas blend rejects that update. Negative distances encode single-sided backface hits."
+    },
+    {
+      "id": "gi-probe-update.storetexel.isfinite",
+      "source": "Passes/PassGIProbeUpdate.hlsl",
+      "function": "StoreTexel",
+      "operation": "isfinite",
+      "count": 4,
+      "bodySha256": "cdc2b1f6acb77b1392c53182d1d986d896ed1aab65176bca4364ad3eea155348",
+      "programs": [
+        "gglab.shader.gi-probe-update"
+      ],
+      "kind": "recovery",
+      "evidence": "counter",
+      "policy": {
+        "negative": "expected",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Reject non-finite history or blend results before any persistent atlas store; retain a sticky field-generation failure instead of substituting or dropping the sample."
     }
   ],
   "injectionPoints": [
@@ -1577,6 +1693,39 @@
       ],
       "claim": "production",
       "rationale": "Temporal AA history read (RGB color, alpha accumulation) before the recovery guards; the recovery branch hides the value from resource scans."
+    },
+    {
+      "id": "pass-gi-reference.csmain.throughput",
+      "source": "Passes/PassGIReference.hlsl",
+      "function": "CSMain",
+      "count": 1,
+      "programs": [
+        "gglab.shader.ray-scene"
+      ],
+      "claim": "production",
+      "rationale": "Debug qualification replaces throughput after the first valid secondary hit and sun NEE. The next bounce must reject it, persist any-depth invalidity independently of first-query outcomes, and report the original non-finite operand through production counters."
+    },
+    {
+      "id": "pass-gi-probe-update.trace.sample",
+      "source": "Passes/PassGIProbeUpdate.hlsl",
+      "function": "Trace",
+      "count": 1,
+      "programs": [
+        "gglab.shader.gi-probe-update"
+      ],
+      "claim": "production",
+      "rationale": "Qualify persistent GI history isolation and sticky failure propagation at a selected probe and ray/interior texel."
+    },
+    {
+      "id": "pass-gi-probe-update.storetexel.history",
+      "source": "Passes/PassGIProbeUpdate.hlsl",
+      "function": "StoreTexel",
+      "count": 2,
+      "programs": [
+        "gglab.shader.gi-probe-update"
+      ],
+      "claim": "production",
+      "rationale": "Qualify persistent GI history isolation and sticky failure propagation at a selected probe and ray/interior texel."
     }
   ]
 }

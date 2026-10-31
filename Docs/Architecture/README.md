@@ -13,7 +13,8 @@ Atlas ID: atlas.overview.layers
 
 Use the [task-routing table](../../.agents/skills/gglab-architecture/references/task-routing.md)
 for a specific change and the [maintenance guide](Boundary_And_Drift_Guide.md) when
-updating a map.
+updating a map. Commands and result handling belong to the
+[verification guide](../../Tests/Verification/README.md).
 
 ## Layers
 

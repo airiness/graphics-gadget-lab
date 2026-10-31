@@ -56,6 +56,9 @@ namespace gglab
 	struct RHIBufferHandleTag
 	{
 	};
+	struct RHIAccelerationStructureHandleTag
+	{
+	};
 	struct RHISamplerHandleTag
 	{
 	};
@@ -86,6 +89,7 @@ namespace gglab
 
 	using RHITextureHandle = RHIHandle<RHITextureHandleTag>;
 	using RHIBufferHandle = RHIHandle<RHIBufferHandleTag>;
+	using RHIAccelerationStructureHandle = RHIHandle<RHIAccelerationStructureHandleTag>;
 	using RHISamplerHandle = RHIHandle<RHISamplerHandleTag>;
 	using RHIPipelineHandle = RHIHandle<RHIPipelineHandleTag>;
 	using RHIBindingLayoutHandle = RHIHandle<RHIBindingLayoutHandleTag>;

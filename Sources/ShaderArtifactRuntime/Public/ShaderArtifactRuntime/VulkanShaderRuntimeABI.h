@@ -23,7 +23,7 @@ namespace gglab
 	// remains a separate artifact axis; m_Revision versions only the binding ABI.
 	struct VulkanShaderRuntimeABI
 	{
-		uint32_t m_Revision = 1;
+		uint32_t m_Revision = 2;
 
 		uint32_t m_FixedHlslRegisterSpace = 0;
 		uint32_t m_GlobalHeapHlslRegisterSpace = 1;

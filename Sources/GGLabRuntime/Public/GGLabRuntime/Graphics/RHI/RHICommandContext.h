@@ -2,6 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfileFrameSnapshot.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
+#include "GGLabRuntime/Graphics/RHI/RHIAccelerationStructure.h"
 #include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDescriptor.h"
 #include "GGLabRuntime/Graphics/RHI/RHIFence.h"
@@ -13,10 +14,12 @@
 #include <atomic>
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <optional>
 #include <span>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 
 namespace gglab
 {
@@ -209,6 +212,26 @@ namespace gglab
 		}
 		// Higher-layer validation can reject a recording through the same batch failure path.
 		void RejectRecording() noexcept { FailRecording(); }
+		[[nodiscard]] bool RetainForSubmission(std::shared_ptr<void> resource) noexcept
+		{
+			if (!m_UploadWriter)
+			{
+				FailRecording();
+				return false;
+			}
+			// The writer poisons invalid owner-thread calls. Foreign-thread rejection
+			// must not mutate either the shared batch or this encoder's recording state.
+			return m_UploadWriter->RetainForSubmission(std::move(resource));
+		}
+		[[nodiscard]] virtual bool BuildAccelerationStructure(RHIAccelerationStructureHandle,
+			const RHIASBuildInputs&, const RHIASBufferRange&) noexcept
+		{
+			FailRecording();
+			return false;
+		}
+		virtual void AccelerationStructureBarrier(RHIAccelerationStructureHandle,
+			RHIResourceState, RHIResourceState) noexcept { FailRecording(); }
+		virtual void TrackAccelerationStructureUse(RHIAccelerationStructureHandle) noexcept { FailRecording(); }
 		// Higher layers assign a small, recording-local required constant set. RHI
 		// tracks only readiness, never payload meanings or logical layout metadata.
 		[[nodiscard]] uint64_t BeginConstantBindingScope(std::span<const uint32_t> parameters) noexcept
@@ -500,6 +523,12 @@ namespace gglab
 	{
 	public:
 		~RHIComputeCommandContext() override = default;
+		[[nodiscard]] virtual bool SetAccelerationStructure(
+			uint32_t, RHIAccelerationStructureHandle) noexcept
+		{
+			FailRecording();
+			return false;
+		}
 
 		virtual void SetPipeline(RHIPipelineHandle pipeline) noexcept = 0;
 		virtual void SetDescriptorTable(const RHIDescriptorTableBinding& binding) noexcept = 0;

@@ -1,4 +1,5 @@
 #pragma once
+#include "Capture/FrameCaptureMetadata.h"
 #include "GGLabRuntime/Graphics/LightingProfile.h"
 #include "GGLabRuntime/Graphics/LightingMutationResult.h"
 #include "GGLabRuntime/Graphics/WorldLightingControlBase.h"
@@ -27,6 +28,7 @@ namespace gglab
 	struct LabDiagnosticsSnapshot;
 	struct LabDiagnosticsFrameContext;
 	struct RenderView;
+	struct RenderScene;
 
 	struct LabSessionCreateInfo
 	{
@@ -45,6 +47,9 @@ namespace gglab
 	{
 		const ResolvedViewRenderSettings& m_ViewSettings;
 		const RenderView* m_View = nullptr;
+		// Borrowed frozen scene/table identities for this frame build only.
+		const RenderScene* m_Scene = nullptr;
+		uint64_t m_FrameSerial = 0;
 	};
 
 	class LabSessionBase
@@ -107,6 +112,10 @@ namespace gglab
 			return std::nullopt;
 		}
 		virtual std::span<const WorldLightingProfile> GetLightingProfiles() const noexcept { return {}; }
+		virtual std::optional<FrameCaptureAssetBundle> GetCaptureAssetBundle() const noexcept
+		{
+			return std::nullopt;
+		}
 		void ApplyParameterChanges(LabChangeImpact impact) noexcept;
 		void ApplyRestoredParametersForPrepare(LabChangeImpact impact) noexcept;
 

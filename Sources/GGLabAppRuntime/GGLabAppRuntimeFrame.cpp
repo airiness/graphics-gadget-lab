@@ -703,23 +703,7 @@ namespace gglab
 				.m_Sequence = referenceSample ? nullptr : &framePatch,
 				.m_ForcedReference = referenceSample ? &framePatch : nullptr,
 			});
-		if (!m_FrameSequence->BeginFrame(captureFrameState, [this](const FrameCaptureGate& gate)
-			{
-				return m_ParameterControl->CoversReadinessGate(
-					ParameterBatchOwner::Sequence(m_FrameSequence->GetStatus()->m_SequenceId), gate);
-			}))
-		{
-			UpdateSequenceParameterEvents();
-			toolingFrame.Complete();
-			return AppRuntimeTickResult::Continue;
-		}
-		// Freeze the previous outcome before BeginFrame replaces it with this plan.
-		// Observation must not enable parameter tracking or reset capture settling.
-		const std::optional<ViewControlSnapshot> viewControl = toolingFrame.IsOpen() ?
-			std::optional(BuildViewControlSnapshot(inheritedView, m_ParameterControl->GetHostViewOverrides(),
-				captureFrameState, m_FrameCapture->GetLastFrameState())) :
-			std::nullopt;
-		m_FrameCapture->BeginFrame(std::move(captureFrameState));
+
 		RenderFrameBuildResult frame;
 		{
 			GGLAB_CPU_PROFILE_SCOPE("RenderHostFrameBuilder");
@@ -727,7 +711,7 @@ namespace gglab
 		}
 		m_ParameterControl->OnFrameBuilt(frame.m_FrameSerial, frame.m_RenderScene.m_WorldLightingGeneration,
 			frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)],
-			&frame.m_RenderViews[utils::ToIndex(frame.m_DisplayViewId)]);
+			&frame.m_RenderViews[utils::ToIndex(frame.m_DisplayViewId)], &frame.m_RenderScene);
 		auto parameterFrame = m_ParameterControl->IsEnabled() ?
 			std::make_shared<ParameterFrameState>(m_ParameterControl->CaptureFrameState(
 				frame.m_FrameSerial, m_RenderServiceBindings.m_Environment->GetBakeRequestGeneration(),
@@ -736,21 +720,14 @@ namespace gglab
 		demo->OnFrameBuilt(frame.m_FrameSerial, frame.m_RenderScene.m_WorldLightingGeneration);
 		RenderFrameContext validationContext = frame.MakeRenderFrameContext();
 		const auto& capturedView = frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)];
-		m_FrameCapture->SetFrameSceneInputs(frame.m_FrameSerial, {
-			.m_Exposure = capturedView.m_Exposure,
-			.m_PostProcess = capturedView.m_PostProcess,
-			.m_Shadows = frame.m_DirectionalShadowSettings,
-			.m_Environment = m_RenderServiceBindings.m_Environment->GetEnvironmentLightingSettings(),
-			.m_ActiveIBLGeneration = frame.m_RenderScene.m_WorldLightingGeneration,
-			.m_Atmosphere = frame.m_RenderScene.m_Atmosphere,
-			.m_Sun = frame.m_RenderScene.m_WorldSun,
-			.m_LocalLightCount = frame.m_RenderScene.m_LocalLightCount,
-			.m_AerialPerspective = capturedView.m_Lighting.m_EnableAerialPerspective,
-		});
+
 		const RenderFrameValidationResult validation =
 			renderPipeline.ValidateRenderFrame(validationContext, services);
 		if (!validation.IsReady())
 		{
+			// Preserve the aborted frame record even though successful capture selection
+			// now waits for the validated observation identity.
+			m_FrameCapture->BeginFrame(std::move(captureFrameState));
 			// Nothing has been recorded. The temporal transaction is aborted and the
 			// RenderFrame handle retires the begun frame on return.
 			m_RenderHost->InvalidateTemporalFrameAfterLateContractFailure(rendererFrame);
@@ -769,6 +746,62 @@ namespace gglab
 				validation.m_Reason, validation.m_Detail.empty() ? "" : ", detail=",
 				validation.m_Detail));
 		}
+		const auto reference = services.m_Presentation->GetGIReferenceObservationDiagnostics();
+		if (reference.m_Active)
+		{
+			captureFrameState.m_Readiness.Add("gi-reference",
+				reference.m_Status == GIReferenceObservationStatus::Completed ? FrameCaptureGateState::Ready :
+					reference.m_Status == GIReferenceObservationStatus::Failed ? FrameCaptureGateState::Failed :
+						FrameCaptureGateState::Pending,
+				std::format("Observation {}: D={}, {}/{} completed samples, {} submitted, version {}; sweep {} samples, tiles {}/{} submitted.",
+					reference.m_Generation, reference.m_MaximumDepth, reference.m_CompletedSamples, reference.m_TargetSamples,
+					reference.m_SubmittedSamples, reference.m_CommittedVersion, reference.m_SweepSamples,
+					reference.m_SubmittedTiles, reference.m_TileCount),
+				"gi-reference", reference.m_Generation);
+		}
+		const auto visibility = services.m_Presentation->GetGISpecularVisibilityProgress();
+		if (visibility.m_Active)
+		{
+			captureFrameState.m_Readiness.Add("gi-specular-visibility",
+				visibility.m_Status == GISpecularVisibilityStatus::Completed ?
+					FrameCaptureGateState::Ready :
+					visibility.m_Status == GISpecularVisibilityStatus::Failed ?
+						FrameCaptureGateState::Failed : FrameCaptureGateState::Pending,
+				std::format("Observation {}: {}/{} completed samples, {} submitted, version {}; sweep {} samples, tiles {}/{} submitted.",
+					visibility.m_Generation, visibility.m_CompletedSamples, visibility.m_TargetSamples,
+					visibility.m_SubmittedSamples, visibility.m_CommittedVersion, visibility.m_SweepSamples,
+					visibility.m_SubmittedTiles, visibility.m_TileCount),
+				"gi-specular-visibility", visibility.m_Generation);
+		}
+		// Select captures only after validation has identified this frame's observation.
+		if (!m_FrameSequence->BeginFrame(captureFrameState, [this](const FrameCaptureGate& gate)
+			{
+				return m_ParameterControl->CoversReadinessGate(
+					ParameterBatchOwner::Sequence(m_FrameSequence->GetStatus()->m_SequenceId), gate);
+			}))
+		{
+			UpdateSequenceParameterEvents();
+			toolingFrame.Complete();
+			return AppRuntimeTickResult::Continue;
+		}
+		// Freeze the previous outcome before BeginFrame replaces it with this plan.
+		// Observation must not enable parameter tracking or reset capture settling.
+		const std::optional<ViewControlSnapshot> viewControl = toolingFrame.IsOpen() ?
+			std::optional(BuildViewControlSnapshot(inheritedView, m_ParameterControl->GetHostViewOverrides(),
+				captureFrameState, m_FrameCapture->GetLastFrameState())) :
+			std::nullopt;
+		m_FrameCapture->BeginFrame(std::move(captureFrameState));
+		m_FrameCapture->SetFrameSceneInputs(frame.m_FrameSerial, {
+			.m_Exposure = capturedView.m_Exposure,
+			.m_PostProcess = capturedView.m_PostProcess,
+			.m_Shadows = frame.m_DirectionalShadowSettings,
+			.m_Environment = m_RenderServiceBindings.m_Environment->GetEnvironmentLightingSettings(),
+			.m_ActiveIBLGeneration = frame.m_RenderScene.m_WorldLightingGeneration,
+			.m_Atmosphere = frame.m_RenderScene.m_Atmosphere,
+			.m_Sun = frame.m_RenderScene.m_WorldSun,
+			.m_LocalLightCount = frame.m_RenderScene.m_LocalLightCount,
+			.m_AerialPerspective = capturedView.m_Lighting.m_EnableAerialPerspective,
+		});
 		demo->GetCameraRig().SubmitDebugDraw(m_DebugDrawService->GetContext());
 		frame.m_DebugDrawFrame = m_DebugDrawService->SealFrame(frameSlotIndex,
 			static_cast<float>(m_Time->GetDeltaTime()), frame.m_DebugDrawCullContext);

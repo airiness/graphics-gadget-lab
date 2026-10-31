@@ -10,6 +10,15 @@
     <Filter Include="Public\ShaderArtifactRuntime">
       <UniqueIdentifier>{57813C07-06F8-4EA1-0E35-3DB6BF4B734E}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{69D44152-95BA-B796-6D1A-20A3BDB5A45D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Common">
+      <UniqueIdentifier>{3A80F562-A35F-B147-BB51-B0A96F519197}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Metadata">
+      <UniqueIdentifier>{BAFE31E8-D94A-8ED7-0850-EB4B6FC183B8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Sources\ShaderArtifactRuntime\Private\ShaderArtifact.cpp">
@@ -68,5 +77,13 @@
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\VulkanShaderRuntimeABI.h">
       <Filter>Public\ShaderArtifactRuntime</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\Shaders\Common\NonFiniteSiteIds.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Metadata\NonFiniteSites.json">
+      <Filter>Shaders\Metadata</Filter>
+    </None>
   </ItemGroup>
 </Project>

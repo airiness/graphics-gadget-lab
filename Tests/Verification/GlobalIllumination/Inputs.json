@@ -1,0 +1,627 @@
+{
+  "schemaVersion": 1,
+  "id": "gglab.gi.qualification-inputs",
+  "date": "2026-10-28",
+  "status": "Initial implementation inputs; no GI qualification result",
+  "codeBaseline": "d2835a77eb4e2e39a3317f4244e9bfade15ae054",
+  "assetBundle": {
+    "manifest": "Assets/Models/GGLabCoastalRetreat/bundle.json",
+    "id": "gglab.coastal-retreat",
+    "revision": "79092da0d167d3bd041de9ead925c45d9f5ed8083cb07f2c0f5351afb94467e9"
+  },
+  "sourceFiles": [
+    {
+      "path": "Sources/WinAppHost/Application/Demo/CoastalSceneReferenceViews.h",
+      "sha256": "2fcf5e99e52ac47327297b5657e313e098d9fef0959788cb97bcaca5f7cbf8c4"
+    },
+    {
+      "path": "Sources/WinAppHost/Application/Demo/CoastalSceneLightingProfiles.h",
+      "sha256": "7514f0a047e9a8fef55ddd3d2f8a7f39f7216fd5a9ae624ba28262fbb17565d6"
+    },
+    {
+      "path": "Sources/WinAppHost/Application/Demo/DemoPlayground.cpp",
+      "sha256": "c997b2b93021fbd84d93b5644aa7585fd5eff8ca4a2733419268ed3d6296f2cf"
+    }
+  ],
+  "fixtureSpecification": {
+    "repository": "gglab-docs",
+    "path": "GGLab_Global_Illumination_Fixture_Specification.md",
+    "version": 1,
+    "sha256": "7e44232f8a97542334bce2e15e3118401309eb44d4a41305c8d22e5ae24c2c33",
+    "instantiated": false
+  },
+  "coastal": {
+    "gltf": "Assets/Models/GGLabCoastalRetreat/GGLabCoastalRetreat.gltf",
+    "coordinateSystem": "Runtime left-handed Y-up meters; reflect glTF world Z once; identity Demo root",
+    "coreMinMeters": [
+      -17.107118606567383,
+      -2.380000114440918,
+      -23.000000953674316
+    ],
+    "coreMaxMeters": [
+      14.406245231628418,
+      6.248000144958496,
+      14.216691017150879
+    ],
+    "placedPrimitivesByAlphaMode": {
+      "OPAQUE": 975,
+      "BLEND": 98
+    },
+    "volume": {
+      "probeMinMeters": [
+        -17.25,
+        -1.5,
+        -23.25
+      ],
+      "probeMaxMeters": [
+        14.75,
+        7.5,
+        14.75
+      ],
+      "spacingMeters": [
+        1,
+        1,
+        1
+      ],
+      "probeCounts": [
+        33,
+        10,
+        39
+      ],
+      "fitFloorMeters": 0.0,
+      "excludedFromFit": [
+        "Retreat_SeaSurface",
+        "Retreat_DistantIsland_00",
+        "Retreat_DistantIsland_01",
+        "Retreat_DistantIsland_02"
+      ],
+      "raySceneExclusions": [],
+      "coverageBlendMeters": 1.0,
+      "note": "Fit above-water receiver coverage; submerged terrain below -1.5 m is outside authored field coverage. All opaque geometry remains in the ray scene. Roof has at least one spacing of top padding."
+    },
+    "field": {
+      "raysPerProbeUpdate": 256,
+      "irradianceTileIncludingBorder": [
+        8,
+        8
+      ],
+      "distanceTileIncludingBorder": [
+        16,
+        16
+      ],
+      "irradianceFormat": "RGBA32F",
+      "distanceFormat": "RG32F",
+      "probeStateBytes": 16,
+      "rayRecordBytes": 16,
+      "fullUpdateRayCapacity": 3294720
+    },
+    "comparisonExtent": [
+      1280,
+      800
+    ],
+    "fixedDeltaTime": 0.016666666666666666,
+    "baselineSettleFrames": 64,
+    "maskCoordinates": "top-left, half-open pixel rectangles at comparisonExtent; certify opaque diffuse coverage in G2",
+    "lighting": {
+      "generation": 3,
+      "profileHash": "b272c126037b4eb3c8bda22cd7456997a8b81742f620c651fd9d384fc13b228b",
+      "profileHashVersion": 2,
+      "profileId": "coastal.daylight"
+    },
+    "sceneInputs": {
+      "aerialPerspective": true,
+      "atmosphere": {
+        "absorption": [
+          6.500000040432496e-07,
+          1.8810000028679497e-06,
+          8.500000348021786e-08
+        ],
+        "absorptionCenterMeters": 25000,
+        "absorptionHalfWidthMeters": 15000,
+        "groundAlbedo": [
+          0.30000001192092896,
+          0.30000001192092896,
+          0.30000001192092896
+        ],
+        "heightMeters": 100000.0,
+        "mieAnisotropy": 0.800000011920929,
+        "mieExtinction": 4.439999884198187e-06,
+        "mieScaleHeightMeters": 1200,
+        "mieScattering": 3.9960000322025735e-06,
+        "planetCenterMeters": [
+          0,
+          -6360000,
+          0
+        ],
+        "planetRadiusMeters": 6360000,
+        "rayleighScaleHeightMeters": 8000,
+        "rayleighScattering": [
+          5.802000032417709e-06,
+          1.3558000318880659e-05,
+          3.310000101919286e-05
+        ],
+        "worldUnitsToMeters": 1
+      },
+      "environment": {
+        "activeIBLGeneration": 3,
+        "backgroundMode": 2,
+        "iblConfig": {
+          "brdfLutFormat": 4,
+          "brdfLutSize": 256,
+          "environmentFormat": 6,
+          "environmentSize": 512,
+          "irradianceFormat": 6,
+          "irradianceSamples": 256,
+          "irradianceSize": 32,
+          "specularFormat": 6,
+          "specularMaxSampleLuminance": 1000,
+          "specularMipLevels": 5,
+          "specularSamples": 512,
+          "specularSize": 128
+        },
+        "iblQuality": "Medium",
+        "intensity": 1,
+        "rotationRadians": 0,
+        "skybox": true
+      },
+      "exposure": {
+        "compensationEV": 0,
+        "effectiveEV100": 15,
+        "manualEV100": 15,
+        "preExposure": 2.5431314497836865e-05,
+        "scale": 2.5431314497836865e-05
+      },
+      "localLightCount": 0,
+      "postProcess": {
+        "bloomEnabled": false,
+        "bloomIntensity": 0.07999999821186066,
+        "bloomMaxLevels": 6,
+        "bloomScatter": 0.699999988079071,
+        "bloomSoftKnee": 0.5,
+        "bloomThreshold": 1,
+        "toneMapping": 0
+      },
+      "schemaVersion": 1,
+      "shadows": {
+        "cascadeBlendFraction": 0.10000000149011612,
+        "cascadeCount": 4,
+        "casterExtrusion": 300,
+        "depthPadding": 200,
+        "distanceFadeFraction": 0.10000000149011612,
+        "enabled": true,
+        "fitMode": 1,
+        "mapSize": 2048,
+        "maxDistance": 80,
+        "orthoPadding": 1,
+        "pcf": true,
+        "receiverBiasTexels": 0.5,
+        "receiverMaxSlope": 4,
+        "receiverSlopeBiasTexels": 0,
+        "splitLambda": 0.6499999761581421,
+        "texelSnapping": true
+      },
+      "sun": {
+        "angularRadiusRadians": 0.0046530477702617645,
+        "chromaticity": [
+          1,
+          1,
+          1
+        ],
+        "directIlluminance": [
+          120000,
+          120000,
+          120000
+        ],
+        "diskRadiance": [
+          1764247296,
+          1764247296,
+          1764247296
+        ],
+        "photonDirection": [
+          -0.6840724945068359,
+          -0.39072588086128235,
+          0.6159367561340332
+        ],
+        "projectedSolidAngle": 6.801767449360341e-05,
+        "toaIlluminanceLux": 120000
+      }
+    },
+    "temporalSettings": {
+      "currentFilter": "gaussian",
+      "depthAbsoluteThreshold": 0.05000000074505806,
+      "depthRelativeThreshold": 0.019999999552965164,
+      "historyAccumulation": "effective-samples",
+      "historyFilter": "catmull-rom-clamped",
+      "historyRectification": "minmax-clamp",
+      "historyRelaxation": 1,
+      "luminanceWeightScale": 0,
+      "maxHistoryFeedback": 0.9700000286102295,
+      "motionSelection": "closest-depth",
+      "neighborhoodClampExpansion": 0,
+      "postTemporalView": "unjittered",
+      "resolutionPreset": "native",
+      "textureLodBiasOffset": -1,
+      "varianceClipGamma": 1,
+      "velocityWeightScale": 0.07500000298023224
+    },
+    "gtao": {
+      "denoiseRadius": 3,
+      "directionCount": 2,
+      "enabled": true,
+      "falloffEnd": 1,
+      "falloffStart": 0.8999999761581421,
+      "radius": 1,
+      "stepCount": 6,
+      "temporalAccumulation": true,
+      "temporalMaxSamples": 8
+    },
+    "observations": [
+      {
+        "id": "C1",
+        "referenceView": "Retreat_SeaPassage",
+        "camera": {
+          "farPlane": 6000,
+          "forward": [
+            0,
+            -0.016445159912109375,
+            0.9998647570610046
+          ],
+          "name": "Main Camera",
+          "nearPlane": 0.05000000074505806,
+          "position": [
+            4.400000095367432,
+            4.050000190734863,
+            2.799999952316284
+          ],
+          "referenceView": "Retreat_SeaPassage",
+          "up": [
+            0,
+            0.9998648166656494,
+            0.016445161774754524
+          ],
+          "verticalFovDegrees": 50.229671478271484
+        },
+        "masks": [
+          {
+            "id": "ceiling",
+            "rectPixels": [
+              350,
+              25,
+              750,
+              95
+            ],
+            "receiver": "valid opaque diffuse",
+            "requiredFor": [
+              "gi-only",
+              "final"
+            ],
+            "certification": "G2 receiver overlay required"
+          },
+          {
+            "id": "shaded-floor",
+            "rectPixels": [
+              60,
+              610,
+              390,
+              755
+            ],
+            "receiver": "valid opaque diffuse",
+            "requiredFor": [
+              "gi-only",
+              "final"
+            ],
+            "certification": "G2 receiver overlay required"
+          },
+          {
+            "id": "pier-leak",
+            "rectPixels": [
+              845,
+              240,
+              910,
+              530
+            ],
+            "receiver": "valid opaque diffuse",
+            "requiredFor": [
+              "gi-only",
+              "final"
+            ],
+            "certification": "G2 receiver overlay required"
+          }
+        ],
+        "referenceProfileVersion": 1
+      },
+      {
+        "id": "C2",
+        "referenceView": "Retreat_Courtyard",
+        "camera": {
+          "farPlane": 6000,
+          "forward": [
+            -0.6538054943084717,
+            -0.03820941969752312,
+            0.7556972503662109
+          ],
+          "name": "Main Camera",
+          "nearPlane": 0.05000000074505806,
+          "position": [
+            1.7999999523162842,
+            4,
+            -5.5
+          ],
+          "referenceView": "Retreat_Courtyard",
+          "up": [
+            -0.02499978616833687,
+            0.9992697834968567,
+            0.02889585867524147
+          ],
+          "verticalFovDegrees": 43.779109954833984
+        },
+        "masks": [
+          {
+            "id": "pale-beside-timber",
+            "rectPixels": [
+              79,
+              200,
+              106,
+              480
+            ],
+            "receiver": "valid opaque diffuse",
+            "requiredFor": [
+              "gi-only",
+              "final"
+            ],
+            "certification": "G2 receiver overlay required"
+          },
+          {
+            "id": "floor-bounce",
+            "rectPixels": [
+              130,
+              530,
+              300,
+              570
+            ],
+            "receiver": "valid opaque diffuse",
+            "requiredFor": [
+              "gi-only",
+              "final"
+            ],
+            "certification": "G2 receiver overlay required"
+          }
+        ],
+        "referenceProfileVersion": 2
+      },
+      {
+        "id": "C3",
+        "referenceView": "GI_InteriorExterior",
+        "camera": {
+          "farPlane": 150,
+          "forward": [
+            0.9834312796592712,
+            -0.10536771267652512,
+            -0.1475146859884262
+          ],
+          "name": "Main Camera",
+          "nearPlane": 0.10000000149011612,
+          "position": [
+            -12,
+            4,
+            -2.9000000953674316
+          ],
+          "referenceView": "GI_InteriorExterior",
+          "up": [
+            0.10420196503400803,
+            0.9944333434104919,
+            -0.015630293637514114
+          ],
+          "verticalFovDegrees": 50.229671478271484
+        },
+        "masks": [
+          {
+            "id": "interior-wall",
+            "rectPixels": [
+              1000,
+              200,
+              1220,
+              650
+            ],
+            "receiver": "valid opaque diffuse",
+            "requiredFor": [
+              "gi-only",
+              "final"
+            ],
+            "certification": "G2 receiver overlay required"
+          },
+          {
+            "id": "doorway-leak",
+            "rectPixels": [
+              900,
+              250,
+              930,
+              680
+            ],
+            "receiver": "valid opaque diffuse",
+            "requiredFor": [
+              "gi-only",
+              "final"
+            ],
+            "certification": "G2 receiver overlay required"
+          }
+        ],
+        "referenceProfileVersion": 1
+      },
+      {
+        "id": "C4",
+        "referenceView": "Retreat_Lounge",
+        "camera": {
+          "farPlane": 6000,
+          "forward": [
+            -0.3701322078704834,
+            -0.082251638174057,
+            0.925330638885498
+          ],
+          "name": "Main Camera",
+          "nearPlane": 0.05000000074505806,
+          "position": [
+            8.149999618530273,
+            3.6500000953674316,
+            -5.699999809265137
+          ],
+          "referenceView": "Retreat_Lounge",
+          "up": [
+            -0.0305474903434515,
+            0.9966115951538086,
+            0.07636873424053192
+          ],
+          "verticalFovDegrees": 34.70804977416992
+        },
+        "masks": [
+          {
+            "id": "left-foot-contact",
+            "rectPixels": [
+              320,
+              568,
+              380,
+              610
+            ],
+            "receiver": "valid opaque diffuse",
+            "requiredFor": [
+              "gi-only",
+              "final"
+            ],
+            "certification": "G2 receiver overlay required"
+          },
+          {
+            "id": "right-foot-contact",
+            "rectPixels": [
+              920,
+              625,
+              980,
+              673
+            ],
+            "receiver": "valid opaque diffuse",
+            "requiredFor": [
+              "gi-only",
+              "final"
+            ],
+            "certification": "G2 receiver overlay required"
+          },
+          {
+            "id": "cushion-recess",
+            "rectPixels": [
+              760,
+              466,
+              955,
+              508
+            ],
+            "receiver": "valid opaque diffuse",
+            "requiredFor": [
+              "gi-only",
+              "final"
+            ],
+            "certification": "G2 receiver overlay required"
+          }
+        ],
+        "referenceProfileVersion": 2
+      }
+    ],
+    "lightingGenerationPolicy": "Recorded generations are session-local. Future runs must match requested/active profile identity and their own published generation; request or generation number alone is insufficient."
+  },
+  "acceptanceTargets": [
+    {
+      "adapter": "NVIDIA GeForce RTX 3060",
+      "extent": [
+        1920,
+        1080
+      ],
+      "renderMode": "Native",
+      "steadyAddedGpuMs": {
+        "median": 6.0,
+        "p95": 7.5
+      },
+      "fullRefreshAddedGpuMsMax": 16.0,
+      "dynamicAddedGpuMsP95": 16.0,
+      "dynamicPreparationCpuMsMax": 2.0,
+      "qualification": "Pending GI implementation"
+    },
+    {
+      "adapter": "NVIDIA GeForce RTX 5080",
+      "extent": [
+        2560,
+        1440
+      ],
+      "renderMode": "Native",
+      "steadyAddedGpuMs": {
+        "median": 2.0,
+        "p95": 2.5
+      },
+      "fullRefreshAddedGpuMsMax": 4.0,
+      "dynamicAddedGpuMsP95": 4.0,
+      "dynamicPreparationCpuMsMax": 2.0,
+      "qualification": "Deferred until after implementation"
+    }
+  ],
+  "gates": {
+    "analyticRelativeErrorMax": 0.01,
+    "thickWallLeakageMax": 0.01,
+    "thinWallLeakageMax": 0.03,
+    "roiMeanRelativeErrorMax": 0.1,
+    "chromaticityAbsoluteErrorMax": 0.02,
+    "localLeakageExcessP95Max": 0.25,
+    "contactMeanBiasMax": 0.15,
+    "temporalRmsRelativeMax": 0.02,
+    "hardResetReadyUpdatesMax": 120,
+    "rtSunVisibilityAgreementMin": 0.995,
+    "crossRhiGiRoiMeanRelativeErrorMax": 0.02,
+    "giOnlyResponseFramesMax": 45,
+    "finalResponseFramesMax": 60,
+    "responseHoldFrames": 30,
+    "responseOvershootMax": 0.1,
+    "requireReferenceConvergence": true,
+    "referenceSamplingRelativeChangeMax": 0.01,
+    "referenceDepthRelativeChangeMax": 0.01,
+    "referenceDepths": [
+      8,
+      16,
+      32,
+      64,
+      128,
+      256
+    ],
+    "readinessAbsoluteFloorLux": 0.001,
+    "nonFiniteValuesAllowed": 0,
+    "giOffPixelDifferenceMax": 0
+  },
+  "deferred": [
+    {
+      "item": "Golden Hour Runtime profile, fixed transition exposure and locks",
+      "bindingStage": "G5",
+      "reason": "Separate atmosphere/exposure qualification; only coastal.daylight is currently registered"
+    },
+    {
+      "item": "Fixture GPU instances and receiver masks",
+      "bindingStage": "G2/G3",
+      "reason": "Construction and mask selectors are frozen here; certify actual visibility and reference convergence when the receiver/reference exists"
+    },
+    {
+      "item": "AS layouts and Vulkan binding ABI",
+      "bindingStage": "G1/G2",
+      "reason": "Freeze from typed RHI/Shader implementation evidence"
+    },
+    {
+      "item": "Readiness noise floor and GTAO/TAA choices",
+      "bindingStage": "G3/G4",
+      "reason": "Evidence-gated experiments retained from the plan"
+    }
+  ],
+  "baseline": {
+    "directory": "Assets/Media/GGLabCoastalRetreat/GI/Daylight",
+    "purpose": "Pre-GI GI-off regression images and resolved inputs; not a GI quality or timing result",
+    "manifestSha256": "af54a59d6eb58145595070da3e82205340b3faa12824e912f84e3bd11c87da85",
+    "qualificationBuildProperties": {
+      "Configuration": "Develop",
+      "PreferredToolArchitecture": "x64",
+      "GGLAB_ENABLE_PIX": 0,
+      "validation": "standard"
+    }
+  },
+  "inputVersion": 2
+}

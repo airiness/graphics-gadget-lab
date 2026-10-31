@@ -1,0 +1,58 @@
+[01:43:05] [info] [PID 49824] [GRAPHICS] DX12 selected adapter: NVIDIA GeForce RTX 3060 (vendor 0x10de, device 0x2504, driver 32.0.15.7719)
+[01:43:06] [info] [PID 49824] [GRAPHICS] DX12 validation requested: layer=true, gpuBased=false; layer enabled=true
+[01:43:06] [info] [PID 49824] [GRAPHICS] EnvironmentAssetController: loading environment candidate 'E:\RSProjs\gglab\Assets\Textures\Skybox\golden_gate_hills_2k.hdr' (selection 1).
+[01:43:06] [info] [PID 49824] [APPLICATION] Startup configuration: demo='Demo.Playground.CoastalAtrium', lab='gglab.lab.culling', mouse_mode='absolute'.
+[01:43:06] [info] [PID 49824] [APPLICATION] Runtime paths: assets='E:\RSProjs\gglab\Build\Output\x64\Develop\Assets', shader_artifacts='E:\RSProjs\gglab\Build\Validation\GIG0\NoPix-c77aa38e39\dx12\State\ShaderArtifacts', ibl_ddc='E:\RSProjs\gglab\Build\Validation\GIG0\NoPix-c77aa38e39\dx12\State\DerivedDataCache\IBL', texture_ddc='E:\RSProjs\gglab\Build\Validation\GIG0\NoPix-c77aa38e39\dx12\State\DerivedDataCache\Texture'.
+[01:43:06] [info] [PID 49824] [APPLICATION] Optional application tooling omitted by host composition.
+[01:43:06] [info] [PID 49824] [APPLICATION] Session 'gi-g0-dx12-61b6a29d' accepts control requests (protocol 4).
+session-ready: gi-g0-dx12-61b6a29d
+[01:43:06] [info] [PID 49824] [GRAPHICS] Async artifact preload published 50 shaders (queueMs=2.26, cpuMs=29.85).
+[01:43:06] [warning] [PID 49824] [GRAPHICS] TextureLoader sanitized HDR 'E:\RSProjs\gglab\Assets\Textures\Skybox\golden_gate_hills_2k.hdr' for FP16 storage: maxFiniteChannel=97536, nonFiniteChannels=0, negativeChannels=0, clampedChannels=16, clamp=65000.
+[01:43:06] [info] [PID 49824] [GRAPHICS] DX12 completed its first production submit/present frame transaction.
+[01:43:06] [info] [PID 49824] [GRAPHICS] IBL stage cache lookup generation 1 completed (cpuHits=0, ddcHits=0, misses=4, queueMs=0.01, cpuMs=1.63).
+[01:43:06] [info] [PID 49824] [GRAPHICS] Texture 8 derived data resolved (cache=miss, key=08bb80ff65c54fed).
+[01:43:06] [info] [PID 49824] [GRAPHICS] Texture 64 derived data resolved (cache=miss, key=9176a61a188dd6c4).
+[01:43:06] [info] [PID 49824] [GRAPHICS] Async texture 64 queued for upload admission (queueMs=0.09, cpuMs=104.53).
+[01:43:06] [info] [PID 49824] [GRAPHICS] Async texture 8 queued for upload admission (queueMs=0.05, cpuMs=87.38).
+[01:43:06] [info] [PID 49824] [GRAPHICS] Texture 64 GPU upload completed in 7.35 ms.
+[01:43:06] [info] [PID 49824] [GRAPHICS] EnvironmentAssetController: committed HDR environment 'E:\RSProjs\gglab\Assets\Textures\Skybox\golden_gate_hills_2k.hdr'.
+[01:43:06] [info] [PID 49824] [GRAPHICS] Texture 8 GPU upload completed in 19.15 ms.
+[01:43:06] [info] [PID 49824] [GRAPHICS] IBL stage cache lookup generation 2 completed (cpuHits=0, ddcHits=0, misses=4, queueMs=0.02, cpuMs=1.67).
+[01:43:06] [info] [PID 49824] [GRAPHICS] IBL bake generation 2 published atomically (cacheStages=0, gpuStages=4, gpuMs=3.200, source=HDR Texture, publicationMs=144.8).
+[01:43:07] [info] [PID 49824] [GRAPHICS] Texture 9 derived data resolved (cache=miss, key=0b9331b13c594bb1).
+[01:43:07] [info] [PID 49824] [GRAPHICS] Async texture 9 queued for upload admission (queueMs=0.01, cpuMs=865.71).
+[01:43:07] [info] [PID 49824] [GRAPHICS] Texture 9 GPU upload completed in 34.39 ms.
+[01:43:07] [info] [PID 49824] [GRAPHICS] Model texture artifacts resolved (textures=26, ddcHits=0).
+[01:43:07] [info] [PID 49824] [GRAPHICS] Texture 65 GPU upload completed in 15.14 ms.
+[01:43:07] [info] [PID 49824] [GRAPHICS] Texture 66 GPU upload completed in 15.20 ms.
+[01:43:07] [info] [PID 49824] [GRAPHICS] Texture 67 GPU upload completed in 15.97 ms.
+[01:43:07] [info] [PID 49824] [GRAPHICS] Texture 68 GPU upload completed in 16.02 ms.
+[01:43:07] [info] [PID 49824] [GRAPHICS] Texture 69 GPU upload completed in 15.57 ms.
+[01:43:07] [info] [PID 49824] [GRAPHICS] Texture 70 GPU upload completed in 15.62 ms.
+[01:43:07] [info] [PID 49824] [GRAPHICS] Texture 71 GPU upload completed in 15.29 ms.
+[01:43:07] [info] [PID 49824] [GRAPHICS] Texture 72 GPU upload completed in 15.32 ms.
+[01:43:07] [info] [PID 49824] [GRAPHICS] Texture 73 GPU upload completed in 16.92 ms.
+[01:43:07] [info] [PID 49824] [GRAPHICS] Texture 74 GPU upload completed in 16.95 ms.
+[01:43:07] [info] [PID 49824] [GRAPHICS] Texture 75 GPU upload completed in 13.80 ms.
+[01:43:07] [info] [PID 49824] [GRAPHICS] Texture 76 GPU upload completed in 16.97 ms.
+[01:43:07] [info] [PID 49824] [GRAPHICS] Texture 77 GPU upload completed in 17.01 ms.
+[01:43:08] [info] [PID 49824] [GRAPHICS] Texture 78 GPU upload completed in 15.85 ms.
+[01:43:08] [info] [PID 49824] [GRAPHICS] Texture 79 GPU upload completed in 15.89 ms.
+[01:43:08] [info] [PID 49824] [GRAPHICS] Texture 80 GPU upload completed in 32.48 ms.
+[01:43:08] [info] [PID 49824] [GRAPHICS] Texture 81 GPU upload completed in 32.53 ms.
+[01:43:08] [info] [PID 49824] [GRAPHICS] Texture 82 GPU upload completed in 33.22 ms.
+[01:43:08] [info] [PID 49824] [GRAPHICS] Texture 83 GPU upload completed in 33.24 ms.
+[01:43:08] [info] [PID 49824] [GRAPHICS] Texture 84 GPU upload completed in 30.83 ms.
+[01:43:08] [info] [PID 49824] [GRAPHICS] Texture 85 GPU upload completed in 13.27 ms.
+[01:43:08] [info] [PID 49824] [GRAPHICS] Texture 86 GPU upload completed in 13.32 ms.
+[01:43:08] [info] [PID 49824] [GRAPHICS] Texture 87 GPU upload completed in 15.83 ms.
+[01:43:08] [info] [PID 49824] [GRAPHICS] Texture 88 GPU upload completed in 15.92 ms.
+[01:43:08] [info] [PID 49824] [GRAPHICS] Texture 89 GPU upload completed in 14.56 ms.
+[01:43:08] [info] [PID 49824] [GRAPHICS] Texture 90 GPU upload completed in 14.58 ms.
+[01:43:09] [info] [PID 49824] [APPLICATION] Activated demo 'Demo.Playground.CoastalAtrium'.
+[01:43:09] [info] [PID 49824] [GRAPHICS] Async model 8 published incrementally (instances=506, textureUploads=26, meshUploads=60, queueMs=0.02, cpuMs=1520.27).
+[01:43:09] [info] [PID 49824] [GRAPHICS] IBL bake generation 3 published atomically (cacheStages=0, gpuStages=4, gpuMs=40.800, source=Physical Sky, publicationMs=338.4).
+[01:43:21] [info] [PID 49824] [APPLICATION] Session 'gi-g0-dx12-61b6a29d' is stopping on request.
+[01:43:21] [info] [PID 49824] [GRAPHICS] AssetManager terminal shutdown prepared; texture GPU resources released at fence 851.
+[01:43:21] [info] [PID 49824] [GRAPHICS] Upload statistics: per-batch high-water leased=65536 B, pages=1, reserved=28160 B; pool pages=2, capacity=131072 B; batches submitted=851, cancelled=0; failures oversized=0, batch-bytes=0, pool-bytes=0, page-count=0, creation=0, mapping=0, publication=0.
+[01:43:21] [info] [PID 49824] [GRAPHICS] DX12 native binding layouts retained at teardown: 5.

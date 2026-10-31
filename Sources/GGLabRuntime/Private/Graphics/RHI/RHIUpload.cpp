@@ -1,9 +1,15 @@
 #include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
+#include <utility>
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "Graphics/RHI/RHIUploadPool.h"
 
 namespace gglab
 {
+	bool RHIUploadWriter::RetainForSubmission(std::shared_ptr<void> resource) noexcept
+	{
+		return m_Batch && m_Batch->RetainForSubmission(std::move(resource));
+	}
+
 	RHIUploadWriter::~RHIUploadWriter() noexcept
 	{
 		GGLAB_ASSERT_MSG(!m_Batch, "An upload writer must be detached before it is destroyed.");
