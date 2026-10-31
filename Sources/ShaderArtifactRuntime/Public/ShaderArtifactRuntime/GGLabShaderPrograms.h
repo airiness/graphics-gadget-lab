@@ -165,6 +165,16 @@ namespace gglab::shader_programs
 		"gglab.shader.ray-scene", "compute.gi-specular-visibility", ShaderStage::Compute };
 	inline const ShaderProgramRef GIReferenceCompute{
 		"gglab.shader.ray-scene", "compute.gi-reference", ShaderStage::Compute };
+	inline const ShaderProgramRef GIProbeInitializeCompute{
+		"gglab.shader.gi-probe-update", "compute.initialize", ShaderStage::Compute };
+	inline const ShaderProgramRef GIProbeTraceCompute{
+		"gglab.shader.gi-probe-update", "compute.trace", ShaderStage::Compute };
+	inline const ShaderProgramRef GIProbeBlendDirectCompute{
+		"gglab.shader.gi-probe-update", "compute.blend-direct", ShaderStage::Compute };
+	inline const ShaderProgramRef GIProbeBlendSharedCompute{
+		"gglab.shader.gi-probe-update", "compute.blend-shared", ShaderStage::Compute };
+	inline const ShaderProgramRef GIProbeBordersCompute{
+		"gglab.shader.gi-probe-update", "compute.borders", ShaderStage::Compute };
 	inline const ShaderProgramRef GIReceiverPixel{
 		"gglab.shader.gi-receiver", "pixel.receiver", ShaderStage::Pixel };
 	inline const ShaderProgramRef GIReceiverPositionPixel{

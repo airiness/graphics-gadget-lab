@@ -14,6 +14,9 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <chrono>
+#include <set>
+#include <tuple>
 #include <cstddef>
 #include <cstring>
 #include <format>
@@ -29,6 +32,22 @@ namespace gglab
 			offsetof(Vertex, m_Normal) == 12 && offsetof(Vertex, m_TexCoord0) == 24 &&
 			offsetof(Vertex, m_TexCoord1) == 32 && offsetof(Vertex, m_Tangent) == 40);
 		struct EmptyData {};
+		using PreparationClock = std::chrono::steady_clock;
+		double ElapsedMilliseconds(PreparationClock::time_point begin) noexcept
+		{
+			return std::chrono::duration<double, std::milli>(PreparationClock::now() - begin).count();
+		}
+		struct PreparationScope
+		{
+			RayScenePreparationStatistics& m_Statistics;
+			PreparationClock::time_point m_Begin = PreparationClock::now();
+			~PreparationScope() noexcept
+			{
+				m_Statistics.m_LastMilliseconds = ElapsedMilliseconds(m_Begin);
+				m_Statistics.m_TotalMilliseconds += m_Statistics.m_LastMilliseconds;
+				++m_Statistics.m_Calls;
+			}
+		};
 
 		struct GeometryCache
 		{
@@ -209,12 +228,17 @@ namespace gglab
 		RaySceneCapacity m_Capacity;
 		RaySceneDiagnostics m_Diagnostics;
 		std::shared_ptr<SceneSnapshot> m_Snapshot;
+		std::vector<std::weak_ptr<SceneSnapshot>> m_ObservedSnapshots;
+		bool m_TrackReplacementMemory = false;
+		RaySceneMemorySnapshot m_ReplacementMemory;
 	};
 
-	RayScene::RayScene(RaySceneCapacity capacity, RaySceneMaterialInputs materialInputs) noexcept :
+	RayScene::RayScene(RaySceneCapacity capacity, RaySceneMaterialInputs materialInputs,
+		bool trackReplacementMemory) noexcept :
 		m_State(std::make_unique<State>())
 	{
 		m_State->m_Capacity = capacity;
+		m_State->m_TrackReplacementMemory = trackReplacementMemory;
 		m_State->m_Diagnostics.m_TracksPrimaryMaterials =
 			materialInputs == RaySceneMaterialInputs::PrimaryReceiver;
 	}
@@ -225,6 +249,13 @@ namespace gglab
 		RHIDevice& device, const RenderSamplerAccess& samplers) noexcept
 	{
 		auto& diagnostics = m_State->m_Diagnostics;
+		auto& statistics = diagnostics.m_Preparation;
+		PreparationScope preparation{ statistics };
+		statistics.m_LastGatherMilliseconds = 0;
+		statistics.m_LastPlanMilliseconds = 0;
+		statistics.m_LastAllocationMilliseconds = 0;
+		std::erase_if(m_State->m_ObservedSnapshots, [](const auto& value) { return value.expired(); });
+		const auto gatherBegin = PreparationClock::now();
 		auto fail = [&diagnostics](RaySceneStatus status, const char* reason) noexcept
 			{
 				diagnostics.m_Status = status;
@@ -334,9 +365,12 @@ namespace gglab
 						matrix.m_13, matrix.m_23, matrix.m_33, matrix.m_43 } });
 			}
 		}
+		statistics.m_LastGatherMilliseconds = ElapsedMilliseconds(gatherBegin);
+		const auto planBegin = PreparationClock::now();
 		RayScenePlan plan;
 		diagnostics.m_Status = PlanRayScene(std::move(sources), m_State->m_Capacity,
 			capabilities.m_BuildLimits, plan, diagnostics.m_Reason);
+		statistics.m_LastPlanMilliseconds = ElapsedMilliseconds(planBegin);
 		if (diagnostics.m_Status != RaySceneStatus::Prepared)
 		{
 			return diagnostics.m_Status;
@@ -352,6 +386,7 @@ namespace gglab
 		{
 			return diagnostics.m_Status;
 		}
+		const auto allocationBegin = PreparationClock::now();
 		auto snapshot = std::make_shared<SceneSnapshot>();
 		snapshot->m_Plan = std::move(plan);
 		snapshot->m_TextureInterests = assets.CreateOwnerScope();
@@ -417,8 +452,81 @@ namespace gglab
 		diagnostics.m_MaterialCount = static_cast<uint32_t>(snapshot->m_Plan.m_Materials.size());
 		diagnostics.m_VertexBytes = snapshot->m_Plan.m_VertexBytes;
 		diagnostics.m_IndexBytes = snapshot->m_Plan.m_IndexBytes;
+		statistics.m_LastAllocationMilliseconds = ElapsedMilliseconds(allocationBegin);
+		statistics.m_LastReplacementMilliseconds = ElapsedMilliseconds(preparation.m_Begin);
+		statistics.m_ReplacementGatherMilliseconds = statistics.m_LastGatherMilliseconds;
+		statistics.m_ReplacementPlanMilliseconds = statistics.m_LastPlanMilliseconds;
+		statistics.m_ReplacementAllocationMilliseconds = statistics.m_LastAllocationMilliseconds;
+		++statistics.m_Replacements;
+		m_State->m_ObservedSnapshots.push_back(snapshot);
 		m_State->m_Snapshot = std::move(snapshot);
+		if (m_State->m_TrackReplacementMemory)
+		{
+			m_State->m_ReplacementMemory = GetMemorySnapshot();
+		}
 		return diagnostics.m_Status;
+	}
+
+	const RaySceneMemorySnapshot& RayScene::GetReplacementMemorySnapshot() const noexcept
+	{
+		return m_State->m_ReplacementMemory;
+	}
+
+	RaySceneMemorySnapshot RayScene::GetMemorySnapshot() const noexcept
+	{
+		RaySceneMemorySnapshot result;
+		std::set<std::tuple<bool, uint32_t, uint32_t>> seen;
+		const auto append = [&](const std::shared_ptr<SceneSnapshot>& snapshot, bool active)
+			{
+				++result.m_LiveSnapshots;
+				auto& device = *snapshot->m_Geometry->m_Device;
+				const auto buffer = [&](RHIBufferHandle handle, RaySceneMemoryKind kind, uint64_t bytes)
+					{
+						if (handle.IsValid() && seen.emplace(false, handle.Index(), handle.Generation()).second)
+						{
+							result.m_Resources.push_back({ kind, active, bytes,
+								device.QueryBufferAllocationFacts(handle) });
+						}
+					};
+				const auto acceleration = [&](RHIAccelerationStructureHandle handle,
+					RaySceneMemoryKind kind, uint64_t bytes)
+					{
+						if (handle.IsValid() && seen.emplace(true, handle.Index(), handle.Generation()).second)
+						{
+							result.m_Resources.push_back({ kind, active, bytes,
+								device.QueryAccelerationStructureAllocationFacts(handle) });
+						}
+					};
+				const auto& geometry = *snapshot->m_Geometry;
+				buffer(geometry.m_Vertices.Get(), RaySceneMemoryKind::Geometry, geometry.m_VertexDesc.m_SizeInBytes);
+				buffer(geometry.m_Indices.Get(), RaySceneMemoryKind::Geometry, geometry.m_IndexDesc.m_SizeInBytes);
+				for (size_t index = 0; index < snapshot->m_Tables.size(); ++index)
+				{
+					buffer(snapshot->m_Tables[index].Get(), RaySceneMemoryKind::Tables,
+						snapshot->m_TableDescs[index].m_SizeInBytes);
+					buffer(snapshot->m_Uploads[index].Get(), RaySceneMemoryKind::Upload,
+						snapshot->m_TableDescs[index].m_SizeInBytes);
+				}
+				for (size_t index = 0; index < geometry.m_BottomLevels.size(); ++index)
+				{
+					acceleration(geometry.m_BottomLevels[index], RaySceneMemoryKind::BottomLevel,
+						geometry.m_Sizes[index].m_StorageSizeInBytes);
+				}
+				acceleration(snapshot->m_Top->m_Handle, RaySceneMemoryKind::TopLevel,
+					snapshot->m_Top->m_Sizes.m_StorageSizeInBytes);
+			};
+		if (m_State->m_Snapshot)
+		{
+			append(m_State->m_Snapshot, true);
+		}
+		for (const auto& observed : m_State->m_ObservedSnapshots)
+		{
+			if (const auto snapshot = observed.lock(); snapshot && snapshot != m_State->m_Snapshot)
+			{
+				append(snapshot, false);
+			}
+		}
+		return result;
 	}
 
 	RaySceneGraphResources RayScene::AddBuildPasses(RenderGraph& graph) noexcept

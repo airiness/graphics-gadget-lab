@@ -157,7 +157,8 @@ namespace gglab
 
 		const auto rayScene = m_GIReference ?
 			m_GIReference->m_RayScene :
-			m_GISpecularVisibility ? m_GISpecularVisibility->m_RayScene : nullptr;
+			m_GISpecularVisibility ? m_GISpecularVisibility->m_RayScene :
+				m_GIProbeUpdate ? m_GIProbeUpdate->GetRayScene() : nullptr;
 		const auto referenceScene = rayScene ? rayScene->AddBuildPasses(rg) : RaySceneGraphResources{};
 		auto* swapChain = services.m_Presentation->GetSwapChain();
 
@@ -527,6 +528,10 @@ namespace gglab
 		{
 			m_GIReceiverPass.AddPass(rg, context, services);
 		}
+		if (m_GIProbeUpdate)
+		{
+			m_GIProbeUpdate->AddPasses(rg, context, services, referenceScene);
+		}
 		if (m_GISpecularVisibility)
 		{
 			m_GISpecularVisibilityPass.AddPass(rg, context, services, referenceScene, *m_GISpecularVisibility);
@@ -825,6 +830,20 @@ namespace gglab
 			{
 				result = m_GIReferencePass.Prepare(context, services, *m_GIReference,
 					m_ForwardPBRShaderSet.m_CoverageVertexShader);
+				if (!result.IsReady())
+				{
+					return result;
+				}
+			}
+			if (m_GIProbeUpdate)
+			{
+				const auto scene = m_GIProbeUpdate->GetRayScene();
+				if ((m_GIReference && scene != m_GIReference->m_RayScene) ||
+					(m_GISpecularVisibility && scene != m_GISpecularVisibility->m_RayScene))
+				{
+					return RenderFrameValidationResult::ContractFailure("GI workloads must share one ray scene");
+				}
+				result = m_GIProbeUpdate->Prepare(context, services);
 				if (!result.IsReady())
 				{
 					return result;

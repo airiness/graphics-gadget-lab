@@ -26,6 +26,7 @@
 #include "GGLabRuntime/Graphics/RenderPipeline/DepthCoverageFramePlan.h"
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlusTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h"
 
 #include <cstdint>
 #include <memory>
@@ -48,6 +49,7 @@ namespace gglab
 			bool m_EnableGIReceiver = false;
 			std::optional<GIReferenceCreateInfo> m_GIReference;
 			std::optional<GISpecularVisibilityCreateInfo> m_GISpecularVisibility;
+			std::shared_ptr<GIProbeUpdateExperiment> m_GIProbeUpdate;
 		};
 
 		explicit RenderPipelineForwardPlus(
@@ -64,6 +66,7 @@ namespace gglab
 				createInfo.m_GISpecularVisibility.has_value()),
 			m_GIReference(std::move(createInfo.m_GIReference)),
 			m_GISpecularVisibility(std::move(createInfo.m_GISpecularVisibility)),
+			m_GIProbeUpdate(std::move(createInfo.m_GIProbeUpdate)),
 			m_ForwardPlusCullPass(m_ForwardPlusDebugReadback),
 			m_ForwardPlusValidationPass(m_ForwardPlusDebugReadback)
 		{
@@ -105,6 +108,7 @@ namespace gglab
 		bool m_EnableGIReceiver = false;
 		std::optional<GIReferenceCreateInfo> m_GIReference;
 		std::optional<GISpecularVisibilityCreateInfo> m_GISpecularVisibility;
+		std::shared_ptr<GIProbeUpdateExperiment> m_GIProbeUpdate;
 		RenderPassGISpecularVisibility m_GISpecularVisibilityPass;
 		RenderPassGIReference m_GIReferencePass;
 		RenderPassGIReceiver m_GIReceiverPass;

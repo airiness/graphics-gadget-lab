@@ -134,7 +134,7 @@ namespace gglab
 		{
 			return validation;
 		}
-		if (!services.m_GIReferenceObservation)
+		if (info.m_Accumulate && !services.m_GIReferenceObservation)
 		{
 			return RenderFrameValidationResult::ContractFailure("GI reference observation service is unavailable");
 		}
@@ -216,6 +216,17 @@ namespace gglab
 			.m_ConstantEnvironment = info.m_ConstantEnvironment };
 		static_assert(sizeof(key.m_ViewProjection) == sizeof(view.m_UnjitteredViewProj));
 		std::memcpy(key.m_ViewProjection.data(), &view.m_UnjitteredViewProj, sizeof(key.m_ViewProjection));
+		if (!info.m_Accumulate)
+		{
+			const uint64_t work = uint64_t(view.m_Width) * view.m_Height * info.m_SampleCount;
+			if (work > info.m_SampleWorkPerSubmission || work * 2 * info.m_MaximumDepth > info.m_QueryWorkPerSubmission)
+			{
+				return RenderFrameValidationResult::ContractFailure("Stateless reference exceeds whole-frame work budgets");
+			}
+			return state.m_Pipeline.IsValid() && state.m_Scene.IsValid() && state.m_Atmosphere.IsValid() ?
+				RenderFrameValidationResult::Ready() :
+				RenderFrameValidationResult::ContractFailure("GI reference compute pipeline is unavailable");
+		}
 		if (!services.m_GIReferenceObservation->Prepare(key,
 			info.m_SamplesPerBatch, info.m_SampleWorkPerSubmission, info.m_QueryWorkPerSubmission,
 			info.m_MaximumTilePixels))
@@ -333,7 +344,7 @@ namespace gglab
 				data.m_Parameters.m_EnvironmentFilter = static_cast<uint32_t>(info.m_EnvironmentFilter);
 				data.m_Parameters.m_MaximumDepth = info.m_MaximumDepth;
 				data.m_Parameters.m_TileExtent = { extent.m_Width, extent.m_Height };
-				if (auto* observation = services.m_GIReferenceObservation)
+				if (auto* observation = info.m_Accumulate ? services.m_GIReferenceObservation : nullptr)
 				{
 					const auto progress = observation->GetDiagnostics();
 					data.m_Parameters.m_ObservationEnabled = 1;
@@ -452,7 +463,7 @@ namespace gglab
 					const auto count = std::min(rows, parameters.m_Height - row);
 					commands->Dispatch((parameters.m_Width + 7) / 8, (count + 7) / 8, 1);
 				}
-				if (services.m_GIReferenceObservation)
+				if (parameters.m_ObservationEnabled && services.m_GIReferenceObservation)
 				{
 					services.m_GIReferenceObservation->MarkRecorded();
 				}

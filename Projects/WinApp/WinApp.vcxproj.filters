@@ -63,6 +63,9 @@
     <FxCompile Include="..\..\Shaders\Passes\PassForwardPlusValidation.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassGIProbeUpdate.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassGIReceiver.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>

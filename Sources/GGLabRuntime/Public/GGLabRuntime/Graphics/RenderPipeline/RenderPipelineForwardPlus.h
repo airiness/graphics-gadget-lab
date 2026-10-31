@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIReference.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h"
 #include "GGLabRuntime/Graphics/Pipeline/GISpecularVisibility.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineSceneExtensionBase.h"
 
@@ -26,6 +27,7 @@ namespace gglab
 		std::optional<GIReferenceCreateInfo> m_GIReference;
 		// Independent pre-temporal diagnostic; never changes production specular IBL.
 		std::optional<GISpecularVisibilityCreateInfo> m_GISpecularVisibility;
+		std::shared_ptr<GIProbeUpdateExperiment> m_GIProbeUpdate;
 	};
 
 	[[nodiscard]] std::unique_ptr<RenderPipelineBase> CreateRenderPipelineForwardPlus(

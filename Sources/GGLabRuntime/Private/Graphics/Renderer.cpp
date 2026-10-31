@@ -1,4 +1,5 @@
 #include "Graphics/Renderer.h"
+#include "Diagnostics/Builders/TransientResourcePoolSnapshotBuilder.h"
 #include "Graphics/Pipeline/GIReferenceObservation.h"
 #include "Graphics/Pipeline/GISpecularVisibilityObservation.h"
 #include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
@@ -712,6 +713,15 @@ namespace gglab
 		else
 		{
 			m_ActiveFrame.m_DeferredCommits.Discard();
+		}
+	}
+
+	void Renderer::CaptureTransientResourcePool(TransientResourcePoolSnapshot& snapshot) const noexcept
+	{
+		CheckServiceLifecycleAccess();
+		if (m_TransientResourcePool)
+		{
+			BuildTransientResourcePoolSnapshot(*m_TransientResourcePool, snapshot);
 		}
 	}
 

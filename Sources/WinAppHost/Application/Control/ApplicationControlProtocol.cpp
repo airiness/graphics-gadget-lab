@@ -1966,6 +1966,29 @@ namespace gglab
 			{ "lighting", SerializeApplicationControlLightingProfiles(status.m_LightingProfiles) },
 			{ "lightingProfileError", status.m_LightingProfileError },
 			{ "controlState", SerializeApplicationControlHostViewStamp(status.m_HostViewControl) } };
+		response["lab"] = Json();
+		if (status.m_Lab)
+		{
+			const auto& lab = *status.m_Lab;
+			response["lab"] = {
+				{ "id", lab.m_ActiveLabId.m_Name },
+				{ "frameInSession", lab.m_FrameInSession },
+				{ "title", lab.m_Diagnostics.m_Title },
+				{ "metrics", Json::array() },
+				{ "checks", Json::array() } };
+			for (const auto& metric : lab.m_Diagnostics.m_Metrics)
+			{
+				response["lab"]["metrics"].push_back({ { "name", metric.m_Name }, { "value", metric.m_Value } });
+			}
+			for (const auto& check : lab.m_Diagnostics.m_Checks)
+			{
+				response["lab"]["checks"].push_back({
+					{ "name", check.m_Name },
+					{ "status", check.m_Status == LabDiagnosticCheckStatus::Passed ? "passed" :
+						check.m_Status == LabDiagnosticCheckStatus::Failed ? "failed" : "pending" },
+					{ "detail", check.m_Detail } });
+			}
+		}
 		response["sequence"] = status.m_Sequence ? SerializeSequence(*status.m_Sequence) : Json();
 		if (!status.m_Frame)
 		{

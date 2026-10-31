@@ -56,6 +56,9 @@ Atlas ID: atlas.runtime.render-pipeline
   [observation](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIReferenceObservation.h).
   Sum/RNG pairs commit at settlement and retire by fence; read-only progress uses
   [GIReferenceTypes.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GIReferenceTypes.h).
+- **Probe update:** Public [configuration and diagnostics](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h)
+  for the optional Runtime [experiment](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIProbeUpdate.cpp),
+  selected by `RenderPipelineForwardPlusCreateInfo::m_GIProbeUpdate`.
 - **Specular visibility:** Public [configuration/progress](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GISpecularVisibility.h)
   selects an independent Renderer-owned [observation](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GISpecularVisibilityObservation.h)
   and [pre-temporal pass](../../../Sources/GGLabRuntime/Private/Graphics/RenderPass/RenderPassGISpecularVisibility.cpp).

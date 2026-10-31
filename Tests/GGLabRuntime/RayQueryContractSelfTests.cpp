@@ -3,6 +3,7 @@
 #include "Graphics/Pipeline/GIReferenceObservation.h"
 #include "Graphics/Pipeline/GISpecularVisibilityObservation.h"
 #include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h"
 #include "GGLabRuntime/Graphics/Pipeline/RaySceneSunVisibility.h"
 #include "GGLabRuntime/Graphics/Pipeline/RaySceneHitMaterial.h"
 #include "Graphics/RenderPass/RenderPassGIReceiver.h"
@@ -37,6 +38,7 @@
 #include <memory>
 #include <span>
 #include <type_traits>
+#include <vector>
 
 namespace gglab
 {
@@ -156,6 +158,43 @@ namespace gglab
 			shadows.m_ShadingEnabled = true;
 			context.Check(!visibility.Prepare(frame, {}),
 				"A CSM for another directional light cannot masquerade as a sun-visibility comparison");
+		}
+
+		void RunProbeUpdateProfileTests(SelfTestContext& context) noexcept
+		{
+			GIProbeUpdateProfile profile;
+			context.Check(ValidateGIProbeUpdateProfile(profile), "Coastal probe workload accepts its declared full-update capacity");
+			profile.m_UpdateDivisor = 4;
+			std::vector<uint32_t> visits(12870, 0);
+			for (uint32_t update = 0; update < 4; ++update)
+			{
+				const auto range = GetGIProbeUpdateRange(profile, update);
+				context.Check(range.m_Count == 3217 || range.m_Count == 3218,
+					"Non-divisible Coastal quarter updates retain their exact work rather than dropping the remainder");
+				for (uint32_t probe = range.m_First; probe < range.m_First + range.m_Count; ++probe)
+				{
+					++visits[probe];
+				}
+			}
+			context.Check(std::ranges::all_of(visits, [](uint32_t count) { return count == 1; }),
+				"Four partial updates visit every probe exactly once without overlap");
+			profile.m_RefreshPeriod = 5;
+			context.Check(GetGIProbeUpdateRange(profile, 0).m_Count == 12870 &&
+				GetGIProbeUpdateRange(profile, 5).m_Count == 12870 &&
+				GetGIProbeUpdateRange(profile, 6).m_Count < 12870,
+				"Declared refreshes use the same capacity while the steady schedule remains partial");
+			for (const uint32_t rays : { 0u, 63u, 257u, UINT32_MAX })
+			{
+				auto invalid = profile;
+				invalid.m_RaysPerProbe = rays;
+				context.Check(!ValidateGIProbeUpdateProfile(invalid) && GetGIProbeUpdateRange(invalid, 0).m_Count == 0,
+					"Unsupported ray profiles reject instead of silently truncating work");
+			}
+			profile.m_Counts = { 128, 32, 128 };
+			context.Check(!ValidateGIProbeUpdateProfile(profile), "Oversized workloads reject before GPU allocation or dispatch");
+			profile = {};
+			profile.m_Spacing = std::numeric_limits<float>::quiet_NaN();
+			context.Check(!ValidateGIProbeUpdateProfile(profile), "Non-finite probe geometry cannot reach GPU execution");
 		}
 
 		void RunGIReferenceInputTests(SelfTestContext& context) noexcept
@@ -1353,6 +1392,7 @@ namespace gglab
 		RunSunVisibilityGraphTests(context);
 		RunGIReceiverPreparationTests(context);
 		RunGIReferenceInputTests(context);
+		RunProbeUpdateProfileTests(context);
 		RunGIReferenceObservationTests(context);
 		RunSpecularVisibilityTests(context);
 		RunGIReferenceTilingTests(context);

@@ -626,6 +626,8 @@ namespace gglab
 				.m_LightingProfiles = parameters ? &parameters->GetLightingProfilePublication() : nullptr,
 				.m_LightingProfileError = parameters ? parameters->GetLightingProfileError() : std::string{},
 				.m_HostViewControl = m_AppRuntime ? m_AppRuntime->GetHostViewControlStamp() : HostViewControlStamp{},
+				.m_Lab = m_LabRuntimeLocator && m_LabRuntimeLocator->GetLabRuntimeIfCreated() ?
+					std::optional(m_LabRuntimeLocator->GetLabRuntimeIfCreated()->GetLabSnapshot()) : std::nullopt,
 				}));
 			return;
 		case ApplicationControlCommand::Parameters:

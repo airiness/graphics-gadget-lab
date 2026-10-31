@@ -10,10 +10,13 @@
 #include <array>
 #include <filesystem>
 #include <memory>
+#include <map>
+#include <string>
 
 namespace gglab
 {
 	class RayScene;
+	class GIProbeUpdateExperiment;
 
 	class GIReferenceLabSession final : public LabSessionBase
 	{
@@ -42,6 +45,17 @@ namespace gglab
 
 	private:
 		void ApplyImmediateParameters() noexcept override;
+		void RecreatePipeline() noexcept override;
+		std::shared_ptr<GIProbeUpdateExperiment> m_ProbeUpdate;
+		bool m_RestoreProbeProfiling = false;
+		bool m_PreviousProbeProfiling = false;
+		uint64_t m_FirstProbeFrame = 0;
+		uint64_t m_LastProbeFrame = 0;
+		uint64_t m_ActivationGpuFrame = 0;
+		uint64_t m_InitializationGpuFrame = 0;
+		double m_InitializationGpuMilliseconds = 0;
+		std::map<std::string, std::pair<uint32_t, double>> m_ActivationGpu;
+		entt::entity m_ProbeEntity = entt::null;
 		void BuildMaterialContract() noexcept;
 		void BuildVisibilityContract() noexcept;
 		void ApplyVisibilityMaterial() noexcept;

@@ -151,6 +151,7 @@ namespace gglab
 		{
 			return m_GIReferenceObservation.get();
 		}
+		void CaptureTransientResourcePool(TransientResourcePoolSnapshot& snapshot) const noexcept override;
 		[[nodiscard]] GIReferenceObservationDiagnostics GetGIReferenceObservationDiagnostics()
 			const noexcept override;
 		GISpecularVisibilityObservation* GetGISpecularVisibilityObservation() const noexcept

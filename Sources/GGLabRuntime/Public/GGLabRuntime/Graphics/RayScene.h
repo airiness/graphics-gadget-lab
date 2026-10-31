@@ -2,6 +2,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Asset/TextureAssetViews.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGResource.h"
+#include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 
 #include <cstdint>
 #include <memory>
@@ -81,6 +82,46 @@ namespace gglab
 		ArtifactContentDigest m_ArtifactContentDigest{};
 	};
 
+	enum class RaySceneMemoryKind : uint8_t
+	{
+		Geometry,
+		Tables,
+		Upload,
+		BottomLevel,
+		TopLevel,
+	};
+
+	struct RaySceneMemoryResource
+	{
+		RaySceneMemoryKind m_Kind = RaySceneMemoryKind::Geometry;
+		bool m_Active = false;
+		uint64_t m_LogicalBytes = 0;
+		RHIAllocationFacts m_Allocation;
+	};
+
+	// Owner-thread snapshot. Weak observations do not prolong GPU resource lifetime.
+	// Native allocation identities are process-local and must be remapped for export.
+	struct RaySceneMemorySnapshot
+	{
+		uint32_t m_LiveSnapshots = 0;
+		std::vector<RaySceneMemoryResource> m_Resources;
+	};
+
+	struct RayScenePreparationStatistics
+	{
+		uint64_t m_Calls = 0;
+		uint64_t m_Replacements = 0;
+		double m_TotalMilliseconds = 0;
+		double m_LastMilliseconds = 0;
+		double m_LastGatherMilliseconds = 0;
+		double m_LastPlanMilliseconds = 0;
+		double m_LastAllocationMilliseconds = 0;
+		double m_LastReplacementMilliseconds = 0;
+		double m_ReplacementGatherMilliseconds = 0;
+		double m_ReplacementPlanMilliseconds = 0;
+		double m_ReplacementAllocationMilliseconds = 0;
+	};
+
 	struct RaySceneDiagnostics
 	{
 		RaySceneStatus m_Status = RaySceneStatus::NotReady;
@@ -103,6 +144,7 @@ namespace gglab
 		bool m_HasCompleteBounds = false;
 		std::vector<RaySceneMaterialTexture> m_MaterialTextures;
 		bool m_TracksPrimaryMaterials = false;
+		RayScenePreparationStatistics m_Preparation;
 	};
 
 	// Graph-local imports. Declare all traversed BLAS reads as well as the TLAS read.
@@ -133,13 +175,17 @@ namespace gglab
 	{
 	public:
 		explicit RayScene(RaySceneCapacity capacity = {},
-			RaySceneMaterialInputs materialInputs = RaySceneMaterialInputs::ReducedDiffuse) noexcept;
+			RaySceneMaterialInputs materialInputs = RaySceneMaterialInputs::ReducedDiffuse,
+			bool trackReplacementMemory = false) noexcept;
 		~RayScene();
 		GGLAB_DELETE_COPYABLE_MOVABLE(RayScene);
 		[[nodiscard]] RaySceneStatus Prepare(const World& world, AssetManager& assets,
 			RHIDevice& device, const RenderSamplerAccess& samplers) noexcept;
 		[[nodiscard]] RaySceneGraphResources AddBuildPasses(RenderGraph& graph) noexcept;
 		[[nodiscard]] const RaySceneDiagnostics& GetDiagnostics() const noexcept;
+		[[nodiscard]] RaySceneMemorySnapshot GetMemorySnapshot() const noexcept;
+		// Historical CPU facts only; never retains replaced GPU resources.
+		[[nodiscard]] const RaySceneMemorySnapshot& GetReplacementMemorySnapshot() const noexcept;
 
 	private:
 		struct State;

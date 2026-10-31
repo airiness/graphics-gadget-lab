@@ -3,8 +3,12 @@
 #include "Application/Demo/CoastalSceneReferenceViews.h"
 #include "Application/Demo/CoastalSceneLightingProfiles.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
+#include "GGLabRuntime/Core/Math/Transform.h"
+#include "GGLabRuntime/Graphics/Asset/ModelTypes.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/TransientResourcePoolSnapshot.h"
+#include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "GGLabRuntime/Graphics/RenderScene.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
@@ -13,6 +17,8 @@
 #include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
 #include "GGLabRuntime/Graphics/Atmosphere.h"
 #include "GGLabRuntime/Graphics/Geometry.h"
+#include "GGLabRuntime/Graphics/CameraPath.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h"
 #include "GGLabRuntime/Graphics/RayScene.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
 #include "GGLabRuntime/Scene/Components.h"
@@ -26,6 +32,8 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <tuple>
+#include <map>
 #include <vector>
 
 namespace gglab
@@ -33,7 +41,19 @@ namespace gglab
 	namespace
 	{
 		const LabParameterId FixtureId("gi_reference.fixture");
+		const LabParameterId ProbeEnabledId("gi_reference.probe_enabled");
+		const LabParameterId ProbeRaysId("gi_reference.probe_rays");
+		const LabParameterId ProbeDivisorId("gi_reference.probe_divisor");
+		const LabParameterId ProbeUpdatesId("gi_reference.probe_updates");
+		const LabParameterId ProbeRefreshId("gi_reference.probe_refresh_period");
+		const LabParameterId ProbeSharedId("gi_reference.probe_shared_blend");
+		const LabParameterId ProbeTraversalId("gi_reference.probe_traversal_only");
+		const LabParameterId ProbeRotateId("gi_reference.probe_rotate");
+		const LabParameterId ProbeDiagnosticsId("gi_reference.probe_allocation_diagnostics");
+		const LabParameterId ProbeTransformId("gi_reference.probe_transform");
+
 		const LabParameterId SamplesId("gi_reference.samples");
+		const LabParameterId AccumulateId("gi_reference.accumulate");
 		const LabParameterId BatchSamplesId("gi_reference.batch_samples");
 		const LabParameterId DepthId("gi_reference.depth");
 		const LabParameterId TilePixelsId("gi_reference.tile_pixels");
@@ -72,6 +92,9 @@ namespace gglab
 			GIReferencePipeline(World& world, AssetManager& assets, GISpecularVisibilityCreateInfo info) noexcept :
 				m_World(world), m_Assets(assets), m_Scene(info.m_RayScene),
 				m_Raster(CreateRenderPipelineForwardPlus({ .m_GISpecularVisibility = std::move(info) })) {}
+			GIReferencePipeline(World& world, AssetManager& assets, std::shared_ptr<GIProbeUpdateExperiment> update) noexcept :
+				m_World(world), m_Assets(assets), m_Scene(update->GetRayScene()),
+				m_Raster(CreateRenderPipelineForwardPlus({ .m_GIProbeUpdate = std::move(update) })) {}
 			std::string_view GetName() const noexcept override { return "GI fixed-depth reference"; }
 			ResolvedTemporalFramePlan ResolveTemporalFramePlan(TemporalFramePlanResolveInfo info) const noexcept override
 			{
@@ -133,7 +156,12 @@ namespace gglab
 				{ 7, "Contract: published environment sphere" },
 				{ 8, "Contract: coupled diffuse planes" }, { 9, "Contract: reduced hit material and snapshots" },
 				{ 10, "Contract: GGX environment visibility" }, { 11, "Coastal: GGX visibility diagnostics" },
-				{ 12, "Coastal: diffuse reference" }, { 13, "Contract: small smooth receiver" } } }));
+				{ 12, "Coastal: diffuse reference" }, { 13, "Contract: small smooth receiver" },
+				{ 14, "Contract: probe furnace" }, { 15, "Coastal: probe update cost" },
+				{ 16, "Contract: probe slab" } } }));
+		GGLAB_UNUSED(parameters.Add({ .m_Id = AccumulateId, .m_Name = "Accumulate bounded reference",
+			.m_Group = "Reference", .m_Type = LabParameterType::Bool,
+			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = true }));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = SamplesId, .m_Name = "Samples per pixel", .m_Group = "Reference",
 			.m_Type = LabParameterType::UInt, .m_Impact = LabChangeImpact::RestartSession,
 			.m_DefaultValue = uint32_t(64), .m_MinValue = LabValue(uint32_t(1)), .m_MaxValue = LabValue(uint32_t(1048576)) }));
@@ -191,6 +219,29 @@ namespace gglab
 			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = int32_t(0),
 			.m_EnumItems = { { 0, "Open" }, { 1, "Closed" }, { 2, "Partial blocker" },
 				{ 3, "Off-camera blocker" } } }));
+		for (const auto& [id, name, value, maximum] : std::array<std::tuple<LabParameterId, const char*, uint32_t, uint32_t>, 4>{ {
+			{ ProbeRaysId, "Probe rays", 256, 256 }, { ProbeDivisorId, "Probe update divisor", 1, 4 },
+			{ ProbeUpdatesId, "Probe update limit (zero continuous)", 1, 1'000'000 },
+			{ ProbeRefreshId, "Full refresh period (zero fixed schedule)", 0, 1'000'000 } } })
+		{
+			GGLAB_UNUSED(parameters.Add({ .m_Id = id, .m_Name = name, .m_Group = "Probe experiment",
+				.m_Type = LabParameterType::UInt, .m_Impact = LabChangeImpact::RestartSession,
+				.m_DefaultValue = value, .m_MinValue = LabValue(uint32_t(0)), .m_MaxValue = LabValue(maximum) }));
+		}
+		for (const auto& [id, name, value] : std::array<std::tuple<LabParameterId, const char*, bool>, 5>{ {
+			{ ProbeEnabledId, "Probe experiment enabled", true }, { ProbeSharedId, "Shared-memory blend", true },
+			{ ProbeTraversalId, "Traversal-only control", false }, { ProbeRotateId, "Rotate probe directions", true },
+			{ ProbeDiagnosticsId, "Detailed allocation diagnostics", true } } })
+		{
+			GGLAB_UNUSED(parameters.Add({ .m_Id = id, .m_Name = name, .m_Group = "Probe experiment",
+				.m_Type = LabParameterType::Bool,
+				.m_Impact = id == ProbeEnabledId ? LabChangeImpact::RecreatePipeline : LabChangeImpact::RestartSession,
+				.m_DefaultValue = value }));
+		}
+		GGLAB_UNUSED(parameters.Add({ .m_Id = ProbeTransformId, .m_Name = "Probe scene translation step",
+			.m_Group = "Probe experiment", .m_Type = LabParameterType::UInt,
+			.m_Impact = LabChangeImpact::Immediate, .m_DefaultValue = uint32_t(0),
+			.m_MinValue = LabValue(uint32_t(0)), .m_MaxValue = LabValue(uint32_t(2)) }));
 		auto& profile = GetMutableViewRenderProfile();
 		profile.m_TemporalAA.m_Enabled = false;
 		profile.m_Lighting.m_GTAO.m_Enabled = false;
@@ -203,8 +254,16 @@ namespace gglab
 		m_World.GetRegistry().clear();
 		m_World.m_Atmosphere.reset();
 		m_Assets.Reset();
+		m_ProbeUpdate.reset();
+		m_FirstProbeFrame = 0;
+		m_LastProbeFrame = 0;
+		m_ActivationGpuFrame = 0;
+		m_InitializationGpuFrame = 0;
+		m_InitializationGpuMilliseconds = 0;
+		m_ActivationGpu.clear();
+		m_ProbeEntity = entt::null;
 		const auto fixture = GetParameters().Get(FixtureId, int32_t(0));
-		const bool coastal = fixture == 11 || fixture == 12;
+		const bool coastal = fixture == 11 || fixture == 12 || fixture == 15;
 		const float exposure = static_cast<float>(GetParameters().Get(ExposureId, int32_t(10)));
 		Color albedo = Color::White;
 		if (fixture == 2 || fixture == 3)
@@ -248,7 +307,14 @@ namespace gglab
 			m_World.GetRegistry().emplace<components::TransformComponent>(entity);
 			m_World.GetRegistry().emplace<components::ModelComponent>(entity, model);
 			m_Assets.TrackModel(model, "Coastal GI geometry");
+			m_ProbeEntity = entity;
 			views.assign(CoastalSceneReferenceViews.begin(), CoastalSceneReferenceViews.end());
+		}
+		else if (fixture == 14 || fixture == 16)
+		{
+			m_ProbeEntity = fixture == 16 ? primitive::Cube::Create(primitiveInfo) : primitive::Sphere::Create(primitiveInfo);
+			m_Assets.TrackModel(fixture == 16 ? ProceduralCubeModelID : ProceduralSphereModelID, "Probe query contract");
+			views.push_back(View("Probe_Contract", { 0, 0, -4 }, { 0, 0, 0 }, 45, exposure));
 		}
 		else if (fixture == 13)
 		{
@@ -436,7 +502,7 @@ namespace gglab
 			if (coastal)
 			{
 				sun.m_WorldSun = CoastalSceneLightingProfiles.front().m_Inputs.m_Sun;
-				if (fixture == 12)
+				if (fixture == 12 || fixture == 15)
 				{
 					sun.m_DirectionalShadowSettings.emplace();
 				}
@@ -451,12 +517,28 @@ namespace gglab
 		const bool registered = GetCameraRig().SetReferenceViews(std::move(views));
 		const bool restored = GetCameraRig().RestoreReferenceView(firstView);
 		GGLAB_ASSERT(registered && restored);
+		if (fixture >= 12)
+		{
+			const auto& camera = GetCamera();
+			const CameraPathKey key{ .m_Frame = 0, .m_Position = camera.GetPosition(),
+				.m_Target = camera.GetPosition() + camera.GetForward(), .m_VerticalFovDegrees = camera.GetFov() };
+			auto last = key;
+			last.m_Frame = 359;
+			const bool paths = GetCameraRig().SetCameraPaths({ CameraPath{
+				.m_Id = "GI_CostStatic", .m_Name = "Probe cost static view",
+				.m_Purpose = "Matched-input GI reference and probe update cost measurement",
+				.m_NearPlane = camera.GetNear(), .m_FarPlane = camera.GetFar(),
+				.m_ManualEV100 = camera.GetManualEV100(), .m_Keys = { key, last } } });
+			GGLAB_ASSERT(paths);
+		}
 		m_RayScene = std::make_shared<RayScene>(RaySceneCapacity{},
-			fixture >= 10 ? RaySceneMaterialInputs::PrimaryReceiver : RaySceneMaterialInputs::ReducedDiffuse);
+			fixture >= 10 && fixture <= 13 ? RaySceneMaterialInputs::PrimaryReceiver : RaySceneMaterialInputs::ReducedDiffuse,
+			fixture >= 14 && GetParameters().Get(ProbeDiagnosticsId, true));
 		GIReferenceCreateInfo reference{ .m_RayScene = m_RayScene,
 			.m_SampleCount = GetParameters().Get(SamplesId, uint32_t(64)),
 			.m_Seed = GetParameters().Get(SeedId, uint32_t(61051)) };
 		reference.m_SamplesPerBatch = GetParameters().Get(BatchSamplesId, uint32_t(64));
+		reference.m_Accumulate = GetParameters().Get(AccumulateId, true);
 		reference.m_MaximumDepth = GetParameters().Get(DepthId, uint32_t(1));
 		reference.m_MaximumDistance = coastal ? 30000.0f : 1000.0f;
 		reference.m_HitMaterialDiagnostics = fixture == 9;
@@ -470,7 +552,11 @@ namespace gglab
 		reference.m_ConstantRadiance = { radiance, radiance, radiance };
 		reference.m_EnvironmentFilter = contract && GetParameters().Get(FilterId, int32_t(0)) == 1 ?
 			GIReferenceEnvironmentFilter::MipZero : GIReferenceEnvironmentFilter::Face32;
-		if (fixture == 10 || fixture == 11)
+		if (fixture >= 14)
+		{
+			RecreatePipeline();
+		}
+		else if (fixture == 10 || fixture == 11)
 		{
 			GISpecularVisibilityCreateInfo visibility{ .m_RayScene = m_RayScene,
 				.m_SampleCount = reference.m_SampleCount, .m_Seed = reference.m_Seed,
@@ -601,6 +687,63 @@ namespace gglab
 		registry.emplace_or_replace<components::MaterialInstanceComponent>(m_VisibilityReceiver, instance);
 	}
 
+	void GIReferenceLabSession::RecreatePipeline() noexcept
+	{
+		const auto fixture = GetParameters().Get(FixtureId, int32_t(0));
+		if (fixture < 14)
+		{
+			return;
+		}
+		m_FirstProbeFrame = 0;
+		m_LastProbeFrame = 0;
+		m_ActivationGpuFrame = 0;
+		m_InitializationGpuFrame = 0;
+		m_InitializationGpuMilliseconds = 0;
+		m_ActivationGpu.clear();
+		if (!GetParameters().Get(ProbeEnabledId, true))
+		{
+			m_ProbeUpdate.reset();
+			m_RayScene.reset();
+			SetRenderPipeline(CreateRenderPipelineForwardPlus());
+			return;
+		}
+		if (m_ProbeEntity != entt::null)
+		{
+			auto& transform = m_World.GetRegistry().get<components::TransformComponent>(m_ProbeEntity);
+			transform.m_Position.m_X = 0.1f * static_cast<float>(GetParameters().Get(ProbeTransformId, uint32_t(0)));
+		}
+		if (!m_RayScene)
+		{
+			m_RayScene = std::make_shared<RayScene>(RaySceneCapacity{},
+				RaySceneMaterialInputs::ReducedDiffuse, GetParameters().Get(ProbeDiagnosticsId, true));
+		}
+		if (!m_ProbeUpdate)
+		{
+			GIProbeUpdateProfile profile;
+			profile.m_RaysPerProbe = GetParameters().Get(ProbeRaysId, uint32_t(256));
+			profile.m_UpdateDivisor = GetParameters().Get(ProbeDivisorId, uint32_t(1));
+			profile.m_MaximumUpdates = GetParameters().Get(ProbeUpdatesId, uint32_t(1));
+			profile.m_RefreshPeriod = GetParameters().Get(ProbeRefreshId, uint32_t(0));
+			profile.m_SharedBlend = GetParameters().Get(ProbeSharedId, true);
+			profile.m_TraversalOnly = GetParameters().Get(ProbeTraversalId, false);
+			profile.m_RotateDirections = GetParameters().Get(ProbeRotateId, true);
+			profile.m_Seed = GetParameters().Get(SeedId, uint32_t(61051));
+			if (fixture != 15)
+			{
+				profile.m_Counts = { 2, 2, 2 };
+				profile.m_Minimum = { -0.25f, -0.25f, -0.25f };
+				profile.m_Spacing = 0.5f;
+				profile.m_ConstantEnvironment = true;
+				profile.m_ConstantRadiance = { 1, 0.5f, 2 };
+				profile.m_Hysteresis = 0;
+				profile.m_TraverseScene = fixture == 16;
+			}
+			m_ProbeUpdate = std::make_shared<GIProbeUpdateExperiment>(m_RayScene, profile);
+		}
+		SetRenderPipeline(std::make_unique<GIReferencePipeline>(m_World,
+			*m_Services.m_AssetManager, m_ProbeUpdate));
+	}
+
 	void GIReferenceLabSession::BuildMaterialContract() noexcept
 	{
 		auto& assets = *m_Services.m_AssetManager;
@@ -718,6 +861,22 @@ namespace gglab
 	{
 		ApplyVisibilityMaterial();
 		auto& registry = m_World.GetRegistry();
+		if (registry.valid(m_ProbeEntity))
+		{
+			// The safe parameter batch mutates CPU authoring only. RayScene::Prepare
+			// replaces immutable tables/TLAS and submission leases retain the old snapshot.
+			auto& transform = registry.get<components::TransformComponent>(m_ProbeEntity);
+			const float translation =
+				0.1f * static_cast<float>(GetParameters().Get(ProbeTransformId, uint32_t(0)));
+			if (transform.m_Position.m_X != translation)
+			{
+				transform.m_Position.m_X = translation;
+				m_FirstProbeFrame = 0;
+				m_LastProbeFrame = 0;
+				m_ActivationGpuFrame = 0;
+				m_ActivationGpu.clear();
+			}
+		}
 		if (!registry.valid(m_MaterialWall))
 		{
 			return;
@@ -805,6 +964,14 @@ namespace gglab
 
 	void GIReferenceLabSession::OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept
 	{
+		if (GetParameters().Get(FixtureId, int32_t(0)) >= 14 && feedback.m_SubmittedFence.IsValid())
+		{
+			if (m_FirstProbeFrame == 0)
+			{
+				m_FirstProbeFrame = feedback.m_RenderFrameSerial;
+			}
+			m_LastProbeFrame = feedback.m_RenderFrameSerial;
+		}
 		if (!m_RayScene || GetParameters().Get(FixtureId, int32_t(0)) != 9)
 		{
 			return;
@@ -832,13 +999,48 @@ namespace gglab
 
 	bool GIReferenceLabSession::SupportsImmediateParameter(const LabParameterId& id) const noexcept
 	{
-		return (id == MaterialCaseId && GetParameters().Get(FixtureId, int32_t(0)) == 9) ||
+		return (id == ProbeTransformId && GetParameters().Get(FixtureId, int32_t(0)) >= 14) ||
+			(id == MaterialCaseId && GetParameters().Get(FixtureId, int32_t(0)) == 9) ||
 			(id == VisibilityMaterialId && GetParameters().Get(FixtureId, int32_t(0)) == 10);
 	}
 
 	std::optional<LabValue> GIReferenceLabSession::ReadImmediateParameterFrameValue(
 		const LabParameterId& id, const LabParameterFrameContext& frame) const noexcept
 	{
+		if (id == ProbeTransformId && frame.m_Scene && frame.m_FrameSerial != 0)
+		{
+			const auto& registry = m_World.GetRegistry();
+			const auto* component = registry.try_get<components::ModelComponent>(m_ProbeEntity);
+			const auto* model = component ? m_Services.m_AssetManager->GetModel(component->m_ModelId) : nullptr;
+			if (!model || model->m_MeshInstance.empty())
+			{
+				return std::nullopt;
+			}
+			for (uint32_t value = 0; value <= 2; ++value)
+			{
+				const Matrix translation = math::CreateTranslation(Vector3(0.1f * static_cast<float>(value), 0, 0));
+				const bool matched = std::ranges::all_of(model->m_MeshInstance, [&](const auto& source)
+					{
+						const auto* mesh = m_Services.m_AssetManager->GetMesh(source.m_MeshId);
+						if (!mesh || !mesh->m_HasBounds)
+						{
+							return false;
+						}
+						const Vector3 expected = math::TransformPoint(mesh->m_Aabb.m_Center,
+							source.m_LocalTransform * translation);
+						return std::ranges::any_of(frame.m_Scene->m_RenderInstances, [&](const auto& instance)
+							{
+								return instance.m_MeshId == source.m_MeshId &&
+									(instance.m_WorldCenterPos - expected).Length() < 0.0001f;
+							});
+					});
+				if (matched)
+				{
+					return LabValue(value);
+				}
+			}
+			return std::nullopt;
+		}
 		if ((id != MaterialCaseId && id != VisibilityMaterialId) || !frame.m_Scene || frame.m_FrameSerial == 0)
 		{
 			return std::nullopt;
@@ -863,12 +1065,124 @@ namespace gglab
 
 	void GIReferenceLabSession::BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept
 	{
+		const bool probe = GetParameters().Get(FixtureId, int32_t(0)) >= 14;
+		const bool allocations = GetParameters().Get(ProbeDiagnosticsId, true);
+		std::map<uint64_t, uint32_t> ordinals;
+		const auto allocation = [&](const char* owner, size_t index, uint32_t kind, bool active,
+			uint64_t logical, const RHIAllocationFacts& facts)
+			{
+				int64_t ordinal = -1;
+				if (facts.m_Status == RHIAllocationFactsStatus::Known)
+				{
+					const auto [found, inserted] = ordinals.emplace(facts.m_NativeAllocationId,
+						static_cast<uint32_t>(ordinals.size()));
+					ordinal = found->second;
+					GGLAB_UNUSED(inserted);
+				}
+				diagnostics.m_Metrics.push_back({ std::format("{} allocation {}", owner, index), std::format(
+					"kind={};active={};logical={};facts={};allocated={};alignment={};ordinal={}",
+					kind, active ? 1 : 0, logical, uint32_t(facts.m_Status), facts.m_AllocatedBytes,
+					facts.m_AlignmentBytes, ordinal) });
+			};
+		if (probe)
+		{
+			diagnostics.m_Title = "Probe update cost experiment";
+			diagnostics.m_Metrics.push_back({ "Activation GPU frame", std::to_string(m_ActivationGpuFrame) });
+			diagnostics.m_Metrics.push_back({ "Initialization GPU", std::format("frame={};milliseconds={}",
+				m_InitializationGpuFrame, m_InitializationGpuMilliseconds) });
+			for (const auto& [name, value] : m_ActivationGpu)
+			{
+				diagnostics.m_Metrics.push_back({ "Activation GPU " + name,
+					std::format("calls={};milliseconds={}", value.first, value.second) });
+			}
+			if (m_ProbeUpdate)
+			{
+				const auto progress = m_ProbeUpdate->GetDiagnostics(allocations);
+				diagnostics.m_Metrics.push_back({ "Probe progress", std::format(
+					"submitted={};completed={};probes={};rayCapacity={};fieldLogical={};prepareMs={};"
+					"allocationMs={};shaderLookupMs={};pipelineMs={};initialized={};failed={}",
+					progress.m_SubmittedUpdates, progress.m_CompletedUpdates, progress.m_ProbeCount,
+					progress.m_RayCapacityBytes, progress.m_FieldLogicalBytes, progress.m_PreparationMilliseconds,
+					progress.m_AllocationMilliseconds, progress.m_ShaderLookupMilliseconds,
+					progress.m_PipelineMilliseconds,
+					progress.m_Initialized ? 1 : 0, progress.m_Failed ? 1 : 0) });
+				diagnostics.m_Metrics.push_back({ "Probe inputs", std::format(
+					"lightingGeneration={};environmentGeneration={};atmosphereAttenuation={}",
+					progress.m_WorldLightingGeneration, progress.m_EnvironmentGeneration,
+					progress.m_AtmosphereAttenuation ? 1 : 0) });
+				for (size_t index = 0; index < progress.m_Allocations.size(); ++index)
+				{
+					const uint64_t logical = index == 0 ? progress.m_RayCapacityBytes :
+						uint64_t(progress.m_ProbeCount) * (index == 1 ? 1024u : index == 2 ? 2048u : 16u);
+					allocation("Probe", index, static_cast<uint32_t>(index), true, logical, progress.m_Allocations[index]);
+				}
+			}
+			if (allocations)
+			{
+				TransientResourcePoolSnapshot pool;
+				m_Services.m_RenderServices.m_Presentation->CaptureTransientResourcePool(pool);
+				diagnostics.m_Metrics.push_back({ "Transient inventory", std::format(
+					"available={};buffers={};textures={};cacheLimit={}", pool.m_SourceAvailable ? 1 : 0,
+					pool.m_BufferCounts.m_Total, pool.m_TextureCounts.m_Total, pool.m_MaxCachedPerKey) });
+				auto* device = m_Services.m_RenderServices.m_Presentation->GetDevice();
+				size_t index = 0;
+				for (const auto& slot : pool.m_Buffers)
+				{
+					if (slot.m_State != TransientPoolSlotState::Destroyed && slot.m_LogicalName == "RayScene.BuildScratch")
+					{
+						const auto desc = device->QueryBufferDescription(slot.m_Buffer);
+						allocation("Scratch", index++, uint32_t(slot.m_State), true,
+							desc ? desc->m_SizeInBytes : 0, device->QueryBufferAllocationFacts(slot.m_Buffer));
+					}
+				}
+			}
+		}
 		if (!m_RayScene)
 		{
 			return;
 		}
 		const auto& scene = m_RayScene->GetDiagnostics();
-		diagnostics.m_Title = "GI reference snapshot inputs";
+		if (!probe)
+		{
+			diagnostics.m_Title = "GI reference snapshot inputs";
+		}
+		if (probe || GetParameters().Get(FixtureId, int32_t(0)) == 9)
+		{
+			const auto& cpu = scene.m_Preparation;
+			diagnostics.m_Metrics.push_back({ "RayScene preparation", std::format(
+				"calls={};replacements={};totalMs={};lastMs={};gatherMs={};planMs={};allocateMs={};lastReplacementMs={};replacementGatherMs={};replacementPlanMs={};replacementAllocateMs={}",
+				cpu.m_Calls, cpu.m_Replacements, cpu.m_TotalMilliseconds, cpu.m_LastMilliseconds,
+				cpu.m_LastGatherMilliseconds, cpu.m_LastPlanMilliseconds, cpu.m_LastAllocationMilliseconds,
+				cpu.m_LastReplacementMilliseconds, cpu.m_ReplacementGatherMilliseconds,
+				cpu.m_ReplacementPlanMilliseconds, cpu.m_ReplacementAllocationMilliseconds) });
+			if (allocations)
+			{
+				const auto& overlap = m_RayScene->GetReplacementMemorySnapshot();
+				diagnostics.m_Metrics.push_back({ "Replacement ray snapshots", std::to_string(overlap.m_LiveSnapshots) });
+				uint64_t overlapBytes = 0;
+				uint64_t inactiveBytes = 0;
+				bool overlapKnown = !overlap.m_Resources.empty();
+				for (const auto& resource : overlap.m_Resources)
+				{
+					overlapKnown &= resource.m_Allocation.m_Status == RHIAllocationFactsStatus::Known;
+					overlapBytes += resource.m_Allocation.m_AllocatedBytes;
+					if (!resource.m_Active)
+					{
+						inactiveBytes += resource.m_Allocation.m_AllocatedBytes;
+					}
+				}
+				diagnostics.m_Metrics.push_back({ "Replacement ray memory", std::format(
+					"known={};allocated={};inactive={}", overlapKnown ? 1 : 0, overlapBytes, inactiveBytes) });
+				const auto memory = m_RayScene->GetMemorySnapshot();
+				diagnostics.m_Metrics.push_back({ "Live ray snapshots", std::to_string(memory.m_LiveSnapshots) });
+				for (size_t index = 0; index < memory.m_Resources.size(); ++index)
+				{
+					const auto& resource = memory.m_Resources[index];
+					allocation("RayScene", index, uint32_t(resource.m_Kind), resource.m_Active,
+						resource.m_LogicalBytes, resource.m_Allocation);
+				}
+			}
+		}
 		for (const auto& [name, value] : std::array<std::pair<const char*, uint64_t>, 7>{ {
 			{ "Snapshot revision", scene.m_Revision }, { "Geometry revision", scene.m_GeometryRevision },
 			{ "BLAS builds", scene.m_BottomLevelBuildCount }, { "TLAS builds", scene.m_TopLevelBuildCount },
@@ -906,7 +1220,14 @@ namespace gglab
 		m_LightingOverride = m_Services.m_EnvironmentLightingControl->AcquireOverride();
 		GGLAB_ASSERT(m_LightingOverride);
 		const auto fixture = GetParameters().Get(FixtureId, int32_t(0));
-		const bool coastal = fixture == 11 || fixture == 12;
+		if (fixture >= 14 && GetParameters().Get(ProbeDiagnosticsId, true) &&
+			m_Services.m_GpuProfiling && m_Services.m_GpuProfilingControl)
+		{
+			m_PreviousProbeProfiling = m_Services.m_GpuProfiling->IsEnabled();
+			m_RestoreProbeProfiling = true;
+			m_Services.m_GpuProfilingControl->RequestEnabled(true);
+		}
+		const bool coastal = fixture == 11 || fixture == 12 || fixture == 15;
 		const bool contract = fixture >= 5;
 		const auto environment = coastal ?
 			3 : contract ? GetParameters().Get(EnvironmentId, int32_t(0)) : 0;
@@ -933,6 +1254,11 @@ namespace gglab
 	}
 	void GIReferenceLabSession::OnExit() noexcept
 	{
+		if (m_RestoreProbeProfiling)
+		{
+			m_Services.m_GpuProfilingControl->RequestEnabled(m_PreviousProbeProfiling);
+			m_RestoreProbeProfiling = false;
+		}
 		if (m_SelectedEnvironment)
 		{
 			auto& controller = *m_Services.m_EnvironmentAssetController;
@@ -951,6 +1277,43 @@ namespace gglab
 
 	void GIReferenceLabSession::Update(float deltaTime) noexcept
 	{
+		if (m_RestoreProbeProfiling && (m_ActivationGpuFrame == 0 || m_InitializationGpuFrame == 0) &&
+			m_FirstProbeFrame != 0)
+		{
+			const auto frame = m_Services.m_GpuProfiling->GetLatestFrame();
+			if (frame.IsValid() && frame.m_RenderFrameSerial >= m_FirstProbeFrame &&
+				frame.m_RenderFrameSerial <= m_LastProbeFrame &&
+				m_ActivationGpuFrame == 0 && std::ranges::any_of(frame.m_Samples, [](const auto& sample)
+					{
+						return sample.m_Name == "RayScene.BuildTLAS";
+					}))
+			{
+				m_ActivationGpuFrame = frame.m_RenderFrameSerial;
+				for (const auto& sample : frame.m_Samples)
+				{
+					if (sample.m_Kind == GpuProfileScopeKind::RenderGraphPass &&
+						(sample.m_Name.starts_with("RayScene.") || sample.m_Name == "GI.ProbeUpdate.Initialize"))
+					{
+						auto& value = m_ActivationGpu[sample.m_Name];
+						value.first += sample.m_CallCount;
+						value.second += sample.m_Milliseconds;
+					}
+				}
+			}
+			if (frame.IsValid() && frame.m_RenderFrameSerial >= m_FirstProbeFrame &&
+				frame.m_RenderFrameSerial <= m_LastProbeFrame && m_InitializationGpuFrame == 0)
+			{
+				for (const auto& sample : frame.m_Samples)
+				{
+					if (sample.m_Kind == GpuProfileScopeKind::RenderGraphPass &&
+						sample.m_Name == "GI.ProbeUpdate.Initialize")
+					{
+						m_InitializationGpuFrame = frame.m_RenderFrameSerial;
+						m_InitializationGpuMilliseconds += sample.m_Milliseconds;
+					}
+				}
+			}
+		}
 		GGLAB_UNUSED(deltaTime);
 	}
 	LabId GIReferenceLabSession::GetId() noexcept { return LabId("gglab.lab.gi_reference"); }

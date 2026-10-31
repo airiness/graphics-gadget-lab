@@ -83,6 +83,26 @@ namespace gglab
 					.m_Space = "Native unjittered render view before temporal integration",
 					.m_Description = "Stateless one-bounce reference. SunIrradiance RGB and EnvironmentIrradiance RGB sum to Irradiance RGB. Sun alpha: atmosphere attenuation bound (0/1); environment alpha: actual cubemap LOD, -1 for direct constant input (background 0). Irradiance excludes receiver albedo and direct receiver sun. LambertRadiance is reduced diffuse albedo * E / pi, not full Forward material or Final. Irradiance alpha: 0 background, 1 valid, -1 unsupported receiver, -2 unmatched/invalid receiver, -3 invalid secondary sample; never drop invalid pixels from metrics." };
 			}
+			if (name == "GI.ProbeUpdate.Rays")
+			{
+				return ResourceExportSemantics{ .m_Role = "gi-probe-update", .m_Units = "scene-linear radiance / metres / fractions as described",
+					.m_Space = "probe grid", .m_Description = "Float4 per probe/ray: reduced outgoing scene-linear radiance RGB and hit distance in metres. Miss distance is t_max; single-sided backface is -0.2*t with zero radiance. Invalid samples remain non-finite." };
+			}
+			if (name == "GI.ProbeUpdate.Irradiance")
+			{
+				return ResourceExportSemantics{ .m_Role = "gi-probe-update", .m_Units = "scene-linear radiance / metres / fractions as described",
+					.m_Space = "probe grid", .m_Description = "RGB: cosine-weighted radiance ratio M; incident E=pi*M. A: initialized texel marker. FP32 octahedral 6x6 interiors with one-texel seam borders. Experimental workload, not a production field certificate." };
+			}
+			if (name == "GI.ProbeUpdate.Distance")
+			{
+				return ResourceExportSemantics{ .m_Role = "gi-probe-update", .m_Units = "scene-linear radiance / metres / fractions as described",
+					.m_Space = "probe grid", .m_Description = "RG: weighted mean and mean-square of min(abs(hit distance), 1.5*length(spacing)). FP32 octahedral 14x14 interiors and one-texel seam borders; cosine-power-50 weights." };
+			}
+			if (name == "GI.ProbeUpdate.State")
+			{
+				return ResourceExportSemantics{ .m_Role = "gi-probe-update", .m_Units = "scene-linear radiance / metres / fractions as described",
+					.m_Space = "probe grid", .m_Description = "RGBA: miss, front/two-sided surface, single-sided backface and invalid fractions over every declared ray. Zero marks an unupdated probe; invalid rays are never dropped from a denominator. The separately labelled traversal-only control reports unclassified committed hits in G and unsigned distance, with zero radiance; it does not evaluate material sidedness." };
+			}
 			constexpr std::array giRecords
 			{
 				std::pair{ "GI.SpecularVisibility.Visibility", "RGB: base, coat and Rec709-luminance layer-weighted continuous GGX environment visibility. A: 0 background/pending, 1 valid calculated estimate, 2 all lobes inactive, -1 unsupported/unmatched primary, -2 invalid sampling. GPU completion is not numerical qualification. Not radiance, reflection transport, specular GI or production S1." },
@@ -220,6 +240,11 @@ namespace gglab
 				if (target.m_Address.m_Resource == "ForwardPlus.TileDepthRanges")
 				{
 					layout = ForwardPlusTileDepthRangeLayout;
+				}
+				if (target.m_Address.m_Resource == "GI.ProbeUpdate.Rays")
+				{
+					static constexpr std::array fields{ GpuBufferFieldLayout{ "radianceDistance", 0, GpuBufferScalar::Float32, 4 } };
+					layout = { 16, fields };
 				}
 				if (layout.m_Stride == stride && !layout.m_Fields.empty())
 				{

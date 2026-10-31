@@ -32,6 +32,9 @@ namespace gglab
 		GIReferenceEnvironmentFilter m_EnvironmentFilter = GIReferenceEnvironmentFilter::Face32;
 		// Total observation samples are independent of submission partitioning.
 		uint32_t m_SamplesPerBatch = 64;
+		// Cost control: stateless work repeats the same bounded samples every frame.
+		// It has no observation/readiness certificate and must fit both whole-frame budgets.
+		bool m_Accumulate = true;
 		// Maximum sampled pixels * batch samples per submission. Full-viewport
 		// receiver/resolve and optional material-diagnostic overhead is additional; viewports are capped at 8,388,608 pixels.
 		uint32_t m_SampleWorkPerSubmission = 8'388'608;

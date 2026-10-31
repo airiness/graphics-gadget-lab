@@ -46,6 +46,7 @@ namespace gglab
 	struct ComputePipelineSlot;
 	struct EnvironmentTextureSource;
 	struct AtmosphereGPU;
+	struct TransientResourcePoolSnapshot;
 	struct GraphicsPhysicalPipelineKey;
 	struct GraphicsPipelineSlot;
 
@@ -249,6 +250,11 @@ namespace gglab
 			const noexcept { return {}; }
 		[[nodiscard]] virtual GISpecularVisibilityProgress GetGISpecularVisibilityProgress()
 			const noexcept { return {}; }
+		// Immutable owner-thread inventory, including cached and pending pool slots.
+		virtual void CaptureTransientResourcePool(TransientResourcePoolSnapshot& snapshot) const noexcept
+		{
+			GGLAB_UNUSED(snapshot);
+		}
 	};
 
 	class RenderBindingLayoutAccess

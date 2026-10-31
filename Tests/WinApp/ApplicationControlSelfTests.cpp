@@ -514,7 +514,18 @@ namespace gglab
 				status["capture"]["reservedReceipts"] == 3 && status["capture"]["limits"]["receipts"] == 128 &&
 				status["capture"]["limits"]["activeJobs"] == 64 && status["capture"]["limits"]["productsPerJob"] == 8 &&
 				status["capture"]["limits"]["resourceTargetsPerJob"] == 64, "Capabilities advertise actual count policy for the final bounded job contract");
+			LabSnapshot lab;
+			lab.m_ActiveLabId.m_Name = "gglab.lab.gi_reference";
+			lab.m_FrameInSession = 17;
+			lab.m_Diagnostics.m_Metrics.push_back({ "Probe progress", "completed=1" });
+			lab.m_Diagnostics.m_Checks.push_back({ "Finite", LabDiagnosticCheckStatus::Passed, "All samples" });
+			const auto labStatus = Json::parse(SerializeApplicationControlStatus(5, { .m_Lab = lab }));
+			context.Check(labStatus["lab"]["id"] == "gglab.lab.gi_reference" &&
+				labStatus["lab"]["frameInSession"] == 17 && labStatus["lab"]["metrics"][0]["value"] == "completed=1" &&
+				labStatus["lab"]["checks"][0]["status"] == "passed",
+				"Status preserves immutable Lab diagnostics without interpreting metric strings");
 			const auto noFrame = Json::parse(SerializeApplicationControlStatus(5, {}));
+			context.Check(noFrame["lab"].is_null(), "Unavailable Lab diagnostics remain absent");
 			const auto available = Json::parse(SerializeApplicationControlStatus(6, { .m_NonFiniteInstrumentation = true }));
 			context.Check(noFrame["frame"].is_null() && noFrame["sequence"].is_null() && noFrame["watch"]["production"] == "Unavailable" &&
 				available["watch"]["production"] == "Incomplete", "Missing frame and production capability do not imply completed coverage");

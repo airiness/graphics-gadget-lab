@@ -53,6 +53,8 @@ before the temporal boundary. Its Public `GIReferenceCreateInfo` retains a
 Lab-prepared, complete `RayScene`; the Runtime recipe imports that scene once and
 owns its queries. Renderer owns the bounded observation and its accumulation,
 independently of the Lab and temporal histories; see [frame settlement](Frame_Execution_Map.md#frame-settlement).
+`GIReferenceCreateInfo::m_Accumulate=false` instead selects stateless whole-frame
+sampling without the Renderer-owned observation.
 `RenderPresentationAccess` returns immutable progress. AppRuntime selects captures
 after pipeline validation identifies the current observation.
 
@@ -67,6 +69,21 @@ The opt-in `m_GISpecularVisibility` adds a Runtime-owned pre-temporal diagnostic
 with an independent Renderer-owned observation. It requires a
 `RaySceneMaterialInputs::PrimaryReceiver` scene; when both GI diagnostics are
 enabled they must share one RayScene import. Neither changes production IBL.
+
+The opt-in `m_GIProbeUpdate` adds the Runtime-owned `GIProbeUpdateExperiment`
+before the temporal boundary. The experiment owns its persistent ray/probe
+resources and shares the recipe's single `RayScene` import without screen
+receiver passes. Exported read states remain the next frame's import contract,
+including after bounded updates stop. Non-constant environments require the
+requested IBL publication. This diagnostic workload installs no production
+field lookup or history.
+
+Memory diagnostics use [`RayScene::GetMemorySnapshot`](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RayScene.h)
+and [`RenderPresentationAccess::CaptureTransientResourcePool`](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderServices.h)
+without retaining the observed resources.
+
+Verification: [probe contracts](../../Tests/Verification/TestGIProbeUpdate.ps1)
+and [quiet timing](../../Tests/Verification/MeasureGIProbeUpdate.ps1).
 
 ## Lab-owned composition
 

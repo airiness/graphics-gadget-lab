@@ -18,6 +18,7 @@
         "gglab.shader.final-color",
         "gglab.shader.forward-coverage",
         "gglab.shader.forward-pbr",
+        "gglab.shader.gi-probe-update",
         "gglab.shader.gi-receiver",
         "gglab.shader.gtao",
         "gglab.shader.ibl-brdf-lut",
@@ -60,6 +61,7 @@
         "gglab.shader.final-color",
         "gglab.shader.forward-coverage",
         "gglab.shader.forward-pbr",
+        "gglab.shader.gi-probe-update",
         "gglab.shader.gi-receiver",
         "gglab.shader.gtao",
         "gglab.shader.ibl-brdf-lut",
@@ -102,6 +104,7 @@
         "gglab.shader.final-color",
         "gglab.shader.forward-coverage",
         "gglab.shader.forward-pbr",
+        "gglab.shader.gi-probe-update",
         "gglab.shader.gi-receiver",
         "gglab.shader.gtao",
         "gglab.shader.ibl-brdf-lut",
@@ -144,6 +147,7 @@
         "gglab.shader.final-color",
         "gglab.shader.forward-coverage",
         "gglab.shader.forward-pbr",
+        "gglab.shader.gi-probe-update",
         "gglab.shader.gi-receiver",
         "gglab.shader.gtao",
         "gglab.shader.ibl-brdf-lut",
@@ -181,6 +185,7 @@
         "gglab.shader.aerial-perspective",
         "gglab.shader.forward-plus-cull",
         "gglab.shader.forward-plus-validation",
+        "gglab.shader.gi-probe-update",
         "gglab.shader.gtao",
         "gglab.shader.physical-sky-preview",
         "gglab.shader.post-process-preview",
@@ -230,6 +235,7 @@
         "gglab.shader.final-color",
         "gglab.shader.forward-coverage",
         "gglab.shader.forward-pbr",
+        "gglab.shader.gi-probe-update",
         "gglab.shader.gi-receiver",
         "gglab.shader.gtao",
         "gglab.shader.ibl-brdf-lut",
@@ -272,6 +278,7 @@
         "gglab.shader.final-color",
         "gglab.shader.forward-coverage",
         "gglab.shader.forward-pbr",
+        "gglab.shader.gi-probe-update",
         "gglab.shader.gi-receiver",
         "gglab.shader.gtao",
         "gglab.shader.ibl-brdf-lut",
@@ -314,6 +321,7 @@
         "gglab.shader.final-color",
         "gglab.shader.forward-coverage",
         "gglab.shader.forward-pbr",
+        "gglab.shader.gi-probe-update",
         "gglab.shader.gi-receiver",
         "gglab.shader.gtao",
         "gglab.shader.ibl-brdf-lut",
@@ -351,6 +359,7 @@
         "gglab.shader.aerial-perspective",
         "gglab.shader.forward-plus-cull",
         "gglab.shader.forward-plus-validation",
+        "gglab.shader.gi-probe-update",
         "gglab.shader.gtao",
         "gglab.shader.physical-sky-preview",
         "gglab.shader.post-process-preview",
@@ -1567,6 +1576,7 @@
       "count": 7,
       "bodySha256": "6add314edd6c9c5b0493d021aa9370a15f8a21be8bfbd71c51c33a5c860200aa",
       "programs": [
+        "gglab.shader.gi-probe-update",
         "gglab.shader.ray-scene"
       ],
       "kind": "recovery",
@@ -1602,11 +1612,34 @@
       "operation": "isfinite",
       "count": 1,
       "bodySha256": "53da467db2d036ad9212a9554671be25291dfe3a9d12fc8beae40c27e9b77801",
-      "programs": ["gglab.shader.ray-scene"],
+      "programs": [
+        "gglab.shader.ray-scene"
+      ],
       "kind": "recovery",
       "evidence": "counter",
-      "policy": { "negative": "report", "fp16Maximum": "report" },
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
       "rationale": "Reject invalid receiver, GGX direction, layer energy and accumulated sums before publishing normalized visibility. Signed geometry and FP32 values are not radiance clamps; per-lobe invalid counts independently invalidate the observation."
+    },
+    {
+      "id": "gi-probe-update.trace.isfinite",
+      "source": "Passes/PassGIProbeUpdate.hlsl",
+      "function": "Trace",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "da269e21c8af875003acde6b3bbe24935c19ef1f0051f0926c14d77a74c02b91",
+      "programs": [
+        "gglab.shader.gi-probe-update"
+      ],
+      "kind": "recovery",
+      "evidence": "counter",
+      "policy": {
+        "negative": "expected",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Invalid probe radiance/distance writes an explicit non-finite sample and increments the per-probe invalid fraction; numerical qualification rejects the entire export. Negative distances encode single-sided backface hits rather than environment misses."
     }
   ],
   "injectionPoints": [
