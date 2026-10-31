@@ -82,8 +82,7 @@ Memory diagnostics use [`RayScene::GetMemorySnapshot`](../../Sources/GGLabRuntim
 and [`RenderPresentationAccess::CaptureTransientResourcePool`](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderServices.h)
 without retaining the observed resources.
 
-Verification: [probe contracts](../../Tests/Verification/TestGIProbeUpdate.ps1)
-and [quiet timing](../../Tests/Verification/MeasureGIProbeUpdate.ps1).
+Verification: [probe update checks and measurements](../../Tests/Verification/README.md#probe-update).
 
 ## Lab-owned composition
 

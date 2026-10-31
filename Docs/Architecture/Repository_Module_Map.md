@@ -135,10 +135,10 @@ and [application interfaces](Modules/Application_Content.md).
 
 ## Review and verification
 
-The [maintenance guide](Boundary_And_Drift_Guide.md#checks) lists ownership and map
-checks. Build/test commands are in the [CI workflow](../../.github/workflows/build.yml);
-scripted suites are listed by
-[RunVerification.ps1](../../Tests/Verification/RunVerification.ps1) `-List`.
+Use the [verification guide](../../Tests/Verification/README.md) for repository
+checks and scripted suites, and the [CI workflow](../../.github/workflows/build.yml)
+for native build/test commands. The [maintenance guide](Boundary_And_Drift_Guide.md)
+describes map maintenance.
 
 ```text
 Anchors:

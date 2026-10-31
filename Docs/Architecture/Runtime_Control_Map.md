@@ -171,11 +171,8 @@ a missing frame input is unknown, never a reason to read live authoring storage.
 `OnFrameSubmitted` records consumption only after a successful EndFrame.
 
 Full [graph exports](../../Sources/GGLabRuntime/Private/Diagnostics/Builders/RenderGraphSnapshotJson.cpp)
-record culled passes and executed pass indices. The TAA resolve pass is
-`PostProcess.TemporalAA`. The [TAA comparison workflow](../../Scripts/Verification/Invoke-TaaComparison.ps1)
-pairs same-frame images and graphs, checks execution and restores the original
-Host override state. Operational details belong to the
-[capture guide](../../.agents/skills/gglab-frame-capture/references/captures.md#guarded-taa-comparison).
+record culled passes and executed pass indices. Consumer-side checks are described
+in the [TAA comparison workflow](../../Tests/Verification/README.md#taa-comparison).
 
 ## Owning tests
 
@@ -185,7 +182,7 @@ Host override state. Operational details belong to the
 | `GGLabAppRuntimeTests`: [capture coordinator](../../Tests/GGLabAppRuntime/FrameCaptureCoordinatorSelfTests.cpp) | Admission, predicates, deadlines, retries, cancellation and same-frame provenance. |
 | `WinAppTests`: [control](../../Tests/WinApp/ApplicationControlSelfTests.cpp), [lifecycle](../../Tests/WinApp/ApplicationLifecycleSelfTests.cpp), [tooling](../../Tests/WinApp/DevToolsViewProfileSelfTests.cpp) | Wire contracts, suspended sessions and tooling overrides. |
 | `GGLabRuntimeTests`: [rendering](../../Tests/GGLabRuntime/RenderingContractSelfTests.cpp), [diagnostics](../../Tests/GGLabRuntime/DiagnosticsContractSelfTests.cpp) | View/temporal contracts and lighting authoring identity. |
-| [Verification catalog](../../Tests/Verification/RunVerification.ps1) | Session, parameter, capture-schema and TAA comparison suites; use `-List` for selection. |
+| [Verification guide](../../Tests/Verification/README.md) | Scripted session, parameter, capture-schema and TAA comparison regressions. |
 
 ```text
 Anchors:

@@ -100,7 +100,7 @@ Atlas ID: atlas.runtime.render-pass-authoring
   Private.
 - **Verification:** `GGLabRuntimeTests`, `rendering-contracts`; `WinAppTests`,
   `napa-voxel`; GPU checks use the
-  [frame-capture skill](../../../.agents/skills/gglab-frame-capture/SKILL.md).
+  [verification workflows](../../../Tests/Verification/README.md#gpu-regressions).
 
 ```text
 Anchors:
