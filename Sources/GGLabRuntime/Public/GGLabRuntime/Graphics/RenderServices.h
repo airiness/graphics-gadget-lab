@@ -32,6 +32,7 @@ namespace gglab
 {
 	class World;
 	class GIReferenceObservation;
+	class GIFieldFrameState;
 	class GISpecularVisibilityObservation;
 	class ComposedLayout;
 	class AssetUploadScheduling;
@@ -309,6 +310,7 @@ namespace gglab
 		RenderPipelineOverlayExtensionBase* m_OverlayExtension = nullptr;
 		// Runtime-internal pass binding; content reads immutable progress through Presentation.
 		GIReferenceObservation* m_GIReferenceObservation = nullptr;
+		GIFieldFrameState* m_GIFieldFrameState = nullptr;
 		GISpecularVisibilityObservation* m_GISpecularVisibilityObservation = nullptr;
 
 		// Validates the stable owner-provided services. The application-injected

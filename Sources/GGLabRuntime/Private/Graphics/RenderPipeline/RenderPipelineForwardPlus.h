@@ -27,6 +27,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/ForwardPlusTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIField.h"
 
 #include <cstdint>
 #include <memory>
@@ -50,6 +51,7 @@ namespace gglab
 			std::optional<GIReferenceCreateInfo> m_GIReference;
 			std::optional<GISpecularVisibilityCreateInfo> m_GISpecularVisibility;
 			std::shared_ptr<GIProbeUpdateExperiment> m_GIProbeUpdate;
+			std::shared_ptr<GIField> m_GIField;
 		};
 
 		explicit RenderPipelineForwardPlus(
@@ -67,6 +69,7 @@ namespace gglab
 			m_GIReference(std::move(createInfo.m_GIReference)),
 			m_GISpecularVisibility(std::move(createInfo.m_GISpecularVisibility)),
 			m_GIProbeUpdate(std::move(createInfo.m_GIProbeUpdate)),
+			m_GIField(std::move(createInfo.m_GIField)),
 			m_ForwardPlusCullPass(m_ForwardPlusDebugReadback),
 			m_ForwardPlusValidationPass(m_ForwardPlusDebugReadback)
 		{
@@ -109,6 +112,7 @@ namespace gglab
 		std::optional<GIReferenceCreateInfo> m_GIReference;
 		std::optional<GISpecularVisibilityCreateInfo> m_GISpecularVisibility;
 		std::shared_ptr<GIProbeUpdateExperiment> m_GIProbeUpdate;
+		std::shared_ptr<GIField> m_GIField;
 		RenderPassGISpecularVisibility m_GISpecularVisibilityPass;
 		RenderPassGIReference m_GIReferencePass;
 		RenderPassGIReceiver m_GIReceiverPass;

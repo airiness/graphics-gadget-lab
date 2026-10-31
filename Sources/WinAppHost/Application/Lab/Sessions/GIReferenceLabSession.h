@@ -18,6 +18,7 @@ namespace gglab
 {
 	class RayScene;
 	class GIProbeUpdateExperiment;
+	class GIField;
 
 	class GIReferenceLabSession final : public LabSessionBase
 	{
@@ -48,6 +49,7 @@ namespace gglab
 		void ApplyImmediateParameters() noexcept override;
 		void RecreatePipeline() noexcept override;
 		std::shared_ptr<GIProbeUpdateExperiment> m_ProbeUpdate;
+		std::shared_ptr<GIField> m_Field;
 		bool m_RestoreProbeProfiling = false;
 		bool m_PreviousProbeProfiling = false;
 		uint64_t m_FirstProbeFrame = 0;

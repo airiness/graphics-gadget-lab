@@ -59,6 +59,10 @@ Atlas ID: atlas.runtime.render-pipeline
 - **Probe update:** Public [configuration and diagnostics](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h)
   for the optional Runtime [experiment](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIProbeUpdate.cpp),
   selected by `RenderPipelineForwardPlusCreateInfo::m_GIProbeUpdate`.
+- **Static world field:** `RenderPipelineForwardPlusCreateInfo::m_GIField` selects
+  the Runtime [owner](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIField.cpp),
+  with Public [configuration and diagnostics](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GIField.h).
+  Renderer owns its [CPU settlement participant](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIFieldState.h).
 - **Specular visibility:** Public [configuration/progress](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GISpecularVisibility.h)
   selects an independent Renderer-owned [observation](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GISpecularVisibilityObservation.h)
   and [pre-temporal pass](../../../Sources/GGLabRuntime/Private/Graphics/RenderPass/RenderPassGISpecularVisibility.cpp).

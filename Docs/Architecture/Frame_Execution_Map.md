@@ -178,9 +178,9 @@ Each frame derives one private outcome from the Renderer path and the RHI result
 
 | Outcome | Required Runtime participant order |
 | --- | --- |
-| Submitted / Failed | GI reference observation → specular visibility observation → Runtime capture → live/bake atmosphere → temporal transaction/history → last submitted fence and IBL scheduler → graph retirement |
-| Discarded | GI reference observation → specular visibility observation → live/bake atmosphere → IBL scheduler → last submitted fence → temporal transaction → graph retirement → Runtime capture |
-| CompletionUnknown | Retain GI reference and specular visibility observations → poison → fail/retain Runtime capture → retain live/bake atmosphere → abort IBL scheduling → abort/invalidate temporal state; no ordinary graph retirement |
+| Submitted / Failed | GI reference observation → field CPU update state → specular visibility observation → Runtime capture → live/bake atmosphere → temporal transaction/history → last submitted fence and IBL scheduler → graph retirement |
+| Discarded | GI reference observation → field CPU update state → specular visibility observation → live/bake atmosphere → IBL scheduler → last submitted fence → temporal transaction → graph retirement → Runtime capture |
+| CompletionUnknown | Retain GI reference observation → invalidate field CPU update state → retain specular visibility observation → poison → fail/retain Runtime capture → retain live/bake atmosphere → abort IBL scheduling → abort/invalidate temporal state; no ordinary graph retirement |
 
 Both Renderer-owned GI observations advance pending tile cursors only on Submitted. The first
 tile defines all pending pixels; later tiles preserve them with declared ReadWrite access.
@@ -191,6 +191,10 @@ through the last-use fence; unknown completion retains them through checked tear
 Observation scene identity uses a weak control-block key; query/build submission leases
 retain the immutable snapshot and texture interests selected by its material-input mode.
 Observations do not extend content asset ownership into AssetManager shutdown.
+
+`GIField` publishes update progress through deferred CPU commits. Failed or
+CompletionUnknown invalidates its in-place contents; Discarded preserves the prior
+state. Its completion counter advances only after checked fence completion.
 
 On the abort path, capture releases unsubmitted taps after the RHI abort has
 recorded the frame's resource uses.

@@ -13,6 +13,7 @@ namespace gglab
 			.m_GIReference = std::move(createInfo.m_GIReference),
 			.m_GISpecularVisibility = std::move(createInfo.m_GISpecularVisibility),
 			.m_GIProbeUpdate = std::move(createInfo.m_GIProbeUpdate),
+			.m_GIField = std::move(createInfo.m_GIField),
 			});
 	}
 }

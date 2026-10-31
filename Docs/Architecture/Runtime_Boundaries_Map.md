@@ -78,6 +78,13 @@ including after bounded updates stop. Non-constant environments require the
 requested IBL publication. This diagnostic workload installs no production
 field lookup or history.
 
+`m_GIField` composes the Runtime-owned `GIField` before ForwardOpaque, exclusively
+of `m_GIProbeUpdate`. The field owns persistent atlases and ray storage and shares
+the recipe's RayScene import. Changes to sealed scene, lighting or shader identities
+require replacement through the safe pipeline path. See
+[field settlement](Frame_Execution_Map.md#frame-settlement) and
+[verification](../../Tests/Verification/README.md#static-field-update).
+
 Memory diagnostics use [`RayScene::GetMemorySnapshot`](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RayScene.h)
 and [`RenderPresentationAccess::CaptureTransientResourcePool`](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderServices.h)
 without retaining the observed resources.

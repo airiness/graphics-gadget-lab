@@ -1,6 +1,7 @@
 #include "Graphics/Renderer.h"
 #include "Diagnostics/Builders/TransientResourcePoolSnapshotBuilder.h"
 #include "Graphics/Pipeline/GIReferenceObservation.h"
+#include "Graphics/Pipeline/GIFieldState.h"
 #include "Graphics/Pipeline/GISpecularVisibilityObservation.h"
 #include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
 #include "GGLabRuntime/Graphics/RenderParameters.h"
@@ -134,6 +135,7 @@ namespace gglab
 		m_TransientResourcePool = std::make_unique<TransientResourcePool>(device);
 		m_PersistentTexturePool = std::make_unique<PersistentTexturePool>(device);
 		m_GIReferenceObservation = std::make_unique<GIReferenceObservation>(*device, *m_PersistentTexturePool);
+		m_GIFieldFrameState = std::make_unique<GIFieldFrameState>();
 		m_GISpecularVisibilityObservation =
 			std::make_unique<GISpecularVisibilityObservation>(*device, *m_PersistentTexturePool);
 		m_Atmosphere = std::make_unique<AtmosphereSystem>(device, m_PersistentTexturePool.get());
@@ -301,6 +303,7 @@ namespace gglab
 		m_GTAOTemporalHistory.reset();
 		m_GIReferenceObservation->Shutdown();
 		m_GIReferenceObservation.reset();
+		m_GIFieldFrameState.reset();
 		m_GISpecularVisibilityObservation->Shutdown();
 		m_GISpecularVisibilityObservation.reset();
 		m_PersistentTexturePool.reset();
@@ -358,6 +361,7 @@ namespace gglab
 		}
 		m_RenderResRegistry->BeginPreviewFrame();
 		m_GIReferenceObservation->BeginFrame(frameSerial);
+		m_GIFieldFrameState->BeginFrame(frameSerial);
 		m_GISpecularVisibilityObservation->BeginFrame(frameSerial);
 		m_ActiveFrame = {};
 		m_ActiveFrame.m_RHIFrame = rhiFrame;
@@ -610,6 +614,7 @@ namespace gglab
 		GGLAB_ASSERT(m_HasActiveFrame && outcome.m_FrameSerial == m_ActiveFrame.m_Serial);
 		const RHIFencePoint fence = outcome.m_Fence;
 		m_GIReferenceObservation->Settle(outcome);
+		m_GIFieldFrameState->Settle(outcome);
 		m_GISpecularVisibilityObservation->Settle(outcome);
 		switch (outcome.m_Kind)
 		{

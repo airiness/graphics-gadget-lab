@@ -158,7 +158,8 @@ namespace gglab
 		const auto rayScene = m_GIReference ?
 			m_GIReference->m_RayScene :
 			m_GISpecularVisibility ? m_GISpecularVisibility->m_RayScene :
-				m_GIProbeUpdate ? m_GIProbeUpdate->GetRayScene() : nullptr;
+				m_GIProbeUpdate ? m_GIProbeUpdate->GetRayScene() :
+					m_GIField ? m_GIField->GetRayScene() : nullptr;
 		const auto referenceScene = rayScene ? rayScene->AddBuildPasses(rg) : RaySceneGraphResources{};
 		auto* swapChain = services.m_Presentation->GetSwapChain();
 
@@ -480,6 +481,12 @@ namespace gglab
 
 		// IBL Pass
 		m_IBLPass.AddPass(rg, context, services);
+
+		// Full field writes precede opaque consumers; lookup joins these dependencies later.
+		if (m_GIField)
+		{
+			m_GIField->AddPasses(rg, context, services, referenceScene);
+		}
 
 		// Directional Shadow Map
 		m_DirectionalShadowMapPass.AddPass(rg, context, services);
@@ -832,6 +839,20 @@ namespace gglab
 			{
 				result = m_GIReferencePass.Prepare(context, services, *m_GIReference,
 					m_ForwardPBRShaderSet.m_CoverageVertexShader);
+				if (!result.IsReady())
+				{
+					return result;
+				}
+			}
+			if (m_GIField)
+			{
+				const auto scene = m_GIField->GetRayScene();
+				if (m_GIProbeUpdate || (m_GIReference && scene != m_GIReference->m_RayScene) ||
+					(m_GISpecularVisibility && scene != m_GISpecularVisibility->m_RayScene))
+				{
+					return RenderFrameValidationResult::ContractFailure("GI field requires one shared scene and an exclusive update workload");
+				}
+				result = m_GIField->Prepare(context, services);
 				if (!result.IsReady())
 				{
 					return result;

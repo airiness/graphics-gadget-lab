@@ -147,6 +147,8 @@ namespace gglab
 		{
 			return m_PersistentTexturePool.get();
 		}
+		GIFieldFrameState* GetGIFieldFrameState() const noexcept { return m_GIFieldFrameState.get(); }
+
 		GIReferenceObservation* GetGIReferenceObservation() const noexcept
 		{
 			return m_GIReferenceObservation.get();
@@ -347,6 +349,7 @@ namespace gglab
 		std::unique_ptr<TransientResourcePool> m_TransientResourcePool;
 		std::unique_ptr<PersistentTexturePool> m_PersistentTexturePool;
 		std::unique_ptr<GIReferenceObservation> m_GIReferenceObservation;
+		std::unique_ptr<GIFieldFrameState> m_GIFieldFrameState;
 		std::unique_ptr<GISpecularVisibilityObservation> m_GISpecularVisibilityObservation;
 		std::unique_ptr<TemporalHistoryManager> m_TemporalHistoryManager;
 		std::unique_ptr<TemporalReferenceAccumulator> m_TemporalReferenceAccumulator;

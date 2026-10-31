@@ -448,6 +448,7 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
 '@
     # Keep catalog expectations and leaf fixtures together so their counts cannot drift.
     $gpuLeaves = [ordered]@{
+        'gi-field' = 'TestGIField.ps1'
         'gi-probe-update' = 'TestGIProbeUpdate.ps1'
         'gi-specular-visibility' = 'TestGISpecularVisibility.ps1'
         'gi-reference' = 'TestGIReference.ps1'
@@ -497,7 +498,7 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
     }
     Check (($gpuResult.suites | Where-Object name -eq 'taa-comparison').steps[0].receipt.python -eq
         'fixture-python-path') 'runner-forwards-selected-python-to-taa-workflow'
-    foreach ($suite in @('session-lifecycle', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update')) {
+    foreach ($suite in @('session-lifecycle', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field')) {
         Check (($gpuResult.suites | Where-Object name -eq $suite).steps[0].receipt.python -eq
             'fixture-python-path') "runner-forwards-selected-python-to-$suite"
     }

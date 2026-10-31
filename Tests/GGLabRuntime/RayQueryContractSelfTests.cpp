@@ -6,6 +6,9 @@
 #include "Graphics/Pipeline/GISpecularVisibilityObservation.h"
 #include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIField.h"
+#include "Graphics/Pipeline/GIFieldState.h"
+#include "GGLabRuntime/Graphics/RayScene.h"
 #include "GGLabRuntime/Graphics/Pipeline/RaySceneSunVisibility.h"
 #include "GGLabRuntime/Graphics/Pipeline/RaySceneHitMaterial.h"
 #include "Graphics/RenderPass/RenderPassGIReceiver.h"
@@ -195,6 +198,86 @@ namespace gglab
 				bindings.back().m_Slot.m_Binding == 10 &&
 				bindings[1].m_Slot.m_Type == RHIBindingType::AccelerationStructure,
 				"Shared ray bindings append t5-t10 after the actual inherited parameter order");
+		}
+
+		void RunGIFieldTests(SelfTestContext& context) noexcept
+		{
+			GIFieldCreateInfo info;
+			context.Check(!ValidateGIFieldCreateInfo(info), "A field cannot prepare without a scene owner");
+			info.m_RayScene = std::make_shared<RayScene>();
+			context.Check(ValidateGIFieldCreateInfo(info), "The Coastal full-update field profile is valid");
+			for (uint32_t count : { 0u, 1u, 129u })
+			{
+				auto invalid = info;
+				invalid.m_Volume.m_Counts[0] = count;
+				context.Check(!ValidateGIFieldCreateInfo(invalid), "A field volume needs a bounded three-dimensional cage");
+			}
+			for (float value : { 0.0f, -1.0f, std::numeric_limits<float>::infinity(),
+				std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::max() })
+			{
+				auto invalid = info;
+				invalid.m_Volume.m_Spacing = value;
+				context.Check(!ValidateGIFieldCreateInfo(invalid), "Nonfinite, collapsed and overflowing volumes reject before allocation");
+			}
+			auto invalid = info;
+			invalid.m_Volume.m_Minimum[0] = 1e30f;
+			context.Check(!ValidateGIFieldCreateInfo(invalid), "Field spacing must remain representable at its origin");
+			invalid = info;
+			invalid.m_RaysPerProbe = 255;
+			context.Check(!ValidateGIFieldCreateInfo(invalid), "Unsupported ray profiles cannot silently change their work budget");
+			GIField first(info);
+			GIField replacement(info);
+			context.Check(first.GetDiagnostics().m_Generation != replacement.GetDiagnostics().m_Generation &&
+				!first.GetDiagnostics().m_Initialized, "Replacement fields have distinct identities and no inherited updates");
+			RenderScene scene;
+			RenderFrameContext frame{ .m_RenderScene = scene };
+			context.Check(!first.Prepare(frame, {}).IsReady(), "A field requires the Runtime settlement service");
+
+			const RHIFencePoint fence{ RHIFenceHandle(0, 1), 1 };
+			GIFieldFrameState participant;
+			auto state = std::make_shared<GIFieldUpdateState>();
+			participant.BeginFrame(1);
+			context.Check(participant.Track(state, 1) && !participant.Track(state, 1),
+				"One field update may participate once in its matching renderer frame");
+			state->MarkRecorded(1);
+			context.Check(!state->Commit(1), "Recording never publishes a field update");
+			participant.Settle({ RenderFrameOutcomeKind::Discarded, 1, fence });
+			context.Check(!state->Commit(1) && !state->IsInvalid(),
+				"Discard with a cleanup retention fence preserves the prior field without publication");
+			participant.BeginFrame(2);
+			context.Check(participant.Track(state, 2), "A discarded update retries on a later frame");
+			state->MarkRecorded(2);
+			participant.Settle({ RenderFrameOutcomeKind::Submitted, 1, fence });
+			context.Check(!state->Commit(2), "An old settlement cannot acknowledge a newer field update");
+			participant.Settle({ RenderFrameOutcomeKind::Submitted, 2, fence });
+			context.Check(state->Commit(2) && !state->Commit(2),
+				"Submitted field CPU state commits exactly once, independently of TAA and host feedback");
+			participant.Settle({ RenderFrameOutcomeKind::Failed, 2, fence });
+			context.Check(!state->IsInvalid(), "Duplicate settlement cannot roll back an accepted field update");
+			participant.BeginFrame(3);
+			context.Check(participant.Track(state, 3), "The next full update uses a new frame serial");
+			participant.Settle({ RenderFrameOutcomeKind::Submitted, 3, fence });
+			context.Check(!state->Commit(3), "An unrecorded field has no update to publish");
+			for (const auto kind : { RenderFrameOutcomeKind::Failed, RenderFrameOutcomeKind::CompletionUnknown })
+			{
+				auto failed = std::make_shared<GIFieldUpdateState>();
+				participant.BeginFrame(4);
+				context.Check(participant.Track(failed, 4), "Failure test tracks its independent field generation");
+				failed->MarkRecorded(4);
+				participant.Settle({ kind, 4, kind == RenderFrameOutcomeKind::Failed ? fence : RHIFencePoint{} });
+				context.Check(failed->IsInvalid() && !failed->Commit(4) && !failed->Begin(5),
+					"Failed or unknown in-place writes invalidate the field and prevent further updates");
+			}
+			auto old = std::make_shared<GIFieldUpdateState>();
+			auto next = std::make_shared<GIFieldUpdateState>();
+			participant.BeginFrame(5);
+			context.Check(participant.Track(old, 5), "The old field owns its recorded frame");
+			old->MarkRecorded(5);
+			participant.Settle({ RenderFrameOutcomeKind::Submitted, 5, fence });
+			context.Check(old->Commit(5) && !next->Commit(5), "A retained old-generation commit never advances its replacement");
+			std::weak_ptr<GIFieldUpdateState> weak = old;
+			old.reset();
+			context.Check(weak.expired(), "Settled participant releases its CPU lease without retaining the session");
 		}
 
 		void RunProbeUpdateProfileTests(SelfTestContext& context) noexcept
@@ -1438,6 +1521,7 @@ namespace gglab
 		RunGIReferenceInputTests(context);
 		RunGISharedContractTests(context);
 		RunProbeUpdateProfileTests(context);
+		RunGIFieldTests(context);
 		RunGIReferenceObservationTests(context);
 		RunSpecularVisibilityTests(context);
 		RunGIReferenceTilingTests(context);

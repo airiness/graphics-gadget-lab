@@ -22,6 +22,7 @@
 #include "GGLabRuntime/Graphics/Geometry.h"
 #include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIField.h"
 #include "GGLabRuntime/Graphics/RayScene.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineForwardPlus.h"
 #include "GGLabRuntime/Scene/Components.h"
@@ -45,6 +46,7 @@ namespace gglab
 	namespace
 	{
 		const LabParameterId FixtureId("gi_reference.fixture");
+		const LabParameterId FieldEnabledId("gi_reference.field_enabled");
 		const LabParameterId ProbeEnabledId("gi_reference.probe_enabled");
 		const LabParameterId ProbeRaysId("gi_reference.probe_rays");
 		const LabParameterId ProbeDivisorId("gi_reference.probe_divisor");
@@ -128,6 +130,9 @@ namespace gglab
 			GIReferencePipeline(World& world, AssetManager& assets, std::shared_ptr<GIProbeUpdateExperiment> update) noexcept :
 				m_World(world), m_Assets(assets), m_Scene(update->GetRayScene()),
 				m_Raster(CreateRenderPipelineForwardPlus({ .m_GIProbeUpdate = std::move(update) })) {}
+			GIReferencePipeline(World& world, AssetManager& assets, std::shared_ptr<GIField> field) noexcept :
+				m_World(world), m_Assets(assets), m_Scene(field->GetRayScene()),
+				m_Raster(CreateRenderPipelineForwardPlus({ .m_GIField = std::move(field) })) {}
 			std::string_view GetName() const noexcept override { return "GI fixed-depth reference"; }
 			ResolvedTemporalFramePlan ResolveTemporalFramePlan(TemporalFramePlanResolveInfo info) const noexcept override
 			{
@@ -282,6 +287,9 @@ namespace gglab
 				.m_Impact = id == ProbeEnabledId ? LabChangeImpact::RecreatePipeline : LabChangeImpact::RestartSession,
 				.m_DefaultValue = value }));
 		}
+		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldEnabledId, .m_Name = "Static field update owner",
+			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
+			.m_Impact = LabChangeImpact::RecreatePipeline, .m_DefaultValue = false }));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = ProbeTransformId, .m_Name = "Probe scene translation step",
 			.m_Group = "Probe experiment", .m_Type = LabParameterType::UInt,
 			.m_Impact = LabChangeImpact::Immediate, .m_DefaultValue = uint32_t(0),
@@ -299,6 +307,7 @@ namespace gglab
 		m_World.m_Atmosphere.reset();
 		m_Assets.Reset();
 		m_ProbeUpdate.reset();
+		m_Field.reset();
 		m_FirstProbeFrame = 0;
 		m_LastProbeFrame = 0;
 		m_ActivationGpuFrame = 0;
@@ -808,6 +817,7 @@ namespace gglab
 		if (!GetParameters().Get(ProbeEnabledId, true))
 		{
 			m_ProbeUpdate.reset();
+			m_Field.reset();
 			m_RayScene.reset();
 			SetRenderPipeline(CreateRenderPipelineForwardPlus());
 			return;
@@ -822,6 +832,28 @@ namespace gglab
 			m_RayScene = std::make_shared<RayScene>(RaySceneCapacity{},
 				RaySceneMaterialInputs::ReducedDiffuse, GetParameters().Get(ProbeDiagnosticsId, true));
 		}
+		if (GetParameters().Get(FieldEnabledId, false))
+		{
+			m_ProbeUpdate.reset();
+			if (!m_Field)
+			{
+				GIFieldCreateInfo info{ .m_RayScene = m_RayScene };
+				info.m_RaysPerProbe = GetParameters().Get(ProbeRaysId, uint32_t(256));
+				info.m_Seed = GetParameters().Get(SeedId, GIObservationLimits::DefaultSeed);
+				if (fixture != GIReferenceFixture::CoastalProbeCost)
+				{
+					info.m_Volume = { .m_Counts = { 2, 2, 2 },
+						.m_Minimum = { -0.25f, -0.25f, -0.25f }, .m_Spacing = 0.5f };
+					info.m_ConstantEnvironment = true;
+					info.m_ConstantRadiance = { 1, 0.5f, 2 };
+				}
+				m_Field = std::make_shared<GIField>(std::move(info));
+			}
+			SetRenderPipeline(std::make_unique<GIReferencePipeline>(m_World,
+				*m_Services.m_AssetManager, m_Field));
+			return;
+		}
+		m_Field.reset();
 		if (!m_ProbeUpdate)
 		{
 			GIProbeUpdateProfile profile;
@@ -1120,7 +1152,8 @@ namespace gglab
 
 	bool GIReferenceLabSession::SupportsImmediateParameter(const LabParameterId& id) const noexcept
 	{
-		return (id == ProbeTransformId && IsGIProbeFixture(ReadFixture(GetParameters()))) ||
+		return (id == ProbeTransformId && IsGIProbeFixture(ReadFixture(GetParameters())) &&
+			!GetParameters().Get(FieldEnabledId, false)) ||
 			(id == MaterialCaseId && ReadFixture(GetParameters()) == GIReferenceFixture::HitMaterial) ||
 			(id == VisibilityMaterialId && ReadFixture(GetParameters()) == GIReferenceFixture::SpecularVisibility);
 	}
@@ -1186,6 +1219,24 @@ namespace gglab
 
 	void GIReferenceLabSession::BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept
 	{
+		if (m_Field)
+		{
+			const auto field = m_Field->GetDiagnostics(true);
+			diagnostics.m_Metrics.push_back({ "GI field", std::format(
+				"generation={};submitted={};completed={};scene={};lighting={};environment={};"
+				"probes={};rays={};field={};initialized={};invalid={}",
+				field.m_Generation, field.m_SubmittedUpdates, field.m_CompletedUpdates,
+				field.m_SceneRevision, field.m_LightingGeneration, field.m_EnvironmentGeneration,
+				field.m_ProbeCount, field.m_RayCapacityBytes, field.m_FieldLogicalBytes,
+				field.m_Initialized ? 1 : 0, field.m_Invalid ? 1 : 0) });
+			for (size_t index = 0; index < field.m_Allocations.size(); ++index)
+			{
+				const auto& allocation = field.m_Allocations[index];
+				diagnostics.m_Metrics.push_back({ std::format("GI field allocation {}", index),
+					std::format("logical={};allocated={};identity={}", allocation.m_LogicalBytes,
+						allocation.m_Allocation.m_AllocatedBytes, allocation.m_Allocation.m_NativeAllocationId) });
+			}
+		}
 		const bool probe = IsGIProbeFixture(ReadFixture(GetParameters()));
 		const bool allocations = GetParameters().Get(ProbeDiagnosticsId, true);
 		std::map<uint64_t, uint32_t> ordinals;

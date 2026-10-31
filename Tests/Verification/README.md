@@ -141,6 +141,18 @@ For cost acquisition, use [standalone measurements](#standalone-measurements).
 For other GI fixtures, frozen inputs and reference/visibility checks, start with
 [GI qualification inputs](GlobalIllumination/README.md).
 
+### Static field update
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/RunVerification.ps1 `
+    -Suite gi-field -Configuration Develop -Rhi dx12,vulkan -Python $python
+```
+
+[TestGIField.ps1](TestGIField.ps1) verifies field updates and lifecycle on the probe
+fixtures through `gi_reference.field_enabled`. Field mode uses full updates, Shared
+blending and rotating directions. Runtime `ray-query-contracts` covers field
+descriptors and CPU settlement.
+
 ## Standalone measurements
 
 Measurements are separate from the catalog's correctness regressions. For the
