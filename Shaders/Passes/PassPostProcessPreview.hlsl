@@ -5,6 +5,7 @@
 #include <Common/FullscreenTriangle.hlsli>
 #include <Common/MaterialSampling.hlsli>
 #include <Common/ApplicationBinding.hlsli>
+#include <Lighting/GIShaderConstants.hlsli>
 
 struct PostProcessPreviewPassParameters
 {
@@ -51,7 +52,12 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target
 	const uint viewIndex = g_Scene.ViewBaseIndex + g_Pass.ViewIndex;
 	const ViewData viewData = g_Views[viewIndex];
 	SamplerState pointSampler = GetSamplerState(g_Pass.SourceSamplerIndex);
-	if (g_Pass.SourceMode >= 29 && g_Pass.SourceMode <= 35)
+	const bool giVisibility = g_Pass.SourceMode == GIPreviewBaseVisibility ||
+		g_Pass.SourceMode == GIPreviewCoatVisibility || g_Pass.SourceMode == GIPreviewCombinedVisibility;
+	const bool giDiffuse = g_Pass.SourceMode == GIPreviewIrradiance ||
+		g_Pass.SourceMode == GIPreviewLambertRadiance || g_Pass.SourceMode == GIPreviewSunIrradiance ||
+		g_Pass.SourceMode == GIPreviewEnvironmentIrradiance;
+	if (giDiffuse || giVisibility)
 	{
 		const float4 value = GetTexture2DFloat4(g_Pass.SourceTextureIndex)
 			.SampleLevel(pointSampler, input.UV, 0);
@@ -67,13 +73,16 @@ float4 PSMain(FullscreenTriangleVSOutput input) : SV_Target
 			const uint2 cell = (uint2)(input.PositionCS.xy) / 8u;
 			return float4((((cell.x + cell.y) & 1u) != 0u ? 0.12 : 0.18).xxx, 1);
 		}
-		if (g_Pass.SourceMode >= 33)
+		if (giVisibility)
 		{
 			const uint active = (uint)(GetTexture2DFloat4(g_Pass.ActivityTextureIndex)
 				.SampleLevel(pointSampler, input.UV, 0).g);
-			const uint channel = g_Pass.SourceMode - 33;
-			const bool inactive = validity == 2.0 ||
-				(channel < 2u && (active & (1u << channel)) == 0u);
+			const uint channel = g_Pass.SourceMode == GIPreviewBaseVisibility ? 0u :
+				g_Pass.SourceMode == GIPreviewCoatVisibility ? 1u : 2u;
+			const uint lobe = g_Pass.SourceMode == GIPreviewBaseVisibility ? GIVisibilityBaseActive :
+				g_Pass.SourceMode == GIPreviewCoatVisibility ? GIVisibilityCoatActive :
+				GIVisibilityBaseActive | GIVisibilityCoatActive;
+			const bool inactive = validity == 2.0 || (active & lobe) == 0u;
 			return inactive ? float4(0.12, 0.25, 0.4, 1) : float4(saturate(value[channel]).xxx, 1);
 		}
 		// GI values are scene referred, independent of the camera's exposure/pre-exposure.

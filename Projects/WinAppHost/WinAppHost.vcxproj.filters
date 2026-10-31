@@ -533,6 +533,9 @@
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\ForwardPlusLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\GIReferenceLabFixture.h">
+      <Filter>Application\Lab\Sessions</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\GIReferenceLabSession.h">
       <Filter>Application\Lab\Sessions</Filter>
     </ClInclude>

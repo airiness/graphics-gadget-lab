@@ -1,5 +1,7 @@
 #include "Graphics/RenderPass/RenderPassGISpecularVisibility.h"
 #include "Graphics/Pipeline/GISpecularVisibilityObservation.h"
+#include "Graphics/Pipeline/GIComputeDispatch.h"
+#include "Graphics/Pipeline/RaySceneShaderBindings.h"
 #include "Graphics/RenderPass/GIReceiverGraphResources.h"
 #include "Graphics/RenderPass/GIPreviewGraphResources.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
@@ -28,6 +30,18 @@ namespace gglab
 		const RenderPassInfo PassInfo{ .m_TypeName = "GI.SpecularVisibility",
 			.m_DisplayName = "GGX environment visibility", .m_CategoryName = "Global Illumination",
 			.m_Category = RenderPassCategory::Debug, .m_Type = RenderPassType::Compute };
+		enum class OutputSlot : size_t
+		{
+			Visibility,
+			Base,
+			Coat,
+			Weights,
+			Position,
+			Diagnostics,
+			F0,
+			LayerEnergy,
+			Count,
+		};
 		constexpr std::array OutputNames
 		{
 			"GI.SpecularVisibility.Visibility", "GI.SpecularVisibility.Base",
@@ -35,13 +49,14 @@ namespace gglab
 			"GI.SpecularVisibility.Position", "GI.SpecularVisibility.Diagnostics",
 			"GI.SpecularVisibility.F0", "GI.SpecularVisibility.LayerEnergy",
 		};
+		static_assert(OutputNames.size() == static_cast<size_t>(OutputSlot::Count));
 		struct Parameters
 		{
 			std::array<uint32_t, 4> m_Receivers{};
 			std::array<uint32_t, 2> m_Reflections{};
 			uint32_t m_Depth = 0;
 			uint32_t m_BrdfLut = 0;
-			std::array<uint32_t, 8> m_Outputs{};
+			std::array<uint32_t, OutputNames.size()> m_Outputs{};
 			std::array<uint32_t, 4> m_Previous{};
 			std::array<uint32_t, 4> m_Next{};
 			std::array<uint32_t, 2> m_Size{};
@@ -73,10 +88,11 @@ namespace gglab
 	RenderFrameValidationResult ValidateGISpecularVisibilityInputs(
 		const GISpecularVisibilityCreateInfo& info, const RaySceneDiagnostics& scene) noexcept
 	{
-		if (info.m_SampleCount == 0 || info.m_SampleCount > 1'048'576 ||
-			info.m_SamplesPerBatch == 0 || info.m_SamplesPerBatch > 4096 ||
-			info.m_QueryWorkPerSubmission < 2 || info.m_QueryWorkPerSubmission > 16'777'216 ||
-			info.m_MaximumTilePixels > 8'388'608 || !std::isfinite(info.m_MaximumDistance) ||
+		if (info.m_SampleCount == 0 || info.m_SampleCount > GIObservationLimits::MaximumSamples ||
+			info.m_SamplesPerBatch == 0 || info.m_SamplesPerBatch > GIObservationLimits::MaximumBatchSamples ||
+			info.m_QueryWorkPerSubmission < GIObservationLimits::VisibilityQueriesPerSample ||
+			info.m_QueryWorkPerSubmission > GIObservationLimits::MaximumQueryWorkPerSubmission ||
+			info.m_MaximumTilePixels > GIObservationLimits::MaximumImagePixels || !std::isfinite(info.m_MaximumDistance) ||
 			info.m_MaximumDistance <= 0)
 		{
 			return RenderFrameValidationResult::ContractFailure("Invalid GGX visibility inputs");
@@ -101,7 +117,7 @@ namespace gglab
 		ComputePipelineRecipe m_Recipe;
 		ComputePipelineSlot m_Slot;
 		ResolvedRenderPipeline m_Pipeline;
-		std::array<uint32_t, 6> m_RayBindings{};
+		std::array<uint32_t, ray_scene_bindings::Count> m_RayBindings{};
 		bool m_ObservationPrepared = false;
 	};
 
@@ -134,15 +150,7 @@ namespace gglab
 				return RenderFrameValidationResult::ContractFailure("GGX visibility layout or format unavailable");
 			}
 			std::vector<LayoutBindingRequirement> bindings(common->GetBindings().begin(), common->GetBindings().end());
-			const auto firstParameter = static_cast<uint32_t>(bindings.size());
-			for (uint32_t index = 0; index < state.m_RayBindings.size(); ++index)
-			{
-				bindings.push_back({ .m_Key = LayoutBindingKey{ 0x800u + index },
-					.m_Slot = { .m_Type = index == 0 ?
-						RHIBindingType::AccelerationStructure : RHIBindingType::ReadOnlyStorageBuffer,
-						.m_Visibility = RHIShaderStage::Compute, .m_Binding = 5 + index, .m_Count = 1 },
-					.m_ParameterOrder = firstParameter + index });
-			}
+			ray_scene_bindings::Append(bindings);
 			const std::array fragments{ LayoutFragment{ "GISpecularVisibility", bindings } };
 			const auto composed = ComposeLayoutFragments(fragments);
 			if (!composed.IsSuccess())
@@ -153,7 +161,7 @@ namespace gglab
 				services.m_Presentation->GetRHIContext()->GetPipelineSystem(), *composed.m_Layout, "GI.SpecularVisibility");
 			for (uint32_t index = 0; index < state.m_RayBindings.size(); ++index)
 			{
-				const auto parameter = composed.m_Layout->FindParameterIndex(LayoutBindingKey{ 0x800u + index });
+				const auto parameter = composed.m_Layout->FindParameterIndex(ray_scene_bindings::Key(index));
 				if (!parameter)
 				{
 					return RenderFrameValidationResult::ContractFailure("GGX visibility binding unavailable");
@@ -213,9 +221,9 @@ namespace gglab
 			RGTextureViewId m_Depth;
 			RGTextureViewId m_RasterPosition;
 			RGTextureViewId m_BrdfLut;
-			std::array<RGTextureViewId, 8> m_Outputs{};
-			std::array<RGTextureViewId, 4> m_Previous{};
-			std::array<RGTextureViewId, 4> m_Next{};
+			std::array<RGTextureViewId, OutputNames.size()> m_Outputs{};
+			std::array<RGTextureViewId, GISpecularVisibilityObservation::SurfaceCount> m_Previous{};
+			std::array<RGTextureViewId, GISpecularVisibilityObservation::SurfaceCount> m_Next{};
 			Parameters m_Parameters;
 		};
 		graph.AddPass<PassData>(PassInfo.m_TypeName.c_str(), RGPassEncoderType::Compute,
@@ -228,10 +236,15 @@ namespace gglab
 					};
 				const auto& receivers = builder.GetBlackboard().Get<RGGIReceiverResources>(GIReceiverResourcesName);
 				data.m_RasterPosition = read(receivers.m_Position);
-				constexpr std::array indices{ 0u, 2u, 3u, 4u, 5u, 6u };
-				for (size_t index = 0; index < indices.size(); ++index)
+				constexpr std::array ReceiverSurfaces
 				{
-					data.m_Receivers[index] = read(receivers.m_Textures[indices[index]]);
+					GIReceiverSurface::FaceNormal, GIReceiverSurface::ShadingNormal,
+					GIReceiverSurface::DiffuseWeight, GIReceiverSurface::BaseColor,
+					GIReceiverSurface::ReflectionRoughness, GIReceiverSurface::ClearcoatNormalRoughness,
+				};
+				for (size_t index = 0; index < ReceiverSurfaces.size(); ++index)
+				{
+					data.m_Receivers[index] = read(receivers.Get(ReceiverSurfaces[index]));
 				}
 				const auto& depth = builder.GetBlackboard().Get<RGSceneDepthResources>(SceneDepthResourcesName);
 				const auto extent = builder.GetTextureDesc(depth.m_Texture).m_Extent;
@@ -245,11 +258,11 @@ namespace gglab
 						{ .m_Format = RHIFormat::R32G32B32A32Float, .m_Extent = extent });
 					builder.WriteInPlace(texture, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
 					data.m_Outputs[index] = builder.CreateView<RHITextureViewType::UnorderedAccess>(texture);
-					if (index == 0)
+					if (index == static_cast<size_t>(OutputSlot::Visibility))
 					{
 						preview.m_Visibility = texture;
 					}
-					else if (index == 5)
+					else if (index == static_cast<size_t>(OutputSlot::Diagnostics))
 					{
 						preview.m_Activity = texture;
 					}
@@ -313,7 +326,8 @@ namespace gglab
 				if (!commands->RetainForSubmission(scene.m_Lifetime) || !constants.SetPipeline(m_State->m_Pipeline) ||
 					!constants.Bind(m_State->m_Scene, frame.m_FrameConstants.m_SceneSnapshot) ||
 					!commands->SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB), frame.m_FrameConstants.m_Views) ||
-					!commands->SetAccelerationStructure(m_State->m_RayBindings[0], execute.GetAccelerationStructureHandle(scene.m_TopLevel)))
+					!commands->SetAccelerationStructure(m_State->m_RayBindings[ray_scene_bindings::TopLevel],
+						execute.GetAccelerationStructureHandle(scene.m_TopLevel)))
 				{
 					return;
 				}
@@ -322,7 +336,9 @@ namespace gglab
 				const std::array buffers{ scene.m_Vertices, scene.m_Indices, scene.m_Geometries, scene.m_Instances, scene.m_Materials };
 				for (uint32_t index = 0; index < buffers.size(); ++index)
 				{
-					commands->SetReadOnlyBuffer(m_State->m_RayBindings[index + 1], execute.GetBufferHandle(buffers[index]));
+					commands->SetReadOnlyBuffer(
+						m_State->m_RayBindings[index + ray_scene_bindings::Vertices],
+						execute.GetBufferHandle(buffers[index]));
 				}
 				auto parameters = data.m_Parameters;
 				parameters.m_Depth = execute.GetViewDescriptor(data.m_Depth).m_Index;
@@ -331,13 +347,13 @@ namespace gglab
 				for (size_t index = 0; index < data.m_Receivers.size(); ++index)
 				{
 					const auto descriptor = execute.GetViewDescriptor(data.m_Receivers[index]).m_Index;
-					if (index < 4)
+					if (index < parameters.m_Receivers.size())
 					{
 						parameters.m_Receivers[index] = descriptor;
 					}
 					else
 					{
-						parameters.m_Reflections[index - 4] = descriptor;
+						parameters.m_Reflections[index - parameters.m_Receivers.size()] = descriptor;
 					}
 				}
 				for (size_t index = 0; index < data.m_Outputs.size(); ++index)
@@ -355,9 +371,8 @@ namespace gglab
 						parameters.m_Next[index] = execute.GetViewDescriptor(data.m_Next[index]).m_Index;
 					}
 				}
-				const uint64_t rowWork = static_cast<uint64_t>(parameters.m_Size[0]) *
-					std::max(1ull, static_cast<uint64_t>(parameters.m_SampleCount) * 2);
-				const uint32_t rows = std::max(8u, static_cast<uint32_t>(8'388'608 / rowWork) / 8 * 8);
+				const auto rows = GIQueryRowsPerDispatch(parameters.m_Size[0], parameters.m_SampleCount,
+					GIObservationLimits::VisibilityQueriesPerSample);
 				for (uint32_t row = 0; row < parameters.m_Size[1]; row += rows)
 				{
 					parameters.m_RowOffset = row;
@@ -365,8 +380,8 @@ namespace gglab
 					{
 						return;
 					}
-					commands->Dispatch((parameters.m_Size[0] + 7) / 8,
-						(std::min(rows, parameters.m_Size[1] - row) + 7) / 8, 1);
+					commands->Dispatch((parameters.m_Size[0] + GIQueryGroupWidth - 1) / GIQueryGroupWidth,
+						(std::min(rows, parameters.m_Size[1] - row) + GIQueryGroupHeight - 1) / GIQueryGroupHeight, 1);
 				}
 				services.m_GISpecularVisibilityObservation->MarkRecorded();
 			});

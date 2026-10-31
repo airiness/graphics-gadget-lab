@@ -8,6 +8,8 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/GIReceiverGraphResources.h"
+#include "Graphics/Pipeline/RaySceneShaderBindings.h"
+#include "Graphics/Pipeline/GIComputeDispatch.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
 #include <array>
@@ -45,7 +47,7 @@ namespace gglab
 		ComputePipelineRecipe m_Recipe;
 		ComputePipelineSlot m_Slot;
 		ResolvedRenderPipeline m_Pipeline;
-		std::array<uint32_t, 6> m_Parameters{};
+		std::array<uint32_t, ray_scene_bindings::Count> m_Parameters{};
 	};
 
 	RaySceneHitMaterial::RaySceneHitMaterial() noexcept : m_State(std::make_unique<State>()) {}
@@ -68,13 +70,7 @@ namespace gglab
 				return false;
 			}
 			std::vector<LayoutBindingRequirement> bindings(common->GetBindings().begin(), common->GetBindings().end());
-			for (uint32_t index = 0; index < state.m_Parameters.size(); ++index)
-			{
-				bindings.push_back({ .m_Key = LayoutBindingKey{ 0x600u + index },
-					.m_Slot = { .m_Type = index == 0 ? RHIBindingType::AccelerationStructure : RHIBindingType::ReadOnlyStorageBuffer,
-						.m_Visibility = RHIShaderStage::Compute, .m_Binding = 5 + index, .m_Count = 1 },
-					.m_ParameterOrder = 10 + index });
-			}
+			ray_scene_bindings::Append(bindings);
 			const std::array fragments{ LayoutFragment{ "HitMaterial", bindings } };
 			const auto composed = ComposeLayoutFragments(fragments);
 			if (!composed.IsSuccess())
@@ -85,7 +81,7 @@ namespace gglab
 				*composed.m_Layout, "RayScene.HitMaterial");
 			for (uint32_t index = 0; index < state.m_Parameters.size(); ++index)
 			{
-				const auto parameter = composed.m_Layout->FindParameterIndex(LayoutBindingKey{ 0x600u + index });
+				const auto parameter = composed.m_Layout->FindParameterIndex(ray_scene_bindings::Key(index));
 				if (!parameter)
 				{
 					return false;
@@ -119,7 +115,8 @@ namespace gglab
 			[&frame, scene](RenderGraph::RGBuilder& builder, PassData& data)
 			{
 				const auto& receivers = builder.GetBlackboard().Get<RGGIReceiverResources>(GIReceiverResourcesName);
-				const auto receiverRead = builder.Read(receivers.m_Textures[0], RGTextureAccess::Sample, RHIStage::ComputeShader);
+				const auto receiverRead = builder.Read(receivers.Get(GIReceiverSurface::FaceNormal),
+					RGTextureAccess::Sample, RHIStage::ComputeShader);
 				data.m_Receiver = builder.CreateView<RHITextureViewType::ShaderResource>(receiverRead);
 				const auto& depth = builder.GetBlackboard().Get<RGSceneDepthResources>(SceneDepthResourcesName);
 				const auto extent = builder.GetTextureDesc(depth.m_Texture).m_Extent;
@@ -152,14 +149,16 @@ namespace gglab
 				if (!commands->RetainForSubmission(scene.m_Lifetime) || !constants.SetPipeline(m_State->m_Pipeline) ||
 					!constants.Bind(m_State->m_Scene, frame.m_FrameConstants.m_SceneSnapshot) ||
 					!commands->SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB), frame.m_FrameConstants.m_Views) ||
-					!commands->SetAccelerationStructure(m_State->m_Parameters[0], execute.GetAccelerationStructureHandle(scene.m_TopLevel)))
+					!commands->SetAccelerationStructure(m_State->m_Parameters[ray_scene_bindings::TopLevel],
+						execute.GetAccelerationStructureHandle(scene.m_TopLevel)))
 				{
 					return;
 				}
 				const std::array buffers{ scene.m_Vertices, scene.m_Indices, scene.m_Geometries, scene.m_Instances, scene.m_Materials };
 				for (uint32_t index = 0; index < buffers.size(); ++index)
 				{
-					commands->SetReadOnlyBuffer(m_State->m_Parameters[index + 1], execute.GetBufferHandle(buffers[index]));
+					commands->SetReadOnlyBuffer(m_State->m_Parameters[index + ray_scene_bindings::Vertices],
+						execute.GetBufferHandle(buffers[index]));
 				}
 				auto parameters = data.m_Parameters;
 				parameters.m_Depth = execute.GetViewDescriptor(data.m_Depth).m_Index;
@@ -170,7 +169,8 @@ namespace gglab
 				}
 				if (commands->SetConstantBufferData(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
 				{
-					commands->Dispatch((parameters.m_Width + 7) / 8, (parameters.m_Height + 7) / 8, 1);
+					commands->Dispatch((parameters.m_Width + GIQueryGroupWidth - 1) / GIQueryGroupWidth,
+						(parameters.m_Height + GIQueryGroupHeight - 1) / GIQueryGroupHeight, 1);
 				}
 			});
 	}

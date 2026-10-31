@@ -8,6 +8,7 @@
 #include "Graphics/PostProcess/PostProcessGraphResources.h"
 #include "Graphics/RenderPass/GTAOGraphResources.h"
 #include "Graphics/RenderPass/GIPreviewGraphResources.h"
+#include "Graphics/GIShaderConstants.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewGraphResources.h"
 #include "Graphics/RenderPass/AtmosphereGraphResources.h"
 #include "Graphics/RenderPass/AerialPerspectiveGraphResources.h"
@@ -69,6 +70,14 @@ namespace gglab
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::TemporalHistoryRelaxation) == 27);
 		static_assert(static_cast<uint32_t>(PostProcessDebugTap::GTAOHistorySamples) == 28);
 
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::GIIrradiance) == gi_shader::GIPreviewIrradiance);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::GILambertRadiance) == gi_shader::GIPreviewLambertRadiance);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::GISunIrradiance) == gi_shader::GIPreviewSunIrradiance);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::GIEnvironmentIrradiance) == gi_shader::GIPreviewEnvironmentIrradiance);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::GIBaseVisibility) == gi_shader::GIPreviewBaseVisibility);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::GICoatVisibility) == gi_shader::GIPreviewCoatVisibility);
+		static_assert(static_cast<uint32_t>(PostProcessDebugTap::GICombinedVisibility) == gi_shader::GIPreviewCombinedVisibility);
+
 		struct PreviewBuildState
 		{
 			std::array<bool, static_cast<std::size_t>(PostProcessPreviewChannel::Count)> m_Added{};
@@ -106,7 +115,7 @@ namespace gglab
 
 		bool IsGIPreview(PostProcessDebugTap tap) noexcept
 		{
-			return tap >= PostProcessDebugTap::GIIrradiance && tap <= PostProcessDebugTap::GICombinedVisibility;
+			return IsGIDiffusePreviewTap(tap) || IsGIVisibilityPreviewTap(tap);
 		}
 
 		bool IsDepthPreview(PostProcessDebugTap tap) noexcept
@@ -207,7 +216,43 @@ namespace gglab
 			std::optional<RHITextureViewDesc> m_ViewDesc;
 			RGTextureId m_Validity{};
 			RGTextureId m_Activity{};
+			GIPreviewSnapshot m_GISnapshot{};
 		};
+
+		DiagnosticSource ResolveGIPreviewSource(const RGGIPreviewResources* gi,
+			PostProcessDebugTap tap) noexcept
+		{
+			if (!gi)
+			{
+				return {};
+			}
+			DiagnosticSource source{};
+			switch (tap)
+			{
+			case PostProcessDebugTap::GIIrradiance:
+				source.m_Texture = gi->m_Irradiance;
+				break;
+			case PostProcessDebugTap::GILambertRadiance:
+				source.m_Texture = gi->m_LambertRadiance;
+				break;
+			case PostProcessDebugTap::GISunIrradiance:
+				source.m_Texture = gi->m_SunIrradiance;
+				break;
+			case PostProcessDebugTap::GIEnvironmentIrradiance:
+				source.m_Texture = gi->m_EnvironmentIrradiance;
+				break;
+			case PostProcessDebugTap::GIBaseVisibility:
+			case PostProcessDebugTap::GICoatVisibility:
+			case PostProcessDebugTap::GICombinedVisibility:
+				return { .m_Texture = gi->m_Visibility, .m_Validity = gi->m_Visibility,
+					.m_Activity = gi->m_Activity, .m_GISnapshot = gi->m_VisibilitySnapshot };
+			default:
+				return {};
+			}
+			source.m_Validity = gi->m_Irradiance;
+			source.m_GISnapshot = gi->m_DiffuseSnapshot;
+			return source;
+		}
 
 		// An ambient-occlusion reference frame presents its running mean as the final AO.
 		RGTextureId ResolveGTAOPreviewSource(const RGGTAOResources& resources,
@@ -252,13 +297,8 @@ namespace gglab
 		DiagnosticSource source{};
 		if (IsGIPreview(tap))
 		{
-			if (const auto* gi = blackboard.TryGet<RGGIPreviewResources>(GIPreviewResourcesName))
-			{
-				const auto index = static_cast<uint32_t>(tap) - static_cast<uint32_t>(PostProcessDebugTap::GIIrradiance);
-				source.m_Texture = index < 4 ? gi->m_Diffuse[index] : gi->m_Visibility;
-				source.m_Validity = index < 4 ? gi->m_Diffuse[0] : gi->m_Visibility;
-				source.m_Activity = index < 4 ? RGTextureId{} : gi->m_Activity;
-			}
+			source = ResolveGIPreviewSource(
+				blackboard.TryGet<RGGIPreviewResources>(GIPreviewResourcesName), tap);
 		}
 		else if (IsTemporalAAPreview(tap))
 		{
@@ -376,11 +416,9 @@ namespace gglab
 		const auto selection = registry->GetPostProcessPreviewSelection(channel);
 		if (IsGIPreview(selection.m_Tap))
 		{
-			const auto* gi = rg.GetBlackboard().TryGet<RGGIPreviewResources>(GIPreviewResourcesName);
-			const auto index = static_cast<uint32_t>(selection.m_Tap) -
-				static_cast<uint32_t>(PostProcessDebugTap::GIIrradiance);
-			const RGTextureId source = gi ? (index < 4 ? gi->m_Diffuse[index] : gi->m_Visibility) : RGTextureId{};
-			if (!source.IsValid())
+			const auto source = ResolveGIPreviewSource(
+				rg.GetBlackboard().TryGet<RGGIPreviewResources>(GIPreviewResourcesName), selection.m_Tap);
+			if (!source.m_Texture.IsValid())
 			{
 				registry->InvalidatePostProcessPreview(selection, channel);
 				return;
@@ -388,10 +426,8 @@ namespace gglab
 			registry->SetGIPreviewSourceAvailable();
 			if (registry->IsPostProcessPreviewRequested(channel))
 			{
-				AddResolvedPass(rg, context, services, source, 1.0f, std::nullopt, selection, channel,
-					index < 4 ? gi->m_Diffuse[0] : gi->m_Visibility,
-					index < 4 ? RGTextureId{} : gi->m_Activity,
-					index < 4 ? gi->m_DiffuseSnapshot : gi->m_VisibilitySnapshot);
+				AddResolvedPass(rg, context, services, source.m_Texture, 1.0f, std::nullopt, selection, channel,
+					source.m_Validity, source.m_Activity, source.m_GISnapshot);
 			}
 			else if (registry->HasPublishedPostProcessPreview(channel))
 			{

@@ -1,4 +1,5 @@
 #include "Graphics/Pipeline/GISpecularVisibilityObservation.h"
+#include "Graphics/Pipeline/GIComputeDispatch.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 
 #include <algorithm>
@@ -47,13 +48,14 @@ namespace gglab
 	{
 		m_Visited = true;
 		const uint64_t pixels = static_cast<uint64_t>(key.m_Width) * key.m_Height;
-		if (m_UnknownCompletion || pixels == 0 || pixels > 8'388'608 || queryWorkBudget < 2 ||
+		if (m_UnknownCompletion || pixels == 0 || pixels > GIObservationLimits::MaximumImagePixels ||
+			queryWorkBudget < GIObservationLimits::VisibilityQueriesPerSample ||
 			key.m_Samples == 0 || samplesPerBatch == 0 ||
-			maximumTilePixels > 8'388'608)
+			maximumTilePixels > GIObservationLimits::MaximumImagePixels)
 		{
 			return false;
 		}
-		const uint64_t queriesPerPixelSample = 2ull;
+		const uint64_t queriesPerPixelSample = GIObservationLimits::VisibilityQueriesPerSample;
 		if (queriesPerPixelSample > queryWorkBudget)
 		{
 			return false;
@@ -105,15 +107,15 @@ namespace gglab
 				}
 				m_TileWidth = static_cast<uint32_t>(std::min(tilePixels,
 					static_cast<uint64_t>(key.m_Width)));
-				if (m_TileWidth < key.m_Width && m_TileWidth >= 8)
+				if (m_TileWidth < key.m_Width && m_TileWidth >= GIQueryGroupWidth)
 				{
-					m_TileWidth = m_TileWidth / 8 * 8;
+					m_TileWidth = m_TileWidth / GIQueryGroupWidth * GIQueryGroupWidth;
 				}
 				m_TileHeight = static_cast<uint32_t>(std::min(tilePixels / m_TileWidth,
 					static_cast<uint64_t>(key.m_Height)));
-				if (m_TileHeight < key.m_Height && m_TileHeight >= 8)
+				if (m_TileHeight < key.m_Height && m_TileHeight >= GIQueryGroupHeight)
 				{
-					m_TileHeight = m_TileHeight / 8 * 8;
+					m_TileHeight = m_TileHeight / GIQueryGroupHeight * GIQueryGroupHeight;
 				}
 				m_Diagnostics.m_TileCount = ((key.m_Width + m_TileWidth - 1) / m_TileWidth) *
 					((key.m_Height + m_TileHeight - 1) / m_TileHeight);

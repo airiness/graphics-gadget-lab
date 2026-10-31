@@ -12,6 +12,8 @@
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 #include "Graphics/RenderPass/AtmosphereGraphResources.h"
+#include "Graphics/Pipeline/RaySceneShaderBindings.h"
+#include "Graphics/GIShaderConstants.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
 #include <algorithm>
@@ -21,6 +23,7 @@
 #include <cstddef>
 #include <deque>
 #include <limits>
+#include <numbers>
 #include <utility>
 #include <vector>
 
@@ -28,10 +31,44 @@ namespace gglab
 {
 	namespace
 	{
-		constexpr std::array TextureNames
+		enum class ProbeStage : size_t
 		{
-			"GI.ProbeUpdate.Irradiance", "GI.ProbeUpdate.Distance", "GI.ProbeUpdate.State"
+			Initialize,
+			TraceShade,
+			BlendDirect,
+			BlendShared,
+			Borders,
+			Count,
 		};
+		enum class ProbeSurface : size_t
+		{
+			Irradiance,
+			Distance,
+			State,
+		};
+		struct SurfaceInfo
+		{
+			const char* m_Name;
+			uint32_t m_TileWidth;
+			RHIFormat m_Format;
+			uint32_t m_TexelBytes;
+		};
+		constexpr std::array Surfaces
+		{
+			SurfaceInfo{ "GI.ProbeUpdate.Irradiance", gi_shader::GIProbeIrradianceTileWidth, RHIFormat::R32G32B32A32Float, 4 * sizeof(float) },
+			SurfaceInfo{ "GI.ProbeUpdate.Distance", gi_shader::GIProbeDistanceTileWidth, RHIFormat::R32G32Float, 2 * sizeof(float) },
+			SurfaceInfo{ "GI.ProbeUpdate.State", 1, RHIFormat::R32G32B32A32Float, 4 * sizeof(float) },
+		};
+		uint64_t LogicalSurfaceBytes(uint32_t probes, const SurfaceInfo& surface) noexcept
+		{
+			return uint64_t(probes) * surface.m_TileWidth * surface.m_TileWidth * surface.m_TexelBytes;
+		}
+
+		constexpr LayoutBindingKey RayInputKey{ 0x906 };
+		constexpr LayoutBindingKey RayOutputKey{ 0x907 };
+		constexpr uint32_t RayInputRegister = 11; // t11; ray-scene records occupy t5-t10.
+		constexpr uint32_t RayOutputRegister = 1; // u1.
+		static_assert(GIProbeUpdateLimits::MaximumRaysPerProbe == gi_shader::GIProbeMaximumRays);
 		const std::array ProgramRefs
 		{
 			shader_programs::GIProbeInitializeCompute, shader_programs::GIProbeTraceCompute,
@@ -51,15 +88,28 @@ namespace gglab
 			RenderPassInfo{ .m_TypeName = "GI.ProbeUpdate.Borders", .m_DisplayName = "Probe octahedral borders",
 				.m_CategoryName = "Global Illumination", .m_Category = RenderPassCategory::Debug, .m_Type = RenderPassType::Compute },
 		};
+		static_assert(ProgramRefs.size() == static_cast<size_t>(ProbeStage::Count));
+		static_assert(PassInfos.size() == ProgramRefs.size());
 		struct Parameters
 		{
-			std::array<uint32_t, 4> m_GridRays{};
-			std::array<uint32_t, 4> m_RangeUpdate{};
-			std::array<float, 4> m_MinimumSpacing{};
-			std::array<float, 4> m_RadianceDistance{};
-			std::array<uint32_t, 4> m_SceneMode{};
-			std::array<uint32_t, 4> m_Targets{};
-			std::array<uint32_t, 4> m_Lighting{ std::numeric_limits<uint32_t>::max(), 0, 0, 0 };
+			std::array<uint32_t, 3> m_GridSize{};
+			uint32_t m_RaysPerProbe = 0;
+			uint32_t m_FirstProbe = 0;
+			uint32_t m_UpdateProbeCount = 0;
+			uint32_t m_ProbeCount = 0;
+			uint32_t m_UpdateIndex = 0;
+			std::array<float, 3> m_GridMinimum{};
+			float m_ProbeSpacing = 0;
+			std::array<float, 3> m_ConstantRadiance{};
+			float m_MaximumDistance = 0;
+			std::array<uint32_t, 3> m_SceneCounts{};
+			uint32_t m_ConstantEnvironment = 0;
+			std::array<uint32_t, Surfaces.size()> m_Targets{};
+			uint32_t m_TargetsPadding = 0;
+			uint32_t m_Transmittance = UINT32_MAX;
+			uint32_t m_AtmosphereSampler = 0;
+			uint32_t m_LightingPadding = 0;
+			uint32_t m_TraverseScene = 0;
 			std::array<float, 4> m_Rotation{};
 			float m_Hysteresis = 0;
 			uint32_t m_RotateDirections = 0;
@@ -100,27 +150,18 @@ namespace gglab
 			RHIDevice* m_Device = nullptr;
 			RHIBufferOwner m_Rays;
 			RHIBufferDesc m_RayDesc;
-			std::array<RHITextureOwner, 3> m_Textures;
-			std::array<RHITextureDesc, 3> m_Descriptions;
+			std::array<RHITextureOwner, Surfaces.size()> m_Textures;
+			std::array<RHITextureDesc, Surfaces.size()> m_Descriptions;
 		};
-		uint32_t Hash(uint32_t value) noexcept
-		{
-			value ^= value >> 16;
-			value *= 0x7feb352du;
-			value ^= value >> 15;
-			value *= 0x846ca68bu;
-			return value ^ (value >> 16);
-		}
 		std::array<float, 4> Rotation(uint32_t seed) noexcept
 		{
 			const auto random = [&seed]() noexcept
 				{
-					seed = Hash(seed + 0x9e3779b9u);
-					return (static_cast<float>(seed >> 9) + 0.5f) / 8388608.0f;
+					return gi_shader::GIRandom(seed);
 				};
 			const float u = random();
-			const float v = 6.283185307179586f * random();
-			const float w = 6.283185307179586f * random();
+			const float v = 2 * std::numbers::pi_v<float> * random();
+			const float w = 2 * std::numbers::pi_v<float> * random();
 			return { std::sqrt(1 - u) * std::sin(v), std::sqrt(1 - u) * std::cos(v),
 				std::sqrt(u) * std::sin(w), std::sqrt(u) * std::cos(w) };
 		}
@@ -131,7 +172,7 @@ namespace gglab
 		uint64_t count = 1;
 		for (uint32_t axis = 0; axis < 3; ++axis)
 		{
-			if (profile.m_Counts[axis] == 0 || profile.m_Counts[axis] > 128 ||
+			if (profile.m_Counts[axis] == 0 || profile.m_Counts[axis] > GIProbeUpdateLimits::MaximumAxisProbes ||
 				!std::isfinite(profile.m_Minimum[axis]) || !std::isfinite(profile.m_ConstantRadiance[axis]) ||
 				profile.m_ConstantRadiance[axis] < 0)
 			{
@@ -139,14 +180,18 @@ namespace gglab
 			}
 			count *= profile.m_Counts[axis];
 		}
-		return count >= profile.m_UpdateDivisor && count <= 65535 && profile.m_Counts[1] <= 32 &&
-			(profile.m_RaysPerProbe == 64 || profile.m_RaysPerProbe == 128 ||
-				profile.m_RaysPerProbe == 192 || profile.m_RaysPerProbe == 256) &&
-			(profile.m_UpdateDivisor == 1 || profile.m_UpdateDivisor == 4) &&
+		return count >= profile.m_UpdateDivisor && count <= GIProbeUpdateLimits::MaximumProbeCount &&
+			profile.m_Counts[1] <= GIProbeUpdateLimits::MaximumArrayLayers &&
+			profile.m_RaysPerProbe >= GIProbeUpdateLimits::RayCountStep &&
+			profile.m_RaysPerProbe <= GIProbeUpdateLimits::MaximumRaysPerProbe &&
+			profile.m_RaysPerProbe % GIProbeUpdateLimits::RayCountStep == 0 &&
+			(profile.m_UpdateDivisor == GIProbeUpdateLimits::FullUpdateDivisor ||
+				profile.m_UpdateDivisor == GIProbeUpdateLimits::PartialUpdateDivisor) &&
 			std::isfinite(profile.m_Spacing) && profile.m_Spacing > 0 &&
 			std::isfinite(profile.m_MaximumDistance) && profile.m_MaximumDistance > 0 &&
 			std::isfinite(profile.m_Hysteresis) && profile.m_Hysteresis >= 0 && profile.m_Hysteresis < 1 &&
-			profile.m_MaximumUpdates <= 1'000'000 && profile.m_RefreshPeriod <= 1'000'000;
+			profile.m_MaximumUpdates <= GIProbeUpdateLimits::MaximumUpdateCount &&
+			profile.m_RefreshPeriod <= GIProbeUpdateLimits::MaximumUpdateCount;
 	}
 
 	GIProbeUpdateRange GetGIProbeUpdateRange(const GIProbeUpdateProfile& profile, uint32_t update) noexcept
@@ -174,13 +219,15 @@ namespace gglab
 		ResolvedRenderLayout m_DataLayout;
 		ResolvedBindingRef<SceneGPU> m_DataScene;
 		ResolvedBindingRef<AtmosphereGPU> m_DataAtmosphere;
-		std::array<uint32_t, 2> m_DataBindings{};
+		uint32_t m_DataRayInput = 0;
+		uint32_t m_DataRayOutput = 0;
 		ResolvedBindingRef<SceneGPU> m_SceneBinding;
 		ResolvedBindingRef<AtmosphereGPU> m_Atmosphere;
-		std::array<uint32_t, 8> m_Bindings{};
-		std::array<ComputePipelineSlot, 5> m_Slots;
-		std::array<ResolvedRenderPipeline, 5> m_Pipelines;
-		std::array<uint64_t, 5> m_Generations{};
+		std::array<uint32_t, ray_scene_bindings::Count> m_Bindings{};
+		uint32_t m_RayOutput = 0;
+		std::array<ComputePipelineSlot, ProgramRefs.size()> m_Slots;
+		std::array<ResolvedRenderPipeline, ProgramRefs.size()> m_Pipelines;
+		std::array<uint64_t, ProgramRefs.size()> m_Generations{};
 	};
 
 	GIProbeUpdateExperiment::GIProbeUpdateExperiment(std::shared_ptr<RayScene> scene,
@@ -199,10 +246,14 @@ namespace gglab
 		auto result = m_State->m_Progress->m_Diagnostics;
 		if (const auto resources = m_State->m_Resources; includeAllocations && resources)
 		{
-			result.m_Allocations.push_back(resources->m_Device->QueryBufferAllocationFacts(resources->m_Rays.Get()));
-			for (const auto& texture : resources->m_Textures)
+			result.m_Allocations.push_back({ result.m_RayCapacityBytes,
+				resources->m_Device->QueryBufferAllocationFacts(resources->m_Rays.Get()) });
+			for (size_t index = 0; index < Surfaces.size(); ++index)
 			{
-				result.m_Allocations.push_back(resources->m_Device->QueryTextureAllocationFacts(texture.Get()));
+				const auto& surface = Surfaces[index];
+				const auto logicalBytes = LogicalSurfaceBytes(result.m_ProbeCount, surface);
+				result.m_Allocations.push_back({ logicalBytes,
+					resources->m_Device->QueryTextureAllocationFacts(resources->m_Textures[index].Get()) });
 			}
 		}
 		return result;
@@ -241,21 +292,17 @@ namespace gglab
 			}
 			std::vector<LayoutBindingRequirement> bindings(atmosphere.m_Layout->GetBindings().begin(),
 				atmosphere.m_Layout->GetBindings().end());
-			uint32_t first = 0;
-			for (const auto& binding : bindings)
-			{
-				first = std::max(first, binding.m_ParameterOrder + 1);
-			}
-			for (uint32_t index = 0; index < state.m_Bindings.size(); ++index)
-			{
-				const auto type = index == 0 ?
-					RHIBindingType::AccelerationStructure :
-					index == 7 ? RHIBindingType::ReadWriteStorageBuffer : RHIBindingType::ReadOnlyStorageBuffer;
-				bindings.push_back({ .m_Key = LayoutBindingKey{ 0x900u + index },
-					.m_Slot = { .m_Type = type,
-						.m_Visibility = RHIShaderStage::Compute, .m_Binding = index == 7 ? 1u : 5u + index, .m_Count = 1 },
-					.m_ParameterOrder = first + index });
-			}
+			ray_scene_bindings::Append(bindings);
+			const LayoutBindingRequirement rayInput{ .m_Key = RayInputKey,
+				.m_Slot = { .m_Type = RHIBindingType::ReadOnlyStorageBuffer,
+					.m_Visibility = RHIShaderStage::Compute, .m_Binding = RayInputRegister, .m_Count = 1 },
+				.m_ParameterOrder = ray_scene_bindings::NextParameterOrder(bindings) };
+			bindings.push_back(rayInput);
+			const LayoutBindingRequirement rayOutput{ .m_Key = RayOutputKey,
+				.m_Slot = { .m_Type = RHIBindingType::ReadWriteStorageBuffer,
+					.m_Visibility = RHIShaderStage::Compute, .m_Binding = RayOutputRegister, .m_Count = 1 },
+				.m_ParameterOrder = ray_scene_bindings::NextParameterOrder(bindings) };
+			bindings.push_back(rayOutput);
 			const std::array fragments{ LayoutFragment{ "GIProbeUpdate", bindings } };
 			const auto composed = ComposeLayoutFragments(fragments);
 			if (!composed.IsSuccess())
@@ -266,19 +313,25 @@ namespace gglab
 				*composed.m_Layout, "GI.ProbeUpdate");
 			for (uint32_t index = 0; index < state.m_Bindings.size(); ++index)
 			{
-				const auto parameter = composed.m_Layout->FindParameterIndex(LayoutBindingKey{ 0x900u + index });
+				const auto parameter = composed.m_Layout->FindParameterIndex(ray_scene_bindings::Key(index));
 				if (!parameter)
 				{
 					return RenderFrameValidationResult::ContractFailure("Probe workload binding unavailable");
 				}
 				state.m_Bindings[index] = *parameter;
 			}
+			const auto outputParameter = composed.m_Layout->FindParameterIndex(RayOutputKey);
+			if (!outputParameter)
+			{
+				return RenderFrameValidationResult::ContractFailure("Probe ray output binding unavailable");
+			}
+			state.m_RayOutput = *outputParameter;
 			// Non-tracing kernels must not inherit a TLAS reservation: the encoders
 			// require every declared AS at dispatch, even when a shader does not use it.
 			std::vector<LayoutBindingRequirement> dataBindings(atmosphere.m_Layout->GetBindings().begin(),
 				atmosphere.m_Layout->GetBindings().end());
-			dataBindings.push_back(bindings[bindings.size() - 2]);
-			dataBindings.push_back(bindings.back());
+			dataBindings.push_back(rayInput);
+			dataBindings.push_back(rayOutput);
 			const std::array dataFragments{ LayoutFragment{ "GIProbeUpdateData", dataBindings } };
 			const auto dataLayout = ComposeLayoutFragments(dataFragments);
 			if (!dataLayout.IsSuccess())
@@ -287,15 +340,14 @@ namespace gglab
 			}
 			state.m_DataLayout = ResolvedRenderLayout::Create(services.m_Presentation->GetRHIContext()->GetPipelineSystem(),
 				*dataLayout.m_Layout, "GI.ProbeUpdate.Data");
-			for (uint32_t index = 0; index < 2; ++index)
+			const auto dataInput = dataLayout.m_Layout->FindParameterIndex(RayInputKey);
+			const auto dataOutput = dataLayout.m_Layout->FindParameterIndex(RayOutputKey);
+			if (!dataInput || !dataOutput)
 			{
-				const auto parameter = dataLayout.m_Layout->FindParameterIndex(LayoutBindingKey{ 0x906u + index });
-				if (!parameter)
-				{
-					return RenderFrameValidationResult::ContractFailure("Probe data binding unavailable");
-				}
-				state.m_DataBindings[index] = *parameter;
+				return RenderFrameValidationResult::ContractFailure("Probe data binding unavailable");
 			}
+			state.m_DataRayInput = *dataInput;
+			state.m_DataRayOutput = *dataOutput;
 			state.m_DataScene = ResolvedBindingRef<SceneGPU>::Resolve(state.m_DataLayout, scene_bindings::SceneConstants);
 			state.m_DataAtmosphere = ResolvedBindingRef<AtmosphereGPU>::Resolve(state.m_DataLayout, scene_bindings::AtmosphereConstants);
 			state.m_SceneBinding = ResolvedBindingRef<SceneGPU>::Resolve(state.m_Layout, scene_bindings::SceneConstants);
@@ -303,8 +355,10 @@ namespace gglab
 			auto resources = std::make_shared<Resources>();
 			resources->m_Device = &device;
 			const uint32_t probes = profile.m_Counts[0] * profile.m_Counts[1] * profile.m_Counts[2];
-			resources->m_RayDesc = { .m_SizeInBytes = uint64_t(probes) * profile.m_RaysPerProbe * 16,
-				.m_StrideInBytes = 16, .m_Usage = RHIBufferUsage::Structured | RHIBufferUsage::UnorderedAccess | RHIBufferUsage::CopySource,
+			resources->m_RayDesc = { .m_SizeInBytes = uint64_t(probes) * profile.m_RaysPerProbe * gi_shader::GIProbeRayStride,
+				.m_StrideInBytes = gi_shader::GIProbeRayStride,
+				.m_Usage = RHIBufferUsage::Structured | RHIBufferUsage::UnorderedAccess |
+					RHIBufferUsage::CopySource,
 				.m_DebugName = "GI.ProbeUpdate.Rays" };
 			resources->m_Rays = RHIBufferOwner(&device, device.CreateBuffer(resources->m_RayDesc));
 			if (!resources->m_Rays)
@@ -314,14 +368,14 @@ namespace gglab
 			auto& diagnostics = state.m_Progress->m_Diagnostics;
 			diagnostics.m_ProbeCount = probes;
 			diagnostics.m_RayCapacityBytes = resources->m_RayDesc.m_SizeInBytes;
-			const std::array widths{ 8u, 16u, 1u };
-			for (uint32_t index = 0; index < 3; ++index)
+			for (size_t index = 0; index < Surfaces.size(); ++index)
 			{
+				const auto& surface = Surfaces[index];
 				auto& desc = resources->m_Descriptions[index];
-				desc = { .m_Format = index == 1 ? RHIFormat::R32G32Float : RHIFormat::R32G32B32A32Float,
+				desc = { .m_Format = surface.m_Format,
 					.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::UnorderedAccess | RHITextureUsage::CopySource,
-					.m_Extent = { profile.m_Counts[0] * widths[index], profile.m_Counts[2] * widths[index], 1 },
-					.m_ArraySize = static_cast<uint16_t>(profile.m_Counts[1]), .m_DebugName = TextureNames[index] };
+					.m_Extent = { profile.m_Counts[0] * surface.m_TileWidth, profile.m_Counts[2] * surface.m_TileWidth, 1 },
+					.m_ArraySize = static_cast<uint16_t>(profile.m_Counts[1]), .m_DebugName = surface.m_Name };
 				if (!device.QueryTextureSupport(desc).IsSupported())
 				{
 					return RenderFrameValidationResult::ContractFailure("Probe atlas format or extent unsupported");
@@ -331,7 +385,7 @@ namespace gglab
 				{
 					return RenderFrameValidationResult::ContractFailure("Probe atlas allocation failed");
 				}
-				diagnostics.m_FieldLogicalBytes += uint64_t(probes) * widths[index] * widths[index] * (index == 1 ? 8u : 16u);
+				diagnostics.m_FieldLogicalBytes += LogicalSurfaceBytes(probes, surface);
 			}
 			state.m_Progress->m_Device = &device;
 			state.m_Resources = std::move(resources);
@@ -357,7 +411,8 @@ namespace gglab
 				state.m_Progress->m_Diagnostics.m_ShaderLookupMilliseconds +=
 					std::chrono::duration<double, std::milli>(pipelineBegin - lookupBegin).count();
 			}
-			const auto& layout = index == 1 ? state.m_Layout : state.m_DataLayout;
+			const auto& layout = index == static_cast<size_t>(ProbeStage::TraceShade) ?
+				state.m_Layout : state.m_DataLayout;
 			const ComputePipelineRecipe recipe{ .m_BindingLayout = layout.GetNativeLayout(), .m_CSId = program };
 			state.m_Pipelines[index] = layout.Resolve(*services.m_PipelineResolver, state.m_Slots[index], recipe, PassInfos[index]);
 			if (firstPreparation)
@@ -405,7 +460,7 @@ namespace gglab
 		struct Imported
 		{
 			RGBufferId m_Rays;
-			std::array<RGTextureId, 3> m_Textures;
+			std::array<RGTextureId, Surfaces.size()> m_Textures;
 		};
 		auto imported = std::make_shared<Imported>();
 		struct Empty {};
@@ -417,7 +472,7 @@ namespace gglab
 					initialized ? RGContentValidity::Defined : RGContentValidity::Undefined);
 				for (size_t index = 0; index < imported->m_Textures.size(); ++index)
 				{
-					imported->m_Textures[index] = builder.ImportTexture(TextureNames[index], resources->m_Textures[index].Get(),
+					imported->m_Textures[index] = builder.ImportTexture(Surfaces[index].m_Name, resources->m_Textures[index].Get(),
 						resources->m_Descriptions[index],
 						initialized ? ToRHIResourceState(RGTextureAccess::Sample) : UndefinedRHITextureState(),
 						initialized ? RGContentValidity::Defined : RGContentValidity::Undefined);
@@ -425,32 +480,37 @@ namespace gglab
 			});
 		if (record)
 		{
-			const std::array stages{ 0u, 1u, profile.m_SharedBlend ? 3u : 2u, 4u };
-			for (const uint32_t stage : stages)
+			const std::array stages{ ProbeStage::Initialize, ProbeStage::TraceShade,
+				profile.m_SharedBlend ? ProbeStage::BlendShared : ProbeStage::BlendDirect, ProbeStage::Borders };
+			for (const auto stage : stages)
 			{
-				if (stage == 0 && initialized)
+				const auto stageIndex = static_cast<size_t>(stage);
+				const bool tracing = stage == ProbeStage::TraceShade;
+				const bool blending = stage == ProbeStage::BlendDirect || stage == ProbeStage::BlendShared;
+				if (stage == ProbeStage::Initialize && initialized)
 				{
 					continue;
 				}
 				struct PassData
 				{
-					std::array<RGTextureViewId, 3> m_Views;
+					std::array<RGTextureViewId, Surfaces.size()> m_Views;
 					RGTextureViewId m_Transmittance;
 					TypedConstantSnapshot<AtmosphereGPU> m_Atmosphere;
 					Parameters m_Parameters;
 				};
-				const char* name = stage == 1 && profile.m_TraversalOnly ?
-					"GI.ProbeUpdate.TraversalOnly" : PassInfos[stage].m_TypeName.c_str();
+				const char* name = tracing && profile.m_TraversalOnly ?
+					"GI.ProbeUpdate.TraversalOnly" : PassInfos[stageIndex].m_TypeName.c_str();
 				graph.AddPass<PassData>(name, RGPassEncoderType::Compute,
 					[=, &frame](RenderGraph::RGBuilder& builder, PassData& data)
 					{
-						for (uint32_t index = 0; index < 3; ++index)
+						for (size_t index = 0; index < Surfaces.size(); ++index)
 						{
-							if (stage == 0)
+							const bool probeState = index == static_cast<size_t>(ProbeSurface::State);
+							if (stage == ProbeStage::Initialize)
 							{
 								builder.WriteInPlace(imported->m_Textures[index], RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
 							}
-							else if ((stage == 1 && index == 2) || (stage != 1 && index != 2))
+							else if (tracing == probeState)
 							{
 								builder.ReadWriteInPlace(imported->m_Textures[index], RGTextureAccess::StorageReadWrite, RHIStage::ComputeShader);
 							}
@@ -463,19 +523,19 @@ namespace gglab
 							desc.m_Type = RHITextureViewType::UnorderedAccess;
 							data.m_Views[index] = builder.CreateView<RHITextureViewType::UnorderedAccess>(imported->m_Textures[index], desc);
 						}
-						if (stage == 0)
+						if (stage == ProbeStage::Initialize)
 						{
 							builder.WriteInPlace(imported->m_Rays, RGBufferAccess::StorageWrite, RHIStage::ComputeShader);
 						}
-						else if (stage == 1)
+						else if (tracing)
 						{
 							builder.ReadWriteInPlace(imported->m_Rays, RGBufferAccess::StorageReadWrite, RHIStage::ComputeShader);
 						}
-						else if (stage == 2 || stage == 3)
+						else if (blending)
 						{
 							GGLAB_UNUSED(builder.Read(imported->m_Rays, RGBufferAccess::StructuredRead, RHIStage::ComputeShader));
 						}
-						if (stage == 1)
+						if (tracing)
 						{
 							GGLAB_UNUSED(builder.Read(scene.m_TopLevel, RGAccelerationStructureAccess::QueryRead));
 							for (const auto blas : scene.m_BottomLevels)
@@ -500,59 +560,66 @@ namespace gglab
 						}
 						data.m_Atmosphere = builder.GetBlackboard().Get<RGForwardAtmosphereConstants>().m_Snapshot;
 						data.m_Parameters = {
-							.m_GridRays = { profile.m_Counts[0], profile.m_Counts[1], profile.m_Counts[2], profile.m_RaysPerProbe },
-							.m_RangeUpdate = { begin, count, total, update },
-							.m_MinimumSpacing = { profile.m_Minimum[0], profile.m_Minimum[1], profile.m_Minimum[2], profile.m_Spacing },
-							.m_RadianceDistance = { profile.m_ConstantRadiance[0], profile.m_ConstantRadiance[1], profile.m_ConstantRadiance[2], profile.m_MaximumDistance },
-							.m_SceneMode = { scene.m_InstanceCount, scene.m_GeometryCount, scene.m_MaterialCount, profile.m_ConstantEnvironment ? 1u : 0u },
+							.m_GridSize = profile.m_Counts, .m_RaysPerProbe = profile.m_RaysPerProbe,
+							.m_FirstProbe = begin, .m_UpdateProbeCount = count,
+							.m_ProbeCount = total, .m_UpdateIndex = update,
+							.m_GridMinimum = profile.m_Minimum, .m_ProbeSpacing = profile.m_Spacing,
+							.m_ConstantRadiance = profile.m_ConstantRadiance, .m_MaximumDistance = profile.m_MaximumDistance,
+							.m_SceneCounts = { scene.m_InstanceCount, scene.m_GeometryCount, scene.m_MaterialCount },
+							.m_ConstantEnvironment = profile.m_ConstantEnvironment ? 1u : 0u,
+							.m_TraverseScene = profile.m_TraverseScene ? 1u : 0u,
 							.m_Rotation = Rotation(profile.m_Seed ^ (profile.m_RotateDirections ? update : 0u)),
 							.m_Hysteresis = profile.m_Hysteresis, .m_RotateDirections = profile.m_RotateDirections ? 1u : 0u,
 							.m_TraversalOnly = profile.m_TraversalOnly ? 1u : 0u };
-						data.m_Parameters.m_Lighting[3] = profile.m_TraverseScene ? 1u : 0u;
 						builder.SideEffect();
 					},
 					[=, this, &frame, &services](RGExecuteContext& execute, PassData& data)
 					{
 						auto& current = *m_State;
 						auto* commands = execute.GetDirectComputeCommandContext();
-						const auto& layout = stage == 1 ? current.m_Layout : current.m_DataLayout;
-						const auto& sceneBinding = stage == 1 ? current.m_SceneBinding : current.m_DataScene;
-						const auto& atmosphereBinding = stage == 1 ? current.m_Atmosphere : current.m_DataAtmosphere;
+						const auto& layout = tracing ? current.m_Layout : current.m_DataLayout;
+						const auto& sceneBinding = tracing ? current.m_SceneBinding : current.m_DataScene;
+						const auto& atmosphereBinding = tracing ? current.m_Atmosphere : current.m_DataAtmosphere;
 						ScopedConstantBindings<RHIComputeCommandContext> constants(*commands,
 							layout, sceneBinding, atmosphereBinding);
 						if (!commands->RetainForSubmission(resources) || !commands->RetainForSubmission(scene.m_Lifetime) ||
-							!constants.SetPipeline(current.m_Pipelines[stage]) ||
+							!constants.SetPipeline(current.m_Pipelines[stageIndex]) ||
 							!constants.Bind(sceneBinding, frame.m_FrameConstants.m_SceneSnapshot) ||
 							!constants.Bind(atmosphereBinding, data.m_Atmosphere))
 						{
 							return;
 						}
-						if (stage == 1)
+						if (tracing)
 						{
 							// The composed layout cannot inherit a prior pass/frame's light table.
 							// Sun hit lighting must read this frame slot alongside its Scene constants.
 							commands->SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::LightSB),
 								services.m_FrameBuffers->GetLightStructuredBuffer()->GetBufferHandle(frame.m_FrameSlotIndex));
-							if (!commands->SetAccelerationStructure(current.m_Bindings[0], execute.GetAccelerationStructureHandle(scene.m_TopLevel)))
+							if (!commands->SetAccelerationStructure(
+								current.m_Bindings[ray_scene_bindings::TopLevel],
+								execute.GetAccelerationStructureHandle(scene.m_TopLevel)))
 							{
 								return;
 							}
 							const std::array buffers{ scene.m_Vertices, scene.m_Indices, scene.m_Geometries, scene.m_Instances, scene.m_Materials };
 							for (uint32_t index = 0; index < buffers.size(); ++index)
 							{
-								commands->SetReadOnlyBuffer(current.m_Bindings[index + 1], execute.GetBufferHandle(buffers[index]));
+								commands->SetReadOnlyBuffer(
+									current.m_Bindings[index + ray_scene_bindings::Vertices],
+									execute.GetBufferHandle(buffers[index]));
 							}
 						}
-						if (stage == 0 || stage == 1)
+						if (stage == ProbeStage::Initialize || tracing)
 						{
-							commands->SetReadWriteBuffer(stage == 1 ? current.m_Bindings[7] : current.m_DataBindings[1], resources->m_Rays.Get());
+							commands->SetReadWriteBuffer(tracing ? current.m_RayOutput : current.m_DataRayOutput,
+								resources->m_Rays.Get());
 						}
-						else if (stage == 2 || stage == 3)
+						else if (blending)
 						{
-							commands->SetReadOnlyBuffer(current.m_DataBindings[0], resources->m_Rays.Get());
+							commands->SetReadOnlyBuffer(current.m_DataRayInput, resources->m_Rays.Get());
 						}
 						auto parameters = data.m_Parameters;
-						for (uint32_t index = 0; index < 3; ++index)
+						for (size_t index = 0; index < Surfaces.size(); ++index)
 						{
 							if (data.m_Views[index].IsValid())
 							{
@@ -561,22 +628,25 @@ namespace gglab
 						}
 						if (data.m_Transmittance.IsValid())
 						{
-							parameters.m_Lighting[0] = execute.GetViewDescriptor(data.m_Transmittance).m_Index;
+							parameters.m_Transmittance = execute.GetViewDescriptor(data.m_Transmittance).m_Index;
 						}
-						parameters.m_Lighting[1] = services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp);
+						parameters.m_AtmosphereSampler = services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp);
 						if (!commands->SetConstantBufferData(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
 						{
 							return;
 						}
-						if (stage == 0)
+						if (stage == ProbeStage::Initialize)
 						{
-							commands->Dispatch(profile.m_Counts[0] * 2, profile.m_Counts[2] * 2, profile.m_Counts[1]);
+							commands->Dispatch(
+								profile.m_Counts[0] * gi_shader::GIProbeDistanceTileWidth / gi_shader::GIQueryGroupWidth,
+								profile.m_Counts[2] * gi_shader::GIProbeDistanceTileWidth / gi_shader::GIQueryGroupHeight,
+								profile.m_Counts[1]);
 						}
 						else
 						{
 							commands->Dispatch(count, 1, 1);
 						}
-						if (stage == 1)
+						if (tracing)
 						{
 							const auto lighting = frame.m_RenderScene.m_WorldLightingGeneration;
 							const uint64_t environment = profile.m_ConstantEnvironment ?
@@ -589,7 +659,7 @@ namespace gglab
 									progress->m_Diagnostics.m_AtmosphereAttenuation = attenuation;
 								});
 						}
-						if (stage == 4)
+						if (stage == ProbeStage::Borders)
 						{
 							execute.DeferCommit([progress, update](const RGCommitContext& commit) noexcept
 								{

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIObservationLimits.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 
@@ -15,19 +16,31 @@ namespace gglab
 	class RayScene;
 	struct RaySceneGraphResources;
 
+	struct GIProbeUpdateLimits
+	{
+		static constexpr uint32_t MaximumAxisProbes = 128;
+		static constexpr uint32_t MaximumProbeCount = 65535; // One dispatch group per probe.
+		static constexpr uint32_t MaximumArrayLayers = 32;
+		static constexpr uint32_t RayCountStep = 64;
+		static constexpr uint32_t MaximumRaysPerProbe = 256;
+		static constexpr uint32_t FullUpdateDivisor = 1;
+		static constexpr uint32_t PartialUpdateDivisor = 4;
+		static constexpr uint32_t MaximumUpdateCount = 1'000'000;
+	};
+
 	// Experimental update workload, independent of production field sampling/readiness.
 	struct GIProbeUpdateProfile
 	{
 		std::array<uint32_t, 3> m_Counts{ 33, 10, 39 };
 		std::array<float, 3> m_Minimum{ -17.25f, -1.5f, -23.25f };
 		float m_Spacing = 1;
-		uint32_t m_RaysPerProbe = 256;
-		uint32_t m_UpdateDivisor = 1;
+		uint32_t m_RaysPerProbe = GIProbeUpdateLimits::MaximumRaysPerProbe;
+		uint32_t m_UpdateDivisor = GIProbeUpdateLimits::FullUpdateDivisor;
 		// A declared full refresh every N updates; zero keeps the fixed divisor.
 		uint32_t m_RefreshPeriod = 0;
 		// Zero continuously records updates for quiet timing; bounded runs stop exactly.
 		uint32_t m_MaximumUpdates = 1;
-		uint32_t m_Seed = 61051;
+		uint32_t m_Seed = GIObservationLimits::DefaultSeed;
 		bool m_SharedBlend = true;
 		bool m_ConstantEnvironment = false;
 		bool m_TraverseScene = true;
@@ -37,6 +50,12 @@ namespace gglab
 		std::array<float, 3> m_ConstantRadiance{ 1, 1, 1 };
 		float m_MaximumDistance = 30000;
 		float m_Hysteresis = 0.97f;
+	};
+
+	struct GIProbeAllocationSnapshot
+	{
+		uint64_t m_LogicalBytes = 0;
+		RHIAllocationFacts m_Allocation;
 	};
 
 	struct GIProbeUpdateDiagnostics
@@ -56,7 +75,7 @@ namespace gglab
 		bool m_Initialized = false;
 		bool m_Failed = false;
 		std::string m_Reason;
-		std::vector<RHIAllocationFacts> m_Allocations;
+		std::vector<GIProbeAllocationSnapshot> m_Allocations;
 	};
 
 	struct GIProbeUpdateRange

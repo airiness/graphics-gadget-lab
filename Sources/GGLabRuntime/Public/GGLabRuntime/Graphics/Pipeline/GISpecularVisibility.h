@@ -1,4 +1,5 @@
 #pragma once
+#include "GGLabRuntime/Graphics/Pipeline/GIObservationLimits.h"
 #include <cstdint>
 #include <memory>
 
@@ -14,10 +15,10 @@ namespace gglab
 	struct GISpecularVisibilityCreateInfo
 	{
 		std::shared_ptr<RayScene> m_RayScene;
-		uint32_t m_SampleCount = 4096;
-		uint32_t m_Seed = 61051;
-		uint32_t m_SamplesPerBatch = 64;
-		uint32_t m_QueryWorkPerSubmission = 8'388'608;
+		uint32_t m_SampleCount = GIObservationLimits::DefaultVisibilitySamples;
+		uint32_t m_Seed = GIObservationLimits::DefaultSeed;
+		uint32_t m_SamplesPerBatch = GIObservationLimits::DefaultBatchSamples;
+		uint32_t m_QueryWorkPerSubmission = GIObservationLimits::DefaultVisibilityQueryWork;
 		uint32_t m_MaximumTilePixels = 0;
 		float m_MaximumDistance = 1000.0f;
 	};

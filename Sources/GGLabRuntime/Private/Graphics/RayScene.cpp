@@ -1,6 +1,7 @@
 #include "GGLabRuntime/Graphics/RayScene.h"
 #include "Graphics/MaterialGpuEncoder.h"
 #include "Graphics/RayScenePlan.h"
+#include "Graphics/GIShaderConstants.h"
 #include "GGLabRuntime/Core/Math/Transform.h"
 #include "GGLabRuntime/Core/Math/BoundingVolumes.h"
 #include "GGLabRuntime/Core/World.h"
@@ -28,9 +29,13 @@ namespace gglab
 {
 	namespace
 	{
-		static_assert(sizeof(Vertex) == 56 && offsetof(Vertex, m_Position) == 0 &&
-			offsetof(Vertex, m_Normal) == 12 && offsetof(Vertex, m_TexCoord0) == 24 &&
-			offsetof(Vertex, m_TexCoord1) == 32 && offsetof(Vertex, m_Tangent) == 40);
+		static_assert(sizeof(Vertex) == gi_shader::RaySceneVertexStride &&
+			offsetof(Vertex, m_Position) == gi_shader::RayScenePositionOffset &&
+			offsetof(Vertex, m_Normal) == gi_shader::RaySceneNormalOffset &&
+			offsetof(Vertex, m_TexCoord0) == gi_shader::RaySceneUV0Offset &&
+			offsetof(Vertex, m_TexCoord1) == gi_shader::RaySceneUV1Offset &&
+			offsetof(Vertex, m_Tangent) == gi_shader::RaySceneTangentOffset);
+		static_assert(3 * sizeof(uint32_t) == gi_shader::RaySceneTriangleIndexBytes);
 		struct EmptyData {};
 		using PreparationClock = std::chrono::steady_clock;
 		double ElapsedMilliseconds(PreparationClock::time_point begin) noexcept
@@ -200,12 +205,12 @@ namespace gglab
 			for (uint32_t index = 0; index < plan.m_Instances.size(); ++index)
 			{
 				const auto& instance = plan.m_Instances[index];
-				if ((instance.m_Flags & 1) != 0)
+				if ((instance.m_Flags & gi_shader::RaySceneOpaqueMask) != 0)
 				{
 					top->m_Instances.push_back({
 						.m_BottomLevel = geometry.m_BottomLevels[instance.m_GeometryIndex],
 						.m_Transform = plan.m_Sources[index].m_Transform,
-						.m_InstanceIndex = index, .m_Mask = 1,
+						.m_InstanceIndex = index, .m_Mask = gi_shader::RaySceneOpaqueMask,
 						.m_Flags = RHIASInstanceFlags::TriangleCullDisable });
 				}
 			}

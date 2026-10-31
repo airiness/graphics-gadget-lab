@@ -1,4 +1,6 @@
 #include "GGLabRuntime/Graphics/Pipeline/RaySceneSunVisibility.h"
+#include "Graphics/Pipeline/RaySceneShaderBindings.h"
+#include "Graphics/Pipeline/GIComputeDispatch.h"
 #include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
@@ -53,7 +55,7 @@ namespace gglab
 		ComputePipelineRecipe m_Recipe;
 		ComputePipelineSlot m_Slot;
 		ResolvedRenderPipeline m_Pipeline;
-		std::array<uint32_t, 5> m_RayParameters{};
+		std::array<uint32_t, ray_scene_bindings::GeometryOnlyCount> m_RayParameters{};
 	};
 
 	RaySceneSunVisibility::RaySceneSunVisibility() noexcept : m_State(std::make_unique<State>()) {}
@@ -86,14 +88,9 @@ namespace gglab
 			bindings.push_back({ .m_Key = scene_bindings::DirectionalShadow,
 				.m_Slot = { .m_Type = RHIBindingType::ConstantBuffer, .m_Visibility = RHIShaderStage::Compute,
 					.m_Binding = 3, .m_Count = 1 },
-				.m_PayloadTag = ConstantPayloadTraits<DirectionalShadowGPU>::Tag, .m_ParameterOrder = 10 });
-			for (uint32_t index = 0; index < 5; ++index)
-			{
-				bindings.push_back({ .m_Key = LayoutBindingKey{ 0x500u + index },
-					.m_Slot = { .m_Type = index == 0 ? RHIBindingType::AccelerationStructure : RHIBindingType::ReadOnlyStorageBuffer,
-						.m_Visibility = RHIShaderStage::Compute, .m_Binding = 5 + index, .m_Count = 1 },
-					.m_ParameterOrder = 11 + index });
-			}
+				.m_PayloadTag = ConstantPayloadTraits<DirectionalShadowGPU>::Tag,
+				.m_ParameterOrder = ray_scene_bindings::NextParameterOrder(bindings) });
+			ray_scene_bindings::Append(bindings, ray_scene_bindings::GeometryOnlyCount);
 			const std::array fragments{ LayoutFragment{ "SunVisibility", bindings } };
 			const auto composed = ComposeLayoutFragments(fragments);
 			if (!composed.IsSuccess())
@@ -104,7 +101,7 @@ namespace gglab
 				*composed.m_Layout, "RayScene.SunVisibility");
 			for (uint32_t index = 0; index < state.m_RayParameters.size(); ++index)
 			{
-				const auto parameter = composed.m_Layout->FindParameterIndex(LayoutBindingKey{ 0x500u + index });
+				const auto parameter = composed.m_Layout->FindParameterIndex(ray_scene_bindings::Key(index));
 				if (!parameter)
 				{
 					return false;
@@ -181,14 +178,17 @@ namespace gglab
 					!constants.Bind(m_State->m_Scene, frame.m_FrameConstants.m_SceneSnapshot) ||
 					!constants.Bind(m_State->m_Shadow, frame.m_FrameConstants.m_DirectionalShadowSnapshot) ||
 					!commands->SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB), frame.m_FrameConstants.m_Views) ||
-					!commands->SetAccelerationStructure(m_State->m_RayParameters[0], execute.GetAccelerationStructureHandle(scene.m_TopLevel)))
+					!commands->SetAccelerationStructure(m_State->m_RayParameters[ray_scene_bindings::TopLevel],
+						execute.GetAccelerationStructureHandle(scene.m_TopLevel)))
 				{
 					return;
 				}
 				const std::array buffers{ scene.m_Vertices, scene.m_Indices, scene.m_Geometries, scene.m_Instances };
 				for (uint32_t index = 0; index < buffers.size(); ++index)
 				{
-					commands->SetReadOnlyBuffer(m_State->m_RayParameters[index + 1], execute.GetBufferHandle(buffers[index]));
+					commands->SetReadOnlyBuffer(
+						m_State->m_RayParameters[index + ray_scene_bindings::Vertices],
+						execute.GetBufferHandle(buffers[index]));
 				}
 				auto parameters = data.m_Parameters;
 				parameters.m_Depth = execute.GetViewDescriptor(data.m_Depth).m_Index;
@@ -196,7 +196,8 @@ namespace gglab
 				parameters.m_Output = execute.GetViewDescriptor(data.m_Output).m_Index;
 				if (commands->SetConstantBufferData(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
 				{
-					commands->Dispatch((parameters.m_Width + 7) / 8, (parameters.m_Height + 7) / 8, 1);
+					commands->Dispatch((parameters.m_Width + GIQueryGroupWidth - 1) / GIQueryGroupWidth,
+						(parameters.m_Height + GIQueryGroupHeight - 1) / GIQueryGroupHeight, 1);
 				}
 			});
 	}

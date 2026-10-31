@@ -2,8 +2,6 @@
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewDiagnostics.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGResource.h"
 
-#include <array>
-
 namespace gglab
 {
 	inline constexpr const char* GIPreviewResourcesName = "GI.Preview.Sources";
@@ -12,7 +10,10 @@ namespace gglab
 	// Sun/environment alpha has filter semantics; use irradiance for validity.
 	struct RGGIPreviewResources
 	{
-		std::array<RGTextureId, 4> m_Diffuse{};
+		RGTextureId m_Irradiance;
+		RGTextureId m_LambertRadiance;
+		RGTextureId m_SunIrradiance;
+		RGTextureId m_EnvironmentIrradiance;
 		RGTextureId m_Visibility;
 		RGTextureId m_Activity;
 		GIPreviewSnapshot m_DiffuseSnapshot{};

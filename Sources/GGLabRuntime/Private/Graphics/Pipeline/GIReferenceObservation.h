@@ -1,4 +1,5 @@
 #pragma once
+#include "Graphics/Pipeline/GIComputeDispatch.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIReference.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIReferenceTypes.h"
 #include "Graphics/Pipeline/TemporalHistoryTextures.h"
@@ -63,23 +64,26 @@ namespace gglab
 	class GIReferenceObservation final
 	{
 	public:
-		static constexpr size_t SurfaceCount = 6;
-		using Surface = TemporalHistoryTextures<SurfaceCount>::RenderGraphSurface;
-		struct Tile
+		enum class SurfaceSlot : size_t
 		{
-			uint32_t m_X = 0;
-			uint32_t m_Y = 0;
-			uint32_t m_Width = 0;
-			uint32_t m_Height = 0;
-			bool m_BeginSweep = false;
-			bool m_EndSweep = false;
+			SunSum,
+			EnvironmentSum,
+			OutcomeSum,
+			RandomState,
+			SunCompensation,
+			EnvironmentCompensation,
+			Count,
 		};
+		static constexpr size_t SurfaceCount = static_cast<size_t>(SurfaceSlot::Count);
+		using Surface = TemporalHistoryTextures<SurfaceCount>::RenderGraphSurface;
+		using Tile = GIObservationTile;
 		GIReferenceObservation(RHIDevice& device, PersistentTexturePool& pool) noexcept;
 		~GIReferenceObservation();
 		void BeginFrame(uint64_t serial) noexcept;
 		[[nodiscard]] bool Prepare(const GIReferenceObservationKey& key,
 			uint32_t samplesPerBatch, uint32_t sampleWorkBudget,
-			uint32_t queryWorkBudget = 16'777'216, uint32_t maximumTilePixels = 0) noexcept;
+			uint32_t queryWorkBudget = GIObservationLimits::MaximumQueryWorkPerSubmission,
+			uint32_t maximumTilePixels = 0) noexcept;
 		[[nodiscard]] Tile GetTile() const noexcept { return m_Tile; }
 		[[nodiscard]] std::array<Surface, SurfaceCount> Import(RenderGraph::RGBuilder& builder) noexcept;
 		void Export(RenderGraph::RGBuilder& builder, const std::array<Surface, SurfaceCount>& surfaces) noexcept;

@@ -35,17 +35,17 @@ namespace gglab
 	class GISpecularVisibilityObservation final
 	{
 	public:
-		static constexpr size_t SurfaceCount = 4;
-		using Surface = TemporalHistoryTextures<SurfaceCount>::RenderGraphSurface;
-		struct Tile
+		enum class SurfaceSlot : size_t
 		{
-			uint32_t m_X = 0;
-			uint32_t m_Y = 0;
-			uint32_t m_Width = 0;
-			uint32_t m_Height = 0;
-			bool m_BeginSweep = false;
-			bool m_EndSweep = false;
+			BaseSum = gi_shader::GIVisibilityBaseSum,
+			CoatSum = gi_shader::GIVisibilityCoatSum,
+			BaseCompensation = gi_shader::GIVisibilityBaseCompensation,
+			CoatCompensation = gi_shader::GIVisibilityCoatCompensation,
+			Count = gi_shader::GIVisibilitySurfaceCount,
 		};
+		static constexpr size_t SurfaceCount = static_cast<size_t>(SurfaceSlot::Count);
+		using Surface = TemporalHistoryTextures<SurfaceCount>::RenderGraphSurface;
+		using Tile = GIObservationTile;
 		GISpecularVisibilityObservation(RHIDevice& device, PersistentTexturePool& pool) noexcept;
 		~GISpecularVisibilityObservation();
 		void BeginFrame(uint64_t serial) noexcept;

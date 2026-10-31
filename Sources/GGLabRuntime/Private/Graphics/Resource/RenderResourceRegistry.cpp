@@ -823,7 +823,7 @@ namespace gglab
 	{
 		auto& state = m_PostProcessPreviewStates[utils::ToIndex(channel)];
 		const float clamped = std::clamp(exposureEV,
-			channel == PostProcessPreviewChannel::GlobalIllumination ? -20.0f : -8.0f, 8.0f);
+			GetPostProcessPreviewMinimumExposureEV(channel), PostProcessPreviewMaximumExposureEV);
 		if (state.m_ExposureEV != clamped)
 		{
 			state.m_ExposureEV = clamped;

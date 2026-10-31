@@ -1394,7 +1394,7 @@
       "function": "PSMain",
       "operation": "isfinite",
       "count": 4,
-      "bodySha256": "17b0161e0392b79f1ddf8aa1d0dc3912c83e6a90990185066e9dbb44801fe552",
+      "bodySha256": "7ff525a855f048b1f058763bd8fcdeb9292368b7c0da523f8dfc82b773e519ef",
       "programs": [
         "gglab.shader.post-process-preview"
       ],
@@ -1412,7 +1412,7 @@
       "function": "PSMain",
       "operation": "ACESFitted",
       "count": 3,
-      "bodySha256": "72b6c63318a3edd2b58d1e330a6ad39765c47f89309ab43c0075131f307ff146",
+      "bodySha256": "3aaa4ac479d798887022a98bbf9d01a476c237cf296b48e6fa26757a4d40a038",
       "programs": [
         "gglab.shader.post-process-preview"
       ],
@@ -1430,7 +1430,7 @@
       "function": "PSMain",
       "operation": "SanitizeHDRColor",
       "count": 1,
-      "bodySha256": "32b4e5efff9926033307d4b8559b195e64da9d0e5b890dbb1296aeac9c6b4b5a",
+      "bodySha256": "7027f6774ac2e60cc02dccba819e738087f88247ff701fbab7bded5a858b6234",
       "programs": [
         "gglab.shader.post-process-preview"
       ],
@@ -1574,7 +1574,7 @@
       "function": "GITraceHit",
       "operation": "isfinite",
       "count": 7,
-      "bodySha256": "6add314edd6c9c5b0493d021aa9370a15f8a21be8bfbd71c51c33a5c860200aa",
+      "bodySha256": "ad762544054c32e7606c94e9d54f72b63aff199ee523cec18f0ca3209d949678",
       "programs": [
         "gglab.shader.gi-probe-update",
         "gglab.shader.ray-scene"
@@ -1629,7 +1629,7 @@
       "function": "Trace",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "da269e21c8af875003acde6b3bbe24935c19ef1f0051f0926c14d77a74c02b91",
+      "bodySha256": "5e6156b0b8b142b4fb1262074c1826803f0b41302cc5301af5aef7d7bf6b443b",
       "programs": [
         "gglab.shader.gi-probe-update"
       ],

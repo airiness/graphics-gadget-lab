@@ -10,6 +10,30 @@
 
 namespace gglab
 {
+	namespace
+	{
+		struct SignalOption
+		{
+			PostProcessDebugTap m_Tap;
+			const char* m_Name;
+		};
+		constexpr std::array SignalOptions
+		{
+			SignalOption{ PostProcessDebugTap::GIIrradiance, "Irradiance" },
+			SignalOption{ PostProcessDebugTap::GILambertRadiance, "Lambert Radiance" },
+			SignalOption{ PostProcessDebugTap::GISunIrradiance, "Sun Irradiance" },
+			SignalOption{ PostProcessDebugTap::GIEnvironmentIrradiance, "Environment Irradiance" },
+			SignalOption{ PostProcessDebugTap::GIBaseVisibility, "Base Visibility" },
+			SignalOption{ PostProcessDebugTap::GICoatVisibility, "Coat Visibility" },
+			SignalOption{ PostProcessDebugTap::GICombinedVisibility, "Combined Visibility" },
+		};
+		const SignalOption& FindSignalOption(PostProcessDebugTap tap) noexcept
+		{
+			const auto found = std::ranges::find(SignalOptions, tap, &SignalOption::m_Tap);
+			return found != SignalOptions.end() ? *found : SignalOptions.front();
+		}
+	}
+
 	void GIViewerPanel::Draw(DevelopGuiContext& context) noexcept
 	{
 		ImGui::SetWindowPos(ImVec2(460, 45), ImGuiCond_FirstUseEver);
@@ -24,22 +48,29 @@ namespace gglab
 		constexpr auto Channel = PostProcessPreviewChannel::GlobalIllumination;
 		const auto preview = view->GetPostProcessPreviewDiagnostics(Channel);
 		auto selection = preview.m_Selected;
-		constexpr std::array Names
-		{
-			"Irradiance", "Lambert Radiance", "Sun Irradiance", "Environment Irradiance",
-			"Base Visibility", "Coat Visibility", "Combined Visibility",
-		};
-		constexpr auto FirstTap = static_cast<int>(PostProcessDebugTap::GIIrradiance);
-		int signal = std::clamp(static_cast<int>(selection.m_Tap) - FirstTap, 0, 6);
 		ImGui::BeginDisabled(m_Frozen);
-		if (ImGui::Combo("Signal", &signal, Names.data(), static_cast<int>(Names.size())))
+		if (ImGui::BeginCombo("Signal", FindSignalOption(selection.m_Tap).m_Name))
 		{
-			selection.m_Tap = static_cast<PostProcessDebugTap>(FirstTap + signal);
-			control->SetPostProcessPreviewSelection(selection, Channel);
+			for (const auto& option : SignalOptions)
+			{
+				const bool selected = option.m_Tap == selection.m_Tap;
+				if (ImGui::Selectable(option.m_Name, selected))
+				{
+					selection.m_Tap = option.m_Tap;
+					control->SetPostProcessPreviewSelection(selection, Channel);
+				}
+				if (selected)
+				{
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
 		}
+		const bool visibility = IsGIVisibilityPreviewTap(selection.m_Tap);
 		float exposure = preview.m_ExposureEV;
-		ImGui::BeginDisabled(signal >= 4);
-		if (ImGui::SliderFloat("Preview EV", &exposure, -20.0f, 8.0f, "%.2f"))
+		ImGui::BeginDisabled(visibility);
+		if (ImGui::SliderFloat("Preview EV", &exposure,
+			GetPostProcessPreviewMinimumExposureEV(Channel), PostProcessPreviewMaximumExposureEV, "%.2f"))
 		{
 			control->SetPostProcessPreviewExposureEV(exposure, Channel);
 		}
@@ -52,16 +83,16 @@ namespace gglab
 		{
 			control->RequestPostProcessPreview(Channel);
 		}
-		ImGui::TextDisabled(signal < 4 ? "Scene referred | ACES + sRGB | independent exposure" :
+		ImGui::TextDisabled(!visibility ? "Scene referred | ACES + sRGB | independent exposure" :
 			"Visibility [0, 1] | black = occluded, white = visible");
 		ImGui::TextDisabled("Magenta: invalid | checker: background/pending | blue: inactive lobe");
 
 		const auto& source = preview.m_GISnapshot;
-		const int publishedSignal = std::clamp(static_cast<int>(preview.m_Published.m_Tap) - FirstTap, 0, 6);
+		const auto& publishedSignal = FindSignalOption(preview.m_Published.m_Tap);
 		ImGui::Text("%s | generation %llu | samples %u / %u",
 			m_Frozen ? "Frozen" : "Live", static_cast<unsigned long long>(source.m_Generation),
 			source.m_Samples, source.m_TargetSamples);
-		if (preview.m_HasPublished && publishedSignal < 4)
+		if (preview.m_HasPublished && IsGIDiffusePreviewTap(preview.m_Published.m_Tap))
 		{
 			ImGui::SameLine();
 			ImGui::Text("| depth %u", source.m_MaximumDepth);
@@ -69,7 +100,7 @@ namespace gglab
 		if (preview.m_HasPublished)
 		{
 			ImGui::TextDisabled("Last submitted %s: frame %llu | update %llu | %u x %u",
-				Names[publishedSignal], static_cast<unsigned long long>(preview.m_FrameSerial),
+				publishedSignal.m_Name, static_cast<unsigned long long>(preview.m_FrameSerial),
 				static_cast<unsigned long long>(preview.m_UpdateCount), preview.m_Width, preview.m_Height);
 		}
 		else

@@ -1,5 +1,7 @@
 #include "Graphics/RenderPass/RenderPassGIReference.h"
 #include "Graphics/Pipeline/GIReferenceObservation.h"
+#include "Graphics/Pipeline/GIComputeDispatch.h"
+#include "Graphics/Pipeline/RaySceneShaderBindings.h"
 #include "GGLabRuntime/Graphics/Pipeline/RaySceneHitMaterial.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
@@ -29,8 +31,17 @@ namespace gglab
 		const RenderPassInfo PassInfo{ .m_TypeName = "GI.Reference.PathTrace",
 			.m_DisplayName = "Fixed-depth irradiance reference", .m_CategoryName = "Global Illumination",
 			.m_Category = RenderPassCategory::Debug, .m_Type = RenderPassType::Compute };
+		enum class OutputSlot : size_t
+		{
+			Irradiance,
+			Diagnostics,
+			Position,
+			Identity,
+			Count,
+		};
 		constexpr std::array OutputNames{ "GI.Reference.Irradiance", "GI.Reference.Diagnostics",
 			"GI.Reference.Position", "GI.Reference.Identity" };
+		static_assert(OutputNames.size() == static_cast<size_t>(OutputSlot::Count));
 		struct Parameters
 		{
 			uint32_t m_Depth = 0;
@@ -86,12 +97,12 @@ namespace gglab
 	{
 		if ((info.m_EnvironmentFilter != GIReferenceEnvironmentFilter::Face32 &&
 			info.m_EnvironmentFilter != GIReferenceEnvironmentFilter::MipZero) ||
-			info.m_SampleCount == 0 || info.m_SampleCount > 1'048'576 ||
-			info.m_SamplesPerBatch == 0 || info.m_SamplesPerBatch > 4096 ||
-			info.m_SampleWorkPerSubmission == 0 || info.m_SampleWorkPerSubmission > 8'388'608 ||
-			info.m_MaximumDepth == 0 || info.m_MaximumDepth > 256 ||
-			info.m_QueryWorkPerSubmission == 0 || info.m_QueryWorkPerSubmission > 16'777'216 ||
-			info.m_MaximumTilePixels > 8'388'608 ||
+			info.m_SampleCount == 0 || info.m_SampleCount > GIObservationLimits::MaximumSamples ||
+			info.m_SamplesPerBatch == 0 || info.m_SamplesPerBatch > GIObservationLimits::MaximumBatchSamples ||
+			info.m_SampleWorkPerSubmission == 0 || info.m_SampleWorkPerSubmission > GIObservationLimits::MaximumSampleWorkPerSubmission ||
+			info.m_MaximumDepth == 0 || info.m_MaximumDepth > GIObservationLimits::MaximumDiffuseDepth ||
+			info.m_QueryWorkPerSubmission == 0 || info.m_QueryWorkPerSubmission > GIObservationLimits::MaximumQueryWorkPerSubmission ||
+			info.m_MaximumTilePixels > GIObservationLimits::MaximumImagePixels ||
 			!std::isfinite(info.m_MaximumDistance) || info.m_MaximumDistance <= 0.0f ||
 			!std::ranges::all_of(info.m_ConstantRadiance,
 				[](float value) { return std::isfinite(value) && value >= 0.0f; }))
@@ -117,7 +128,7 @@ namespace gglab
 		ComputePipelineRecipe m_Recipe;
 		ComputePipelineSlot m_Slot;
 		ResolvedRenderPipeline m_Pipeline;
-		std::array<uint32_t, 6> m_Parameters{};
+		std::array<uint32_t, ray_scene_bindings::Count> m_Parameters{};
 	};
 
 	RenderPassGIReference::RenderPassGIReference() noexcept : m_State(std::make_unique<State>()) {}
@@ -166,13 +177,7 @@ namespace gglab
 			}
 			std::vector<LayoutBindingRequirement> bindings(
 				atmosphere.m_Layout->GetBindings().begin(), atmosphere.m_Layout->GetBindings().end());
-			for (uint32_t index = 0; index < state.m_Parameters.size(); ++index)
-			{
-				bindings.push_back({ .m_Key = LayoutBindingKey{ 0x700u + index },
-					.m_Slot = { .m_Type = index == 0 ? RHIBindingType::AccelerationStructure : RHIBindingType::ReadOnlyStorageBuffer,
-						.m_Visibility = RHIShaderStage::Compute, .m_Binding = 5 + index, .m_Count = 1 },
-					.m_ParameterOrder = 14 + index });
-			}
+			ray_scene_bindings::Append(bindings);
 			const std::array fragments{ LayoutFragment{ "GIReference", bindings } };
 			const auto composed = ComposeLayoutFragments(fragments);
 			if (!composed.IsSuccess())
@@ -183,7 +188,7 @@ namespace gglab
 				*composed.m_Layout, "GI.Reference");
 			for (uint32_t index = 0; index < state.m_Parameters.size(); ++index)
 			{
-				const auto parameter = composed.m_Layout->FindParameterIndex(LayoutBindingKey{ 0x700u + index });
+				const auto parameter = composed.m_Layout->FindParameterIndex(ray_scene_bindings::Key(index));
 				if (!parameter)
 				{
 					return RenderFrameValidationResult::ContractFailure("GI reference ray binding is unavailable");
@@ -220,7 +225,9 @@ namespace gglab
 		if (!info.m_Accumulate)
 		{
 			const uint64_t work = uint64_t(view.m_Width) * view.m_Height * info.m_SampleCount;
-			if (work > info.m_SampleWorkPerSubmission || work * 2 * info.m_MaximumDepth > info.m_QueryWorkPerSubmission)
+			if (work > info.m_SampleWorkPerSubmission ||
+				work * GIObservationLimits::QueriesPerDiffuseDepth * info.m_MaximumDepth >
+					info.m_QueryWorkPerSubmission)
 			{
 				return RenderFrameValidationResult::ContractFailure("Stateless reference exceeds whole-frame work budgets");
 			}
@@ -285,10 +292,10 @@ namespace gglab
 						const auto read = builder.Read(texture, RGTextureAccess::Sample, RHIStage::ComputeShader);
 						return builder.CreateView<RHITextureViewType::ShaderResource>(read);
 					};
-				data.m_Face = readTexture(receivers.m_Textures[0]);
+				data.m_Face = readTexture(receivers.Get(GIReceiverSurface::FaceNormal));
 				data.m_RasterPosition = readTexture(receivers.m_Position);
-				data.m_Shading = readTexture(receivers.m_Textures[2]);
-				data.m_ReceiverAlbedo = readTexture(receivers.m_Textures[7]);
+				data.m_Shading = readTexture(receivers.Get(GIReceiverSurface::ShadingNormal));
+				data.m_ReceiverAlbedo = readTexture(receivers.Get(GIReceiverSurface::HitAlbedo));
 				const auto& depth = builder.GetBlackboard().Get<RGSceneDepthResources>(SceneDepthResourcesName);
 				const auto extent = builder.GetTextureDesc(depth.m_Texture).m_Extent;
 				const auto read = builder.Read(depth.m_Texture, RGTextureAccess::Sample, RHIStage::ComputeShader);
@@ -310,9 +317,9 @@ namespace gglab
 					auto output = builder.CreateTexture(OutputNames[index], { .m_Format = RHIFormat::R32G32B32A32Float, .m_Extent = extent });
 					builder.WriteInPlace(output, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
 					data.m_Outputs[index] = builder.CreateView<RHITextureViewType::UnorderedAccess>(output);
-					if (index == 0)
+					if (index == static_cast<size_t>(OutputSlot::Irradiance))
 					{
-						preview.m_Diffuse[0] = output;
+						preview.m_Irradiance = output;
 					}
 				}
 				auto radiance = builder.CreateTexture("GI.Reference.LambertRadiance",
@@ -327,9 +334,9 @@ namespace gglab
 					{ .m_Format = RHIFormat::R32G32B32A32Float, .m_Extent = extent });
 				builder.WriteInPlace(environment, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
 				data.m_EnvironmentIrradiance = builder.CreateView<RHITextureViewType::UnorderedAccess>(environment);
-				preview.m_Diffuse[1] = radiance;
-				preview.m_Diffuse[2] = sun;
-				preview.m_Diffuse[3] = environment;
+				preview.m_LambertRadiance = radiance;
+				preview.m_SunIrradiance = sun;
+				preview.m_EnvironmentIrradiance = environment;
 				preview.m_DiffuseSnapshot = { .m_Samples = info.m_SampleCount,
 					.m_TargetSamples = info.m_SampleCount, .m_MaximumDepth = info.m_MaximumDepth };
 				auto pathDiagnostics = builder.CreateTexture("GI.Reference.PathDiagnostics",
@@ -405,7 +412,8 @@ namespace gglab
 					!constants.Bind(m_State->m_Scene, frame.m_FrameConstants.m_SceneSnapshot) ||
 					!constants.Bind(m_State->m_Atmosphere, data.m_Atmosphere) ||
 					!commands->SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB), frame.m_FrameConstants.m_Views) ||
-					!commands->SetAccelerationStructure(m_State->m_Parameters[0], execute.GetAccelerationStructureHandle(scene.m_TopLevel)))
+					!commands->SetAccelerationStructure(m_State->m_Parameters[ray_scene_bindings::TopLevel],
+						execute.GetAccelerationStructureHandle(scene.m_TopLevel)))
 				{
 					return;
 				}
@@ -414,7 +422,8 @@ namespace gglab
 				const std::array buffers{ scene.m_Vertices, scene.m_Indices, scene.m_Geometries, scene.m_Instances, scene.m_Materials };
 				for (uint32_t index = 0; index < buffers.size(); ++index)
 				{
-					commands->SetReadOnlyBuffer(m_State->m_Parameters[index + 1], execute.GetBufferHandle(buffers[index]));
+					commands->SetReadOnlyBuffer(m_State->m_Parameters[index + ray_scene_bindings::Vertices],
+						execute.GetBufferHandle(buffers[index]));
 				}
 				auto parameters = data.m_Parameters;
 				parameters.m_Depth = execute.GetViewDescriptor(data.m_Depth).m_Index;
@@ -463,9 +472,8 @@ namespace gglab
 				}
 				// The observation bounds the entire submission; row dispatches also bound
 				// encoder work. Resolve-only frames do not advance samples or RNG.
-				const uint64_t rowWork = static_cast<uint64_t>(parameters.m_Width) *
-					std::max(1ull, static_cast<uint64_t>(parameters.m_SampleCount) * 2 * parameters.m_MaximumDepth);
-				const uint32_t rows = std::max(8u, static_cast<uint32_t>(8'388'608 / rowWork) / 8 * 8);
+				const auto rows = GIQueryRowsPerDispatch(parameters.m_Width, parameters.m_SampleCount,
+					GIObservationLimits::QueriesPerDiffuseDepth * parameters.m_MaximumDepth);
 				for (uint32_t row = 0; row < parameters.m_Height; row += rows)
 				{
 					parameters.m_RowOffset = row;
@@ -475,7 +483,8 @@ namespace gglab
 						return;
 					}
 					const auto count = std::min(rows, parameters.m_Height - row);
-					commands->Dispatch((parameters.m_Width + 7) / 8, (count + 7) / 8, 1);
+					commands->Dispatch((parameters.m_Width + GIQueryGroupWidth - 1) / GIQueryGroupWidth,
+						(count + GIQueryGroupHeight - 1) / GIQueryGroupHeight, 1);
 				}
 				if (parameters.m_ObservationEnabled && services.m_GIReferenceObservation)
 				{

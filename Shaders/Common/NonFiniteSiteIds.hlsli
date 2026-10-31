@@ -91,5 +91,5 @@ static const uint NF_INJECT_PASS_GI_REFERENCE_CSMAIN_THROUGHPUT = 3u;
 static const uint NF_INJECTION_POINT_COUNT = 4u;
 
 static const uint NF_ABI_VERSION = 2u;
-static const uint NF_INVENTORY_LOW = 0x0106924du;
-static const uint NF_INVENTORY_HIGH = 0x50de22edu;
+static const uint NF_INVENTORY_LOW = 0x03c3472fu;
+static const uint NF_INVENTORY_HIGH = 0x3554810fu;

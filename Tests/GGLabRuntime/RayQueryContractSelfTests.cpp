@@ -1,6 +1,8 @@
 #include "RayQueryContractSelfTests.h"
 #include "AssetTestServices.h"
 #include "Graphics/Pipeline/GIReferenceObservation.h"
+#include "Graphics/Pipeline/GIComputeDispatch.h"
+#include "Graphics/Pipeline/RaySceneShaderBindings.h"
 #include "Graphics/Pipeline/GISpecularVisibilityObservation.h"
 #include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h"
@@ -160,6 +162,41 @@ namespace gglab
 				"A CSM for another directional light cannot masquerade as a sun-visibility comparison");
 		}
 
+		void RunGISharedContractTests(SelfTestContext& context) noexcept
+		{
+			// Pin the pre-refactor sequence, not a second copy of the hash implementation.
+			uint32_t state = 61051;
+			for (const uint32_t expected : { 0xe5dbcb2au, 0x0c7d240au, 0xc42aa907u, 0x21283ec9u })
+			{
+				const float sample = gi_shader::GIRandom(state);
+				context.Check(state == expected && sample > 0 && sample < 1,
+					"Shared CPU/HLSL sampling preserves the qualified serial random stream");
+			}
+			context.Check(gi_shader::GIUniformOpenInterval(0) > 0 &&
+				gi_shader::GIUniformOpenInterval(UINT32_MAX) < 1,
+				"The open-interval conversion excludes both rounded FP32 endpoints");
+			context.Check(GIQueryRowsPerDispatch(1024, 64, 2) == 64 &&
+				GIQueryRowsPerDispatch(1024, 0, 512) == 8192 &&
+				GIQueryRowsPerDispatch(1u << 23, 4096, 512) == 8,
+				"Query splitting handles sampled, resolve-only and oversized-row dispatches");
+
+			// Parameter order is not a count: inherited layouts may contain gaps.
+			std::vector<LayoutBindingRequirement> bindings
+			{
+				{ .m_Key = LayoutBindingKey{ 0x100 },
+					.m_Slot = { .m_Type = RHIBindingType::ReadOnlyStorageBuffer,
+						.m_Visibility = RHIShaderStage::Compute, .m_Binding = 0, .m_Count = 1 },
+					.m_ParameterOrder = 41 },
+			};
+			ray_scene_bindings::Append(bindings);
+			const std::array fragments{ LayoutFragment{ "RaySceneContract", bindings } };
+			const auto layout = ComposeLayoutFragments(fragments);
+			context.Check(layout.IsSuccess() && bindings[1].m_ParameterOrder == 42 &&
+				bindings.back().m_Slot.m_Binding == 10 &&
+				bindings[1].m_Slot.m_Type == RHIBindingType::AccelerationStructure,
+				"Shared ray bindings append t5-t10 after the actual inherited parameter order");
+		}
+
 		void RunProbeUpdateProfileTests(SelfTestContext& context) noexcept
 		{
 			GIProbeUpdateProfile profile;
@@ -183,7 +220,14 @@ namespace gglab
 				GetGIProbeUpdateRange(profile, 5).m_Count == 12870 &&
 				GetGIProbeUpdateRange(profile, 6).m_Count < 12870,
 				"Declared refreshes use the same capacity while the steady schedule remains partial");
-			for (const uint32_t rays : { 0u, 63u, 257u, UINT32_MAX })
+			for (const uint32_t rays : { 64u, 128u, 192u, 256u })
+			{
+				auto valid = profile;
+				valid.m_RaysPerProbe = rays;
+				context.Check(ValidateGIProbeUpdateProfile(valid),
+					"All four qualified ray counts survive shared workload-limit admission");
+			}
+			for (const uint32_t rays : { 0u, 63u, 65u, 127u, 193u, 257u, UINT32_MAX })
 			{
 				auto invalid = profile;
 				invalid.m_RaysPerProbe = rays;
@@ -1392,6 +1436,7 @@ namespace gglab
 		RunSunVisibilityGraphTests(context);
 		RunGIReceiverPreparationTests(context);
 		RunGIReferenceInputTests(context);
+		RunGISharedContractTests(context);
 		RunProbeUpdateProfileTests(context);
 		RunGIReferenceObservationTests(context);
 		RunSpecularVisibilityTests(context);

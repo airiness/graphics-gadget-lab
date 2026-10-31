@@ -4,6 +4,7 @@
 static const int MaterialAlphaModeOpaque = 0;
 static const int MaterialAlphaModeMask = 1;
 static const int MaterialAlphaModeBlend = 2;
+static const uint MaterialFlagDoubleSided = 1u; // MaterialFlags::DoubleSided on the CPU.
 
 float2 SelectUV(MaterialTextureBindingData bindingData, float2 uv0, float2 uv1)
 {

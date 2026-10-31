@@ -3,6 +3,7 @@
 #include <Common/DepthReconstruction.hlsli>
 #include <Common/VertexTransform.hlsli>
 #include <Lighting/GIHitLighting.hlsli>
+#include <Lighting/GISampling.hlsli>
 
 cbuffer Parameters : register(b2)
 {
@@ -48,22 +49,6 @@ cbuffer Parameters : register(b2)
 	uint TilePadding;
 };
 
-uint GIHash(uint value)
-{
-	value ^= value >> 16;
-	value *= 0x7feb352du;
-	value ^= value >> 15;
-	value *= 0x846ca68bu;
-	return value ^ (value >> 16);
-}
-
-float GIRandom(inout uint state)
-{
-	state = GIHash(state + 0x9e3779b9u);
-	// 23 bits keep the half-unit representable: neither endpoint can round to 1.
-	return ((float)(state >> 9) + 0.5) / 8388608.0;
-}
-
 float GISecondaryRandom(uint pixel, uint sampleIndex, uint bounce, uint dimension)
 {
 	// A separate counter stream leaves the serial primary sequence unchanged.
@@ -73,7 +58,7 @@ float GISecondaryRandom(uint pixel, uint sampleIndex, uint bounce, uint dimensio
 	state = GIHash(state ^ GIHash(sampleIndex));
 	state = GIHash(state ^ GIHash(bounce));
 	state = GIHash(state ^ GIHash(dimension));
-	return ((float)(state >> 9) + 0.5) / 8388608.0;
+	return GIUniformOpenInterval(state);
 }
 
 bool GIPathFinite(float3 value)
@@ -106,11 +91,11 @@ float3 GICosineDirection(float3 normal, float2 sample)
 	const float radius = sqrt(sample.x);
 	float sine;
 	float cosine;
-	sincos(6.28318530717958647692 * sample.y, sine, cosine);
+	sincos(TWO_PI * sample.y, sine, cosine);
 	return tangent * (radius * cosine) + bitangent * (radius * sine) + normal * sqrt(1.0 - sample.x);
 }
 
-[numthreads(8, 8, 1)]
+[numthreads(GIQueryGroupWidth, GIQueryGroupHeight, 1)]
 void CSMain(uint3 id : SV_DispatchThreadID)
 {
 	const uint2 pixel = uint2(id.x, id.y + RowOffset);
@@ -157,7 +142,7 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 		return;
 	}
 	irradiance[pixel] = float4(0.0, 0.0, 0.0, -1.0);
-	if (face.w != 1.0)
+	if (face.w != GIReceiverOpaque)
 	{
 		return;
 	}
@@ -171,15 +156,15 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	const uint receiverMatch = rasterPosition.w == face.w &&
 		GIPathFinite(rasterPosition.xyz) && GIPathFinite(position) && GIPathFinite(face.xyz) ?
 		GIMatchReceiver(pixel, uint2(Width, Height), position, rasterPosition.xyz,
-			face.xyz, view, MaximumDistance, counts, receiver) : 3u;
-	if (receiverMatch != 1 && receiverMatch != 2 && receiverMatch != 6)
+			face.xyz, view, MaximumDistance, counts, receiver) : GIReceiverMatchInvalid;
+	if (!GIReceiverMatched(receiverMatch))
 	{
 		irradiance[pixel] = float4(0.0, 0.0, 0.0, -2.0);
 		return;
 	}
 	positions[pixel] = float4(receiver.Position, 1.0);
 	identities[pixel] = float4((float)(receiver.Instance), (float)(receiver.Primitive),
-		receiver.FaceNormal.y, receiverMatch == 6 ? 3.0 : (float)(receiverMatch));
+		receiver.FaceNormal.y, receiverMatch == GIReceiverMatchRaster ? 3.0 : (float)(receiverMatch));
 	const float3 normal = normalize(GetTexture2DFloat4(ShadingIndex).Load(int3(pixel, 0)).xyz);
 	uint randomState = GIHash(Seed ^ GIHash(pixel.x + Width * pixel.y));
 	precise float3 sunSum = 0.0.xxx;
@@ -345,7 +330,7 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	const float validity = resolvedSamples == 0 ?
 		0.0 :
 		outcomes.w == 0 && invalidPaths == 0.0 ? 1.0 : -3.0;
-	const float weight = 3.14159265358979323846 / (float)(totalSamples);
+	const float weight = PI / (float)(totalSamples);
 	const float3 sunEstimate = sunSum * weight;
 	const float3 environmentEstimate = environmentSum * weight;
 	const float3 estimate = sunEstimate + environmentEstimate;
@@ -355,7 +340,7 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	irradiance[pixel] = float4(estimate, validity);
 	// Reduced diffuse diagnostic only, not the complete Forward material or Final.
 	const float3 albedo = GetTexture2DFloat4(ReceiverAlbedoIndex).Load(int3(pixel, 0)).rgb;
-	lambertRadiance[pixel] = float4(albedo * estimate / 3.14159265358979323846, validity);
+	lambertRadiance[pixel] = float4(albedo * estimate / PI, validity);
 	diagnostics[pixel] = (float4)(outcomes) / (float)(totalSamples);
 	// First-query diagnostics retain their original meaning. These independent
 	// channels report any-depth invalid paths, depth truncation and actual depth.

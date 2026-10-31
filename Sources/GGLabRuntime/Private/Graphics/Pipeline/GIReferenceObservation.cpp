@@ -1,4 +1,5 @@
 #include "Graphics/Pipeline/GIReferenceObservation.h"
+#include "Graphics/Pipeline/GIComputeDispatch.h"
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 
 #include <algorithm>
@@ -47,14 +48,14 @@ namespace gglab
 	{
 		m_Visited = true;
 		const uint64_t pixels = static_cast<uint64_t>(key.m_Width) * key.m_Height;
-		if (m_UnknownCompletion || pixels == 0 || pixels > 8'388'608 || sampleWorkBudget == 0 ||
+		if (m_UnknownCompletion || pixels == 0 || pixels > GIObservationLimits::MaximumImagePixels || sampleWorkBudget == 0 ||
 			key.m_Samples == 0 || samplesPerBatch == 0 ||
-			key.m_MaximumDepth == 0 || key.m_MaximumDepth > 256 ||
-			maximumTilePixels > 8'388'608)
+			key.m_MaximumDepth == 0 || key.m_MaximumDepth > GIObservationLimits::MaximumDiffuseDepth ||
+			maximumTilePixels > GIObservationLimits::MaximumImagePixels)
 		{
 			return false;
 		}
-		const uint64_t queriesPerPixelSample = 2ull * key.m_MaximumDepth;
+		const uint64_t queriesPerPixelSample = uint64_t(GIObservationLimits::QueriesPerDiffuseDepth) * key.m_MaximumDepth;
 		if (queriesPerPixelSample > queryWorkBudget)
 		{
 			return false;
@@ -80,7 +81,7 @@ namespace gglab
 			for (size_t index = 0; index < descriptions.size(); ++index)
 			{
 				descriptions[index] = { .m_CreateInfo = { .m_Desc = {
-					.m_Format = index == 3 ? RHIFormat::R32Uint : RHIFormat::R32G32B32A32Float,
+					.m_Format = index == static_cast<size_t>(SurfaceSlot::RandomState) ? RHIFormat::R32Uint : RHIFormat::R32G32B32A32Float,
 					.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::UnorderedAccess | RHITextureUsage::CopySource,
 					.m_Extent = { key.m_Width, key.m_Height, 1 } } }, .m_AllocationNames = names[index] };
 			}
@@ -111,15 +112,15 @@ namespace gglab
 				}
 				m_TileWidth = static_cast<uint32_t>(std::min(tilePixels,
 					static_cast<uint64_t>(key.m_Width)));
-				if (m_TileWidth < key.m_Width && m_TileWidth >= 8)
+				if (m_TileWidth < key.m_Width && m_TileWidth >= GIQueryGroupWidth)
 				{
-					m_TileWidth = m_TileWidth / 8 * 8;
+					m_TileWidth = m_TileWidth / GIQueryGroupWidth * GIQueryGroupWidth;
 				}
 				m_TileHeight = static_cast<uint32_t>(std::min(tilePixels / m_TileWidth,
 					static_cast<uint64_t>(key.m_Height)));
-				if (m_TileHeight < key.m_Height && m_TileHeight >= 8)
+				if (m_TileHeight < key.m_Height && m_TileHeight >= GIQueryGroupHeight)
 				{
-					m_TileHeight = m_TileHeight / 8 * 8;
+					m_TileHeight = m_TileHeight / GIQueryGroupHeight * GIQueryGroupHeight;
 				}
 				m_Diagnostics.m_TileCount = ((key.m_Width + m_TileWidth - 1) / m_TileWidth) *
 					((key.m_Height + m_TileHeight - 1) / m_TileHeight);

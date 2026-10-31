@@ -2,6 +2,7 @@
 #include <Common/ApplicationBinding.hlsli>
 #include <Common/ForwardCoverageVaryings.hlsli>
 #include <Lighting/GIHitMaterial.hlsli>
+#include <Lighting/GIShaderConstants.hlsli>
 #include <PBR/IndirectLighting.hlsli>
 
 cbuffer Parameters : register(b2)
@@ -34,7 +35,8 @@ float4 PSPosition(ForwardCoverageVSOutput input) : SV_Target0
 	SetMaterialTextureLodBias(input.MaterialTextureLodBias);
 	const SurfaceData surface = EvaluateSurface(data, input.UV0, input.UV1);
 	ResolveMaterialAlpha(data, surface.Opacity);
-	return float4(input.PositionWS, data.AlphaMode == MaterialAlphaModeMask ? 2.0 : 1.0);
+	return float4(input.PositionWS,
+		data.AlphaMode == MaterialAlphaModeMask ? GIReceiverMasked : GIReceiverOpaque);
 }
 
 #if defined(GGLAB_NONFINITE_COUNTERS)
@@ -63,7 +65,7 @@ ReceiverOutput PSMain(ForwardCoverageVSOutput input, bool frontFace : SV_IsFront
 	}
 	const PreparedMaterialShading material = PrepareMaterialShading(surface, frame,
 		ReceiverBrdfLUT(frame.NoV, frame.Base.EffectivePerceptualRoughness), coat);
-	const bool flip = (data.Flags & 1u) != 0 && !frontFace;
+	const bool flip = (data.Flags & MaterialFlagDoubleSided) != 0 && !frontFace;
 	const float3 vertexNormal = SafeNormalize(input.NormalWS, float3(0.0, 1.0, 0.0)) * (flip ? -1.0 : 1.0);
 	// World-space derivative area shrinks with pixel footprint. SafeNormalize's
 	// absolute length floor would replace valid close-up faces with smooth vertex
@@ -78,8 +80,9 @@ ReceiverOutput PSMain(ForwardCoverageVSOutput input, bool frontFace : SV_IsFront
 	float3 faceNormal = faceScale == 0.0 ? vertexNormal : normalize(face / faceScale);
 	faceNormal *= dot(faceNormal, vertexNormal) < 0.0 ? -1.0 : 1.0;
 	ReceiverOutput output;
-	// Class 0 is cleared background, 1 opaque, 2 MASK. BLEND is not a receiver.
-	output.FaceNormal = float4(faceNormal, data.AlphaMode == MaterialAlphaModeMask ? 2.0 : 1.0);
+	// BLEND does not participate in receiver coverage.
+	output.FaceNormal = float4(faceNormal,
+		data.AlphaMode == MaterialAlphaModeMask ? GIReceiverMasked : GIReceiverOpaque);
 	output.VertexNormal = float4(vertexNormal, frontFace ? 1.0 : -1.0);
 	output.ShadingNormal = float4(material.Base.NormalWS, surface.Metallic);
 	output.DiffuseWeight = float4(material.DiffuseWeight, coat.Factor);

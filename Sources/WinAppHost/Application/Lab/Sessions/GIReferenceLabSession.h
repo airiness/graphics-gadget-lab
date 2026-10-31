@@ -1,5 +1,6 @@
 #pragma once
 #include "AssetPreparationTracker.h"
+#include "Application/Lab/Sessions/GIReferenceLabFixture.h"
 #include "Lab/LabSessionBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingOverrideBase.h"
 
@@ -60,12 +61,12 @@ namespace gglab
 		void BuildVisibilityContract() noexcept;
 		void ApplyVisibilityMaterial() noexcept;
 		entt::entity m_VisibilityReceiver = entt::null;
-		std::array<TextureID, 3> m_VisibilityTextures{};
+		std::array<TextureID, static_cast<size_t>(GIVisibilityTexture::Count)> m_VisibilityTextures{};
 		ModelID m_VisibilityNormalModel{};
 		std::optional<FrameCaptureAssetBundle> m_CaptureBundle;
 		void UpdateMaterialProgress() noexcept;
 		std::shared_ptr<RayScene> m_RayScene;
-		std::array<TextureID, 8> m_MaterialTextures{};
+		std::array<TextureID, static_cast<size_t>(GIMaterialTexture::Count)> m_MaterialTextures{};
 		std::array<ModelID, 2> m_MaterialModels{};
 		entt::entity m_MaterialWall = entt::null;
 		uint32_t m_MaterialCase = 0;

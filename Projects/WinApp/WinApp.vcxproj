@@ -214,8 +214,11 @@
     <None Include="..\..\Shaders\Lighting\GIHitLighting.hlsli" />
     <None Include="..\..\Shaders\Lighting\GIHitMaterial.hlsli" />
     <None Include="..\..\Shaders\Lighting\GIRayScene.hlsli" />
+    <None Include="..\..\Shaders\Lighting\GISampling.hlsli" />
+    <None Include="..\..\Shaders\Lighting\GIShaderConstants.hlsli" />
     <None Include="..\..\Shaders\Lighting\GTAO.hlsli" />
     <None Include="..\..\Shaders\Lighting\IrradianceIntegrationMath.hlsli" />
+    <None Include="..\..\Shaders\Lighting\RaySceneGeometry.hlsli" />
     <None Include="..\..\Shaders\Lighting\ShadowReceiverPlaneMath.hlsli" />
     <None Include="..\..\Shaders\Lighting\ShadowSampling.hlsli" />
     <None Include="..\..\Shaders\Lighting\SpecularIntegrationMath.hlsli" />

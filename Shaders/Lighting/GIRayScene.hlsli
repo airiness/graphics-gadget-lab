@@ -1,5 +1,6 @@
 #pragma once
 #include <Lighting/GIHitMaterial.hlsli>
+#include <Lighting/RaySceneGeometry.hlsli>
 
 RaytracingAccelerationStructure GIRayScene : register(t5);
 ByteAddressBuffer GIVertices : register(t6);
@@ -24,21 +25,9 @@ struct GIHit
 	uint Primitive;
 };
 
-// Normal-directed ULP offset (Ray Tracing Gems, chapter 6).
-float3 GIOffsetOrigin(float3 position, float3 normal)
-{
-	const int3 offset = (int3)(256.0 * normal);
-	const int3 bits = asint(position) + int3(position.x < 0.0 ? -offset.x : offset.x,
-		position.y < 0.0 ? -offset.y : offset.y, position.z < 0.0 ? -offset.z : offset.z);
-	const float3 shifted = asfloat(bits);
-	return float3(abs(position.x) < 0.03125 ? position.x + normal.x / 65536.0 : shifted.x,
-		abs(position.y) < 0.03125 ? position.y + normal.y / 65536.0 : shifted.y,
-		abs(position.z) < 0.03125 ? position.z + normal.z / 65536.0 : shifted.z);
-}
-
 float3 GIHitOrigin(GIHit hit)
 {
-	return GIOffsetOrigin(hit.Position + hit.OriginError * hit.FaceNormal, hit.FaceNormal);
+	return OffsetRaySceneOrigin(hit.Position + hit.OriginError * hit.FaceNormal, hit.FaceNormal);
 }
 
 // Counts and bindings must describe the same immutable all-World snapshot.
@@ -49,7 +38,8 @@ uint GITraceHit(RayDesc ray, uint3 counts, out GIHit hit, bool rasterReceiver)
 {
 	hit = (GIHit)(0);
 	RayQuery<RAY_FLAG_NONE> query;
-	query.TraceRayInline(GIRayScene, rasterReceiver ? RAY_FLAG_FORCE_NON_OPAQUE : RAY_FLAG_FORCE_OPAQUE, 1, ray);
+	query.TraceRayInline(GIRayScene, rasterReceiver ? RAY_FLAG_FORCE_NON_OPAQUE : RAY_FLAG_FORCE_OPAQUE,
+		RaySceneOpaqueMask, ray);
 	while (query.Proceed())
 	{
 		if (query.CandidateType() != CANDIDATE_NON_OPAQUE_TRIANGLE ||
@@ -58,11 +48,11 @@ uint GITraceHit(RayDesc ray, uint3 counts, out GIHit hit, bool rasterReceiver)
 			return GIHitInvalid;
 		}
 		const uint4 candidate = GIInstances[query.CandidateInstanceID()];
-		if (candidate.y >= counts.z || (candidate.z & 1u) == 0)
+		if (candidate.y >= counts.z || (candidate.z & RaySceneOpaqueMask) == 0)
 		{
 			return GIHitInvalid;
 		}
-		if (query.CandidateTriangleFrontFace() || (GIMaterials[candidate.y].Flags & 1u) != 0)
+		if (query.CandidateTriangleFrontFace() || (GIMaterials[candidate.y].Flags & MaterialFlagDoubleSided) != 0)
 		{
 			query.CommitNonOpaqueTriangleHit();
 		}
@@ -78,7 +68,7 @@ uint GITraceHit(RayDesc ray, uint3 counts, out GIHit hit, bool rasterReceiver)
 		return GIHitInvalid;
 	}
 	const uint4 instance = GIInstances[hit.Instance];
-	if (instance.x >= counts.y || instance.y >= counts.z || (instance.z & 1u) == 0)
+	if (instance.x >= counts.y || instance.y >= counts.z || (instance.z & RaySceneOpaqueMask) == 0)
 	{
 		return GIHitInvalid;
 	}
@@ -87,12 +77,12 @@ uint GITraceHit(RayDesc ray, uint3 counts, out GIHit hit, bool rasterReceiver)
 	{
 		return GIHitInvalid;
 	}
-	const uint3 indices = GIIndices.Load3(geometry.y + hit.Primitive * 12);
+	const uint3 indices = GIIndices.Load3(geometry.y + hit.Primitive * RaySceneTriangleIndexBytes);
 	if (any(indices >= geometry.w))
 	{
 		return GIHitInvalid;
 	}
-	const uint3 addresses = geometry.x + indices * 56;
+	const uint3 addresses = geometry.x + indices * RaySceneVertexStride;
 	const float3 a = asfloat(GIVertices.Load3(addresses.x));
 	const float3 b = asfloat(GIVertices.Load3(addresses.y));
 	const float3 c = asfloat(GIVertices.Load3(addresses.z));
@@ -122,17 +112,11 @@ uint GITraceHit(RayDesc ray, uint3 counts, out GIHit hit, bool rasterReceiver)
 	}
 	// Project reconstruction/intersection/transform error onto the geometric normal,
 	// as in the qualified sun-visibility tap; ULP displacement alone is insufficient.
-	const float3 span = abs(edgeA) + abs(edgeB) + abs(abs(edgeA) - abs(edgeB));
-	float3 localError = 5.96046448e-8 * abs(a) + 1.78813977e-7 * max(span.x, max(span.y, span.z));
-	localError += 1.19209318e-7 * mul(abs(worldToObject), float4(abs(hit.Position), 1.0));
-	const float3 translation = float3(objectToWorld[0][3], objectToWorld[1][3], objectToWorld[2][3]);
-	const float3 worldError = 1.78813977e-7 * mul(abs((float3x3)(objectToWorld)), abs(localPosition)) +
-		1.19209318e-7 * abs(translation);
-	hit.OriginError = dot(worldError, abs(hit.FaceNormal)) +
-		inverseNormalLength * dot(localError, abs(localNormal));
-	const float3 normalA = mul(normalMatrix, asfloat(GIVertices.Load3(addresses.x + 12)));
-	const float3 normalB = mul(normalMatrix, asfloat(GIVertices.Load3(addresses.y + 12)));
-	const float3 normalC = mul(normalMatrix, asfloat(GIVertices.Load3(addresses.z + 12)));
+	hit.OriginError = RaySceneTriangleOriginError(a, edgeA, edgeB, localPosition, hit.Position,
+		localNormal, hit.FaceNormal, inverseNormalLength, objectToWorld, worldToObject);
+	const float3 normalA = mul(normalMatrix, asfloat(GIVertices.Load3(addresses.x + RaySceneNormalOffset)));
+	const float3 normalB = mul(normalMatrix, asfloat(GIVertices.Load3(addresses.y + RaySceneNormalOffset)));
+	const float3 normalC = mul(normalMatrix, asfloat(GIVertices.Load3(addresses.z + RaySceneNormalOffset)));
 	// Finite zero normals retain the established face-normal fallback. Non-finite
 	// inputs must reject the hit before normalization can conceal a deep-path error.
 	if (!all(isfinite(NonFiniteObserveValue(NF_SITE_GI_RAY_SCENE_GITRACE_HIT_ISFINITE, normalA))) ||
@@ -155,17 +139,19 @@ uint GITraceHit(RayDesc ray, uint3 counts, out GIHit hit, bool rasterReceiver)
 	}
 	if (!query.CommittedTriangleFrontFace())
 	{
-		if ((material.Flags & 1u) == 0)
+		if ((material.Flags & MaterialFlagDoubleSided) == 0)
 		{
 			return GIHitBackface;
 		}
 		hit.FaceNormal = -hit.FaceNormal;
 		hit.VertexNormal = -hit.VertexNormal;
 	}
-	const float2 uv0 = asfloat(GIVertices.Load2(addresses.x + 24)) * weights.x +
-		asfloat(GIVertices.Load2(addresses.y + 24)) * weights.y + asfloat(GIVertices.Load2(addresses.z + 24)) * weights.z;
-	const float2 uv1 = asfloat(GIVertices.Load2(addresses.x + 32)) * weights.x +
-		asfloat(GIVertices.Load2(addresses.y + 32)) * weights.y + asfloat(GIVertices.Load2(addresses.z + 32)) * weights.z;
+	const float2 uv0 = asfloat(GIVertices.Load2(addresses.x + RaySceneUV0Offset)) * weights.x +
+		asfloat(GIVertices.Load2(addresses.y + RaySceneUV0Offset)) * weights.y +
+		asfloat(GIVertices.Load2(addresses.z + RaySceneUV0Offset)) * weights.z;
+	const float2 uv1 = asfloat(GIVertices.Load2(addresses.x + RaySceneUV1Offset)) * weights.x +
+		asfloat(GIVertices.Load2(addresses.y + RaySceneUV1Offset)) * weights.y +
+		asfloat(GIVertices.Load2(addresses.z + RaySceneUV1Offset)) * weights.z;
 	if (!all(isfinite(NonFiniteObserveValue(NF_SITE_GI_RAY_SCENE_GITRACE_HIT_ISFINITE, float4(uv0, uv1)))))
 	{
 		return GIHitInvalid;
@@ -178,6 +164,12 @@ uint GITraceHit(RayDesc ray, uint3 counts, out GIHit hit, bool rasterReceiver)
 	return GIHitSurface;
 }
 
+bool GIReceiverMatched(uint match)
+{
+	return match == GIReceiverMatchCenter || match == GIReceiverMatchEnvelope ||
+		match == GIReceiverMatchRaster;
+}
+
 // Only primary matching follows raster coverage. Secondary rays keep their
 // original hit/miss and sidedness rules, including occluded single-sided backfaces.
 uint GIMatchReceiver(uint2 pixel, uint2 size, float3 position, float3 rasterPosition,
@@ -185,19 +177,24 @@ uint GIMatchReceiver(uint2 pixel, uint2 size, float3 position, float3 rasterPosi
 {
 	receiver = (GIHit)(0);
 	const float3 delta = position - view.CameraPos.xyz;
-	const float tolerance = max(0.002, length(delta) * 0.0002);
+	const float tolerance = max(RaySceneMinimumMatchTolerance,
+		length(delta) * RaySceneRelativeMatchTolerance);
 	const float3 positionVS = mul(float4(position, 1), view.ViewMat).xyz;
 	const float footprint = 2.0 * abs(positionVS.z * view.InvProjMat[1][1]) / (float)(size.y);
 	const float pixelRadius = max(1.0 / 128.0, 2.0e-6 / max(footprint, 1.0e-20));
-	uint failure = 5;
-	for (uint attempt = 0; attempt < 82; ++attempt)
+	const uint envelopeRadius = 4;
+	const uint envelopeWidth = 2 * envelopeRadius + 1;
+	const uint matchAttempts = 1 + envelopeWidth * envelopeWidth;
+	uint failure = GIReceiverMatchMiss;
+	for (uint attempt = 0; attempt < matchAttempts; ++attempt)
 	{
 		// A thin triangle need not intersect the envelope's corners or axes.
 		float2 offset = 0.0.xx;
 		if (attempt != 0)
 		{
 			const uint index = attempt - 1;
-			offset = float2((float)(index % 9) - 4.0, (float)(index / 9) - 4.0) / 4.0;
+			offset = (float2(index % envelopeWidth, index / envelopeWidth) -
+				(float)(envelopeRadius)) / (float)(envelopeRadius);
 		}
 		const float2 uv = ((float2)(pixel) + 0.5 + pixelRadius * offset) / (float2)(size);
 		const float3 nearVS = ReconstructViewPosition(uv,
@@ -214,7 +211,7 @@ uint GIMatchReceiver(uint2 pixel, uint2 size, float3 position, float3 rasterPosi
 		// ray instead of clipping valid grazing receivers with a fixed t window.
 		const float planeDistance = dot(delta, face) / cosine;
 		const float rayTolerance = tolerance / abs(cosine);
-		ray.TMin = max(0.001, planeDistance - rayTolerance);
+		ray.TMin = max(RayScenePrimaryMinimumDistance, planeDistance - rayTolerance);
 		ray.TMax = min(maximumDistance, planeDistance + rayTolerance);
 		if (ray.TMin >= ray.TMax)
 		{
@@ -224,16 +221,16 @@ uint GIMatchReceiver(uint2 pixel, uint2 size, float3 position, float3 rasterPosi
 		const uint outcome = GITraceHit(ray, counts, candidate, true);
 		if (outcome != GIHitMiss && outcome != GIHitSurface)
 		{
-			return 3;
+			return GIReceiverMatchInvalid;
 		}
 		if (outcome == GIHitSurface)
 		{
-			failure = 4;
-			if (dot(candidate.FaceNormal, face) > 0.9999 &&
+			failure = GIReceiverMatchDifferentSurface;
+			if (dot(candidate.FaceNormal, face) > RaySceneMatchingNormalCosine &&
 				abs(dot(candidate.Position - position, face)) <= tolerance)
 			{
 				receiver = candidate;
-				return attempt == 0 ? 1u : 2u;
+				return attempt == 0 ? GIReceiverMatchCenter : GIReceiverMatchEnvelope;
 			}
 		}
 	}
@@ -254,11 +251,11 @@ uint GIMatchReceiver(uint2 pixel, uint2 size, float3 position, float3 rasterPosi
 			max(abs(rasterPosition.y), abs(rasterPosition.z)));
 		const float error = max(2.0e-6, 4.0 * candidate.OriginError +
 			16.0 * 1.1920928955078125e-7 * magnitude);
-		if (outcome == GIHitSurface && dot(candidate.FaceNormal, face) > 0.9999 &&
+		if (outcome == GIHitSurface && dot(candidate.FaceNormal, face) > RaySceneMatchingNormalCosine &&
 			length(candidate.Position - rasterPosition) <= error)
 		{
 			receiver = candidate;
-			return 6;
+			return GIReceiverMatchRaster;
 		}
 	}
 	return failure;
@@ -276,7 +273,7 @@ bool GISunVisible(GIHit hit, float3 direction, float maximumDistance)
 	ray.TMin = 0.0;
 	ray.TMax = maximumDistance;
 	RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> query;
-	query.TraceRayInline(GIRayScene, RAY_FLAG_NONE, 1, ray);
+	query.TraceRayInline(GIRayScene, RAY_FLAG_NONE, RaySceneOpaqueMask, ray);
 	while (query.Proceed())
 	{
 	}

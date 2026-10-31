@@ -4,6 +4,7 @@
 #include <Common/VertexTransform.hlsli>
 #include <Common/Sampling.hlsli>
 #include <Lighting/GIRayScene.hlsli>
+#include <Lighting/GISampling.hlsli>
 #include <PBR/BRDF.hlsli>
 
 cbuffer Parameters : register(b2)
@@ -37,23 +38,15 @@ cbuffer Parameters : register(b2)
 	uint3 Padding;
 };
 
-uint VisibilityHash(uint value)
-{
-	value ^= value >> 16;
-	value *= 0x7feb352du;
-	value ^= value >> 15;
-	value *= 0x846ca68bu;
-	return value ^ (value >> 16);
-}
-
 float VisibilityRandom(uint pixel, uint sampleIndex, uint lobe, uint dimension)
 {
-	uint state = VisibilityHash(Seed ^ 0x681b923du);
-	state = VisibilityHash(state ^ VisibilityHash(pixel));
-	state = VisibilityHash(state ^ VisibilityHash(sampleIndex));
-	state = VisibilityHash(state ^ VisibilityHash(lobe));
-	state = VisibilityHash(state ^ VisibilityHash(dimension));
-	return ((float)(state >> 9) + 0.5) / 8388608.0;
+	const uint visibilityStream = 0x681b923du;
+	uint state = GIHash(Seed ^ visibilityStream);
+	state = GIHash(state ^ GIHash(pixel));
+	state = GIHash(state ^ GIHash(sampleIndex));
+	state = GIHash(state ^ GIHash(lobe));
+	state = GIHash(state ^ GIHash(dimension));
+	return GIUniformOpenInterval(state);
 }
 
 bool VisibilityFinite(float4 value)
@@ -98,14 +91,14 @@ float4 VisibilitySample(GIHit receiver, float3 reflection, float roughness,
 	ray.TMin = 0;
 	ray.TMax = MaximumDistance;
 	RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> query;
-	query.TraceRayInline(GIRayScene, RAY_FLAG_NONE, 1, ray);
+	query.TraceRayInline(GIRayScene, RAY_FLAG_NONE, RaySceneOpaqueMask, ray);
 	while (query.Proceed())
 	{
 	}
 	return float4(query.CommittedStatus() == COMMITTED_NOTHING ? weight : 0.0, weight, 0, 0);
 }
 
-[numthreads(8, 8, 1)]
+[numthreads(GIQueryGroupWidth, GIQueryGroupHeight, 1)]
 void CSMain(uint3 id : SV_DispatchThreadID)
 {
 	const uint2 pixel = uint2(id.x, id.y + RowOffset);
@@ -129,9 +122,9 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	diagnostics[pixel] = 0.0.xxxx;
 	f0Output[pixel] = 0.0.xxxx;
 	energyOutput[pixel] = 0.0.xxxx;
-	float4 sums[4];
+	float4 sums[GIVisibilitySurfaceCount];
 	[unroll]
-	for (uint surface = 0; surface < 4; ++surface)
+	for (uint surface = 0; surface < GIVisibilitySurfaceCount; ++surface)
 	{
 		sums[surface] = SubmittedSamples != 0 ?
 			GetTexture2DFloat4(PreviousIndices[surface]).Load(int3(pixel, 0)) : 0.0.xxxx;
@@ -147,7 +140,7 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	}
 	visibility[pixel] = float4(0, 0, 0, -1);
 	diagnostics[pixel] = float4(-1, 0, SubmittedSamples, 0);
-	if (face.w != 1 || !VisibilityFinite(face))
+	if (face.w != GIReceiverOpaque || !VisibilityFinite(face))
 	{
 		return;
 	}
@@ -164,8 +157,8 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	const float4 rasterPosition = GetTexture2DFloat4(RasterPositionIndex).Load(int3(pixel, 0));
 	const uint match = rasterPosition.w == face.w && VisibilityFinite(rasterPosition) ?
 		GIMatchReceiver(pixel, Size, position, rasterPosition.xyz, face.xyz, view,
-			MaximumDistance, uint3(InstanceCount, GeometryCount, MaterialCount), receiver) : 3u;
-	if (match != 1 && match != 2 && match != 6)
+			MaximumDistance, uint3(InstanceCount, GeometryCount, MaterialCount), receiver) : GIReceiverMatchInvalid;
+	if (!GIReceiverMatched(match))
 	{
 		diagnostics[pixel] = float4(-(float)(match), 0, SubmittedSamples, 0);
 		return;
@@ -215,14 +208,15 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	{
 		return;
 	}
-	const uint active = (baseY > 0 ? 1u : 0u) | (coatWeight > 0 ? 2u : 0u);
+	const uint active = (baseY > 0 ? GIVisibilityBaseActive : 0u) |
+		(coatWeight > 0 ? GIVisibilityCoatActive : 0u);
 	weightsOutput[pixel] = float4(baseWeight, coatWeight);
 	positions[pixel] = float4(receiver.Position, (float)(receiver.Instance));
 	f0Output[pixel] = float4(f0, ior);
 	energyOutput[pixel] = float4(diffuse.w, coatAlbedo, noV, coatNoV);
-	float4 pending[4];
+	float4 pending[GIVisibilitySurfaceCount];
 	[unroll]
-	for (uint index = 0; index < 4; ++index)
+	for (uint index = 0; index < GIVisibilitySurfaceCount; ++index)
 	{
 		pending[index] = SampleCount != 0 ? GetRWTexture2DFloat4(NextIndices[index])[pixel] : sums[index];
 	}
@@ -231,21 +225,23 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	for (uint sample = 0; sample < count; ++sample)
 	{
 		const uint pixelIndex = pixel.x + Size.x * pixel.y;
-		if ((active & 1u) != 0)
+		if ((active & GIVisibilityBaseActive) != 0)
 		{
 			VisibilityAccumulate(VisibilitySample(receiver, normalize(base.xyz), base.w,
-				pixelIndex, SampleBegin + sample, 0), pending[0], pending[2]);
+				pixelIndex, SampleBegin + sample, GIVisibilityBaseSum),
+				pending[GIVisibilityBaseSum], pending[GIVisibilityBaseCompensation]);
 		}
-		if ((active & 2u) != 0)
+		if ((active & GIVisibilityCoatActive) != 0)
 		{
 			VisibilityAccumulate(VisibilitySample(receiver, reflect(-viewDirection, normalize(coat.xyz)),
-				coat.w, pixelIndex, SampleBegin + sample, 1), pending[1], pending[3]);
+				coat.w, pixelIndex, SampleBegin + sample, GIVisibilityCoatSum),
+				pending[GIVisibilityCoatSum], pending[GIVisibilityCoatCompensation]);
 		}
 	}
 	if (SampleCount != 0)
 	{
 		[unroll]
-		for (uint index = 0; index < 4; ++index)
+		for (uint index = 0; index < GIVisibilitySurfaceCount; ++index)
 		{
 			if (samplePixel)
 			{
@@ -258,22 +254,24 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 		}
 	}
 	const uint samples = SampleCount != 0 && EndSweep != 0 ? SampleBegin + SampleCount : SubmittedSamples;
+	const float4 baseSum = sums[GIVisibilityBaseSum];
+	const float4 coatSum = sums[GIVisibilityCoatSum];
 	if (samples != 0)
 	{
-		baseOutput[pixel] = sums[0] / (float)(samples);
-		coatOutput[pixel] = sums[1] / (float)(samples);
+		baseOutput[pixel] = baseSum / (float)(samples);
+		coatOutput[pixel] = coatSum / (float)(samples);
 	}
 	diagnostics[pixel] = float4((float)(receiver.Primitive), (float)(active), (float)(samples), 0);
-	if (sums[0].w != 0 || sums[1].w != 0 || !VisibilityFinite(sums[0]) || !VisibilityFinite(sums[1]) ||
-		(samples != 0 && (((active & 1u) != 0 && sums[0].y <= 0) ||
-			((active & 2u) != 0 && sums[1].y <= 0))))
+	if (baseSum.w != 0 || coatSum.w != 0 || !VisibilityFinite(baseSum) || !VisibilityFinite(coatSum) ||
+		(samples != 0 && (((active & GIVisibilityBaseActive) != 0 && baseSum.y <= 0) ||
+			((active & GIVisibilityCoatActive) != 0 && coatSum.y <= 0))))
 	{
 		visibility[pixel] = float4(0, 0, 0, -2);
 		diagnostics[pixel] = float4((float)(receiver.Primitive), (float)(active), (float)(samples), 1);
 		return;
 	}
-	const float baseVisibility = sums[0].y > 0 ? sums[0].x / sums[0].y : 0;
-	const float coatVisibility = sums[1].y > 0 ? sums[1].x / sums[1].y : 0;
+	const float baseVisibility = baseSum.y > 0 ? baseSum.x / baseSum.y : 0;
+	const float coatVisibility = coatSum.y > 0 ? coatSum.x / coatSum.y : 0;
 	const float totalWeight = baseY + coatWeight;
 	const float combined = totalWeight > 0 ?
 		(baseY * baseVisibility + coatWeight * coatVisibility) / totalWeight : 0;

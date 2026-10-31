@@ -1,4 +1,5 @@
 #include "Graphics/RayScenePlan.h"
+#include "Graphics/GIShaderConstants.h"
 #include "GGLabRuntime/Graphics/VertexData.h"
 
 #include <algorithm>
@@ -102,7 +103,7 @@ namespace gglab
 					return value.m_Key == source.m_Geometry;
 				});
 			entry.m_GeometryIndex = static_cast<uint32_t>(geometry - plan.m_Geometries.begin());
-			entry.m_Flags = 1;
+			entry.m_Flags = gi_shader::RaySceneOpaqueMask;
 			if (geometry == plan.m_Geometries.end())
 			{
 				const bool mixedRoles = source.m_Vertices.m_Buffer == source.m_Indices.m_Buffer ||
