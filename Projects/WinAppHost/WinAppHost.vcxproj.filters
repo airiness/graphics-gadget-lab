@@ -67,6 +67,12 @@
     <Filter Include="DevTools\EnumText">
       <UniqueIdentifier>{5CC851E9-C8F0-E203-FBB1-41C995C19353}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{2407D494-11CF-8C34-C873-6C93EAC27388}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Passes">
+      <UniqueIdentifier>{9F5C1023-4D95-BDB4-F5F8-4A7EF548A139}</UniqueIdentifier>
+    </Filter>
     <Filter Include="ThirdParty">
       <UniqueIdentifier>{6A8F12C3-D4D3-C968-0534-4156FE54BBAE}</UniqueIdentifier>
     </Filter>
@@ -815,5 +821,22 @@
     <ClInclude Include="..\..\Sources\WinAppHost\DevTools\RHIText.h">
       <Filter>DevTools</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="..\..\Shaders\Passes\PassCoordinateConformance.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassNapaVoxel.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassRayQuery.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassRaySceneProbe.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassRenderGraphComputeSmoke.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

@@ -202,6 +202,21 @@
     <Filter Include="Public\GGLabRuntime\Scene">
       <UniqueIdentifier>{8F0CB072-67B4-0338-CA0D-7818EA01ADD1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{9391D990-096F-7C1A-25E4-EDC2D6E59F46}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Common">
+      <UniqueIdentifier>{35424CEE-0DCD-4EB5-783C-4D2CAF5869A7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Lighting">
+      <UniqueIdentifier>{8A466D91-ADA6-8141-A121-32FAF9187053}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Passes">
+      <UniqueIdentifier>{C78B232B-5772-A24A-AB7D-E56C8230C7EF}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\PBR">
+      <UniqueIdentifier>{B4FB2A79-F3B9-9C99-FE2B-6375FD983B31}</UniqueIdentifier>
+    </Filter>
     <Filter Include="ThirdParty">
       <UniqueIdentifier>{40265C81-FE76-4393-686B-E1945C246E69}</UniqueIdentifier>
     </Filter>
@@ -2537,5 +2552,261 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Scene\WorldTooling.h">
       <Filter>Public\GGLabRuntime\Scene</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="..\..\Shaders\Passes\PassAerialPerspective.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassAtmosphere.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassBloom.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassDebugDraw.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassDepthPrepass.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassDirectionalShadowMap.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassFinalColor.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassForwardCoverage.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassForwardPBR.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassForwardPlusCull.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassForwardPlusValidation.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassGIProbeUpdate.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassGIReceiver.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassGIReference.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassGISpecularVisibility.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassGTAO.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLBrdfLUT.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLCubemapPreview.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLEnvironment.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLEnvironmentMip.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLImportance.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLIrradiance.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassIBLPrefilteredSpecular.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassNonFiniteCounters.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassNonFiniteScan.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassPhysicalSky.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassPostProcessPreview.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassRaySceneHitMaterial.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassRaySceneSunVisibility.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassShadowMapPreview.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassSkybox.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalAA.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalAADepthHistory.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalAADisplayDepth.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassTemporalReference.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\Shaders\Common\ApplicationBinding.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\BindlessResources.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\BufferLayout.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\Common.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\Cubemap.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\DepthReconstruction.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\DisplayColor.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\EnvironmentSampling.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\ForwardCoverageVaryings.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\FullscreenTriangle.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\HDRColorMath.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\MaterialSampling.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\MaterialUtils.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\NonFiniteCounters.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\NonFiniteScan.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\Sampling.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\ScreenSpace.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\SurfaceEvaluation.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\Temporal.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\TemporalAA.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\TemporalMotion.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\VertexInput.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Common\VertexTransform.hlsli">
+      <Filter>Shaders\Common</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\AmbientOcclusion.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\Atmosphere.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\AtmosphereBinding.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\DirectionalShadowData.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\DirectionalShadowVisibility.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\EnvironmentImportanceSampling.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\ForwardPlus.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\GIHitLighting.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\GIHitMaterial.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\GIRayScene.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\GISampling.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\GIShaderConstants.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\GTAO.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\IrradianceIntegrationMath.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\RaySceneGeometry.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\ShadowReceiverPlaneMath.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\ShadowSampling.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\SpecularIntegrationMath.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\WorldSunTransmittance.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\AnisotropicIBL.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\BRDF.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\DirectLighting.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\IndirectLighting.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\MaterialDiagnostics.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\MaterialShading.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
+    <None Include="..\..\Shaders\PBR\SpecularAA.hlsli">
+      <Filter>Shaders\PBR</Filter>
+    </None>
   </ItemGroup>
 </Project>

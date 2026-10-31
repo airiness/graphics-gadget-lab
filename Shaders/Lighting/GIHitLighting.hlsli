@@ -1,4 +1,5 @@
 #pragma once
+#include <Common/ApplicationBinding.hlsli>
 #include <Common/EnvironmentSampling.hlsli>
 #include <Lighting/GIRayScene.hlsli>
 #include <Lighting/WorldSunTransmittance.hlsli>

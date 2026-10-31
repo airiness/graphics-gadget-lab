@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{2FBF803E-5FED-53C4-EE1A-B62126154228}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Tests">
+      <UniqueIdentifier>{D156294C-668B-4652-645E-4294158D5B08}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
     <ClCompile Include="..\..\Tests\ShaderRuntimeIntegration\BrdfLutNumericSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\ShaderRuntimeIntegration\LayoutBindingNumericSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\ShaderRuntimeIntegration\NonFiniteScanNumericSelfTests.cpp" />
@@ -16,5 +24,52 @@
     <ClInclude Include="..\..\Tests\ShaderRuntimeIntegration\ShaderCompileContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\ShaderRuntimeIntegration\SpirVDecorationReader.h" />
     <ClInclude Include="..\..\Tests\ShaderRuntimeIntegration\TemporalAccumulationNumericSelfTests.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="..\..\Shaders\Tests\AnisotropicIBLContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\BrdfLutWhiteFurnace.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\IrradianceIntegrationContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\MaterialDiagnosticContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\MaterialShadingContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\NonFiniteCounterFixture.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\RenderingContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\SceneAtmosphereBindingsContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\SpecularIntegrationContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\SunDiskContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\SurfaceContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\TemporalHistoryAccumulationContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\TemporalHistoryClipContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\TemporalObjectLayoutContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Tests\TemporalViewLayoutContractCompile.hlsl">
+      <Filter>Shaders\Tests</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

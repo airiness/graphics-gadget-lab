@@ -443,7 +443,6 @@
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Input\WindowsInputMapping.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\ApplicationPch.h" />
   </ItemGroup>
-  <ItemGroup></ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\GGLabAppRuntime\GGLabAppRuntime.vcxproj">
       <Project>{A7F6C8E1-2D3B-4A59-91C7-6E8D4B2F0A35}</Project>
@@ -466,8 +465,13 @@
       <LinkLibraryDependencies>false</LinkLibraryDependencies>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'"></ItemGroup>
-  <ItemGroup Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'"></ItemGroup>
+  <ItemGroup Label="ShaderSources" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'">
+    <FxCompile Include="..\..\Shaders\Passes\PassCoordinateConformance.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassNapaVoxel.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassRayQuery.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassRaySceneProbe.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassRenderGraphComputeSmoke.hlsl" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
     <Import Project="..\..\PropertySheets\GGLabBuildStamp.targets" />

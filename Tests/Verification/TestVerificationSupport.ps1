@@ -475,7 +475,7 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
         'temporal-aa-counters' = 'TestTemporalAACounters.ps1'
     }
     $contractSuites = @(
-        'coastal-assets', 'gi-inputs', 'verification-support', 'source-normalization',
+        'coastal-assets', 'gi-inputs', 'verification-support', 'source-normalization', 'shader-project-ownership',
         'nonfinite-sites', 'render-graph-schema',
         'resource-export-schema', 'nonfinite-coverage-schema', 'capture-comparison', 'taa-comparison-workflow',
         'capture-bundle-schema', 'gpu-timing-schema', 'parameter-frames-schema', 'gi-reference-contracts',

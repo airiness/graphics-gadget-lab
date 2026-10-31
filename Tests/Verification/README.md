@@ -66,7 +66,18 @@ The Atlas helper reports links/anchors, baseline ancestry, external dependencies
 and affected entries. Exit zero means it produced a report: inspect navigation
 and publication findings plus incomplete impact coverage. `-AsJson` exposes the
 same report for tools. The boundary validator separately checks project ownership
-and include rules. Map maintenance belongs to the
+and include rules, including unique feature-domain membership for shader sources,
+shared headers and metadata. After shader additions or ownership changes, run
+`Scripts/SyncShadersToVS.ps1 -RootDir .` to regenerate project entries and filters.
+The GPU-free `shader-project-ownership` suite checks routing, missing/duplicate/wrong
+owners, item types and conditions, source-byte preservation and no-op synchronization:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/RunVerification.ps1 `
+    -Suite shader-project-ownership
+```
+
+Map maintenance belongs to the
 [Atlas guide](../../Docs/Architecture/Boundary_And_Drift_Guide.md).
 
 ## GPU regressions

@@ -103,8 +103,10 @@ with the Lab.
 A pass that uses a new shader program:
 
 1. References it as a `shader_programs` entry in `GGLabShaderPrograms.h`.
-2. Adds its build record in `Sources/Tools/ShaderCompiler/GGLabRuntimeShaderBuild.cpp`;
-   a new shader source also needs `Scripts/SyncShadersToVS.ps1`.
+2. Adds its build record in `Sources/Tools/ShaderCompiler/GGLabRuntimeShaderBuild.cpp`.
+   New shader sources also need `Scripts/SyncShadersToVS.ps1`, which registers them
+   in their [feature-domain project](Repository_Module_Map.md#shader-source-ownership),
+   independently of recipe ownership and deployment.
 3. Registers demand: production programs in `GetRendererInitialShaderProgramDemand`,
    Lab programs in its `LabRegistration::m_ShaderPrograms`.
 4. Loads it through `RenderServices::m_ShaderPrograms` and resolves pipelines through

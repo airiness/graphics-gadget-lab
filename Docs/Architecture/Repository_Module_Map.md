@@ -10,8 +10,9 @@ DevTools belong to `WinAppHost`. Instance ownership is described separately in t
 
 ## Projects and source ownership
 
-Project links resolve to the authoritative `ClCompile`/`ClInclude` membership.
-The source roots below locate those items.
+Project links resolve to the authoritative `ClCompile`/`ClInclude` membership for
+C++ and `FxCompile`/`None` membership for shader sources, shared includes and
+metadata. The source roots below locate the C++ items.
 
 | Project | Source roots | Role |
 | --- | --- | --- |
@@ -37,6 +38,33 @@ The source roots below locate those items.
 `GGLabFoundationHeaderSelfContainment.targets` generates the Foundation probes
 inside that test project's intermediate directory. Vendored DirectXTex is a
 separate solution project under `Externals/Vender`, outside this first-party set.
+
+### Shader source ownership
+
+Shader files stay under `Shaders`; project membership follows the implemented
+feature rather than the executable that requests it:
+
+| Project | Shader items |
+| --- | --- |
+| `GGLabRuntime` | Runtime pass sources and shared rendering includes under `Common`, `Lighting` and `PBR`, including CPU/HLSL GI contracts |
+| `WinAppHost` | Lab-authored CoordinateConformance, NapaVoxel, RayQuery, RaySceneProbe and RenderGraphComputeSmoke sources |
+| `ShaderRuntimeIntegrationTests` | `Shaders/Tests` compile/numerical fixtures, including generated fixtures when present |
+| `ShaderArtifactRuntime` | `Common/NonFiniteSiteIds.hlsli` and `Metadata` artifact-contract inventories |
+| `ShaderCompiler` | `shadertoolsconfig.json` source-tooling configuration |
+
+[ShaderProjectOwnership.psm1](../../Scripts/ShaderProjectOwnership.psm1) defines
+routing for [SyncShadersToVS.ps1](../../Scripts/SyncShadersToVS.ps1) and the boundary
+validator. Synchronization regenerates shader membership and filters; validation
+rejects missing, duplicate, stale or incorrectly owned items. New shader categories
+need an explicit routing policy. Shared shader consumption does not add a C++
+project reference: qualification can consume the coordinate-conformance source
+without linking WinAppHost.
+
+These IDE items retain their artifact-only presentation condition and remain
+excluded from MSBuild shader compilation by `Directory.Build.targets`. Shader-domain
+build records and compilation policy remain authoritative. WinApp still deploys
+the development source directory through `LinkShaderDirectory.targets`; deployment
+does not make it the source owner.
 
 ## Declared project references
 

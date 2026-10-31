@@ -96,7 +96,11 @@ persisted schemas, ABIs and process protocols in the owning domain, without a
 global Foundation version for unrelated contracts.
 
 Shader sources and metadata live under `Shaders`; shared HLSL includes use
-`.hlsli`. Keep CPU/GPU layouts synchronized, including field order, alignment,
+`.hlsli`. Each shader source, include and metadata file has one feature-domain
+project owner, including CPU/HLSL shared headers. Compiler-tool and deployment
+consumers do not determine source ownership; see the Atlas
+[shader ownership map](Docs/Architecture/Repository_Module_Map.md#shader-source-ownership).
+Keep CPU/GPU layouts synchronized, including field order, alignment,
 padding, stride and relevant `static_assert`s. Do not rely on implicit C++
 padding for GPU uploads. Shader compilation and correct rendering are separate
 verification claims.
@@ -154,7 +158,7 @@ do not hand-edit their generated mappings.
 | C++ files added/moved or project membership changed | `powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GenerateProjectFilters.ps1 -RootDir .` |
 | Verify affected filter metadata before handoff | `powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/GenerateProjectFilters.ps1 -RootDir . -Check` |
 | Ownership, project files, include paths or platform boundaries changed | `powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/ValidateProjectBoundaries.ps1 -RootDir .` |
-| Shader sources or metadata added, removed or moved | `powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/SyncShadersToVS.ps1 -RootDir .` (also regenerates filters) |
+| Shader sources/metadata added, removed, moved or reassigned to another project | `powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/SyncShadersToVS.ps1 -RootDir .` (also regenerates filters) |
 
 ## Build and verification
 
