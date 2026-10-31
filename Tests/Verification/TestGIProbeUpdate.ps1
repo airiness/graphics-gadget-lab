@@ -120,7 +120,7 @@ try {
                     Write-VerificationJson "$path/status.json" $status
                     $cases+=$case
                     Write-VerificationJson "$output/cases.json" @($cases)
-                    Write-Output "$config/$backend probe case $index published"
+                    Write-Verbose "$config/$backend probe case $index published"
                     $index++
                 }
                 foreach ($accumulate in @($true,$false)) {
@@ -178,5 +178,7 @@ try {
     Write-VerificationJson "$output/result.json" @{status='passed';observations=$cases.Count;productionFieldQualified=$false}
 } catch {
     Write-VerificationJson "$output/result.json" @{status='failed';error=[string]$_}
-    throw
+    [Console]::Out.WriteLine((@{ok=$false;directory=$output;error=[string]$_} | ConvertTo-Json -Compress))
+    exit 1
 }
+[Console]::Out.WriteLine((@{ok=$true;directory=$output} | ConvertTo-Json -Compress))

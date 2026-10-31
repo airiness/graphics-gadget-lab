@@ -102,18 +102,22 @@ for fixture requirements, attached-session ownership and recovery procedures.
 
 ### Probe update
 
-Run the CPU oracle contracts and the standalone numerical/lifecycle experiment:
+Run the CPU oracle contracts and the numerical/lifecycle experiment:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/RunVerification.ps1 `
     -Suite gi-probe-update-contracts -Python $python
 & ./Tests/Verification/TestGIProbeUpdate.ps1 `
     -Configuration Develop -Rhi @('dx12', 'vulkan') -Python $python
+# The same full GPU experiment through the catalog runner:
+powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/RunVerification.ps1 `
+    -Suite gi-probe-update -Configuration Develop -Rhi dx12,vulkan -Python $python
 ```
 
-Use the standalone GPU entry point: it emits progress text and a `status`-based
-`result.json`, not the single `ok` JSON receipt expected by the catalog runner's
-currently registered `gi-probe-update` entry.
+Both GPU entry points return one JSON control receipt with `ok` and the run
+directory. The standalone producer retains its `status`-based `result.json` and
+reports per-case progress through `-Verbose`; the catalog records the producer
+receipt and exit code. A numerical or artifact-audit failure fails either entry.
 
 [TestGIProbeUpdate.ps1](TestGIProbeUpdate.ps1) captures ray/probe arrays and graphs,
 checks integration, schedules/history, inputs and resource lifetimes, and records

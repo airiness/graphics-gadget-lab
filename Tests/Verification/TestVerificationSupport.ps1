@@ -501,6 +501,66 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
         Check (($gpuResult.suites | Where-Object name -eq $suite).steps[0].receipt.python -eq
             'fixture-python-path') "runner-forwards-selected-python-to-$suite"
     }
+    # Run the real probe producer through the catalog with GPU transport stubbed.
+    # Generic leaf fixtures cannot detect stdout contamination or missing receipts.
+    & {
+        Copy-Item -LiteralPath (Join-Path $root 'Tests/Verification/TestGIProbeUpdate.ps1') -Destination $runnerTests
+        $supportPath = Join-Path $runnerTools 'VerificationSupport.psm1'
+        $originalSupport = [IO.File]::ReadAllText($supportPath)
+        $stub = @'
+function git { $global:LASTEXITCODE = 0; return 'Sources/probe-input.cpp' }
+function Invoke-VerificationSession {
+    param([string]$Command, [string]$Session, [hashtable]$Parameters = @{})
+    switch ($Command) {
+        'start' { return @{ownership='created';runIdentity='probe-fixture';outputLog=(Join-Path $PSScriptRoot 'probe.log')} }
+        'set' { return @{batch=@{succeeded=$true}} }
+        'capture' {
+            $null = New-Item -ItemType Directory -Path $Parameters.OutputDirectory -Force
+            return @{status='completed';publication='Published'}
+        }
+        'status' { return @{ok=$true} }
+        'stop' { return @{ok=$true;exitCode=0} }
+        default { throw "Unexpected probe fixture command: $Command" }
+    }
+}
+Export-ModuleMember -Function git, Invoke-VerificationSession
+'@
+        $null = New-Item -ItemType Directory -Path (Join-Path $runnerRepository 'Sources') -Force
+        [IO.File]::WriteAllText((Join-Path $runnerRepository 'Sources/probe-input.cpp'), 'input')
+        [IO.File]::WriteAllText((Join-Path $runnerTools 'probe.log'), 'clean native fixture')
+        foreach ($name in @('gglab-shaderc.exe','dxcompiler.dll','dxil.dll')) {
+            [IO.File]::WriteAllText((Join-Path $runnerBin $name), 'binary')
+        }
+        $probePython = Join-Path $runnerRepository 'probe-python.cmd'
+        [IO.File]::WriteAllText($probePython, "@echo oracle fixture passed`r`n@exit /b 0`r`n")
+        try {
+            [IO.File]::WriteAllText($supportPath, $originalSupport + "`r`n" + $stub,
+                (New-Object Text.UTF8Encoding($false)))
+            $execution = Invoke-VerificationScript (Join-Path $runnerTests 'RunVerification.ps1') @{
+                Suite='gi-probe-update';Python=$probePython;OutputDirectory=(Join-Path $output 'real-probe') }
+            $probeResult = $execution.output | ConvertFrom-Json
+            $step = $probeResult.suites[0].steps[0]
+            Check ($execution.exitCode -eq 0 -and $probeResult.ok -and $step.receipt -and
+                $step.receipt.ok) 'real-probe-producer-emits-one-catalog-receipt'
+            $disk = Get-Content (Join-Path $step.receipt.directory 'result.json') -Raw | ConvertFrom-Json
+            Check ($disk.status -eq 'passed' -and $disk.observations -gt 0 -and
+                -not $disk.productionFieldQualified) 'real-probe-retains-status-result-and-scope'
+            [IO.File]::WriteAllText($probePython,
+                "@if `"%~2`"==`"--root`" exit /b 7`r`n@exit /b 0`r`n")
+            $execution = Invoke-VerificationScript (Join-Path $runnerTests 'RunVerification.ps1') @{
+                Suite='gi-probe-update';Python=$probePython;OutputDirectory=(Join-Path $output 'failed-probe') }
+            $probeResult = $execution.output | ConvertFrom-Json
+            $step = $probeResult.suites[0].steps[0]
+            Check ($execution.exitCode -ne 0 -and -not $probeResult.ok -and $step.receipt -and
+                -not $step.receipt.ok -and $step.receipt.error -match 'Probe verification failed') `
+                'real-probe-oracle-failure-cannot-report-success'
+            $disk = Get-Content (Join-Path $step.receipt.directory 'result.json') -Raw | ConvertFrom-Json
+            Check ($disk.status -eq 'failed') 'real-probe-failure-retains-disk-result'
+        } finally {
+            [IO.File]::WriteAllText($supportPath, $originalSupport,
+                (New-Object Text.UTF8Encoding($false)))
+        }
+    }
     $unused = Join-Path $output 'must-not-create'
     $list = Invoke-VerificationScript $runner @{ List=$true; OutputDirectory=$unused }
     $items = $list.output | ConvertFrom-Json
