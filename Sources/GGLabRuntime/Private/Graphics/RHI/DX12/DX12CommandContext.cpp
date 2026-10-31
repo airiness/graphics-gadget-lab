@@ -823,8 +823,10 @@ namespace gglab
 		DX12Buffer* nativeBuffer = m_Backend.GetDevice()->ResolveBuffer(buffer);
 		if (!nativeBuffer || offset >= nativeBuffer->SizeInBytes())
 		{
-			GGLAB_LOG_GRAPHICS_WARN(
+			// A skipped root descriptor would leave the draw reading a stale or unset address.
+			GGLAB_LOG_GRAPHICS_ERROR(
 				"DX12GraphicsCommandContext::SetReadOnlyBuffer received an invalid buffer binding.");
+			FailRecording();
 			return;
 		}
 		m_Backend.Get()->SetGraphicsRootShaderResourceView(
@@ -1186,8 +1188,9 @@ namespace gglab
 		DX12Buffer* nativeBuffer = m_Backend->GetDevice()->ResolveBuffer(buffer);
 		if (!nativeBuffer || offset >= nativeBuffer->SizeInBytes())
 		{
-			GGLAB_LOG_GRAPHICS_WARN(
+			GGLAB_LOG_GRAPHICS_ERROR(
 				"DX12ComputeCommandContext::SetReadOnlyBuffer received an invalid buffer binding.");
+			FailRecording();
 			return;
 		}
 		m_Backend->GetCommandList()->SetComputeReadOnlyBuffer(
@@ -1232,8 +1235,9 @@ namespace gglab
 		DX12Buffer* nativeBuffer = m_Backend->GetDevice()->ResolveBuffer(buffer);
 		if (!nativeBuffer || offset >= nativeBuffer->SizeInBytes())
 		{
-			GGLAB_LOG_GRAPHICS_WARN(
+			GGLAB_LOG_GRAPHICS_ERROR(
 				"DX12ComputeCommandContext::SetReadWriteBuffer received an invalid buffer binding.");
+			FailRecording();
 			return;
 		}
 		m_Backend->GetCommandList()->SetComputeReadWriteBuffer(
