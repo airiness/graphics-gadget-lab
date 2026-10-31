@@ -22,7 +22,7 @@ namespace gglab
 		ResolvedRenderLayout m_Layout;
 		ResolvedBindingRef<SceneGPU> m_Scene;
 		GraphicsPhysicalPipelineKey m_Recipe;
-		std::array<GraphicsPipelineSlot, 2> m_Slots{};
-		std::array<ResolvedRenderPipeline, 2> m_Pipelines{};
+		std::array<GraphicsPipelineSlot, 4> m_Slots{};
+		std::array<ResolvedRenderPipeline, 4> m_Pipelines{};
 	};
 }

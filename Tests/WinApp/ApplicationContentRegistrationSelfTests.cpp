@@ -1718,9 +1718,9 @@ namespace gglab
 			"Coordinate conformance selection contributes four stable shader demands");
 		checkSelectedDemand("gglab.lab.ray_query", 54,
 			"Ray-query selection contributes query, preview and pipeline-identity artifacts without changing raster startup demand");
-		checkSelectedDemand("gglab.lab.gi_reference", 54,
+		checkSelectedDemand("gglab.lab.gi_reference", 55,
 			"GI diagnostics opt into receiver/reference/visibility/material shaders without changing ordinary raster startup demand");
-		checkSelectedDemand("gglab.lab.coastal_ray_scene", 54,
+		checkSelectedDemand("gglab.lab.coastal_ray_scene", 55,
 			"Coastal ray-scene selection contributes its membership and sun-visibility programs to raster startup demand");
 		checkSelectedDemand("gglab.lab.napa_voxel", 52,
 			"Napa voxel selection contributes two stable shader demands");

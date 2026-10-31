@@ -60,11 +60,13 @@ namespace gglab
 			uint32_t m_GeometryCount = 0;
 			uint32_t m_MaterialCount = 0;
 			uint32_t m_RasterMaterialCapacity = 0;
+			uint32_t m_RasterPosition = 0;
+			std::array<uint32_t, 3> m_Padding{};
 		};
-		static_assert(sizeof(Parameters) == 176 && offsetof(Parameters, m_Outputs) == 32 &&
+		static_assert(sizeof(Parameters) == 192 && offsetof(Parameters, m_Outputs) == 32 &&
 			offsetof(Parameters, m_Previous) == 64 && offsetof(Parameters, m_Size) == 96 &&
 			offsetof(Parameters, m_SampleBegin) == 128 && offsetof(Parameters, m_MaximumDistance) == 152 &&
-			offsetof(Parameters, m_InstanceCount) == 160);
+			offsetof(Parameters, m_InstanceCount) == 160 && offsetof(Parameters, m_RasterPosition) == 176);
 	}
 
 	RenderFrameValidationResult ValidateGISpecularVisibilityInputs(
@@ -177,6 +179,8 @@ namespace gglab
 			.m_SceneRevision = info.m_RayScene->GetDiagnostics().m_Revision,
 			.m_BrdfLut = services.m_Resources->GetTextureHandle(RenderTextureIndex::IBL_BrdfLut),
 			.m_ShaderGeneration = services.m_ShaderPrograms->GetGeneration(state.m_Recipe.m_CSId),
+			.m_PositionShaderGeneration = services.m_ShaderPrograms->GetGeneration(
+				services.m_ShaderPrograms->LoadProgram(shader_programs::GIReceiverPositionPixel)),
 			.m_ReceiverShaderGeneration = services.m_ShaderPrograms->GetGeneration(
 				services.m_ShaderPrograms->LoadProgram(shader_programs::GIReceiverPixel)),
 			.m_CoverageShaderGeneration = services.m_ShaderPrograms->GetGeneration(coverageVertex),
@@ -206,6 +210,7 @@ namespace gglab
 		{
 			std::array<RGTextureViewId, 6> m_Receivers{};
 			RGTextureViewId m_Depth;
+			RGTextureViewId m_RasterPosition;
 			RGTextureViewId m_BrdfLut;
 			std::array<RGTextureViewId, 8> m_Outputs{};
 			std::array<RGTextureViewId, 4> m_Previous{};
@@ -221,6 +226,7 @@ namespace gglab
 							builder.Read(texture, RGTextureAccess::Sample, RHIStage::ComputeShader));
 					};
 				const auto& receivers = builder.GetBlackboard().Get<RGGIReceiverResources>(GIReceiverResourcesName);
+				data.m_RasterPosition = read(receivers.m_Position);
 				constexpr std::array indices{ 0u, 2u, 3u, 4u, 5u, 6u };
 				for (size_t index = 0; index < indices.size(); ++index)
 				{
@@ -307,6 +313,7 @@ namespace gglab
 				}
 				auto parameters = data.m_Parameters;
 				parameters.m_Depth = execute.GetViewDescriptor(data.m_Depth).m_Index;
+				parameters.m_RasterPosition = execute.GetViewDescriptor(data.m_RasterPosition).m_Index;
 				parameters.m_BrdfLut = execute.GetViewDescriptor(data.m_BrdfLut).m_Index;
 				for (size_t index = 0; index < data.m_Receivers.size(); ++index)
 				{

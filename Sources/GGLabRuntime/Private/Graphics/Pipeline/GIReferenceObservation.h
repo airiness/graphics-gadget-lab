@@ -39,6 +39,7 @@ namespace gglab
 		uint64_t m_ShaderGeneration = 0;
 		uint64_t m_ReceiverShaderGeneration = 0;
 		uint64_t m_CoverageShaderGeneration = 0;
+		uint64_t m_PositionShaderGeneration = 0;
 		std::array<float, 16> m_ViewProjection{};
 		std::array<float, 3> m_CameraPosition{};
 		std::array<float, 3> m_ConstantRadiance{};

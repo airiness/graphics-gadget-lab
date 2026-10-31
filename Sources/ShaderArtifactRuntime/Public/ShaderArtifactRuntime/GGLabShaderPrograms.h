@@ -167,6 +167,8 @@ namespace gglab::shader_programs
 		"gglab.shader.ray-scene", "compute.gi-reference", ShaderStage::Compute };
 	inline const ShaderProgramRef GIReceiverPixel{
 		"gglab.shader.gi-receiver", "pixel.receiver", ShaderStage::Pixel };
+	inline const ShaderProgramRef GIReceiverPositionPixel{
+		"gglab.shader.gi-receiver", "pixel.position", ShaderStage::Pixel };
 	inline const ShaderProgramRef RenderGraphComputeReadWrite{
 		"gglab.shader.render-graph-compute", "compute.read-write", ShaderStage::Compute };
 	inline const ShaderProgramRef RenderGraphComputeNonFiniteProbe{

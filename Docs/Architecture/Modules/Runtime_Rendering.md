@@ -50,7 +50,8 @@ Atlas ID: atlas.runtime.render-pipeline
 - **GI receivers:** `RenderPipelineForwardPlusCreateInfo::m_EnableGIReceiver` selects
   the Runtime-owned [receiver pass](../../../Sources/GGLabRuntime/Private/Graphics/RenderPass/RenderPassGIReceiver.cpp)
   before the temporal boundary. It requires Native, unjittered rendering with TAA
-  off; receiver records shared by Runtime consumers stay Private.
+  off; receiver records and the paired raster-position tap stay Private. Both
+  query diagnostics share the primary-matching helper in `GIRayScene.hlsli`.
 - **GI reference:** the optional reference pass uses the Renderer-owned
   [observation](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIReferenceObservation.h).
   Sum/RNG pairs commit at settlement and retire by fence; read-only progress uses

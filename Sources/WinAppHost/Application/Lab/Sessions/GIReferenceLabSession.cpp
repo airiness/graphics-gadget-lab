@@ -132,7 +132,8 @@ namespace gglab
 				{ 5, "Contract: sun transport" }, { 6, "Contract: off-camera sun blocker" },
 				{ 7, "Contract: published environment sphere" },
 				{ 8, "Contract: coupled diffuse planes" }, { 9, "Contract: reduced hit material and snapshots" },
-				{ 10, "Contract: GGX environment visibility" }, { 11, "Coastal: GGX visibility diagnostics" } } }));
+				{ 10, "Contract: GGX environment visibility" }, { 11, "Coastal: GGX visibility diagnostics" },
+				{ 12, "Coastal: diffuse reference" }, { 13, "Contract: small smooth receiver" } } }));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = SamplesId, .m_Name = "Samples per pixel", .m_Group = "Reference",
 			.m_Type = LabParameterType::UInt, .m_Impact = LabChangeImpact::RestartSession,
 			.m_DefaultValue = uint32_t(64), .m_MinValue = LabValue(uint32_t(1)), .m_MaxValue = LabValue(uint32_t(1048576)) }));
@@ -203,6 +204,7 @@ namespace gglab
 		m_World.m_Atmosphere.reset();
 		m_Assets.Reset();
 		const auto fixture = GetParameters().Get(FixtureId, int32_t(0));
+		const bool coastal = fixture == 11 || fixture == 12;
 		const float exposure = static_cast<float>(GetParameters().Get(ExposureId, int32_t(10)));
 		Color albedo = Color::White;
 		if (fixture == 2 || fixture == 3)
@@ -229,7 +231,7 @@ namespace gglab
 			.m_SamplerRegistry = m_Services.m_RenderServices.m_Samplers, .m_World = &m_World,
 			.m_MaterialInstance = material };
 		std::vector<CameraReferenceView> views;
-		if (fixture == 11)
+		if (coastal)
 		{
 			std::string failure;
 			const auto bundle = LoadRuntimeAssetBundle(
@@ -245,8 +247,52 @@ namespace gglab
 			const auto entity = m_World.GetRegistry().create();
 			m_World.GetRegistry().emplace<components::TransformComponent>(entity);
 			m_World.GetRegistry().emplace<components::ModelComponent>(entity, model);
-			m_Assets.TrackModel(model, "Coastal visibility geometry");
+			m_Assets.TrackModel(model, "Coastal GI geometry");
 			views.assign(CoastalSceneReferenceViews.begin(), CoastalSceneReferenceViews.end());
+		}
+		else if (fixture == 13)
+		{
+			// A two-centimetre plane with deliberately tilted smooth normals exposes
+			// absolute derivative-area floors without changing frozen F1-F10 inputs.
+			auto& assets = *m_Services.m_AssetManager;
+			auto mesh = std::make_unique<Mesh>();
+			mesh->m_Name = StringID("Small smooth GI receiver");
+			AssetManager::MeshUploadData upload;
+			Vector3 normal(0.3f, 0.4f, -1.0f);
+			normal.Normalize();
+			for (const auto uv : std::array<Vector2, 4>{ Vector2(0, 1), Vector2(0, 0),
+				Vector2(1, 0), Vector2(1, 1) })
+			{
+				upload.m_VerticesData.push_back({ Vector3(uv.m_X * 2 - 1, 1 - uv.m_Y * 2, 0),
+					normal, uv, uv, Vector4(1, 0, 0, 1) });
+			}
+			upload.m_IndicesData = { 0, 1, 2, 0, 2, 3 };
+			const auto meshId = assets.AddProceduralMesh(std::move(mesh), upload);
+			auto model = std::make_unique<Model>();
+			model->m_Name = StringID("Small smooth GI receiver");
+			model->m_MeshInstance.push_back({ meshId, ProceduralPrimitiveMaterialID });
+			const auto modelId = assets.AddProceduralModel(std::move(model));
+			const auto* stored = assets.GetModel(modelId);
+			const bool retained = stored && GetAssetOwnerScope().RetainModel(
+				modelId, stored->m_ContentGeneration);
+			GGLAB_ASSERT(retained);
+			auto& registry = m_World.GetRegistry();
+			const auto entity = registry.create();
+			components::TransformComponent transform;
+			transform.m_Scale = Vector3(0.01f, 0.01f, 0.01f);
+			registry.emplace<components::TransformComponent>(entity, transform);
+			registry.emplace<components::ModelComponent>(entity, modelId);
+			registry.emplace<components::MaterialInstanceComponent>(entity, material);
+			m_Assets.TrackModel(modelId, "Small smooth GI receiver");
+			views = {
+				View("Contract_SmallReceiver", { 0, 0, -0.04f }, { 0, 0, 0 }, 35, exposure),
+				View("Contract_SmallReceiverGrazing", { -0.038f, 0, -0.012f }, { 0, 0, 0 }, 35, exposure),
+			};
+			for (auto& view : views)
+			{
+				view.m_NearPlane = 0.0001f;
+				view.m_FarPlane = 1.0f;
+			}
 		}
 		else if (fixture == 10)
 		{
@@ -370,13 +416,13 @@ namespace gglab
 			}
 		}
 		const bool contract = fixture >= 5;
-		const auto environment = fixture == 11 ?
+		const auto environment = coastal ?
 			3 : contract ? GetParameters().Get(EnvironmentId, int32_t(0)) : 0;
 		if (fixture == 4 || fixture == 5 || fixture == 6 || fixture == 8 || fixture == 9 || environment == 3)
 		{
 			auto& registry = m_World.GetRegistry();
 			const auto light = registry.create();
-			Vector3 direction = fixture == 11 ?
+			Vector3 direction = coastal ?
 				CoastalSceneLightingProfiles.front().m_Inputs.m_SunDirection :
 				fixture == 4 ? Vector3(0.2f, -1, -1) : Vector3(0, -1, 1);
 			direction.Normalize();
@@ -387,9 +433,13 @@ namespace gglab
 			sun.m_WorldSun = WorldSunSettings{
 				.m_PerpendicularIlluminanceLux = fixture == 4 ? 10000.0f :
 					static_cast<float>(GetParameters().Get(SunId, int32_t(10000))) };
-			if (fixture == 11)
+			if (coastal)
 			{
 				sun.m_WorldSun = CoastalSceneLightingProfiles.front().m_Inputs.m_Sun;
+				if (fixture == 12)
+				{
+					sun.m_DirectionalShadowSettings.emplace();
+				}
 			}
 			registry.emplace<components::LightComponent>(light, sun);
 			if (environment == 3 || (contract && GetParameters().Get(AtmosphereId, false)))
@@ -408,6 +458,7 @@ namespace gglab
 			.m_Seed = GetParameters().Get(SeedId, uint32_t(61051)) };
 		reference.m_SamplesPerBatch = GetParameters().Get(BatchSamplesId, uint32_t(64));
 		reference.m_MaximumDepth = GetParameters().Get(DepthId, uint32_t(1));
+		reference.m_MaximumDistance = coastal ? 30000.0f : 1000.0f;
 		reference.m_HitMaterialDiagnostics = fixture == 9;
 		reference.m_MaximumTilePixels = GetParameters().Get(TilePixelsId, uint32_t(0));
 		reference.m_ConstantEnvironment = environment == 0;
@@ -419,7 +470,7 @@ namespace gglab
 		reference.m_ConstantRadiance = { radiance, radiance, radiance };
 		reference.m_EnvironmentFilter = contract && GetParameters().Get(FilterId, int32_t(0)) == 1 ?
 			GIReferenceEnvironmentFilter::MipZero : GIReferenceEnvironmentFilter::Face32;
-		if (fixture >= 10)
+		if (fixture == 10 || fixture == 11)
 		{
 			GISpecularVisibilityCreateInfo visibility{ .m_RayScene = m_RayScene,
 				.m_SampleCount = reference.m_SampleCount, .m_Seed = reference.m_Seed,
@@ -855,15 +906,16 @@ namespace gglab
 		m_LightingOverride = m_Services.m_EnvironmentLightingControl->AcquireOverride();
 		GGLAB_ASSERT(m_LightingOverride);
 		const auto fixture = GetParameters().Get(FixtureId, int32_t(0));
+		const bool coastal = fixture == 11 || fixture == 12;
 		const bool contract = fixture >= 5;
-		const auto environment = fixture == 11 ?
+		const auto environment = coastal ?
 			3 : contract ? GetParameters().Get(EnvironmentId, int32_t(0)) : 0;
 		m_LightingOverride->Apply({
-			.m_Intensity = fixture == 11 ?
+			.m_Intensity = coastal ?
 				1.0f : environment == 0 ? 0.0f : static_cast<float>(GetParameters().Get(IntensityId, int32_t(1))),
-			.m_RotationRadians = environment == 0 || fixture == 11 ?
+			.m_RotationRadians = environment == 0 || coastal ?
 				0.0f : static_cast<float>(GetParameters().Get(YawId, int32_t(0))) * 0.017453292519943295f,
-			.m_EnableSkybox = fixture == 11,
+			.m_EnableSkybox = coastal,
 			.m_BackgroundMode = environment == 3 ?
 				EnvironmentBackgroundMode::PhysicalSky : EnvironmentBackgroundMode::TextureEnvironment });
 		if (environment == 1 || environment == 2)

@@ -8,6 +8,7 @@ param(
     [string[]]$Configuration = @('Develop'),
     [string[]]$Rhi = @('dx12','vulkan'),
     [string[]]$Views = @('F1_Plane','F2_Floor','F3_Floor','F4_Floor','F4_Back'),
+    [switch]$Coastal,
     [string]$OutputDirectory,
     [string]$RunDirectory,
     [switch]$Resume,
@@ -15,6 +16,8 @@ param(
     [string]$Python = 'python',
     [ValidateRange(1,524288)][int]$InitialSamples = 64,
     [ValidateRange(1,524288)][int]$InitialF4Samples = 4096,
+    [ValidateRange(1,524288)][int]$InitialCoastalSamples = 4096,
+    [string]$ShaderCacheDirectory,
     [ValidateRange(2,1048576)][int]$MaximumSamples = 1048576,
     [ValidateSet(16,32,64,128,256)][int]$MaximumDepth = 256,
     [ValidateRange(1,4096)][int]$BatchSamples = 64,
@@ -24,7 +27,20 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
+$Configuration = @($Configuration | ForEach-Object { $_ -split ',' })
+$Rhi = @($Rhi | ForEach-Object { $_ -split ',' })
+$Views = @($Views | ForEach-Object { $_ -split ',' })
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+if ($Coastal -and -not $PSBoundParameters.ContainsKey('Views')) {
+    $Views = @('Retreat_SeaPassage','Retreat_Courtyard','GI_InteriorExterior','Retreat_Lounge')
+}
+$coastalViews = @('Retreat_SeaPassage','Retreat_Courtyard','GI_InteriorExterior','Retreat_Lounge')
+if (@($Views | Where-Object { $_ -in $coastalViews }).Count -gt 0 -and -not $Coastal) {
+    throw 'Coastal views require -Coastal and the frozen 1280x800 extent.'
+}
+if ($Coastal -and @($Views | Where-Object { $_ -notin $coastalViews }).Count -gt 0) {
+    throw 'Coastal and fixture views cannot share an extent.'
+}
 Import-Module "$root/Scripts/Verification/VerificationSupport.psm1"
 if (-not $OutputDirectory -and -not $RunDirectory) { $OutputDirectory = "$root/Build/Validation/GIReferenceConvergence" }
 if ($Resume) {
@@ -76,7 +92,7 @@ try {
     $sourceIdentity = Get-SourceIdentity
     foreach ($config in $Configuration) {
         $binaries = @{}
-        foreach ($file in @('GraphicsGadgetLab.exe','dxcompiler.dll','dxil.dll')) {
+        foreach ($file in @('GraphicsGadgetLab.exe','gglab-shaderc.exe','dxcompiler.dll','dxil.dll')) {
             $binaries[$file] = Get-ReferenceFileHash "$root/Build/Output/x64/$config/$file"
         }
         foreach ($backend in $Rhi) {
@@ -89,13 +105,18 @@ try {
             Write-VerificationJson "$directory/attempt-$attempt.json" @{
                 maximumObservations=$MaximumObservations;maximumSeconds=$MaximumSeconds;
                 timeoutSeconds=$TimeoutSeconds;resume=[bool]$Resume;cancellationFile=$CancellationFile}
-            Write-VerificationJson "$directory/attempt-$attempt.json" @{
-                maximumObservations=$MaximumObservations;maximumSeconds=$MaximumSeconds;
-                timeoutSeconds=$TimeoutSeconds;resume=[bool]$Resume;cancellationFile=$CancellationFile}
             try {
+                $stateRoot = "$directory/state-$attempt"
+                if ($ShaderCacheDirectory) {
+                    $null = New-Item -ItemType Directory -Path $stateRoot -Force
+                    foreach ($name in @('ShaderCache','ShaderArtifacts')) {
+                        $seed = "$ShaderCacheDirectory/$backend/$name"
+                        if (Test-Path -LiteralPath $seed) { Copy-Item -LiteralPath $seed -Destination "$stateRoot/$name" -Recurse }
+                    }
+                }
                 $start = Invoke-VerificationSession start $session @{Configuration=$config;Rhi=$backend;
-                    Lab='gglab.lab.gi_reference';WindowSize='640x400';NoDevTools=$true;Validation='standard';
-                    StateRoot="$directory/state-$attempt";StartTimeoutSeconds=$TimeoutSeconds}
+                    Lab='gglab.lab.gi_reference';WindowSize=$(if ($Coastal) {'1280x800'} else {'640x400'});
+                    NoDevTools=$true;Validation='standard';StateRoot=$stateRoot;StartTimeoutSeconds=$TimeoutSeconds}
                 Write-VerificationJson "$directory/start-$attempt.json" $start
                 if ($start.ownership -ne 'created') { throw 'Convergence runner must own its session.' }
                 $run = $start.runIdentity
@@ -103,9 +124,12 @@ try {
                     SettleFrames=1;OutputDirectory="$directory/warmup-$attempt";TimeoutSeconds=$TimeoutSeconds}
                 $bundle = Get-Content -LiteralPath $warmup.manifest -Raw | ConvertFrom-Json
                 $depths = @(8,16,32,64,128,256 | Where-Object { $_ -le $MaximumDepth })
-                $recipe = @{schemaVersion=1;views=@($Views);depths=$depths;initialSamples=$InitialSamples;
+                $recipe = @{schemaVersion=2;views=@($Views);depths=$depths;initialSamples=$InitialSamples;
                     initialF4Samples=$InitialF4Samples;maximumSamples=$MaximumSamples;batchSamples=$BatchSamples;
-                    relativeLimit=0.01;absoluteFloor=0.000001;configuration=$config;rhi=$backend;extent=@(640,400);
+                    initialCoastalSamples=$InitialCoastalSamples;
+                    inputsSha256=(Get-ReferenceFileHash "$PSScriptRoot/GlobalIllumination/Inputs.json").ToLowerInvariant();
+                    relativeLimit=0.01;absoluteFloor=0.000001;configuration=$config;rhi=$backend;
+                    extent=$(if ($Coastal) {@(1280,800)} else {@(640,400)});
                     sourceIdentity=$sourceIdentity;binaries=$binaries;
                     adapterDriverIdentity=$bundle.environment.device.compatibilityIdentity;
                     build=$bundle.environment.build;shaderArtifactIdentity='unavailable; source and compiler binaries hashed'}
@@ -139,7 +163,7 @@ try {
                     }
                     $case = $plan.request
                     $changes = @()
-                    foreach ($name in @('fixture','depth','samples','batch_samples','tile_pixels','seed','albedo','secondary_albedo','environment')) {
+                    foreach ($name in @('fixture','depth','samples','batch_samples','tile_pixels','seed','albedo','secondary_albedo','environment','ev100')) {
                         $type = if ($name -in @('depth','samples','batch_samples','tile_pixels','seed')) {'uint'} else {'enum'}
                         $changes += @{id="gi_reference.$name";type=$type;value=$case.$name}
                     }
@@ -161,6 +185,18 @@ try {
                     Write-VerificationJson "$captureDirectory/case.json" $case
                     if ($capture.status -eq 'cancelled') { throw 'Reference capture cancelled.' }
                     if ($capture.status -ne 'completed' -or $capture.publication -ne 'Published') { throw 'Incomplete reference capture.' }
+                    if ($case.fixture -in @(12,13)) {
+                        $receiverTargets = @('GI.Receiver.FaceNormal','GI.Receiver.VertexNormal','GI.Receiver.ShadingNormal',
+                            'GI.Receiver.DiffuseWeight','GI.Receiver.Position','DisplayView.DepthBuffer') | ForEach-Object {@{resource=$_}}
+                        $receiverProducts = @(@{kind='resource';targets=@($receiverTargets)},@{kind='graph'}) | ConvertTo-Json -Depth 8 -Compress
+                        $receiverCapture = Invoke-VerificationSession capture $session @{ExpectedRunIdentity=$run;
+                            Timing='after-ready';SettleFrames=1;View=$case.view;RequiredContentId='gglab.lab.gi_reference';
+                            Products=$receiverProducts;OutputDirectory="$captureDirectory/receivers";TimeoutSeconds=$TimeoutSeconds}
+                        Write-VerificationJson "$captureDirectory/receivers/capture.json" $receiverCapture
+                        if ($receiverCapture.status -ne 'completed' -or $receiverCapture.publication -ne 'Published') {
+                            throw 'Incomplete paired receiver capture.'
+                        }
+                    }
                     $plan = Invoke-Planner $directory @('--ingest',"$captureDirectory/case.json")
                 }
                 if ((Get-SourceIdentity) -ne $sourceIdentity) { throw 'Source inputs changed during convergence attempt.' }

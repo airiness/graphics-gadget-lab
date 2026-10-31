@@ -15,12 +15,16 @@ import numpy as np
 
 from ValidateGIReferenceTransport import read_case, transport_masks
 from ValidateGIReferenceLighting import require
+from ValidateCoastalGIReference import (COASTAL_VIEWS, CONTRACT_VIEWS, INPUT_PATH,
+                                       read_case as read_coastal_case, self_test as coastal_self_test)
 
-SCHEMA = 1
+SCHEMA = 2
 SEEDS = (61051, 61052)
 LUMA = np.array([.2126, .7152, .0722])
 COMPONENTS = ("Irradiance", "SunIrradiance", "EnvironmentIrradiance")
 VIEWS = {"F1_Plane": 1, "F2_Floor": 2, "F3_Floor": 3, "F4_Floor": 4, "F4_Back": 4}
+VIEWS.update({view: 12 for view in COASTAL_VIEWS})
+VIEWS.update({view: 13 for view in CONTRACT_VIEWS})
 
 
 def digest(value):
@@ -70,7 +74,8 @@ def plan(state):
     p, records = state["recipe"], state["observations"]
     results = {}
     for view in p["views"]:
-        n = p["initialF4Samples"] if view.startswith("F4_") else p["initialSamples"]
+        n = p["initialCoastalSamples"] if view in COASTAL_VIEWS else (
+            p["initialF4Samples"] if view.startswith("F4_") else p["initialSamples"])
         final = None
         for low, high in zip(p["depths"], p["depths"][1:]):
             while 2*n <= p["maximumSamples"]:
@@ -81,7 +86,8 @@ def plan(state):
                         return dict(status="Running", results=results, request=dict(
                             directory="captures/"+name, view=view, fixture=VIEWS[view], depth=d,
                             samples=s, seed=seed, batch_samples=p["batchSamples"], tile_pixels=0,
-                            albedo=0, secondary_albedo=0, environment=0))
+                            albedo=0, secondary_albedo=0, environment=3 if view in COASTAL_VIEWS else 0,
+                            ev100=15 if view in COASTAL_VIEWS else 10))
                 sampling = []
                 for d in (low, high):
                     rows = [records[key(view, d, s, seed)] for s in (n, 2*n) for seed in SEEDS]
@@ -100,6 +106,11 @@ def plan(state):
                              samples=2*n, seeds=list(SEEDS), lowerDepth=low, sampling=sampling, depthChange=depth)
                 if final["status"] == "ReferenceConverged":
                     final["candidates"] = [key(view, high, 2*n, seed) for seed in SEEDS]
+                    if view in COASTAL_VIEWS:
+                        candidate = records[final["candidates"][0]]
+                        final["signal"] = "incident-irradiance"
+                        final["receiverConstraints"] = {roi: row["receiverConstraints"]
+                                                        for roi, row in candidate["rois"].items()}
                 final["roiStatus"] = {roi: "ReferenceConverged" if
                     max(sampling[roi].values()) < p["relativeLimit"] and
                     max(depth[roi].values()) < p["relativeLimit"] else "ReferenceUnconverged" for roi in sampling}
@@ -112,12 +123,16 @@ def plan(state):
 
 
 def file_receipts(directory):
-    files = sorted(p for p in directory.rglob("*") if p.is_file() and p.suffix in (".npy", ".json"))
+    files = sorted(p for p in directory.rglob("*") if p.is_file() and p.suffix in (".npy", ".json", ".png"))
     return {str(p.relative_to(directory)).replace("\\", "/"): hashlib.sha256(p.read_bytes()).hexdigest() for p in files}
 
 
 def summarize(root, case):
-    values, frame = read_case(root, case)
+    masks = None
+    if case["fixture"] in (12, 13):
+        values, frame, masks = read_coastal_case(root, case)
+    else:
+        values, frame = read_case(root, case)
     actual = {p["id"].split(".", 1)[1]: p["value"] for p in frame["parameters"]["values"]
               if p["id"].startswith("gi_reference.")}
     require(actual.get("tile_pixels", 0) == case.get("tile_pixels", 0), "Wrong tile partition provenance")
@@ -125,11 +140,11 @@ def summarize(root, case):
     generation = lighting["active"]["generation"]
     require(generation == lighting["requested"]["generation"] ==
             frame["sceneInputs"]["environment"]["activeIBLGeneration"], "Stale World Lighting publication")
-    if case["fixture"] == 1:
+    if masks is None and case["fixture"] == 1:
         pos, identity = values["GI.Reference.Position"], values["GI.Reference.Identity"]
         masks = {"plane": (pos[..., 3] == 1) & (identity[..., 0] == 0) &
                  np.isin(identity[..., 1], [0, 1]) & (np.abs(pos[..., 0]) <= 1) & (np.abs(pos[..., 2]) <= 1)}
-    else:
+    elif masks is None:
         masks = transport_masks(case, values, frame)
     scene = copy.deepcopy(frame["sceneInputs"])
     scene["environment"].pop("activeIBLGeneration", None)
@@ -141,9 +156,12 @@ def summarize(root, case):
     input_identity = digest(inputs)
     identity = digest(dict(inputIdentity=input_identity, backend=frame["backend"], adapter=frame["adapterDriverIdentity"]))
     rois = {}
+    receiver_report = load(root/case["directory"]/"receiver-report.json") if case["fixture"] == 12 else None
     for name, mask in masks.items():
         require(mask.sum() >= 32, "Empty convergence ROI")
         row = dict(pixels=int(mask.sum()), maskSha256=hashlib.sha256(mask.tobytes()).hexdigest())
+        if receiver_report is not None:
+            row["receiverConstraints"] = receiver_report["masks"][name]
         for component in COMPONENTS:
             mean = values["GI.Reference."+component][mask, :3].mean(0, dtype=np.float64)
             row[component] = [*mean.tolist(), float(mean @ LUMA)]
@@ -162,12 +180,19 @@ def summarize(root, case):
 def validate_recipe(p):
     require(p["schemaVersion"] == SCHEMA and p["views"] and len(set(p["views"])) == len(p["views"]) and
             all(v in VIEWS for v in p["views"]), "Invalid convergence recipe views/version")
+    coastal = any(v in COASTAL_VIEWS for v in p["views"])
+    require(all((v in COASTAL_VIEWS) == coastal for v in p["views"]), "Coastal and fixture extents cannot be mixed")
+    if coastal:
+        require(p["extent"] == [1280, 800] and
+                p["inputsSha256"] == hashlib.sha256(INPUT_PATH.read_bytes()).hexdigest(), "Changed Coastal input lock/extent")
     require(p["depths"] in ([8, 16], [8, 16, 32], [8, 16, 32, 64],
                             [8, 16, 32, 64, 128], [8, 16, 32, 64, 128, 256]), "Invalid depth ladder")
     require(p["relativeLimit"] == .01 and p["absoluteFloor"] == 1e-6, "Qualification thresholds are frozen")
     require(1 <= p["initialSamples"]*2 <= p["maximumSamples"] <= 1048576 and
             1 <= p["initialF4Samples"]*2 <= p["maximumSamples"] and 1 <= p["batchSamples"] <= 4096,
             "Invalid sample limits")
+    if coastal:
+        require(1 <= p["initialCoastalSamples"]*2 <= p["maximumSamples"], "Invalid Coastal sample limits")
 
 
 def validate_tiles(root):
@@ -233,7 +258,7 @@ def compare_rhi(root):
 
 
 def self_test():
-    p = dict(schemaVersion=1, views=["F4_Floor"], depths=[8, 16, 32], initialSamples=2,
+    p = dict(schemaVersion=SCHEMA, views=["F4_Floor"], depths=[8, 16, 32], initialSamples=2,
              initialF4Samples=2, maximumSamples=16, batchSamples=7, relativeLimit=.01, absoluteFloor=1e-6)
     validate_recipe(p)
     state = dict(recipe=p, observations={})
@@ -292,6 +317,13 @@ def self_test():
             plan(state)["results"]["F4_Floor"]["reason"] == "DepthLimit", "Depth exhaustion is explicit")
     state["observations"][key("F4_Floor", 16, 4, SEEDS[1])]["rois"]["floor"]["SunIrradiance"] = [32.]*4
     require(plan(state)["results"]["F4_Floor"]["reason"] == "SamplingLimit", "Sampling exhaustion is explicit")
+    coastal_self_test()
+    coastal = dict(p, views=[COASTAL_VIEWS[0]], extent=[1280, 800], initialCoastalSamples=2,
+                   inputsSha256=hashlib.sha256(INPUT_PATH.read_bytes()).hexdigest())
+    validate_recipe(coastal)
+    request = plan(dict(recipe=coastal, observations={}))['request']
+    require(request['fixture'] == 12 and request['environment'] == 3 and request['ev100'] == 15,
+            "Coastal recipe must select locked Physical Daylight")
     print("GI reference convergence self-tests passed (ladder, seeds, common N, identities, channels, limits, cache)")
 
 

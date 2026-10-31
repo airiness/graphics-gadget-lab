@@ -67,7 +67,8 @@ namespace gglab
 			std::array<uint32_t, 2> m_TileExtent{};
 			uint32_t m_BeginSweep = 1;
 			uint32_t m_EndSweep = 1;
-			std::array<uint32_t, 2> m_TilePadding{};
+			uint32_t m_RasterPosition = 0;
+			uint32_t m_TilePadding = 0;
 		};
 		static_assert(sizeof(Parameters) == 208 && offsetof(Parameters, m_ConstantRadiance) == 64 &&
 			offsetof(Parameters, m_Transmittance) == 80 &&
@@ -75,7 +76,8 @@ namespace gglab
 			offsetof(Parameters, m_Previous) == 112 && offsetof(Parameters, m_SampleBegin) == 144 &&
 			offsetof(Parameters, m_MaximumDepth) == 152 && offsetof(Parameters, m_PathDiagnostics) == 156 &&
 			offsetof(Parameters, m_PreviousCompensation) == 160 && offsetof(Parameters, m_NextCompensation) == 168 &&
-			offsetof(Parameters, m_TileOrigin) == 176 && offsetof(Parameters, m_BeginSweep) == 192);
+			offsetof(Parameters, m_TileOrigin) == 176 && offsetof(Parameters, m_BeginSweep) == 192 &&
+			offsetof(Parameters, m_RasterPosition) == 200);
 	}
 
 	RenderFrameValidationResult ValidateGIReferenceInputs(
@@ -203,6 +205,8 @@ namespace gglab
 			.m_ReceiverShaderGeneration =
 				services.m_ShaderPrograms->GetGeneration(services.m_ShaderPrograms->LoadProgram(shader_programs::GIReceiverPixel)),
 			.m_CoverageShaderGeneration = services.m_ShaderPrograms->GetGeneration(coverageVertex),
+			.m_PositionShaderGeneration = services.m_ShaderPrograms->GetGeneration(
+				services.m_ShaderPrograms->LoadProgram(shader_programs::GIReceiverPositionPixel)),
 			.m_CameraPosition = { view.m_CameraPosition.m_X, view.m_CameraPosition.m_Y, view.m_CameraPosition.m_Z },
 			.m_ConstantRadiance = info.m_ConstantRadiance, .m_MaximumDistance = info.m_MaximumDistance,
 			.m_EnvironmentIntensity = environment.m_Intensity, .m_EnvironmentRotation = environment.m_RotationRadians,
@@ -246,6 +250,7 @@ namespace gglab
 		{
 			RGTextureViewId m_Depth;
 			RGTextureViewId m_Face;
+			RGTextureViewId m_RasterPosition;
 			RGTextureViewId m_Shading;
 			RGTextureViewId m_Transmittance;
 			RGTextureViewId m_ReceiverAlbedo;
@@ -269,6 +274,7 @@ namespace gglab
 						return builder.CreateView<RHITextureViewType::ShaderResource>(read);
 					};
 				data.m_Face = readTexture(receivers.m_Textures[0]);
+				data.m_RasterPosition = readTexture(receivers.m_Position);
 				data.m_Shading = readTexture(receivers.m_Textures[2]);
 				data.m_ReceiverAlbedo = readTexture(receivers.m_Textures[7]);
 				const auto& depth = builder.GetBlackboard().Get<RGSceneDepthResources>(SceneDepthResourcesName);
@@ -388,6 +394,7 @@ namespace gglab
 				auto parameters = data.m_Parameters;
 				parameters.m_Depth = execute.GetViewDescriptor(data.m_Depth).m_Index;
 				parameters.m_Face = execute.GetViewDescriptor(data.m_Face).m_Index;
+				parameters.m_RasterPosition = execute.GetViewDescriptor(data.m_RasterPosition).m_Index;
 				parameters.m_Shading = execute.GetViewDescriptor(data.m_Shading).m_Index;
 				parameters.m_ReceiverAlbedo = execute.GetViewDescriptor(data.m_ReceiverAlbedo).m_Index;
 				parameters.m_LambertRadiance = execute.GetViewDescriptor(data.m_LambertRadiance).m_Index;

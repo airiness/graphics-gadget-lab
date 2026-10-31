@@ -44,7 +44,8 @@ cbuffer Parameters : register(b2)
 	uint2 TileExtent;
 	uint BeginSweep;
 	uint EndSweep;
-	uint2 TilePadding;
+	uint RasterPositionIndex;
+	uint TilePadding;
 };
 
 uint GIHash(uint value)
@@ -164,58 +165,21 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	const float rawDepth = GetTexture2DFloat(DepthIndex).Load(int3(pixel, 0));
 	const float3 positionVS = ReconstructViewPosition(PixelCenterToUV(pixel, uint2(Width, Height)), rawDepth, view.InvProjMat);
 	const float3 position = mul(float4(positionVS, 1.0), view.InvViewMat).xyz;
-	const float distance = length(position - view.CameraPos.xyz);
-	const float tolerance = max(0.002, distance * 0.0002);
-	RayDesc primary;
-	primary.Origin = view.CameraPos.xyz;
-	primary.Direction = normalize(position - primary.Origin);
-	primary.TMin = max(0.001, distance - tolerance);
-	primary.TMax = distance + tolerance;
 	const uint3 counts = uint3(InstanceCount, GeometryCount, MaterialCount);
 	GIHit receiver;
-	uint receiverOutcome = GITraceHit(primary, counts, receiver, true);
-	bool receiverFallback = false;
-	if (receiverOutcome == GIHitMiss)
-	{
-		// Raster edge coverage is quantized to subpixels; an ideal centre ray
-		// can miss a covered silhouette. Search only a 1/128-pixel envelope,
-		// retaining the raster face/depth match and an explicit fallback marker.
-		// This never applies to secondary rays or converts their hits into sky.
-		const float footprint = 2.0 * abs(positionVS.z * view.InvProjMat[1][1]) / (float)(Height);
-		const float epsilon = max(2.0e-6, footprint / 128.0);
-		const float3 right = mul(float4(1, 0, 0, 0), view.InvViewMat).xyz;
-		const float3 up = mul(float4(0, 1, 0, 0), view.InvViewMat).xyz;
-		const float2 offsets[8] =
-		{
-			float2(-1, 0), float2(1, 0), float2(0, -1), float2(0, 1),
-			float2(-1, -1), float2(-1, 1), float2(1, -1), float2(1, 1)
-		};
-		float nearest = tolerance + 4.0 * epsilon;
-		for (uint attempt = 0; attempt < 8; ++attempt)
-		{
-			RayDesc shifted = primary;
-			const float3 target = position + epsilon *
-				(right * offsets[attempt].x + up * offsets[attempt].y);
-			shifted.Direction = normalize(target - primary.Origin);
-			GIHit candidate;
-			const uint outcome = GITraceHit(shifted, counts, candidate, true);
-			const float error = length(candidate.Position - position);
-			if (outcome == GIHitSurface && dot(candidate.FaceNormal, face.xyz) > 0.9999 && error < nearest)
-			{
-				nearest = error;
-				receiver = candidate;
-				receiverOutcome = outcome;
-				receiverFallback = true;
-			}
-		}
-	}
-	if (receiverOutcome != GIHitSurface)
+	const float4 rasterPosition = GetTexture2DFloat4(RasterPositionIndex).Load(int3(pixel, 0));
+	const uint receiverMatch = rasterPosition.w == face.w &&
+		GIPathFinite(rasterPosition.xyz) && GIPathFinite(position) && GIPathFinite(face.xyz) ?
+		GIMatchReceiver(pixel, uint2(Width, Height), position, rasterPosition.xyz,
+			face.xyz, view, MaximumDistance, counts, receiver) : 3u;
+	if (receiverMatch != 1 && receiverMatch != 2 && receiverMatch != 6)
 	{
 		irradiance[pixel] = float4(0.0, 0.0, 0.0, -2.0);
 		return;
 	}
 	positions[pixel] = float4(receiver.Position, 1.0);
-	identities[pixel] = float4((float)(receiver.Instance), (float)(receiver.Primitive), receiver.FaceNormal.y, receiverFallback ? 2.0 : 1.0);
+	identities[pixel] = float4((float)(receiver.Instance), (float)(receiver.Primitive),
+		receiver.FaceNormal.y, receiverMatch == 6 ? 3.0 : (float)(receiverMatch));
 	const float3 normal = normalize(GetTexture2DFloat4(ShadingIndex).Load(int3(pixel, 0)).xyz);
 	uint randomState = GIHash(Seed ^ GIHash(pixel.x + Width * pixel.y));
 	precise float3 sunSum = 0.0.xxx;

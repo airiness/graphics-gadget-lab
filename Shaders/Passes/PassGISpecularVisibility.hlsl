@@ -33,6 +33,8 @@ cbuffer Parameters : register(b2)
 	uint GeometryCount;
 	uint MaterialCount;
 	uint RasterMaterialCapacity;
+	uint RasterPositionIndex;
+	uint3 Padding;
 };
 
 uint VisibilityHash(uint value)
@@ -66,56 +68,6 @@ void VisibilityAccumulate(float4 value, inout float4 sum, inout float4 compensat
 	precise float4 error = (next - sum) - adjusted;
 	compensation = error;
 	sum = next;
-}
-
-uint VisibilityReceiver(float3 position, float3 face, ViewData view, out GIHit receiver)
-{
-	const float distance = length(position - view.CameraPos.xyz);
-	const float tolerance = max(0.002, distance * 0.0002);
-	RayDesc ray;
-	ray.Origin = view.CameraPos.xyz;
-	ray.Direction = normalize(position - ray.Origin);
-	ray.TMin = max(0.001, distance - tolerance);
-	ray.TMax = distance + tolerance;
-	const uint3 counts = uint3(InstanceCount, GeometryCount, MaterialCount);
-	const uint outcome = GITraceHit(ray, counts, receiver, true);
-	if (outcome == GIHitSurface)
-	{
-		return dot(receiver.FaceNormal, face) > 0.9999 ? 0u : 4u;
-	}
-	if (outcome != GIHitMiss)
-	{
-		return 3u;
-	}
-	// Same bounded raster-silhouette envelope as the diffuse reference. This is
-	// primary matching only; visibility rays never search for a replacement miss.
-	const float3 positionVS = mul(float4(position, 1), view.ViewMat).xyz;
-	const float footprint = 2.0 * abs(positionVS.z * view.InvProjMat[1][1]) / (float)(Size.y);
-	const float epsilon = max(2.0e-6, footprint / 128.0);
-	const float3 right = mul(float4(1, 0, 0, 0), view.InvViewMat).xyz;
-	const float3 up = mul(float4(0, 1, 0, 0), view.InvViewMat).xyz;
-	const float2 offsets[8] =
-	{
-		float2(-1, 0), float2(1, 0), float2(0, -1), float2(0, 1),
-		float2(-1, -1), float2(-1, 1), float2(1, -1), float2(1, 1)
-	};
-	float nearest = tolerance + 4.0 * epsilon;
-	bool matched = false;
-	for (uint index = 0; index < 8; ++index)
-	{
-		ray.Direction = normalize(position + epsilon *
-			(right * offsets[index].x + up * offsets[index].y) - ray.Origin);
-		GIHit candidate;
-		const uint status = GITraceHit(ray, counts, candidate, true);
-		const float error = length(candidate.Position - position);
-		if (status == GIHitSurface && dot(candidate.FaceNormal, face) > 0.9999 && error < nearest)
-		{
-			receiver = candidate;
-			nearest = error;
-			matched = true;
-		}
-	}
-	return matched ? 0u : 5u;
 }
 
 float4 VisibilitySample(GIHit receiver, float3 reflection, float roughness,
@@ -209,8 +161,11 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 		diagnostics[pixel] = float4(-2, 0, SubmittedSamples, 0);
 		return;
 	}
-	const uint match = VisibilityReceiver(position, face.xyz, view, receiver);
-	if (match != 0)
+	const float4 rasterPosition = GetTexture2DFloat4(RasterPositionIndex).Load(int3(pixel, 0));
+	const uint match = rasterPosition.w == face.w && VisibilityFinite(rasterPosition) ?
+		GIMatchReceiver(pixel, Size, position, rasterPosition.xyz, face.xyz, view,
+			MaximumDistance, uint3(InstanceCount, GeometryCount, MaterialCount), receiver) : 3u;
+	if (match != 1 && match != 2 && match != 6)
 	{
 		diagnostics[pixel] = float4(-(float)(match), 0, SubmittedSamples, 0);
 		return;

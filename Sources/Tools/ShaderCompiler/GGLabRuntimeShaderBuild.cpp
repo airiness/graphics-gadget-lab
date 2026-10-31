@@ -172,6 +172,7 @@ namespace gglab
 			ShaderProgramBuildRecord{ &GIReferenceCompute, L"Passes/PassGIReference.hlsl", L"CSMain" },
 			ShaderProgramBuildRecord{ &GISpecularVisibilityCompute, L"Passes/PassGISpecularVisibility.hlsl", L"CSMain" },
 			ShaderProgramBuildRecord{ &GIReceiverPixel, L"Passes/PassGIReceiver.hlsl", L"PSMain" },
+			ShaderProgramBuildRecord{ &GIReceiverPositionPixel, L"Passes/PassGIReceiver.hlsl", L"PSPosition" },
 			ShaderProgramBuildRecord{ &RenderGraphComputeReadWrite, L"Passes/PassRenderGraphComputeSmoke.hlsl", L"CSReadWrite" },
 			ShaderProgramBuildRecord{ &RenderGraphComputeNonFiniteProbe, L"Passes/PassRenderGraphComputeSmoke.hlsl", L"CSNonFiniteProbe" },
 			ShaderProgramBuildRecord{ &RenderGraphComputePreviewVertex, L"Passes/PassRenderGraphComputeSmoke.hlsl", L"VSMain" },

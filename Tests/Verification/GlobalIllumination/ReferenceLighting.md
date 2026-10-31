@@ -162,3 +162,52 @@ selected depth/sample candidates are explicitly unavailable for that comparison.
 Runtime Completed remains calculation progress, not numerical certification.
 
 Material transport and snapshot qualification use the separate [material contract](ReferenceMaterials.md).
+
+## Coastal reference qualification
+
+Fixture 12 uses the locked Coastal bundle, Physical Daylight, C1-C4 camera profiles,
+Native 1280x800 extent and original `Inputs.json` rectangles. TAA, GTAO and bloom
+remain off. Its RayScene tracks the complete primary-material dependencies.
+The supplemental `GI.Receiver.Position` pass retains the eight existing receiver
+meanings and uses the same coverage draws/read-only depth. Geometric derivatives
+are normalized independently of pixel footprint. Primary matching validates face
+and plane depth, with explicit centre (Identity A=1), bounded subpixel (A=2), and
+paired raster-interpolant local (A=3) matches. Secondary rays never use these
+fallbacks. A local match must agree with the native triangle within its geometric
+reconstruction/transform error bound; it is not an environment miss.
+
+The convergence runner's schema 2 recipe adds Coastal inputs/extent and compiler
+binary identity. Old schema 1 receipts remain historical and cannot resume as a
+schema 2 attempt. PNG overlays join JSON/NPY immutable receipts. Optional shader
+cache seeds contain only Runtime-validated content-addressed artifacts.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/TestGIReferenceConvergence.ps1 -Coastal -RunDirectory Build/Validation/GICoastalReference/MyRun -Python <python-with-numpy-and-jsonschema>
+```
+
+`-Views` can select a subset of C1-C4 with `-Coastal`. Initial Coastal samples
+default to 4096 (`-InitialCoastalSamples`); ceilings and attempt budgets remain
+explicit. The external planner requires both independent seeds, N/2N and depth
+8/16/.../256 with the unchanged 1% RGB/luminance gates for E/Sun/environment.
+Runtime completion, a diagnostic run or an exhausted budget never grants a
+certificate. Asset, camera, effective lighting/exposure, extent, receiver coverage,
+native IDs and any-bounce validity are checked before ROI selection. Masks retain
+all opaque pixels inside the original rectangle, including metallic receivers;
+background/diffuse/nondiffuse counts and every mask/overlay are retained. Incident
+E is defined independently of receiver albedo. A mask containing no diffuse
+receivers is explicitly unavailable for diffuse GI-only response acceptance even
+if its incident E converges; no mask is shrunk to obtain a certificate. An unmatched
+covered receiver anywhere in the image fails the observation.
+
+Fixture 13 is an independent two-centimetre plane with tilted smooth normals and
+normal/grazing views. Its furnace integral is analytically
+`pi * (1 + dot(shadingNormal, faceNormal)) / 2`, including below-face rejection.
+It detects absolute derivative-area fallback without changing F1-F10:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/TestGIReferenceConvergence.ps1 -Views Contract_SmallReceiver,Contract_SmallReceiverGrazing -InitialSamples 64 -InitialF4Samples 64 -MaximumSamples 128 -MaximumDepth 16 -RunDirectory Build/Validation/GICoastalReference/ReceiverContract -Python <python-with-numpy-and-jsonschema>
+```
+
+Coastal reference certificates do not qualify production S1, DDGI, memory or
+performance. Specular Coastal collections remain diagnostics unless separately
+sampling-qualified under their own contract.

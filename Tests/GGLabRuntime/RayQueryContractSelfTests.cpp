@@ -310,6 +310,12 @@ namespace gglab
 			GGLAB_UNUSED(observation.Prepare(key, 4, 256));
 			context.Check(observation.GetDiagnostics().m_Generation == generation + 2 &&
 				observation.GetDiagnostics().m_SubmittedSamples == 0, "Snapshot changes cancel and restart the observation");
+			++key.m_PositionShaderGeneration;
+			GGLAB_UNUSED(observation.Prepare(key, 4, 256));
+			context.Check(observation.GetDiagnostics().m_Generation == generation + 3 &&
+				observation.GetDiagnostics().m_SubmittedSamples == 0 &&
+				observation.GetDiagnostics().m_CommittedVersion == 0,
+				"Raster-position shader replacement invalidates the reference and resets every published sample");
 			record();
 			observation.Settle({ RenderFrameOutcomeKind::Failed, 5, fence });
 			context.Check(observation.GetDiagnostics().m_Status == GIReferenceObservationStatus::Failed &&
@@ -446,6 +452,12 @@ namespace gglab
 			context.Check(observation.GetDiagnostics().m_Generation == generation + 1 &&
 				observation.GetDiagnostics().m_SubmittedSamples == 0,
 				"Receiver shader changes invalidate material reconstruction and sums");
+			++key.m_PositionShaderGeneration;
+			GGLAB_UNUSED(observation.Prepare(key, 64, 128));
+			context.Check(observation.GetDiagnostics().m_Generation == generation + 2 &&
+				observation.GetDiagnostics().m_SubmittedSamples == 0 &&
+				observation.GetDiagnostics().m_CommittedVersion == 0,
+				"Raster-position shader replacement invalidates visibility without retaining old samples");
 			record();
 			observation.Settle({ RenderFrameOutcomeKind::Failed, 7, fence });
 			context.Check(observation.GetDiagnostics().m_Status == GISpecularVisibilityStatus::Failed &&

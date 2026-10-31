@@ -14,9 +14,11 @@ namespace gglab
 	};
 
 	// Runtime-private record shared by receiver, reference and diagnostic consumers.
-	// Position is reconstructed from the paired opaque depth; view direction from the camera.
+	// Depth reconstructs the canonical position. The paired raster interpolant
+	// resolves quantized, grazing primary coverage without changing secondary rays.
 	struct RGGIReceiverResources
 	{
 		std::array<RGTextureId, GIReceiverTextureNames.size()> m_Textures{};
+		RGTextureId m_Position;
 	};
 }

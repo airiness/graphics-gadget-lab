@@ -178,6 +178,92 @@ uint GITraceHit(RayDesc ray, uint3 counts, out GIHit hit, bool rasterReceiver)
 	return GIHitSurface;
 }
 
+// Only primary matching follows raster coverage. Secondary rays keep their
+// original hit/miss and sidedness rules, including occluded single-sided backfaces.
+uint GIMatchReceiver(uint2 pixel, uint2 size, float3 position, float3 rasterPosition,
+	float3 face, ViewData view, float maximumDistance, uint3 counts, out GIHit receiver)
+{
+	receiver = (GIHit)(0);
+	const float3 delta = position - view.CameraPos.xyz;
+	const float tolerance = max(0.002, length(delta) * 0.0002);
+	const float3 positionVS = mul(float4(position, 1), view.ViewMat).xyz;
+	const float footprint = 2.0 * abs(positionVS.z * view.InvProjMat[1][1]) / (float)(size.y);
+	const float pixelRadius = max(1.0 / 128.0, 2.0e-6 / max(footprint, 1.0e-20));
+	uint failure = 5;
+	for (uint attempt = 0; attempt < 82; ++attempt)
+	{
+		// A thin triangle need not intersect the envelope's corners or axes.
+		float2 offset = 0.0.xx;
+		if (attempt != 0)
+		{
+			const uint index = attempt - 1;
+			offset = float2((float)(index % 9) - 4.0, (float)(index / 9) - 4.0) / 4.0;
+		}
+		const float2 uv = ((float2)(pixel) + 0.5 + pixelRadius * offset) / (float2)(size);
+		const float3 nearVS = ReconstructViewPosition(uv,
+			GetDepthNearValue(view.DepthConvention), view.InvProjMat);
+		RayDesc ray;
+		ray.Origin = view.CameraPos.xyz;
+		ray.Direction = normalize(mul(float4(nearVS, 0), view.InvViewMat).xyz);
+		const float cosine = dot(ray.Direction, face);
+		if (abs(cosine) <= 1.0e-8)
+		{
+			continue;
+		}
+		// Depth uncertainty is a face-plane displacement. Project it onto the
+		// ray instead of clipping valid grazing receivers with a fixed t window.
+		const float planeDistance = dot(delta, face) / cosine;
+		const float rayTolerance = tolerance / abs(cosine);
+		ray.TMin = max(0.001, planeDistance - rayTolerance);
+		ray.TMax = min(maximumDistance, planeDistance + rayTolerance);
+		if (ray.TMin >= ray.TMax)
+		{
+			continue;
+		}
+		GIHit candidate;
+		const uint outcome = GITraceHit(ray, counts, candidate, true);
+		if (outcome != GIHitMiss && outcome != GIHitSurface)
+		{
+			return 3;
+		}
+		if (outcome == GIHitSurface)
+		{
+			failure = 4;
+			if (dot(candidate.FaceNormal, face) > 0.9999 &&
+				abs(dot(candidate.Position - position, face)) <= tolerance)
+			{
+				receiver = candidate;
+				return attempt == 0 ? 1u : 2u;
+			}
+		}
+	}
+	// Fixed-point raster coverage/interpolation can differ from an ideal centre
+	// ray at a grazing sliver. Resolve the paired raster interpolant locally on
+	// the immutable triangles; require the same face and its reconstruction bound.
+	// This is an explicit primary match kind, never a replacement environment miss.
+	if (abs(dot(rasterPosition - position, face)) <= tolerance)
+	{
+		RayDesc local;
+		local.Origin = rasterPosition + tolerance * face;
+		local.Direction = -face;
+		local.TMin = 0;
+		local.TMax = 2.0 * tolerance;
+		GIHit candidate;
+		const uint outcome = GITraceHit(local, counts, candidate, true);
+		const float magnitude = max(abs(rasterPosition.x),
+			max(abs(rasterPosition.y), abs(rasterPosition.z)));
+		const float error = max(2.0e-6, 4.0 * candidate.OriginError +
+			16.0 * 1.1920928955078125e-7 * magnitude);
+		if (outcome == GIHitSurface && dot(candidate.FaceNormal, face) > 0.9999 &&
+			length(candidate.Position - rasterPosition) <= error)
+		{
+			receiver = candidate;
+			return 6;
+		}
+	}
+	return failure;
+}
+
 bool GISunVisible(GIHit hit, float3 direction, float maximumDistance)
 {
 	if (dot(hit.FaceNormal, direction) <= 0.0)

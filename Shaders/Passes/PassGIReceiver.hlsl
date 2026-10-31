@@ -28,6 +28,15 @@ float2 ReceiverBrdfLUT(float noV, float roughness)
 		float2(saturate(noV), saturate(roughness)), 0).rg;
 }
 
+float4 PSPosition(ForwardCoverageVSOutput input) : SV_Target0
+{
+	const MaterialData data = g_Materials[input.MaterialIndex];
+	SetMaterialTextureLodBias(input.MaterialTextureLodBias);
+	const SurfaceData surface = EvaluateSurface(data, input.UV0, input.UV1);
+	ResolveMaterialAlpha(data, surface.Opacity);
+	return float4(input.PositionWS, data.AlphaMode == MaterialAlphaModeMask ? 2.0 : 1.0);
+}
+
 #if defined(GGLAB_NONFINITE_COUNTERS)
 [earlydepthstencil]
 #endif
@@ -56,7 +65,17 @@ ReceiverOutput PSMain(ForwardCoverageVSOutput input, bool frontFace : SV_IsFront
 		ReceiverBrdfLUT(frame.NoV, frame.Base.EffectivePerceptualRoughness), coat);
 	const bool flip = (data.Flags & 1u) != 0 && !frontFace;
 	const float3 vertexNormal = SafeNormalize(input.NormalWS, float3(0.0, 1.0, 0.0)) * (flip ? -1.0 : 1.0);
-	float3 faceNormal = SafeNormalize(cross(ddx(input.PositionWS), ddy(input.PositionWS)), vertexNormal);
+	// World-space derivative area shrinks with pixel footprint. SafeNormalize's
+	// absolute length floor would replace valid close-up faces with smooth vertex
+	// normals. Scale each derivative before taking the cross product instead.
+	const float3 derivativeX = ddx_fine(input.PositionWS);
+	const float3 derivativeY = ddy_fine(input.PositionWS);
+	const float scaleX = max(abs(derivativeX.x), max(abs(derivativeX.y), abs(derivativeX.z)));
+	const float scaleY = max(abs(derivativeY.x), max(abs(derivativeY.y), abs(derivativeY.z)));
+	const float3 face = cross(derivativeX / max(scaleX, 1.0e-20),
+		derivativeY / max(scaleY, 1.0e-20));
+	const float faceScale = max(abs(face.x), max(abs(face.y), abs(face.z)));
+	float3 faceNormal = faceScale == 0.0 ? vertexNormal : normalize(face / faceScale);
 	faceNormal *= dot(faceNormal, vertexNormal) < 0.0 ? -1.0 : 1.0;
 	ReceiverOutput output;
 	// Class 0 is cleared background, 1 opaque, 2 MASK. BLEND is not a receiver.

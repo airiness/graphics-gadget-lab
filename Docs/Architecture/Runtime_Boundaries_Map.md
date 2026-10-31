@@ -56,6 +56,13 @@ independently of the Lab and temporal histories; see [frame settlement](Frame_Ex
 `RenderPresentationAccess` returns immutable progress. AppRuntime selects captures
 after pipeline validation identifies the current observation.
 
+`GI.Receiver` also produces a paired raster-position pass through the same
+coverage draws and read-only depth. The eight original surface records retain
+their meanings. Reference and visibility use one Private primary-matching helper;
+its explicit raster-interpolant match is confined to primary coverage. Secondary
+queries retain their original sidedness and miss semantics. Both observations
+include the position shader generation in their reset identity.
+
 The opt-in `m_GISpecularVisibility` adds a Runtime-owned pre-temporal diagnostic
 with an independent Renderer-owned observation. It requires a
 `RaySceneMaterialInputs::PrimaryReceiver` scene; when both GI diagnostics are
