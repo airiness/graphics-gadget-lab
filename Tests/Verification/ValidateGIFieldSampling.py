@@ -5,7 +5,6 @@ import json
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
 
 from ValidateGIReferenceLighting import f4_oracle, masks as reference_masks
 
@@ -243,6 +242,9 @@ def inspect_ao(directory):
 
 
 def validate(root):
+    # Only GPU capture comparisons need Pillow; the CPU self-test does not.
+    from PIL import Image
+
     cases = load(root/"cases.json")
     report = []
     ao_report = []
