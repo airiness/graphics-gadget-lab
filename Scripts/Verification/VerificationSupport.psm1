@@ -22,6 +22,47 @@ function Write-VerificationJson {
         (New-Object Text.UTF8Encoding($false)))
 }
 
+function Get-VerificationSourceIdentity {
+    param([string]$Root, [string[]]$Paths)
+    # The caller owns the source scope; retain Git paths, ordinal order and hash case.
+    $names = @(& git -c "safe.directory=$($Root.Replace('\','/'))" -C $Root ls-files --cached --others --exclude-standard -- @Paths)
+    if ($LASTEXITCODE -ne 0) { throw 'Source enumeration failed.' }
+    [Array]::Sort($names, [StringComparer]::Ordinal)
+    return @($names | ForEach-Object {
+        [ordered]@{path=$_;sha256=(Get-FileHash -LiteralPath "$Root/$_" -Algorithm SHA256).Hash}
+    })
+}
+
+function Get-VerificationBinaryIdentity {
+    param([string]$Root, [string]$Configuration)
+    return @(@('GraphicsGadgetLab.exe','gglab-shaderc.exe','dxcompiler.dll','dxil.dll') | ForEach-Object {
+        [ordered]@{file=$_;sha256=(Get-FileHash -LiteralPath "$Root/Build/Output/x64/$Configuration/$_" -Algorithm SHA256).Hash}
+    })
+}
+
+function Assert-VerificationIdentity {
+    param($Expected, $Actual, [string]$Message, [int]$Depth = 4)
+    if ((ConvertTo-Json -InputObject @($Expected) -Depth $Depth -Compress) -cne
+        (ConvertTo-Json -InputObject @($Actual) -Depth $Depth -Compress)) { throw $Message }
+}
+
+function Invoke-VerificationPython {
+    param([string]$Python, [string]$Script, [string[]]$Arguments, [string]$Receipt,
+        [string]$FailureMessage)
+    $lines = @(& $Python $Script @Arguments)
+    $code = $LASTEXITCODE
+    Write-VerificationJson $Receipt @{exitCode=$code;output=($lines -join "`n")}
+    if ($code -ne 0) { throw "${FailureMessage}: $Script" }
+}
+
+function Assert-VerificationArtifacts {
+    param([string]$Root, [string]$Directory, [string]$Python, [string]$FailureMessage)
+    foreach ($validator in @('ValidateCaptureBundles.py','ValidateResourceExports.py','ValidateRenderGraphExports.py')) {
+        Invoke-VerificationPython $Python "$Root/Scripts/Verification/$validator" @($Directory) `
+            "$Directory/$validator.result.json" $FailureMessage
+    }
+}
+
 function Invoke-VerificationScript {
     param([string]$Path, [hashtable]$Parameters = @{})
     # Contain script exit calls and preserve typed arrays/switches across the child shell.
@@ -125,4 +166,6 @@ function Stop-VerificationSession {
 }
 
 Export-ModuleMember -Function New-VerificationRunDirectory, Write-VerificationJson, Invoke-VerificationScript, Invoke-VerificationSession,
-    Wait-VerificationCondition, Stop-VerificationSession, Get-VerificationCaptureFile
+    Wait-VerificationCondition, Stop-VerificationSession, Get-VerificationCaptureFile,
+    Get-VerificationSourceIdentity, Get-VerificationBinaryIdentity, Assert-VerificationIdentity,
+    Invoke-VerificationPython, Assert-VerificationArtifacts

@@ -19,21 +19,14 @@ Import-Module "$root/Scripts/Verification/VerificationSupport.psm1"
 if (-not $OutputDirectory -and -not $RunDirectory) { $OutputDirectory = "$root/Build/Validation/GIProbeUpdate" }
 $output = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory -RunId ([Guid]::NewGuid().ToString('N').Substring(0,8))
 function Check-Python([string]$Script, [string[]]$Arguments, [string]$Receipt) {
-    $lines = @(& $Python $Script @Arguments)
-    $code = $LASTEXITCODE
-    Write-VerificationJson $Receipt @{exitCode=$code;output=($lines -join "`n")}
-    if ($code -ne 0) { throw "Probe verification failed: $Script" }
+    Invoke-VerificationPython $Python $Script $Arguments $Receipt 'Probe verification failed'
 }
 function Source-Identity {
-    $names = @(& git -c "safe.directory=$($root.Replace('\','/'))" -C $root ls-files --cached --others --exclude-standard -- Sources Shaders Tests/Verification Scripts/Verification Schemas Projects PropertySheets)
-    if ($LASTEXITCODE -ne 0) { throw 'Source enumeration failed.' }
-    [Array]::Sort($names, [StringComparer]::Ordinal)
-    return @($names | ForEach-Object { [ordered]@{path=$_;sha256=(Get-FileHash -LiteralPath "$root/$_" -Algorithm SHA256).Hash} })
+    Get-VerificationSourceIdentity $root @('Sources','Shaders','Tests/Verification','Scripts/Verification',
+        'Schemas','Projects','PropertySheets')
 }
 function Binary-Identity([string]$Config) {
-    return @(@('GraphicsGadgetLab.exe','gglab-shaderc.exe','dxcompiler.dll','dxil.dll') | ForEach-Object {
-        [ordered]@{file=$_;sha256=(Get-FileHash -LiteralPath "$root/Build/Output/x64/$Config/$_" -Algorithm SHA256).Hash}
-    })
+    Get-VerificationBinaryIdentity $root $Config
 }
 function Set-Inputs([string]$Session, [string]$Run, [hashtable]$Values) {
     $changes = foreach ($key in $Values.Keys) {
@@ -166,15 +159,13 @@ try {
             }
         }
         $finalBinaries=Binary-Identity $config
-        if ((ConvertTo-Json -InputObject @($binaries) -Compress) -cne (ConvertTo-Json -InputObject @($finalBinaries) -Compress)) { throw 'Compiler/product changed during probe verification.' }
+        Assert-VerificationIdentity $binaries $finalBinaries 'Compiler/product changed during probe verification.' -Depth 2
     }
     Check-Python "$PSScriptRoot/ValidateGIProbeUpdate.py" @('--root',$output) "$output/oracle-result.json"
-    foreach ($validator in @('ValidateCaptureBundles.py','ValidateResourceExports.py','ValidateRenderGraphExports.py')) {
-        Check-Python "$root/Scripts/Verification/$validator" @($output) "$output/$validator.result.json"
-    }
+    Assert-VerificationArtifacts $root $output $Python 'Probe verification failed'
     $finalSource=Source-Identity
     Write-VerificationJson "$output/source-identity-final.json" $finalSource
-    if ((ConvertTo-Json -InputObject @($source) -Depth 4 -Compress) -cne (ConvertTo-Json -InputObject @($finalSource) -Depth 4 -Compress)) { throw 'Sources changed during probe verification.' }
+    Assert-VerificationIdentity $source $finalSource 'Sources changed during probe verification.'
     Write-VerificationJson "$output/result.json" @{status='passed';observations=$cases.Count;productionFieldQualified=$false}
 } catch {
     Write-VerificationJson "$output/result.json" @{status='failed';error=[string]$_}

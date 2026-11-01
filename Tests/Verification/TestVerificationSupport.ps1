@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Checks verification transport, polling, cleanup and runner selection without a GPU.
+Checks verification evidence, transport, polling, cleanup and runner selection without a GPU.
 #>
 [CmdletBinding()]
 param([string]$OutputDirectory)
@@ -412,6 +412,20 @@ switch ($Command) {
     $path = Join-Path $output 'empty.json'
     Write-VerificationJson $path @()
     Check (([IO.File]::ReadAllText($path) -replace '\s', '') -eq '[]' -and [IO.File]::ReadAllBytes($path)[0] -eq 91) 'empty-array-without-bom'
+    $pythonFixture = Join-Path $fixtureDirectory 'evidence python.cmd'
+    [IO.File]::WriteAllText($pythonFixture, "@echo %~1`r`n@echo %~2`r`n@echo %~3`r`n@exit /b 0`r`n")
+    $pythonPath = Join-Path $output 'python.json'
+    $leaked = @(Invoke-VerificationPython $pythonFixture 'validator with spaces.py' @('first argument','second') `
+        $pythonPath 'Fixture verification failed')
+    $pythonReceipt = Get-Content $pythonPath -Raw | ConvertFrom-Json
+    Check ($leaked.Count -eq 0 -and $pythonReceipt.exitCode -eq 0 -and
+        $pythonReceipt.output -ceq "validator with spaces.py`nfirst argument`nsecond" -and
+        @($pythonReceipt.PSObject.Properties).Count -eq 2) 'python-preserves-arguments-and-receipt-without-stdout-leaks'
+    [IO.File]::WriteAllText($pythonFixture, "@exit /b 0`r`n")
+    $leaked = @(Invoke-VerificationPython $pythonFixture 'empty.py' @() $pythonPath 'Fixture verification failed')
+    $pythonReceipt = Get-Content $pythonPath -Raw | ConvertFrom-Json
+    Check ($leaked.Count -eq 0 -and $pythonReceipt.exitCode -eq 0 -and $pythonReceipt.output -ceq '' -and
+        [IO.File]::ReadAllBytes($pythonPath)[0] -eq 123) 'python-retains-empty-output-and-utf8-without-bom'
     $stopPath = Join-Path $output 'stop.json'
     $null = Stop-VerificationSession normal -ReceiptPath $stopPath -RequireCleanExit
     Check ((Get-Content $stopPath -Raw | ConvertFrom-Json).exitCode -eq 0) 'clean-stop-receipt'
@@ -504,61 +518,141 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
         Check (($gpuResult.suites | Where-Object name -eq $suite).steps[0].receipt.python -eq
             'fixture-python-path') "runner-forwards-selected-python-to-$suite"
     }
-    # Run the real probe producer through the catalog with GPU transport stubbed.
-    # Generic leaf fixtures cannot detect stdout contamination or missing receipts.
+    # Exercise both real producers through the catalog with only native transport and
+    # Python stubbed. Keep their source/binary seals, receipts and failure paths real.
     & {
-        Copy-Item -LiteralPath (Join-Path $root 'Tests/Verification/TestGIProbeUpdate.ps1') -Destination $runnerTests
+        foreach ($leaf in @('TestGIProbeUpdate.ps1','TestGIField.ps1')) {
+            Copy-Item -LiteralPath (Join-Path $root "Tests/Verification/$leaf") -Destination $runnerTests
+        }
         $supportPath = Join-Path $runnerTools 'VerificationSupport.psm1'
         $originalSupport = [IO.File]::ReadAllText($supportPath)
         $stub = @'
-function git { $global:LASTEXITCODE = 0; return 'Sources/probe-input.cpp' }
+$script:FixtureRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$script:FixtureMode = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'mode.txt'))
+$script:Mutated = $false
+function git {
+    Write-VerificationJson (Join-Path $PSScriptRoot 'git-arguments.json') @($args)
+    $global:LASTEXITCODE = if ($script:FixtureMode -eq 'enumeration-failure') { 7 } else { 0 }
+    # Deliberately unsorted; ordinal order differs from culture-sensitive sorting.
+    $names = @('Sources/input.cpp','Sources/Z-input.cpp')
+    if ($script:Mutated -and $script:FixtureMode -eq 'source-addition') { $names += 'Sources/added.cpp' }
+    if ($script:Mutated -and $script:FixtureMode -eq 'source-removal') { $names = @('Sources/input.cpp') }
+    return $names
+}
 function Invoke-VerificationSession {
     param([string]$Command, [string]$Session, [hashtable]$Parameters = @{})
     switch ($Command) {
-        'start' { return @{ownership='created';runIdentity='probe-fixture';outputLog=(Join-Path $PSScriptRoot 'probe.log')} }
+        'start' { return @{ownership='created';runIdentity='evidence-fixture';outputLog=(Join-Path $PSScriptRoot 'native.log')} }
         'set' { return @{batch=@{succeeded=$true}} }
         'capture' {
             $null = New-Item -ItemType Directory -Path $Parameters.OutputDirectory -Force
             return @{status='completed';publication='Published'}
         }
         'status' { return @{ok=$true} }
-        'stop' { return @{ok=$true;exitCode=0} }
-        default { throw "Unexpected probe fixture command: $Command" }
+        'stop' {
+            if (-not $script:Mutated) {
+                switch ($script:FixtureMode) {
+                    'source-mutation' { [IO.File]::WriteAllText("$script:FixtureRoot/Sources/input.cpp", 'modified') }
+                    'source-addition' { [IO.File]::WriteAllText("$script:FixtureRoot/Sources/added.cpp", 'new') }
+                    'source-removal' { Remove-Item -LiteralPath "$script:FixtureRoot/Sources/Z-input.cpp" }
+                    'compiler-mutation' { [IO.File]::WriteAllText("$script:FixtureRoot/Build/Output/x64/Develop/gglab-shaderc.exe", 'modified') }
+                }
+                $script:Mutated = $true
+            }
+            return @{ok=$true;exitCode=0}
+        }
+        default { throw "Unexpected evidence fixture command: $Command" }
     }
 }
 Export-ModuleMember -Function git, Invoke-VerificationSession
 '@
         $null = New-Item -ItemType Directory -Path (Join-Path $runnerRepository 'Sources') -Force
-        [IO.File]::WriteAllText((Join-Path $runnerRepository 'Sources/probe-input.cpp'), 'input')
-        [IO.File]::WriteAllText((Join-Path $runnerTools 'probe.log'), 'clean native fixture')
-        foreach ($name in @('gglab-shaderc.exe','dxcompiler.dll','dxil.dll')) {
-            [IO.File]::WriteAllText((Join-Path $runnerBin $name), 'binary')
-        }
-        $probePython = Join-Path $runnerRepository 'probe-python.cmd'
-        [IO.File]::WriteAllText($probePython, "@echo oracle fixture passed`r`n@exit /b 0`r`n")
+        [IO.File]::WriteAllText((Join-Path $runnerTools 'native.log'), 'clean native fixture')
+        $fixturePython = Join-Path $runnerRepository 'evidence-python.cmd'
+        $validators = @('ValidateCaptureBundles.py','ValidateResourceExports.py','ValidateRenderGraphExports.py')
+        $modes = @('passed','oracle-failure','source-mutation','source-addition','source-removal',
+            'compiler-mutation','enumeration-failure') + $validators
         try {
             [IO.File]::WriteAllText($supportPath, $originalSupport + "`r`n" + $stub,
                 (New-Object Text.UTF8Encoding($false)))
-            $execution = Invoke-VerificationScript (Join-Path $runnerTests 'RunVerification.ps1') @{
-                Suite='gi-probe-update';Python=$probePython;OutputDirectory=(Join-Path $output 'real-probe') }
-            $probeResult = $execution.output | ConvertFrom-Json
-            $step = $probeResult.suites[0].steps[0]
-            Check ($execution.exitCode -eq 0 -and $probeResult.ok -and $step.receipt -and
-                $step.receipt.ok) 'real-probe-producer-emits-one-catalog-receipt'
-            $disk = Get-Content (Join-Path $step.receipt.directory 'result.json') -Raw | ConvertFrom-Json
-            Check ($disk.status -eq 'passed' -and $disk.observations -gt 0 -and
-                -not $disk.productionFieldQualified) 'real-probe-retains-status-result-and-scope'
-            [IO.File]::WriteAllText($probePython,
-                "@if `"%~2`"==`"--root`" exit /b 7`r`n@exit /b 0`r`n")
-            $execution = Invoke-VerificationScript (Join-Path $runnerTests 'RunVerification.ps1') @{
-                Suite='gi-probe-update';Python=$probePython;OutputDirectory=(Join-Path $output 'failed-probe') }
-            $probeResult = $execution.output | ConvertFrom-Json
-            $step = $probeResult.suites[0].steps[0]
-            Check ($execution.exitCode -ne 0 -and -not $probeResult.ok -and $step.receipt -and
-                -not $step.receipt.ok -and $step.receipt.error -match 'Probe verification failed') `
-                'real-probe-oracle-failure-cannot-report-success'
-            $disk = Get-Content (Join-Path $step.receipt.directory 'result.json') -Raw | ConvertFrom-Json
-            Check ($disk.status -eq 'failed') 'real-probe-failure-retains-disk-result'
+            foreach ($suite in @('gi-probe-update','gi-field')) {
+                $context = if ($suite -eq 'gi-field') { 'Field' } else { 'Probe' }
+                foreach ($mode in $modes) {
+                    [IO.File]::WriteAllText((Join-Path $runnerTools 'mode.txt'), $mode)
+                    foreach ($name in @('input.cpp','Z-input.cpp')) {
+                        [IO.File]::WriteAllText("$runnerRepository/Sources/$name", 'input')
+                    }
+                    foreach ($name in @('GraphicsGadgetLab.exe','gglab-shaderc.exe','dxcompiler.dll','dxil.dll')) {
+                        [IO.File]::WriteAllText((Join-Path $runnerBin $name), 'binary')
+                    }
+                    $python = "@echo %~nx1`r`n"
+                    if ($mode -eq 'oracle-failure') { $python += "@if `"%~2`"==`"--root`" exit /b 7`r`n" }
+                    if ($mode -in $validators) { $python += "@if `"%~nx1`"==`"$mode`" exit /b 7`r`n" }
+                    [IO.File]::WriteAllText($fixturePython, $python + "@exit /b 0`r`n")
+                    $execution = Invoke-VerificationScript (Join-Path $runnerTests 'RunVerification.ps1') @{
+                        Suite=$suite;Python=$fixturePython;OutputDirectory=(Join-Path $output "$suite-$mode") }
+                    $producerResult = $execution.output | ConvertFrom-Json
+                    $step = $producerResult.suites[0].steps[0]
+                    $directory = $step.receipt.directory
+                    $disk = Get-Content (Join-Path $directory 'result.json') -Raw | ConvertFrom-Json
+                    if ($mode -eq 'passed') {
+                        Check ($execution.exitCode -eq 0 -and $producerResult.ok -and $step.receipt.ok -and
+                            $disk.status -eq 'passed' -and $disk.observations -gt 0) "$suite-one-catalog-receipt-and-disk-result"
+                        $qualified = if ($suite -eq 'gi-field') {
+                            $disk.productionLookupQualified -or $disk.readinessQualified
+                        } else { $disk.productionFieldQualified }
+                        Check (-not $qualified) "$suite-preserves-qualification-scope"
+                        $source = Get-Content "$directory/source-identity.json" -Raw | ConvertFrom-Json
+                        $finalSource = Get-Content "$directory/source-identity-final.json" -Raw | ConvertFrom-Json
+                        $binaryPath = if ($suite -eq 'gi-field') { "$directory/binaries.json" } else { "$directory/Develop/binaries.json" }
+                        $binaries = Get-Content $binaryPath -Raw | ConvertFrom-Json
+                        Check (($source.path -join ',') -ceq 'Sources/Z-input.cpp,Sources/input.cpp' -and
+                            ($source[0].PSObject.Properties.Name -join ',') -ceq 'path,sha256' -and
+                            $source[0].sha256 -cmatch '^[0-9A-F]{64}$') "$suite-preserves-source-order-shape-and-hash-case"
+                        Assert-VerificationIdentity $source $finalSource 'Fixture source seals differ.'
+                        Check (($binaries.file -join ',') -ceq 'GraphicsGadgetLab.exe,gglab-shaderc.exe,dxcompiler.dll,dxil.dll' -and
+                            ($binaries[0].PSObject.Properties.Name -join ',') -ceq 'file,sha256' -and
+                            $binaries[0].sha256 -cmatch '^[0-9A-F]{64}$') "$suite-preserves-binary-order-shape-and-hash-case"
+                        $gitArguments = Get-Content (Join-Path $runnerTools 'git-arguments.json') -Raw | ConvertFrom-Json
+                        # PowerShell consumes -- at the function stub boundary, unlike native Git.
+                        $expectedArguments = @('-c',"safe.directory=$($runnerRepository.Replace('\','/'))",'-C',
+                            $runnerRepository,'ls-files','--cached','--others','--exclude-standard',
+                            'Sources','Shaders','Tests/Verification','Scripts/Verification','Schemas','Projects','PropertySheets')
+                        Assert-VerificationIdentity $expectedArguments $gitArguments 'Fixture source scope differs.'
+                        Check $true "$suite-preserves-git-enumeration-scope"
+                        foreach ($validator in $validators) {
+                            $audit = Get-Content "$directory/$validator.result.json" -Raw | ConvertFrom-Json
+                            Check ($audit.exitCode -eq 0 -and $audit.output -ceq $validator) "$suite-retains-$validator-receipt"
+                        }
+                        $lower = @($source | ForEach-Object { [ordered]@{path=$_.path;sha256=$_.sha256.ToLowerInvariant()} })
+                        Reject { Assert-VerificationIdentity $source $lower 'Hash case changed.' } 'Hash case changed' "$suite-identity-comparison-is-case-sensitive"
+                    } else {
+                        $pattern = switch ($mode) {
+                            'enumeration-failure' { 'Source enumeration failed' }
+                            'compiler-mutation' { 'Compiler/product changed|Sources or product/compiler binaries changed' }
+                            { $_ -like 'source-*' } { 'Sources changed|Sources or product/compiler binaries changed' }
+                            default { "$context verification failed" }
+                        }
+                        Check ($execution.exitCode -ne 0 -and -not $producerResult.ok -and -not $step.receipt.ok -and
+                            $step.receipt.error -match $pattern -and $disk.status -eq 'failed') "$suite-rejects-$mode-and-retains-result"
+                        if ($mode -eq 'oracle-failure' -or $mode -in $validators) {
+                            $receiptName = if ($mode -eq 'oracle-failure') { 'oracle-result.json' } else { "$mode.result.json" }
+                            $failed = Get-Content (Join-Path $directory $receiptName) -Raw | ConvertFrom-Json
+                            Check ($failed.exitCode -eq 7 -and $failed.output) "$suite-$mode-retains-python-failure-receipt"
+                            $remaining = $mode -eq 'oracle-failure'
+                            foreach ($validator in $validators) {
+                                if ($remaining) {
+                                    Check (-not (Test-Path "$directory/$validator.result.json")) "$suite-$mode-stops-before-$validator"
+                                } elseif ($validator -eq $mode) { $remaining = $true }
+                                else {
+                                    $audit = Get-Content "$directory/$validator.result.json" -Raw | ConvertFrom-Json
+                                    Check ($audit.exitCode -eq 0) "$suite-$mode-runs-$validator-first"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         } finally {
             [IO.File]::WriteAllText($supportPath, $originalSupport,
                 (New-Object Text.UTF8Encoding($false)))
