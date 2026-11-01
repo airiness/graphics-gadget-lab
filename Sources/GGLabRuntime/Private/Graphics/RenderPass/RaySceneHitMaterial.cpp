@@ -8,7 +8,7 @@
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "Graphics/RenderPass/GIReceiverGraphResources.h"
-#include "Graphics/Pipeline/RaySceneShaderBindings.h"
+#include "Graphics/Pipeline/RaySceneQuery.h"
 #include "Graphics/Pipeline/GIComputeDispatch.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
@@ -79,14 +79,9 @@ namespace gglab
 			}
 			state.m_Layout = ResolvedRenderLayout::Create(services.m_Presentation->GetRHIContext()->GetPipelineSystem(),
 				*composed.m_Layout, "RayScene.HitMaterial");
-			for (uint32_t index = 0; index < state.m_Parameters.size(); ++index)
+			if (!ray_scene_bindings::ResolveParameters(*composed.m_Layout, state.m_Parameters))
 			{
-				const auto parameter = composed.m_Layout->FindParameterIndex(ray_scene_bindings::Key(index));
-				if (!parameter)
-				{
-					return false;
-				}
-				state.m_Parameters[index] = *parameter;
+				return false;
 			}
 			state.m_Scene = ResolvedBindingRef<SceneGPU>::Resolve(state.m_Layout, scene_bindings::SceneConstants);
 			state.m_Recipe.m_BindingLayout = state.m_Layout.GetNativeLayout();
@@ -128,15 +123,7 @@ namespace gglab
 					builder.WriteInPlace(output, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
 					data.m_Outputs[index] = builder.CreateView<RHITextureViewType::UnorderedAccess>(output);
 				}
-				GGLAB_UNUSED(builder.Read(scene.m_TopLevel, RGAccelerationStructureAccess::QueryRead));
-				for (const auto blas : scene.m_BottomLevels)
-				{
-					GGLAB_UNUSED(builder.Read(blas, RGAccelerationStructureAccess::QueryRead));
-				}
-				for (const auto buffer : { scene.m_Vertices, scene.m_Indices, scene.m_Geometries, scene.m_Instances, scene.m_Materials })
-				{
-					GGLAB_UNUSED(builder.Read(buffer, RGBufferAccess::StructuredRead, RHIStage::ComputeShader));
-				}
+				ray_scene_bindings::DeclareQueryReads(builder, scene);
 				data.m_Parameters = { .m_View = frame.GetRenderQueue(frame.GetDisplayViewId()).m_CoverageRasterDomain.m_ViewBindingId,
 					.m_Width = extent.m_Width, .m_Height = extent.m_Height, .m_InstanceCount = scene.m_InstanceCount,
 					.m_GeometryCount = scene.m_GeometryCount, .m_MaterialCount = scene.m_MaterialCount };
@@ -149,16 +136,9 @@ namespace gglab
 				if (!commands->RetainForSubmission(scene.m_Lifetime) || !constants.SetPipeline(m_State->m_Pipeline) ||
 					!constants.Bind(m_State->m_Scene, frame.m_FrameConstants.m_SceneSnapshot) ||
 					!commands->SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB), frame.m_FrameConstants.m_Views) ||
-					!commands->SetAccelerationStructure(m_State->m_Parameters[ray_scene_bindings::TopLevel],
-						execute.GetAccelerationStructureHandle(scene.m_TopLevel)))
+					!ray_scene_bindings::BindQueryResources(*commands, execute, scene, m_State->m_Parameters))
 				{
 					return;
-				}
-				const std::array buffers{ scene.m_Vertices, scene.m_Indices, scene.m_Geometries, scene.m_Instances, scene.m_Materials };
-				for (uint32_t index = 0; index < buffers.size(); ++index)
-				{
-					commands->SetReadOnlyBuffer(m_State->m_Parameters[index + ray_scene_bindings::Vertices],
-						execute.GetBufferHandle(buffers[index]));
 				}
 				auto parameters = data.m_Parameters;
 				parameters.m_Depth = execute.GetViewDescriptor(data.m_Depth).m_Index;

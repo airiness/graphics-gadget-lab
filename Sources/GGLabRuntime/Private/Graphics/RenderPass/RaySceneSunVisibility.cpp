@@ -1,5 +1,5 @@
 #include "GGLabRuntime/Graphics/Pipeline/RaySceneSunVisibility.h"
-#include "Graphics/Pipeline/RaySceneShaderBindings.h"
+#include "Graphics/Pipeline/RaySceneQuery.h"
 #include "Graphics/Pipeline/GIComputeDispatch.h"
 #include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
@@ -99,14 +99,9 @@ namespace gglab
 			}
 			state.m_Layout = ResolvedRenderLayout::Create(services.m_Presentation->GetRHIContext()->GetPipelineSystem(),
 				*composed.m_Layout, "RayScene.SunVisibility");
-			for (uint32_t index = 0; index < state.m_RayParameters.size(); ++index)
+			if (!ray_scene_bindings::ResolveParameters(*composed.m_Layout, state.m_RayParameters))
 			{
-				const auto parameter = composed.m_Layout->FindParameterIndex(ray_scene_bindings::Key(index));
-				if (!parameter)
-				{
-					return false;
-				}
-				state.m_RayParameters[index] = *parameter;
+				return false;
 			}
 			state.m_Scene = ResolvedBindingRef<SceneGPU>::Resolve(state.m_Layout, scene_bindings::SceneConstants);
 			state.m_Shadow = ResolvedBindingRef<DirectionalShadowGPU>::Resolve(state.m_Layout, scene_bindings::DirectionalShadow);
@@ -150,15 +145,7 @@ namespace gglab
 					data.m_Shadow = builder.CreateView<RHITextureViewType::ShaderResource>(shadowRead,
 						MakeRHITexture2DArrayViewDesc(RHIFormat::R32Float, 0, 0, shadow.m_CascadeCount, RHITextureAspect::Depth));
 				}
-				GGLAB_UNUSED(builder.Read(scene.m_TopLevel, RGAccelerationStructureAccess::QueryRead));
-				for (const auto blas : scene.m_BottomLevels)
-				{
-					GGLAB_UNUSED(builder.Read(blas, RGAccelerationStructureAccess::QueryRead));
-				}
-				for (const auto buffer : { scene.m_Vertices, scene.m_Indices, scene.m_Geometries, scene.m_Instances })
-				{
-					GGLAB_UNUSED(builder.Read(buffer, RGBufferAccess::StructuredRead, RHIStage::ComputeShader));
-				}
+				ray_scene_bindings::DeclareQueryReads(builder, scene, ray_scene_bindings::QueryInputs::GeometryOnly);
 				const auto& settings = frame.GetDirectionalShadowFramePlan().m_Settings;
 				const auto direction = -frame.m_RenderScene.m_WorldSun->m_Direction;
 				data.m_Parameters = { .m_ShadowSampler = services.m_Samplers->GetSamplerIndex(SamplerPreset::ShadowCmpLinearClamp),
@@ -178,17 +165,9 @@ namespace gglab
 					!constants.Bind(m_State->m_Scene, frame.m_FrameConstants.m_SceneSnapshot) ||
 					!constants.Bind(m_State->m_Shadow, frame.m_FrameConstants.m_DirectionalShadowSnapshot) ||
 					!commands->SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB), frame.m_FrameConstants.m_Views) ||
-					!commands->SetAccelerationStructure(m_State->m_RayParameters[ray_scene_bindings::TopLevel],
-						execute.GetAccelerationStructureHandle(scene.m_TopLevel)))
+					!ray_scene_bindings::BindQueryResources(*commands, execute, scene, m_State->m_RayParameters))
 				{
 					return;
-				}
-				const std::array buffers{ scene.m_Vertices, scene.m_Indices, scene.m_Geometries, scene.m_Instances };
-				for (uint32_t index = 0; index < buffers.size(); ++index)
-				{
-					commands->SetReadOnlyBuffer(
-						m_State->m_RayParameters[index + ray_scene_bindings::Vertices],
-						execute.GetBufferHandle(buffers[index]));
 				}
 				auto parameters = data.m_Parameters;
 				parameters.m_Depth = execute.GetViewDescriptor(data.m_Depth).m_Index;

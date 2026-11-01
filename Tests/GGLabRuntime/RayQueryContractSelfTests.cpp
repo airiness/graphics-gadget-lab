@@ -3,7 +3,7 @@
 #include "Graphics/Pipeline/GIReferenceObservation.h"
 #include "Graphics/Pipeline/GIComputeDispatch.h"
 #include "Graphics/Pipeline/GIObservationSceneIdentity.h"
-#include "Graphics/Pipeline/RaySceneShaderBindings.h"
+#include "Graphics/Pipeline/RaySceneQuery.h"
 #include "Graphics/Pipeline/GISpecularVisibilityObservation.h"
 #include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h"
@@ -24,6 +24,7 @@
 #include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 #include "GGLabRuntime/Graphics/RHI/RHIAccelerationStructure.h"
+#include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGResourceUtils.h"
 #include "Graphics/RHI/DX12/Utility/DX12BindingLayoutUtils.h"
 #include "Graphics/RHI/DX12/DX12RayQuerySupport.h"
@@ -43,6 +44,7 @@
 #include <limits>
 #include <memory>
 #include <span>
+#include <string>
 #include <type_traits>
 #include <vector>
 
@@ -202,6 +204,190 @@ namespace gglab
 				bindings.back().m_Slot.m_Binding == 10 &&
 				bindings[1].m_Slot.m_Type == RHIBindingType::AccelerationStructure,
 				"Shared ray bindings append t5-t10 after the actual inherited parameter order");
+		}
+
+		void RunRaySceneQueryTests(SelfTestContext& context) noexcept
+		{
+			class QueryCommands final : public RHIComputeCommandContext
+			{
+			public:
+				RHICommandContextHandle GetHandle() const noexcept override { return {}; }
+				RHIQueueType GetQueueType() const noexcept override { return RHIQueueType::Graphics; }
+				void TrackTextureUse(RHITextureHandle) noexcept override {}
+				void TrackBufferUse(RHIBufferHandle) noexcept override {}
+				void TrackAccelerationStructureUse(RHIAccelerationStructureHandle) noexcept override {}
+				void TextureBarrier(std::span<const RHITextureBarrier>) noexcept override {}
+				void BufferBarrier(std::span<const RHIBufferBarrier>) noexcept override {}
+				void AccelerationStructureBarrier(RHIAccelerationStructureHandle,
+					RHIResourceState, RHIResourceState) noexcept override {}
+				void FlushBarriers() noexcept override {}
+				void CopyBuffer(RHIBufferHandle, uint64_t, RHIBufferHandle, uint64_t, uint64_t) noexcept override {}
+				void CopyTextureToBuffer(const RHITextureToBufferCopy&) noexcept override {}
+				void SetPipeline(RHIPipelineHandle) noexcept override {}
+				void SetDescriptorTable(const RHIDescriptorTableBinding&) noexcept override {}
+				bool SetConstantBuffer(uint32_t, const RHIConstantBufferBinding&) noexcept override { return false; }
+				void SetInlineConstantWords(uint32_t, std::span<const uint32_t>, uint32_t) noexcept override {}
+				bool SetAccelerationStructure(uint32_t parameter,
+					RHIAccelerationStructureHandle handle) noexcept override
+				{
+					m_TopLevelParameter = parameter;
+					m_TopLevel = handle;
+					return m_AcceptTopLevel;
+				}
+				void SetReadOnlyBuffer(uint32_t parameter, RHIBufferHandle buffer, uint64_t) noexcept override
+				{
+					m_Parameters.push_back(parameter);
+					m_Buffers.push_back(buffer);
+					if (parameter == m_FailedParameter)
+					{
+						RejectRecording();
+					}
+				}
+				void SetReadWriteBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
+				void Dispatch(uint32_t, uint32_t, uint32_t) noexcept override {}
+				bool m_AcceptTopLevel = true;
+				uint32_t m_FailedParameter = UINT32_MAX;
+				uint32_t m_TopLevelParameter = UINT32_MAX;
+				RHIAccelerationStructureHandle m_TopLevel;
+				std::vector<uint32_t> m_Parameters;
+				std::vector<RHIBufferHandle> m_Buffers;
+			};
+
+			for (const auto inputs : { ray_scene_bindings::QueryInputs::GeometryOnly,
+				ray_scene_bindings::QueryInputs::Materials })
+			{
+				const uint32_t count = inputs == ray_scene_bindings::QueryInputs::GeometryOnly ?
+					ray_scene_bindings::GeometryOnlyCount : ray_scene_bindings::Count;
+				std::vector<LayoutBindingRequirement> bindings;
+				ray_scene_bindings::Append(bindings, count);
+				// Scramble native parameter order independently of semantic slots and t5-t10.
+				constexpr std::array orders{ 30u, 3u, 18u, 1u, 9u, 5u };
+				for (uint32_t slot = 0; slot < count; ++slot)
+				{
+					bindings[slot].m_ParameterOrder = orders[slot];
+				}
+				const std::array fragments{ LayoutFragment{ "Query", bindings } };
+				const auto layout = ComposeLayoutFragments(fragments);
+				context.Check(layout.IsSuccess(), "Query layouts allow non-semantic native parameter order");
+				if (!layout.IsSuccess())
+				{
+					continue;
+				}
+				std::array<uint32_t, ray_scene_bindings::Count> parameters{};
+				auto selected = std::span(parameters).first(count);
+				context.Check(ray_scene_bindings::ResolveParameters(*layout.m_Layout, selected) &&
+					parameters[ray_scene_bindings::TopLevel] != ray_scene_bindings::TopLevel,
+					"Query parameters resolve semantic keys rather than assuming native slot indices");
+				std::array<uint32_t, ray_scene_bindings::Count> untouched;
+				untouched.fill(UINT32_MAX);
+				if (count == ray_scene_bindings::GeometryOnlyCount)
+				{
+					context.Check(!ray_scene_bindings::ResolveParameters(*layout.m_Layout, untouched) &&
+						std::ranges::all_of(untouched, [](uint32_t value) { return value == UINT32_MAX; }),
+						"A missing material binding rejects the complete mapping without partial publication");
+				}
+				context.Check(!ray_scene_bindings::ResolveParameters(*layout.m_Layout,
+					std::span(untouched).first(1)) && untouched[0] == UINT32_MAX,
+					"Incomplete query input sets cannot publish a parameter mapping");
+
+				asset_test::TestRHIDevice device;
+				TransientResourcePool pool(&device);
+				RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+				RaySceneGraphResources scene;
+				RHIAccelerationStructureHandle topLevel;
+				std::vector<RHIBufferHandle> expectedBuffers;
+				struct Empty {};
+				graph.AddPass<Empty>("ImportQuery", [&](RenderGraph::RGBuilder& builder, Empty&)
+					{
+						const RHIAccelerationStructureDesc desc{
+							.m_Type = RHIAccelerationStructureType::TopLevel, .m_SizeInBytes = 256 };
+						topLevel = device.CreateAccelerationStructure(desc);
+						scene.m_TopLevel = builder.Import<RGAccelerationStructureResource>("Query.TLAS",
+							topLevel, desc, RGAccelerationStructureAccess::QueryRead, RGContentValidity::Defined);
+						for (uint32_t index = 0; index < 2; ++index)
+						{
+							const RHIAccelerationStructureDesc bottomDesc{ .m_SizeInBytes = 256 };
+							scene.m_BottomLevels.push_back(builder.Import<RGAccelerationStructureResource>(
+								("Query.BLAS." + std::to_string(index)).c_str(),
+								device.CreateAccelerationStructure(bottomDesc), bottomDesc,
+								RGAccelerationStructureAccess::QueryRead, RGContentValidity::Undefined));
+						}
+						const std::array ids
+						{
+							&scene.m_Vertices, &scene.m_Indices, &scene.m_Geometries,
+							&scene.m_Instances, &scene.m_Materials,
+						};
+						for (uint32_t slot = ray_scene_bindings::Vertices; slot < count; ++slot)
+						{
+							const RHIBufferDesc bufferDesc{ .m_SizeInBytes = 256, .m_StrideInBytes = 16,
+								.m_Usage = RHIBufferUsage::Structured };
+							const auto handle = device.CreateBuffer(bufferDesc, {});
+							expectedBuffers.push_back(handle);
+							*ids[slot - ray_scene_bindings::Vertices] = builder.ImportBuffer(
+								("Query.Buffer." + std::to_string(slot)).c_str(), handle, bufferDesc,
+								RGBufferAccess::StructuredRead, RGContentValidity::Defined);
+						}
+					});
+				uint32_t built = 0;
+				for (uint32_t index = 0; index < scene.m_BottomLevels.size(); ++index)
+				{
+					graph.AddPass<Empty>(("BuildQueryBLAS." + std::to_string(index)).c_str(),
+						RGPassEncoderType::Compute,
+						[&, index](RenderGraph::RGBuilder& builder, Empty&)
+						{
+							builder.WriteInPlace(scene.m_BottomLevels[index], RGAccelerationStructureAccess::BuildWrite);
+						},
+						[&](RGExecuteContext&, Empty&) { ++built; });
+				}
+				bool bound = false;
+				uint32_t parameterCount = count;
+				graph.AddPass<Empty>("Query", RGPassEncoderType::Compute,
+					[&](RenderGraph::RGBuilder& builder, Empty&)
+					{
+						ray_scene_bindings::DeclareQueryReads(builder, scene, inputs);
+						builder.SideEffect();
+					},
+					[&](RGExecuteContext& execute, Empty&)
+					{
+						// Logical recording fixture only: no native query or scene snapshot is submitted.
+						bound = ray_scene_bindings::BindQueryResources(*execute.GetDirectComputeCommandContext(),
+							execute, scene, std::span(parameters).first(parameterCount));
+					});
+				context.Check(graph.Compile(), "Both query input sets compile with all BLAS producer dependencies");
+				if (!graph.GetExecutionPlan())
+				{
+					continue;
+				}
+				for (uint32_t failure = 0; failure < 4; ++failure)
+				{
+					QueryCommands commands;
+					commands.m_AcceptTopLevel = failure != 1;
+					commands.m_FailedParameter = failure == 2 ? parameters[ray_scene_bindings::Indices] : UINT32_MAX;
+					parameterCount = failure == 3 ? 1 : count;
+					RGDeferredCommitList commits;
+					RGExecuteContext execute(commits, { .m_DirectComputeCommandContext = &commands });
+					built = 0;
+					graph.Execute(execute);
+					context.Check(built == scene.m_BottomLevels.size(),
+						"Every traversed BLAS producer remains live before a query");
+					if (failure == 0)
+					{
+						context.Check(bound && commands.m_TopLevel == topLevel &&
+							commands.m_TopLevelParameter == parameters[ray_scene_bindings::TopLevel] &&
+							commands.m_Buffers == expectedBuffers &&
+							commands.m_Parameters == std::vector<uint32_t>(selected.begin() + 1, selected.end()),
+							"Query binding preserves native parameters, pool order and the optional material table");
+					}
+					else
+					{
+						const size_t expected = failure == 2 ? 2 : 0;
+						context.Check(!bound && commands.m_Buffers.size() == expected &&
+							(failure == 1 || commands.HasRecordingError()),
+							"Invalid input counts, rejected TLAS and buffer recording errors stop query setup");
+					}
+					graph.Retire({});
+				}
+			}
 		}
 
 		void RunGIFieldTests(SelfTestContext& context) noexcept
@@ -1881,6 +2067,7 @@ namespace gglab
 		RunGIReceiverPreparationTests(context);
 		RunGIReferenceInputTests(context);
 		RunGISharedContractTests(context);
+		RunRaySceneQueryTests(context);
 		RunProbeUpdateProfileTests(context);
 		RunGIFieldTests(context);
 		RunGIReferenceObservationTests(context);

@@ -597,6 +597,9 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\PipelineCache.cpp">
       <Filter>Private\Graphics\Pipeline</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\RaySceneQuery.cpp">
+      <Filter>Private\Graphics\Pipeline</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\RHIPipelineRecipeAdapter.cpp">
       <Filter>Private\Graphics\Pipeline</Filter>
     </ClCompile>
@@ -1341,6 +1344,9 @@
       <Filter>Private\Graphics\Pipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\PipelineCache.h">
+      <Filter>Private\Graphics\Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\RaySceneQuery.h">
       <Filter>Private\Graphics\Pipeline</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\RaySceneShaderBindings.h">

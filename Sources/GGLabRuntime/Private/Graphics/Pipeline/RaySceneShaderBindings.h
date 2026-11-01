@@ -30,6 +30,28 @@ namespace gglab::ray_scene_bindings
 		return LayoutBindingKey{ BindingKeyBase + slot };
 	}
 
+	// Publish only a complete semantic-to-native mapping, never a partially resolved layout.
+	[[nodiscard]] inline bool ResolveParameters(const ComposedLayout& layout,
+		std::span<uint32_t> parameters) noexcept
+	{
+		if (parameters.size() != GeometryOnlyCount && parameters.size() != Count)
+		{
+			return false;
+		}
+		std::array<uint32_t, Count> resolved{};
+		for (uint32_t slot = 0; slot < parameters.size(); ++slot)
+		{
+			const auto parameter = layout.FindParameterIndex(Key(slot));
+			if (!parameter)
+			{
+				return false;
+			}
+			resolved[slot] = *parameter;
+		}
+		std::copy_n(resolved.begin(), parameters.size(), parameters.begin());
+		return true;
+	}
+
 	[[nodiscard]] inline uint32_t NextParameterOrder(
 		std::span<const LayoutBindingRequirement> bindings) noexcept
 	{

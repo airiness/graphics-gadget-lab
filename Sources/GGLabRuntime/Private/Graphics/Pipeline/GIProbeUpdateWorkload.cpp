@@ -13,7 +13,7 @@
 #include "GGLabRuntime/Graphics/RHI/RHIDevice.h"
 #include "GGLabRuntime/Graphics/RHI/RHITextureViewDescUtils.h"
 #include "Graphics/RenderPass/AtmosphereGraphResources.h"
-#include "Graphics/Pipeline/RaySceneShaderBindings.h"
+#include "Graphics/Pipeline/RaySceneQuery.h"
 #include "Graphics/GIShaderConstants.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
@@ -354,14 +354,9 @@ namespace gglab
 			}
 			state.m_Layout = ResolvedRenderLayout::Create(services.m_Presentation->GetRHIContext()->GetPipelineSystem(),
 				*composed.m_Layout, "GI.ProbeUpdate");
-			for (uint32_t index = 0; index < state.m_Bindings.size(); ++index)
+			if (!ray_scene_bindings::ResolveParameters(*composed.m_Layout, state.m_Bindings))
 			{
-				const auto parameter = composed.m_Layout->FindParameterIndex(ray_scene_bindings::Key(index));
-				if (!parameter)
-				{
-					return RenderFrameValidationResult::ContractFailure("Probe workload binding unavailable");
-				}
-				state.m_Bindings[index] = *parameter;
+				return RenderFrameValidationResult::ContractFailure("Probe workload binding unavailable");
 			}
 			const auto outputParameter = composed.m_Layout->FindParameterIndex(RayOutputKey);
 			const auto statusParameter = composed.m_Layout->FindParameterIndex(StatusOutputKey);
@@ -631,15 +626,7 @@ namespace gglab
 						}
 						if (tracing)
 						{
-							GGLAB_UNUSED(builder.Read(scene.m_TopLevel, RGAccelerationStructureAccess::QueryRead));
-							for (const auto blas : scene.m_BottomLevels)
-							{
-								GGLAB_UNUSED(builder.Read(blas, RGAccelerationStructureAccess::QueryRead));
-							}
-							for (const auto buffer : { scene.m_Vertices, scene.m_Indices, scene.m_Geometries, scene.m_Instances, scene.m_Materials })
-							{
-								GGLAB_UNUSED(builder.Read(buffer, RGBufferAccess::StructuredRead, RHIStage::ComputeShader));
-							}
+							ray_scene_bindings::DeclareQueryReads(builder, scene);
 							if (!profile.m_ConstantEnvironment)
 							{
 								const auto& ibl = builder.GetBlackboard().Get<RGIBLResources>(IBLResourcesName);
@@ -691,18 +678,9 @@ namespace gglab
 							// Sun hit lighting must read this frame slot alongside its Scene constants.
 							commands->SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::LightSB),
 								services.m_FrameBuffers->GetLightStructuredBuffer()->GetBufferHandle(frame.m_FrameSlotIndex));
-							if (!commands->SetAccelerationStructure(
-								current.m_Bindings[ray_scene_bindings::TopLevel],
-								execute.GetAccelerationStructureHandle(scene.m_TopLevel)))
+							if (!ray_scene_bindings::BindQueryResources(*commands, execute, scene, current.m_Bindings))
 							{
 								return;
-							}
-							const std::array buffers{ scene.m_Vertices, scene.m_Indices, scene.m_Geometries, scene.m_Instances, scene.m_Materials };
-							for (uint32_t index = 0; index < buffers.size(); ++index)
-							{
-								commands->SetReadOnlyBuffer(
-									current.m_Bindings[index + ray_scene_bindings::Vertices],
-									execute.GetBufferHandle(buffers[index]));
 							}
 						}
 						if (stage == ProbeStage::Initialize || tracing)

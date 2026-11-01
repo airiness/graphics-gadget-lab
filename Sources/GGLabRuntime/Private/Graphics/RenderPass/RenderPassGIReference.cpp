@@ -1,7 +1,7 @@
 #include "Graphics/RenderPass/RenderPassGIReference.h"
 #include "Graphics/Pipeline/GIReferenceObservation.h"
 #include "Graphics/Pipeline/GIComputeDispatch.h"
-#include "Graphics/Pipeline/RaySceneShaderBindings.h"
+#include "Graphics/Pipeline/RaySceneQuery.h"
 #include "GGLabRuntime/Graphics/Pipeline/RaySceneHitMaterial.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
@@ -194,14 +194,9 @@ namespace gglab
 			}
 			state.m_Layout = ResolvedRenderLayout::Create(services.m_Presentation->GetRHIContext()->GetPipelineSystem(),
 				*composed.m_Layout, "GI.Reference");
-			for (uint32_t index = 0; index < state.m_Parameters.size(); ++index)
+			if (!ray_scene_bindings::ResolveParameters(*composed.m_Layout, state.m_Parameters))
 			{
-				const auto parameter = composed.m_Layout->FindParameterIndex(ray_scene_bindings::Key(index));
-				if (!parameter)
-				{
-					return RenderFrameValidationResult::ContractFailure("GI reference ray binding is unavailable");
-				}
-				state.m_Parameters[index] = *parameter;
+				return RenderFrameValidationResult::ContractFailure("GI reference ray binding is unavailable");
 			}
 			state.m_Scene = ResolvedBindingRef<SceneGPU>::Resolve(state.m_Layout, scene_bindings::SceneConstants);
 			state.m_Atmosphere = ResolvedBindingRef<AtmosphereGPU>::Resolve(state.m_Layout, scene_bindings::AtmosphereConstants);
@@ -354,15 +349,7 @@ namespace gglab
 					{ .m_Format = RHIFormat::R32G32B32A32Float, .m_Extent = extent });
 				builder.WriteInPlace(pathDiagnostics, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
 				data.m_PathDiagnostics = builder.CreateView<RHITextureViewType::UnorderedAccess>(pathDiagnostics);
-				GGLAB_UNUSED(builder.Read(scene.m_TopLevel, RGAccelerationStructureAccess::QueryRead));
-				for (const auto blas : scene.m_BottomLevels)
-				{
-					GGLAB_UNUSED(builder.Read(blas, RGAccelerationStructureAccess::QueryRead));
-				}
-				for (const auto buffer : { scene.m_Vertices, scene.m_Indices, scene.m_Geometries, scene.m_Instances, scene.m_Materials })
-				{
-					GGLAB_UNUSED(builder.Read(buffer, RGBufferAccess::StructuredRead, RHIStage::ComputeShader));
-				}
+				ray_scene_bindings::DeclareQueryReads(builder, scene);
 				data.m_Parameters = { .m_View = frame.GetRenderQueue(frame.GetDisplayViewId()).m_CoverageRasterDomain.m_ViewBindingId,
 					.m_Width = extent.m_Width, .m_Height = extent.m_Height, .m_InstanceCount = scene.m_InstanceCount,
 					.m_GeometryCount = scene.m_GeometryCount, .m_MaterialCount = scene.m_MaterialCount,
@@ -428,19 +415,12 @@ namespace gglab
 					!constants.Bind(m_State->m_Scene, frame.m_FrameConstants.m_SceneSnapshot) ||
 					!constants.Bind(m_State->m_Atmosphere, data.m_Atmosphere) ||
 					!commands->SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB), frame.m_FrameConstants.m_Views) ||
-					!commands->SetAccelerationStructure(m_State->m_Parameters[ray_scene_bindings::TopLevel],
-						execute.GetAccelerationStructureHandle(scene.m_TopLevel)))
+					!ray_scene_bindings::BindQueryResources(*commands, execute, scene, m_State->m_Parameters))
 				{
 					return;
 				}
 				commands->SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::LightSB),
 					services.m_FrameBuffers->GetLightStructuredBuffer()->GetBufferHandle(frame.m_FrameSlotIndex));
-				const std::array buffers{ scene.m_Vertices, scene.m_Indices, scene.m_Geometries, scene.m_Instances, scene.m_Materials };
-				for (uint32_t index = 0; index < buffers.size(); ++index)
-				{
-					commands->SetReadOnlyBuffer(m_State->m_Parameters[index + ray_scene_bindings::Vertices],
-						execute.GetBufferHandle(buffers[index]));
-				}
 				auto parameters = data.m_Parameters;
 				parameters.m_Depth = execute.GetViewDescriptor(data.m_Depth).m_Index;
 				parameters.m_Face = execute.GetViewDescriptor(data.m_Face).m_Index;

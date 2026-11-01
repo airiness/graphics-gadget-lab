@@ -157,6 +157,7 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\TemporalReferenceAccumulator.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIReferenceObservation.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIReceiverCache.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\RaySceneQuery.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIProbeUpdate.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIProbeUpdateWorkload.cpp" />
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIField.cpp" />
@@ -403,6 +404,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\GIShaderConstants.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIComputeDispatch.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\RaySceneShaderBindings.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\RaySceneQuery.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIObservationSceneIdentity.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GITiledObservation.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIReferenceObservation.h" />

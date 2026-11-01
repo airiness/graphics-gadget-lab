@@ -1,7 +1,7 @@
 #include "Graphics/RenderPass/RenderPassGISpecularVisibility.h"
 #include "Graphics/Pipeline/GISpecularVisibilityObservation.h"
 #include "Graphics/Pipeline/GIComputeDispatch.h"
-#include "Graphics/Pipeline/RaySceneShaderBindings.h"
+#include "Graphics/Pipeline/RaySceneQuery.h"
 #include "Graphics/RenderPass/GIReceiverGraphResources.h"
 #include "Graphics/RenderPass/GIPreviewGraphResources.h"
 #include "Graphics/Resource/RenderResourceRegistry.h"
@@ -174,14 +174,9 @@ namespace gglab
 			}
 			state.m_Layout = ResolvedRenderLayout::Create(
 				services.m_Presentation->GetRHIContext()->GetPipelineSystem(), *composed.m_Layout, "GI.SpecularVisibility");
-			for (uint32_t index = 0; index < state.m_RayBindings.size(); ++index)
+			if (!ray_scene_bindings::ResolveParameters(*composed.m_Layout, state.m_RayBindings))
 			{
-				const auto parameter = composed.m_Layout->FindParameterIndex(ray_scene_bindings::Key(index));
-				if (!parameter)
-				{
-					return RenderFrameValidationResult::ContractFailure("GGX visibility binding unavailable");
-				}
-				state.m_RayBindings[index] = *parameter;
+				return RenderFrameValidationResult::ContractFailure("GGX visibility binding unavailable");
 			}
 			state.m_Scene = ResolvedBindingRef<SceneGPU>::Resolve(state.m_Layout, scene_bindings::SceneConstants);
 			state.m_Recipe.m_BindingLayout = state.m_Layout.GetNativeLayout();
@@ -284,17 +279,7 @@ namespace gglab
 						preview.m_Activity = texture;
 					}
 				}
-				GGLAB_UNUSED(builder.Read(scene.m_TopLevel, RGAccelerationStructureAccess::QueryRead));
-				for (const auto blas : scene.m_BottomLevels)
-				{
-					GGLAB_UNUSED(builder.Read(blas, RGAccelerationStructureAccess::QueryRead));
-				}
-				const std::array rayBuffers{ scene.m_Vertices, scene.m_Indices,
-					scene.m_Geometries, scene.m_Instances, scene.m_Materials };
-				for (const auto buffer : rayBuffers)
-				{
-					GGLAB_UNUSED(builder.Read(buffer, RGBufferAccess::StructuredRead, RHIStage::ComputeShader));
-				}
+				ray_scene_bindings::DeclareQueryReads(builder, scene);
 				auto* observation = services.m_GISpecularVisibilityObservation;
 				auto& receiverCache = observation->GetReceiverCache();
 				data.m_ReceiverCache = receiverCache.Import(builder);
@@ -348,20 +333,12 @@ namespace gglab
 				if (!commands->RetainForSubmission(scene.m_Lifetime) || !constants.SetPipeline(m_State->m_Pipeline) ||
 					!constants.Bind(m_State->m_Scene, frame.m_FrameConstants.m_SceneSnapshot) ||
 					!commands->SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::ViewSB), frame.m_FrameConstants.m_Views) ||
-					!commands->SetAccelerationStructure(m_State->m_RayBindings[ray_scene_bindings::TopLevel],
-						execute.GetAccelerationStructureHandle(scene.m_TopLevel)))
+					!ray_scene_bindings::BindQueryResources(*commands, execute, scene, m_State->m_RayBindings))
 				{
 					return;
 				}
 				commands->SetReadOnlyBuffer(static_cast<uint32_t>(CommonRSRootParamIndex::MaterialSB),
 					services.m_FrameBuffers->GetMaterialStructuredBuffer()->GetBufferHandle(frame.m_FrameSlotIndex));
-				const std::array buffers{ scene.m_Vertices, scene.m_Indices, scene.m_Geometries, scene.m_Instances, scene.m_Materials };
-				for (uint32_t index = 0; index < buffers.size(); ++index)
-				{
-					commands->SetReadOnlyBuffer(
-						m_State->m_RayBindings[index + ray_scene_bindings::Vertices],
-						execute.GetBufferHandle(buffers[index]));
-				}
 				auto parameters = data.m_Parameters;
 				parameters.m_Depth = execute.GetViewDescriptor(data.m_Depth).m_Index;
 				parameters.m_RasterPosition = execute.GetViewDescriptor(data.m_RasterPosition).m_Index;
