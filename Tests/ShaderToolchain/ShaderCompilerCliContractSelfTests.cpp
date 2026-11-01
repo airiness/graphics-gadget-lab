@@ -1411,7 +1411,7 @@ namespace gglab
 			const std::filesystem::path& sourceRoot,
 			const std::filesystem::path& tempRoot) noexcept
 		{
-			constexpr size_t ExpectedRuntimeProgramCount = 154;
+			constexpr size_t ExpectedRuntimeProgramCount = 158;
 			const std::string expectedProgramCountField = std::format("\"programCount\":{}", ExpectedRuntimeProgramCount);
 			const CliRunResult missingRequiredOption = RunCli({ L"build-runtime", L"--result-format", L"json", });
 			const CliRunResult unknownOption = RunCli({ L"build-runtime", L"--bogus", L"--result-format", L"json", });
@@ -1509,6 +1509,8 @@ namespace gglab
 				shader_programs::GIReceiverPositionPixel,
 				shader_programs::GIReferenceCompute,
 				shader_programs::GISpecularVisibilityCompute,
+				shader_programs::GIProbeClassifyCompute,
+				shader_programs::GIFieldLookupCompute,
 				nonfinite::CounterVariant(shader_programs::RaySceneProbeCompute),
 				nonfinite::CounterVariant(shader_programs::RaySceneSunVisibilityCompute),
 				nonfinite::CounterVariant(shader_programs::RaySceneHitMaterialCompute),
@@ -1516,6 +1518,8 @@ namespace gglab
 				nonfinite::CounterVariant(shader_programs::GIReceiverPositionPixel),
 				nonfinite::CounterVariant(shader_programs::GIReferenceCompute),
 				nonfinite::CounterVariant(shader_programs::GISpecularVisibilityCompute),
+				nonfinite::CounterVariant(shader_programs::GIProbeClassifyCompute),
+				nonfinite::CounterVariant(shader_programs::GIFieldLookupCompute),
 			};
 			for (const ShaderProgramRef& programRef : requiredPrograms)
 			{
