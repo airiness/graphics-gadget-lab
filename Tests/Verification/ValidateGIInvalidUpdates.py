@@ -13,7 +13,8 @@ def snapshot(directory, field):
         if value.dtype.names == ('radianceDistance',):
             value = value['radianceDistance']
         arrays[target['address']['resource'].rsplit('.', 1)[-1]] = value
-    require(set(arrays) == {'Rays', 'Irradiance', 'Distance', 'State', 'UpdateStatus'}, 'Missing diagnostic payload')
+    expected = {'Rays', 'Irradiance', 'Distance', 'State', 'UpdateStatus'}
+    require(set(arrays) == expected, 'Missing diagnostic payload')
     for name in ('Irradiance', 'Distance', 'State'):
         require(np.isfinite(arrays[name]).all(), f'{directory}: nonfinite persistent {name}')
     status = arrays['UpdateStatus']
@@ -25,6 +26,31 @@ def snapshot(directory, field):
     cpu = fields(metrics['GI field update status' if field else 'Probe update status'])
     require(cpu == verdict, 'CPU status disagrees with the completed GPU readback')
     return arrays, verdict, progress
+
+
+def query_snapshot(directory, expected_status):
+    record = load(next(directory.glob('*.resource-export.json')))
+    arrays = {t['address']['resource'].rsplit('.', 1)[-1]: np.load(directory / t['array'], allow_pickle=False)
+              for t in record['targets']}
+    require(set(arrays) == {'Classification', 'ReceiverIrradiance', 'ReceiverQuery', 'UpdateStatus'},
+            'Missing paired query failure evidence')
+    status = arrays['UpdateStatus']
+    require({n: int(status[n][0]) for n in status.dtype.names} == expected_status,
+            'Query diagnostics name a different sticky failure')
+    classes = arrays['Classification']
+    require(classes.dtype == np.dtype('<u4') and
+            bool(classes[0, 0, 0, 0] & (1 << 31)) == bool(expected_status['error']),
+            'GPU query failure flag disagrees with authoritative status')
+    query, energy = arrays['ReceiverQuery'], arrays['ReceiverIrradiance']
+    covered = query[..., 3] != 0
+    require(covered.any() and np.isfinite(query).all() and np.isfinite(energy).all(), 'Invalid query failure diagnostics')
+    if expected_status['error']:
+        require(np.all(query[covered, 3] == -1) and np.all(query[covered, 2] == 0) and
+                np.all(energy[covered, :3] == 0) and np.all(energy[covered, 3] == -1),
+                'An invalid field generation was sampled as compatible irradiance')
+    else:
+        require(np.isin(classes, [1, 2]).all() and np.all(query[covered, 3] == 1) and
+                np.all(energy[covered, 3] == 1), 'Replacement query did not restore compatibility')
 
 
 def validate(root, backends):
@@ -65,6 +91,8 @@ def validate(root, backends):
                         'Safe owner replacement did not restore valid updates')
                 if mode == 'field':
                     require(clean_progress['generation'] != progress['generation'], 'Recovery reused the invalid field generation')
+                    query_snapshot(directory / 'query-frozen', frozen_status)
+                    query_snapshot(directory / 'query-replaced', clean_status)
                 count += 1
     require(count == len(backends) * 15, 'Injection matrix is incomplete')
     return dict(status='passed', cases=count, backends=backends)

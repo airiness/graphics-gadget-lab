@@ -482,7 +482,7 @@ namespace gglab
 		// IBL Pass
 		m_IBLPass.AddPass(rg, context, services);
 
-		// Full field writes precede opaque consumers; lookup joins these dependencies later.
+		// Field consumers declare sampled reads after the full update and seam borders.
 		if (m_GIField)
 		{
 			m_GIField->AddPasses(rg, context, services, referenceScene);
@@ -534,6 +534,10 @@ namespace gglab
 		if (m_EnableGIReceiver)
 		{
 			m_GIReceiverPass.AddPass(rg, context, services);
+			if (m_GIField)
+			{
+				m_GIField->AddReceiverDiagnostics(rg, context, services);
+			}
 		}
 		if (m_GIProbeUpdate)
 		{
@@ -624,6 +628,10 @@ namespace gglab
 
 		// Atmosphere LUT previews must declare their reads before the persistent cache is exported.
 		m_AtmospherePass.AddFinishPass(rg);
+		if (m_GIField)
+		{
+			m_GIField->ExportResources(rg);
+		}
 
 		// The composited capture tap reads the final display target after every
 		// writer and before the present export.

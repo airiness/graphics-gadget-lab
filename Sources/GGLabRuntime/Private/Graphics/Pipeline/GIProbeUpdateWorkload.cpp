@@ -1,5 +1,6 @@
 #include "Graphics/Pipeline/GIProbeUpdateWorkload.h"
 #include "Graphics/Pipeline/GIFieldState.h"
+#include "Graphics/RenderPass/GIFieldGraphResources.h"
 #include "GGLabRuntime/Graphics/RayScene.h"
 #include "GGLabRuntime/Graphics/Buffer/PersistentStructuredBuffer.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
@@ -39,6 +40,7 @@ namespace gglab
 			BlendDirect,
 			BlendShared,
 			Borders,
+			Classify,
 			Count,
 		};
 		enum class ProbeSurface : size_t
@@ -46,10 +48,11 @@ namespace gglab
 			Irradiance,
 			Distance,
 			State,
+			Classification,
 		};
-		constexpr std::array FieldSurfaces{ "GI.Field.Irradiance", "GI.Field.Distance", "GI.Field.State" };
+		constexpr std::array FieldSurfaces{ "GI.Field.Irradiance", "GI.Field.Distance", "GI.Field.State", "GI.Field.Classification" };
 		constexpr std::array FieldPasses{ "GI.Field.Initialize", "GI.Field.TraceShade",
-			"GI.Field.BlendDirect", "GI.Field.BlendShared", "GI.Field.Borders" };
+			"GI.Field.BlendDirect", "GI.Field.BlendShared", "GI.Field.Borders", "GI.Field.Classify" };
 		struct SurfaceInfo
 		{
 			const char* m_Name;
@@ -62,6 +65,7 @@ namespace gglab
 			SurfaceInfo{ "GI.ProbeUpdate.Irradiance", gi_shader::GIProbeIrradianceTileWidth, RHIFormat::R32G32B32A32Float, 4 * sizeof(float) },
 			SurfaceInfo{ "GI.ProbeUpdate.Distance", gi_shader::GIProbeDistanceTileWidth, RHIFormat::R32G32Float, 2 * sizeof(float) },
 			SurfaceInfo{ "GI.ProbeUpdate.State", 1, RHIFormat::R32G32B32A32Float, 4 * sizeof(float) },
+			SurfaceInfo{ "GI.Field.Classification", 1, RHIFormat::R32Uint, sizeof(uint32_t) },
 		};
 		uint64_t LogicalSurfaceBytes(uint32_t probes, const SurfaceInfo& surface) noexcept
 		{
@@ -79,11 +83,13 @@ namespace gglab
 		static_assert(uint32_t(GIUpdateError::InvalidRay) == gi_shader::GIUpdateErrorInvalidRay &&
 			uint32_t(GIUpdateError::InvalidHistory) == gi_shader::GIUpdateErrorInvalidHistory &&
 			uint32_t(GIUpdateError::InvalidBlend) == gi_shader::GIUpdateErrorInvalidBlend);
-		const std::array ProgramRefs
+		// Inline program identities own strings. Store constant addresses instead
+		// of copying them during cross-translation-unit dynamic initialization.
+		constexpr std::array ProgramRefs
 		{
-			shader_programs::GIProbeInitializeCompute, shader_programs::GIProbeTraceCompute,
-			shader_programs::GIProbeBlendDirectCompute, shader_programs::GIProbeBlendSharedCompute,
-			shader_programs::GIProbeBordersCompute
+			&shader_programs::GIProbeInitializeCompute, &shader_programs::GIProbeTraceCompute,
+			&shader_programs::GIProbeBlendDirectCompute, &shader_programs::GIProbeBlendSharedCompute,
+			&shader_programs::GIProbeBordersCompute, &shader_programs::GIProbeClassifyCompute
 		};
 		const std::array PassInfos
 		{
@@ -97,6 +103,8 @@ namespace gglab
 				.m_CategoryName = "Global Illumination", .m_Category = RenderPassCategory::Debug, .m_Type = RenderPassType::Compute },
 			RenderPassInfo{ .m_TypeName = "GI.ProbeUpdate.Borders", .m_DisplayName = "Probe octahedral borders",
 				.m_CategoryName = "Global Illumination", .m_Category = RenderPassCategory::Debug, .m_Type = RenderPassType::Compute },
+			RenderPassInfo{ .m_TypeName = "GI.Field.Classify", .m_DisplayName = "Classify static probes",
+				.m_CategoryName = "Global Illumination", .m_Category = RenderPassCategory::Lighting, .m_Type = RenderPassType::Compute },
 		};
 		static_assert(ProgramRefs.size() == static_cast<size_t>(ProbeStage::Count));
 		static_assert(ProgramRefs.size() == GIProbeUpdateWorkload::ProgramCount);
@@ -115,8 +123,7 @@ namespace gglab
 			float m_MaximumDistance = 0;
 			std::array<uint32_t, 3> m_SceneCounts{};
 			uint32_t m_ConstantEnvironment = 0;
-			std::array<uint32_t, Surfaces.size()> m_Targets{};
-			uint32_t m_TargetsPadding = 0;
+			std::array<uint32_t, Surfaces.size()> m_Targets{ UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX };
 			uint32_t m_Transmittance = UINT32_MAX;
 			uint32_t m_AtmosphereSampler = 0;
 			uint32_t m_LightingPadding = 0;
@@ -272,6 +279,10 @@ namespace gglab
 				resources->m_Device->QueryBufferAllocationFacts(resources->m_Rays.Get()) });
 			for (size_t index = 0; index < Surfaces.size(); ++index)
 			{
+				if (index == static_cast<size_t>(ProbeSurface::Classification) && !m_State->m_Field)
+				{
+					continue;
+				}
 				const auto& surface = Surfaces[index];
 				const auto logicalBytes = LogicalSurfaceBytes(result.m_ProbeCount, surface);
 				result.m_Allocations.push_back({ logicalBytes,
@@ -413,6 +424,10 @@ namespace gglab
 			diagnostics.m_RayCapacityBytes = resources->m_RayDesc.m_SizeInBytes;
 			for (size_t index = 0; index < Surfaces.size(); ++index)
 			{
+				if (index == static_cast<size_t>(ProbeSurface::Classification) && !state.m_Field)
+				{
+					continue;
+				}
 				const auto& surface = Surfaces[index];
 				auto& desc = resources->m_Descriptions[index];
 				desc = { .m_Format = surface.m_Format,
@@ -466,9 +481,24 @@ namespace gglab
 		}
 		for (uint32_t index = 0; index < ProgramRefs.size(); ++index)
 		{
+			if (index == static_cast<size_t>(ProbeStage::Classify) && !state.m_Field)
+			{
+				continue;
+			}
 			const auto lookupBegin = std::chrono::steady_clock::now();
-			const auto program = services.m_ShaderPrograms->LoadProgram(ProgramRefs[index]);
+			const auto& programRef = *ProgramRefs[index];
+			if (!programRef.IsValid())
+			{
+				return RenderFrameValidationResult::ContractFailure("Probe shader identity is invalid",
+					PassInfos[index].m_TypeName);
+			}
+			const auto program = services.m_ShaderPrograms->LoadProgram(programRef);
 			const auto generation = services.m_ShaderPrograms->GetGeneration(program);
+			if (!program.IsValid() || generation == 0)
+			{
+				return RenderFrameValidationResult::ContractFailure("Probe shader artifact is unavailable",
+					programRef.m_ProgramId + ":" + programRef.m_VariantId);
+			}
 			if (state.m_Generations[index] != 0 && state.m_Generations[index] != generation)
 			{
 				return RenderFrameValidationResult::ContractFailure("Probe update programs changed; replace the update owner");
@@ -480,7 +510,8 @@ namespace gglab
 				state.m_Progress->m_Diagnostics.m_ShaderLookupMilliseconds +=
 					std::chrono::duration<double, std::milli>(pipelineBegin - lookupBegin).count();
 			}
-			const auto& layout = index == static_cast<size_t>(ProbeStage::TraceShade) ?
+			const auto& layout = index == static_cast<size_t>(ProbeStage::TraceShade) ||
+				index == static_cast<size_t>(ProbeStage::Classify) ?
 				state.m_Layout : state.m_DataLayout;
 			const ComputePipelineRecipe recipe{ .m_BindingLayout = layout.GetNativeLayout(), .m_CSId = program };
 			state.m_Pipelines[index] = layout.Resolve(*services.m_PipelineResolver, state.m_Slots[index], recipe, PassInfos[index]);
@@ -509,7 +540,7 @@ namespace gglab
 
 	void GIProbeUpdateWorkload::AddPasses(RenderGraph& graph, const RenderFrameContext& frame,
 		const RenderServices& services, const RaySceneGraphResources& scene,
-		std::shared_ptr<GIFieldUpdateState> fieldUpdate) noexcept
+		std::shared_ptr<GIFieldUpdateState> fieldUpdate, bool compose) noexcept
 	{
 		auto& state = *m_State;
 		if (!state.m_Profile.m_ConstantEnvironment)
@@ -552,6 +583,10 @@ namespace gglab
 					initialized ? RGContentValidity::Defined : RGContentValidity::Undefined);
 				for (size_t index = 0; index < imported->m_Textures.size(); ++index)
 				{
+					if (!resources->m_Textures[index])
+					{
+						continue;
+					}
 					imported->m_Textures[index] = builder.ImportTexture(field ? FieldSurfaces[index] : Surfaces[index].m_Name, resources->m_Textures[index].Get(),
 						resources->m_Descriptions[index],
 						initialized ? ToRHIResourceState(RGTextureAccess::Sample) : UndefinedRHITextureState(),
@@ -560,14 +595,20 @@ namespace gglab
 			});
 		if (record)
 		{
-			const std::array stages{ ProbeStage::Initialize, ProbeStage::TraceShade,
+			const std::array stages{ ProbeStage::Initialize, ProbeStage::Classify, ProbeStage::TraceShade,
 				profile.m_SharedBlend ? ProbeStage::BlendShared : ProbeStage::BlendDirect, ProbeStage::Borders };
 			for (const auto stage : stages)
 			{
 				const auto stageIndex = static_cast<size_t>(stage);
 				const bool tracing = stage == ProbeStage::TraceShade;
+				const bool classifying = stage == ProbeStage::Classify;
+				const bool querying = tracing || classifying;
 				const bool blending = stage == ProbeStage::BlendDirect || stage == ProbeStage::BlendShared;
 				if (stage == ProbeStage::Initialize && initialized)
+				{
+					continue;
+				}
+				if (classifying && (initialized || !state.m_Field))
 				{
 					continue;
 				}
@@ -594,12 +635,18 @@ namespace gglab
 						}
 						for (size_t index = 0; index < Surfaces.size(); ++index)
 						{
+							if (!imported->m_Textures[index].IsValid())
+							{
+								continue;
+							}
 							const bool probeState = index == static_cast<size_t>(ProbeSurface::State);
+							const bool classification = index == static_cast<size_t>(ProbeSurface::Classification);
 							if (stage == ProbeStage::Initialize)
 							{
 								builder.WriteInPlace(imported->m_Textures[index], RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
 							}
-							else if (tracing == probeState)
+							else if ((classification && (querying || blending)) ||
+								(!classifying && !classification && tracing == probeState))
 							{
 								builder.ReadWriteInPlace(imported->m_Textures[index], RGTextureAccess::StorageReadWrite, RHIStage::ComputeShader);
 							}
@@ -624,7 +671,7 @@ namespace gglab
 						{
 							GGLAB_UNUSED(builder.Read(imported->m_Rays, RGBufferAccess::StructuredRead, RHIStage::ComputeShader));
 						}
-						if (tracing)
+						if (querying)
 						{
 							ray_scene_bindings::DeclareQueryReads(builder, scene);
 							if (!profile.m_ConstantEnvironment)
@@ -658,9 +705,9 @@ namespace gglab
 					{
 						auto& current = *m_State;
 						auto* commands = execute.GetDirectComputeCommandContext();
-						const auto& layout = tracing ? current.m_Layout : current.m_DataLayout;
-						const auto& sceneBinding = tracing ? current.m_SceneBinding : current.m_DataScene;
-						const auto& atmosphereBinding = tracing ? current.m_Atmosphere : current.m_DataAtmosphere;
+						const auto& layout = querying ? current.m_Layout : current.m_DataLayout;
+						const auto& sceneBinding = querying ? current.m_SceneBinding : current.m_DataScene;
+						const auto& atmosphereBinding = querying ? current.m_Atmosphere : current.m_DataAtmosphere;
 						ScopedConstantBindings<RHIComputeCommandContext> constants(*commands,
 							layout, sceneBinding, atmosphereBinding);
 						if (!commands->RetainForSubmission(resources) || !commands->RetainForSubmission(scene.m_Lifetime) ||
@@ -670,9 +717,9 @@ namespace gglab
 						{
 							return;
 						}
-						commands->SetReadWriteBuffer(tracing ? current.m_StatusOutput : current.m_DataStatusOutput,
+						commands->SetReadWriteBuffer(querying ? current.m_StatusOutput : current.m_DataStatusOutput,
 							resources->m_Status.Get());
-						if (tracing)
+						if (querying)
 						{
 							// The composed layout cannot inherit a prior pass/frame's light table.
 							// Sun hit lighting must read this frame slot alongside its Scene constants.
@@ -718,7 +765,7 @@ namespace gglab
 						}
 						else
 						{
-							commands->Dispatch(count, 1, 1);
+							commands->Dispatch(classifying ? total : count, 1, 1);
 						}
 						if (tracing)
 						{
@@ -789,19 +836,63 @@ namespace gglab
 						});
 				});
 		}
-		graph.AddPass<Empty>(state.m_Field ? "GI.Field.Publish" : "GI.ProbeUpdate.Publish",
-			[imported](RenderGraph::RGBuilder& builder, Empty&)
+		graph.AddPass<Empty>(state.m_Field ? "GI.Field.QueryResources" : "GI.ProbeUpdate.Publish",
+			[imported, profile, compose, field = state.m_Field, &services](RenderGraph::RGBuilder& builder, Empty&)
 			{
 				// The next frame imports these persistent resources in the exported states.
-				builder.Export(imported->m_Rays, RGBufferAccess::StructuredRead);
-				builder.Export(imported->m_Status, RGBufferAccess::StructuredRead);
-				for (const auto texture : imported->m_Textures)
+				if (!field)
 				{
-					builder.Export(texture, RGTextureAccess::Sample);
+					builder.Export(imported->m_Rays, RGBufferAccess::StructuredRead);
+					builder.Export(imported->m_Status, RGBufferAccess::StructuredRead);
+					for (const auto texture : imported->m_Textures)
+					{
+						if (texture.IsValid())
+						{
+							builder.Export(texture, RGTextureAccess::Sample);
+						}
+					}
+				}
+				if (field)
+				{
+					builder.GetBlackboard().Create<RGGIFieldResources>() = {
+						.m_Parameters = { .m_Counts = profile.m_Counts, .m_Enabled = 1,
+							.m_Minimum = profile.m_Minimum, .m_Spacing = profile.m_Spacing },
+						.m_Textures = { imported->m_Textures[0], imported->m_Textures[1], imported->m_Textures[3] },
+						.m_State = imported->m_Textures[2], .m_Rays = imported->m_Rays,
+						.m_Status = imported->m_Status,
+						.m_Compose = compose };
 				}
 				builder.SideEffect();
 			},
 			[resources](RGExecuteContext& execute, Empty&)
+			{
+				GGLAB_UNUSED(execute.GetGraphicsCommandContext()->RetainForSubmission(resources));
+			});
+	}
+
+	void GIProbeUpdateWorkload::ExportFieldResources(RenderGraph& graph) noexcept
+	{
+		const auto* field = graph.GetBlackboard().TryGet<RGGIFieldResources>();
+		if (!field)
+		{
+			return;
+		}
+		struct Empty {};
+		graph.AddPass<Empty>("GI.Field.Publish",
+			[field](RenderGraph::RGBuilder& builder, Empty&)
+			{
+				// Export closes access for this graph. Every receiver must declare its
+				// reads first; these final states govern the following frame's import.
+				for (const auto texture : field->m_Textures)
+				{
+					builder.Export(texture, RGTextureAccess::Sample);
+				}
+				builder.Export(field->m_State, RGTextureAccess::Sample);
+				builder.Export(field->m_Rays, RGBufferAccess::StructuredRead);
+				builder.Export(field->m_Status, RGBufferAccess::StructuredRead);
+				builder.SideEffect();
+			},
+			[resources = m_State->m_Resources](RGExecuteContext& execute, Empty&)
 			{
 				GGLAB_UNUSED(execute.GetGraphicsCommandContext()->RetainForSubmission(resources));
 			});

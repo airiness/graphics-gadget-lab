@@ -28,6 +28,8 @@ namespace gglab
 		ProbeFurnace = 14,
 		CoastalProbeCost = 15,
 		ProbeSlab = 16,
+		FieldCoverage = 17,
+		FieldUnsupportedCage = 18,
 	};
 
 	struct GIReferenceFixtureDescription
@@ -54,6 +56,8 @@ namespace gglab
 		GIReferenceFixtureDescription{ GIReferenceFixture::ProbeFurnace, "Contract: probe furnace" },
 		GIReferenceFixtureDescription{ GIReferenceFixture::CoastalProbeCost, "Coastal: probe update cost" },
 		GIReferenceFixtureDescription{ GIReferenceFixture::ProbeSlab, "Contract: probe slab" },
+		GIReferenceFixtureDescription{ GIReferenceFixture::FieldCoverage, "Contract: field coverage" },
+		GIReferenceFixtureDescription{ GIReferenceFixture::FieldUnsupportedCage, "Contract: unsupported field cage" },
 	};
 
 	constexpr bool IsCoastalGIFixture(GIReferenceFixture fixture) noexcept
@@ -88,7 +92,8 @@ namespace gglab
 			fixture == GIReferenceFixture::PublishedEnvironment ||
 			fixture == GIReferenceFixture::CoupledDiffusePlanes ||
 			fixture == GIReferenceFixture::HitMaterial || UsesGIPrimaryReceiverMaterials(fixture) ||
-			IsGIProbeFixture(fixture);
+			IsGIProbeFixture(fixture) || fixture == GIReferenceFixture::FieldCoverage ||
+			fixture == GIReferenceFixture::FieldUnsupportedCage;
 	}
 
 	enum class GIReferenceEnvironment : int32_t

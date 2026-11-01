@@ -57,6 +57,17 @@ static const uint GIProbeIrradianceTileTexels = GIProbeIrradianceTileWidth * GIP
 static const uint GIProbeTileTexels = GIProbeIrradianceTileTexels + GIProbeDistanceTileWidth * GIProbeDistanceTileWidth;
 static const uint GIProbeGroupThreads = 64;
 static const uint GIProbeMaximumRays = 256;
+static const uint GIProbeClassificationRays = 32;
+static const uint GIProbeUnclassified = 0;
+static const uint GIProbeActive = 1;
+static const uint GIProbeInactive = 2;
+// Texel zero retains its classification in the low bits and mirrors sticky
+// whole-field numerical failure in bit 31 for same-submission GPU consumers.
+static const uint GIProbeFieldInvalidBit = 0x80000000u;
+static const uint GIFieldValid = 1;
+static const uint GIFieldLowConfidence = 2;
+static const uint GIFieldNoValidSupport = 3;
+static const uint GIFieldOutsideCoverage = 4;
 static const uint GIUpdateErrorNone = 0;
 static const uint GIUpdateErrorInvalidRay = 1;
 static const uint GIUpdateErrorInvalidHistory = 2;

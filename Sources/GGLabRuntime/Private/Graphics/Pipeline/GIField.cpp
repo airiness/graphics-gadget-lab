@@ -3,8 +3,16 @@
 #include "GGLabRuntime/Graphics/RenderServices.h"
 #include "Graphics/Pipeline/GIFieldState.h"
 #include "Graphics/Pipeline/GIProbeUpdateWorkload.h"
+#include "Graphics/RenderPass/GIFieldGraphResources.h"
+#include "Graphics/RenderPass/GIReceiverGraphResources.h"
+#include "GGLabRuntime/Graphics/Pipeline/SceneBindingLayouts.h"
+#include "GGLabRuntime/Graphics/Pipeline/ScopedConstantBindings.h"
+#include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
+#include "GGLabRuntime/Graphics/RHI/RHIContext.h"
+#include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
 #include <atomic>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <utility>
@@ -14,6 +22,23 @@ namespace gglab
 	namespace
 	{
 		std::atomic<uint64_t> NextGeneration{ 1 };
+		const RenderPassInfo LookupPassInfo{ .m_TypeName = "GI.Field.Lookup",
+			.m_DisplayName = "Field receiver query diagnostics", .m_CategoryName = "Global Illumination",
+			.m_Category = RenderPassCategory::Debug, .m_Type = RenderPassType::Compute };
+		struct LookupParameters
+		{
+			GIFieldSamplingParameters m_Field;
+			uint32_t m_Position = 0;
+			uint32_t m_VertexNormal = 0;
+			uint32_t m_ShadingNormal = 0;
+			uint32_t m_Irradiance = 0;
+			uint32_t m_Query = 0;
+			std::array<uint32_t, 2> m_Extent{};
+			uint32_t m_Padding = 0;
+			std::array<float, 3> m_Camera{};
+			uint32_t m_CameraPadding = 0;
+		};
+		static_assert(sizeof(LookupParameters) == 96 && offsetof(LookupParameters, m_Camera) == 80);
 
 		GIProbeUpdateProfile UpdateProfile(const GIFieldCreateInfo& info) noexcept
 		{
@@ -63,6 +88,11 @@ namespace gglab
 		std::array<uint64_t, GIProbeUpdateWorkload::ProgramCount> m_ShaderGenerations{};
 		bool m_Sealed = false;
 		bool m_UpdatePrepared = false;
+		ResolvedRenderLayout m_LookupLayout;
+		ResolvedBindingRef<SceneGPU> m_LookupScene;
+		ComputePipelineSlot m_LookupSlot;
+		ResolvedRenderPipeline m_LookupPipeline;
+		uint64_t m_LookupGeneration = 0;
 		State(GIFieldCreateInfo info) noexcept :
 			m_Info(std::move(info)), m_Workload(m_Info.m_RayScene, UpdateProfile(m_Info), true) {}
 	};
@@ -127,6 +157,39 @@ namespace gglab
 		{
 			return result;
 		}
+		if (state.m_Info.m_EnableReceiverSampling && state.m_Workload.GetDiagnostics().m_Failed)
+		{
+			// Update-only inspection retains raw error evidence. Production shading
+			// cannot resume from a numerically invalid in-place field generation.
+			return RenderFrameValidationResult::ContractFailure(
+				"GI field numerical failure; replace the field through the safe pipeline path");
+		}
+		if (!state.m_LookupLayout.IsValid())
+		{
+			const auto* common = services.m_BindingLayout->GetCommonLayoutContract();
+			if (!common)
+			{
+				return RenderFrameValidationResult::ContractFailure("Field lookup common layout unavailable");
+			}
+			state.m_LookupLayout = ResolvedRenderLayout::Create(
+				services.m_Presentation->GetRHIContext()->GetPipelineSystem(), *common, "GI.Field.Lookup");
+			state.m_LookupScene = ResolvedBindingRef<SceneGPU>::Resolve(
+				state.m_LookupLayout, scene_bindings::SceneConstants);
+		}
+		const auto lookup = services.m_ShaderPrograms->LoadProgram(shader_programs::GIFieldLookupCompute);
+		const auto lookupGeneration = services.m_ShaderPrograms->GetGeneration(lookup);
+		if (state.m_LookupGeneration != 0 && state.m_LookupGeneration != lookupGeneration)
+		{
+			return RenderFrameValidationResult::ContractFailure("Field lookup changed; replace the static field");
+		}
+		state.m_LookupGeneration = lookupGeneration;
+		state.m_LookupPipeline = state.m_LookupLayout.Resolve(*services.m_PipelineResolver,
+			state.m_LookupSlot, ComputePipelineRecipe{
+				.m_BindingLayout = state.m_LookupLayout.GetNativeLayout(), .m_CSId = lookup }, LookupPassInfo);
+		if (!state.m_LookupPipeline.IsValid())
+		{
+			return RenderFrameValidationResult::ContractFailure("Field lookup pipeline unavailable");
+		}
 		const auto revision = state.m_Info.m_RayScene->GetDiagnostics().m_Revision;
 		const auto lighting = frame.m_RenderScene.m_WorldLightingGeneration;
 		const uint64_t environment = state.m_Info.m_ConstantEnvironment ?
@@ -156,6 +219,81 @@ namespace gglab
 		}
 		const bool tracked = services.m_GIFieldFrameState->Track(m_State->m_Update, frame.m_FrameSerial);
 		GGLAB_ASSERT_MSG(tracked, "A GI field must participate in exactly one matching renderer frame.");
-		m_State->m_Workload.AddPasses(graph, frame, services, scene, m_State->m_Update);
+		m_State->m_Workload.AddPasses(graph, frame, services, scene, m_State->m_Update,
+			m_State->m_Info.m_EnableReceiverSampling);
+	}
+
+	void GIField::AddReceiverDiagnostics(RenderGraph& graph, const RenderFrameContext& frame,
+		const RenderServices& services) noexcept
+	{
+		const auto* field = graph.GetBlackboard().TryGet<RGGIFieldResources>();
+		const auto* receiver = graph.GetBlackboard().TryGet<RGGIReceiverResources>(GIReceiverResourcesName);
+		if (!field || !receiver)
+		{
+			return;
+		}
+		struct PassData
+		{
+			GIFieldSamplingViews m_Field;
+			std::array<RGTextureViewId, 3> m_Receivers;
+			std::array<RGTextureViewId, 2> m_Outputs;
+			LookupParameters m_Parameters;
+		};
+		const auto& view = frame.GetDisplayRenderView();
+		graph.AddPass<PassData>(LookupPassInfo.m_TypeName.c_str(), RGPassEncoderType::Compute,
+			[=](RenderGraph::RGBuilder& builder, PassData& data)
+			{
+				data.m_Field.Declare(builder, *field, RHIStage::ComputeShader);
+				const std::array inputs{ receiver->m_Position,
+					receiver->Get(GIReceiverSurface::VertexNormal), receiver->Get(GIReceiverSurface::ShadingNormal) };
+				for (size_t index = 0; index < inputs.size(); ++index)
+				{
+					data.m_Receivers[index] = builder.CreateView<RHITextureViewType::ShaderResource>(
+						builder.Read(inputs[index], RGTextureAccess::Sample, RHIStage::ComputeShader));
+				}
+				const std::array names{ "GI.Field.ReceiverIrradiance", "GI.Field.ReceiverQuery" };
+				for (size_t index = 0; index < names.size(); ++index)
+				{
+					auto output = builder.CreateTexture(names[index], {
+						.m_Format = RHIFormat::R32G32B32A32Float,
+						.m_Extent = { view.m_Width, view.m_Height, 1 } });
+					builder.WriteInPlace(output, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+					data.m_Outputs[index] = builder.CreateView<RHITextureViewType::UnorderedAccess>(output);
+				}
+				// Diagnostic targets are graph-owned, not persistent external resources.
+				builder.SideEffect();
+				data.m_Parameters.m_Extent = { view.m_Width, view.m_Height };
+				data.m_Parameters.m_Camera = {
+					view.m_CameraPosition.m_X, view.m_CameraPosition.m_Y, view.m_CameraPosition.m_Z };
+			},
+			[this, &frame](RGExecuteContext& execute, PassData& data)
+			{
+				auto& state = *m_State;
+				auto* commands = execute.GetDirectComputeCommandContext();
+				ScopedConstantBindings<RHIComputeCommandContext> constants(*commands,
+					state.m_LookupLayout, state.m_LookupScene);
+				if (!constants.SetPipeline(state.m_LookupPipeline) ||
+					!constants.Bind(state.m_LookupScene, frame.m_FrameConstants.m_SceneSnapshot))
+				{
+					return;
+				}
+				auto parameters = data.m_Parameters;
+				parameters.m_Field = data.m_Field.Resolve(execute);
+				parameters.m_Position = execute.GetViewDescriptor(data.m_Receivers[0]).m_Index;
+				parameters.m_VertexNormal = execute.GetViewDescriptor(data.m_Receivers[1]).m_Index;
+				parameters.m_ShadingNormal = execute.GetViewDescriptor(data.m_Receivers[2]).m_Index;
+				parameters.m_Irradiance = execute.GetViewDescriptor(data.m_Outputs[0]).m_Index;
+				parameters.m_Query = execute.GetViewDescriptor(data.m_Outputs[1]).m_Index;
+				if (commands->SetConstantBufferData(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+				{
+					commands->Dispatch((parameters.m_Extent[0] + 7) / 8, (parameters.m_Extent[1] + 7) / 8, 1);
+				}
+			});
+		GGLAB_UNUSED(services);
+	}
+
+	void GIField::ExportResources(RenderGraph& graph) noexcept
+	{
+		m_State->m_Workload.ExportFieldResources(graph);
 	}
 }

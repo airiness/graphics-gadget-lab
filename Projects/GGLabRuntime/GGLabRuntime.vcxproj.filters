@@ -1316,6 +1316,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIComputeDispatch.h">
       <Filter>Private\Graphics\Pipeline</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIFieldSampling.h">
+      <Filter>Private\Graphics\Pipeline</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIFieldState.h">
       <Filter>Private\Graphics\Pipeline</Filter>
     </ClInclude>
@@ -1440,6 +1443,9 @@
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\ForwardShadingCommon.h">
+      <Filter>Private\Graphics\RenderPass</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\GIFieldGraphResources.h">
       <Filter>Private\Graphics\RenderPass</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RenderPass\GIPreviewGraphResources.h">
@@ -2629,6 +2635,9 @@
     <FxCompile Include="..\..\Shaders\Passes\PassForwardPlusValidation.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassGIFieldLookup.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassGIProbeUpdate.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
@@ -2791,6 +2800,9 @@
       <Filter>Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\Shaders\Lighting\ForwardPlus.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\GIFieldSampling.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\Shaders\Lighting\GIHitLighting.hlsli">

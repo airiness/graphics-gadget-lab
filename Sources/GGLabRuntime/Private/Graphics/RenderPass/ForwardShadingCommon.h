@@ -3,6 +3,7 @@
 #include "GGLabRuntime/Graphics/GraphicsHandles.h"
 #include "GGLabRuntime/Graphics/GraphicsTypes.h"
 #include "Graphics/RenderPass/ForwardBindingLayout.h"
+#include "Graphics/RenderPass/GIFieldGraphResources.h"
 #include "GGLabRuntime/Graphics/Pipeline/PipelineTypes.h"
 #include "GGLabRuntime/Graphics/RenderContexts.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
@@ -40,9 +41,10 @@ namespace gglab::forward_shading
 		// only pre-temporal shading binds them.
 		uint32_t m_GTAOTextureIndex = 0;
 		uint32_t m_GTAOFlags = 0;
+		GIFieldSamplingParameters m_GIField;
 	};
 	static_assert(IsPassConstantBufferStruct<PassParameters>);
-	static_assert(sizeof(PassParameters) == 64);
+	static_assert(sizeof(PassParameters) == 112 && offsetof(PassParameters, m_GIField) == 64);
 
 	inline constexpr uint32_t GTAOEnabledFlag = 1u;
 	inline constexpr size_t MaterialDiagnosticTargetCount = 3;
@@ -85,6 +87,7 @@ namespace gglab::forward_shading
 		uint32_t m_ShadowMapSize = 0;
 		uint32_t m_ShadowSamplerIndex = 0;
 		uint32_t m_ShadowFlags = 0;
+		GIFieldSamplingViews m_GIField;
 	};
 
 	// Resolution domain a Forward shading pass composes into.

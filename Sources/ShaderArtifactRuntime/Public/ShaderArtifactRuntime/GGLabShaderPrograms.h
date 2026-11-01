@@ -175,6 +175,10 @@ namespace gglab::shader_programs
 		"gglab.shader.gi-probe-update", "compute.blend-shared", ShaderStage::Compute };
 	inline const ShaderProgramRef GIProbeBordersCompute{
 		"gglab.shader.gi-probe-update", "compute.borders", ShaderStage::Compute };
+	inline const ShaderProgramRef GIProbeClassifyCompute{
+		"gglab.shader.gi-field", "compute.classify", ShaderStage::Compute };
+	inline const ShaderProgramRef GIFieldLookupCompute{
+		"gglab.shader.gi-field", "compute.lookup-diagnostics", ShaderStage::Compute };
 	inline const ShaderProgramRef GIReceiverPixel{
 		"gglab.shader.gi-receiver", "pixel.receiver", ShaderStage::Pixel };
 	inline const ShaderProgramRef GIReceiverPositionPixel{

@@ -179,6 +179,25 @@ fixtures through `gi_reference.field_enabled`. Field mode uses full updates, Sha
 blending and rotating directions. Runtime `ray-query-contracts` covers field
 descriptors and CPU settlement.
 
+### Static field sampling
+
+`RunVerification.ps1 -Suite gi-field-sampling` runs hidden DX12/Vulkan receiver
+lookup and Forward composition checks through `TestGIFieldSampling.ps1`.
+The paired eight-resource group includes both atlases, classification, raster
+position/normals and query outputs. `ValidateGIFieldSampling.py` independently
+evaluates the interpolation in FP64, checks support/coverage and graph export
+order, and verifies update-only versus disabled image equality. Separate images
+inspect diffuse composition; they are not the resource group's submitted frame.
+
+The suite uses Native 320x200 and fixed update settling, not GI readiness.
+An A0 comparison uses paired HDR/field/receiver/IBL data and GTAO visibility to
+check that the volume-edge blend attenuates only the IBL share. The unsupported
+cage is a separate classification/query contract, not frozen F10 qualification.
+Its F1/F2/F4 quality measurements preserve passing and failing thresholds in
+`validation.json`; engineering lookup success does not grant static-field quality,
+reference convergence, target-extent acceptance or complete GI performance.
+The field coverage contract is a separate fixture, not frozen F8 qualification.
+
 ## Standalone measurements
 
 Measurements are separate from the catalog's correctness regressions. For the

@@ -18,6 +18,7 @@
         "gglab.shader.final-color",
         "gglab.shader.forward-coverage",
         "gglab.shader.forward-pbr",
+        "gglab.shader.gi-field",
         "gglab.shader.gi-probe-update",
         "gglab.shader.gi-receiver",
         "gglab.shader.gtao",
@@ -61,6 +62,7 @@
         "gglab.shader.final-color",
         "gglab.shader.forward-coverage",
         "gglab.shader.forward-pbr",
+        "gglab.shader.gi-field",
         "gglab.shader.gi-probe-update",
         "gglab.shader.gi-receiver",
         "gglab.shader.gtao",
@@ -104,6 +106,7 @@
         "gglab.shader.final-color",
         "gglab.shader.forward-coverage",
         "gglab.shader.forward-pbr",
+        "gglab.shader.gi-field",
         "gglab.shader.gi-probe-update",
         "gglab.shader.gi-receiver",
         "gglab.shader.gtao",
@@ -147,6 +150,7 @@
         "gglab.shader.final-color",
         "gglab.shader.forward-coverage",
         "gglab.shader.forward-pbr",
+        "gglab.shader.gi-field",
         "gglab.shader.gi-probe-update",
         "gglab.shader.gi-receiver",
         "gglab.shader.gtao",
@@ -185,6 +189,7 @@
         "gglab.shader.aerial-perspective",
         "gglab.shader.forward-plus-cull",
         "gglab.shader.forward-plus-validation",
+        "gglab.shader.gi-field",
         "gglab.shader.gi-probe-update",
         "gglab.shader.gtao",
         "gglab.shader.physical-sky-preview",
@@ -235,6 +240,7 @@
         "gglab.shader.final-color",
         "gglab.shader.forward-coverage",
         "gglab.shader.forward-pbr",
+        "gglab.shader.gi-field",
         "gglab.shader.gi-probe-update",
         "gglab.shader.gi-receiver",
         "gglab.shader.gtao",
@@ -278,6 +284,7 @@
         "gglab.shader.final-color",
         "gglab.shader.forward-coverage",
         "gglab.shader.forward-pbr",
+        "gglab.shader.gi-field",
         "gglab.shader.gi-probe-update",
         "gglab.shader.gi-receiver",
         "gglab.shader.gtao",
@@ -321,6 +328,7 @@
         "gglab.shader.final-color",
         "gglab.shader.forward-coverage",
         "gglab.shader.forward-pbr",
+        "gglab.shader.gi-field",
         "gglab.shader.gi-probe-update",
         "gglab.shader.gi-receiver",
         "gglab.shader.gtao",
@@ -359,6 +367,7 @@
         "gglab.shader.aerial-perspective",
         "gglab.shader.forward-plus-cull",
         "gglab.shader.forward-plus-validation",
+        "gglab.shader.gi-field",
         "gglab.shader.gi-probe-update",
         "gglab.shader.gtao",
         "gglab.shader.physical-sky-preview",
@@ -1052,7 +1061,7 @@
       "function": "global",
       "operation": "SanitizeHDRColor",
       "count": 2,
-      "bodySha256": "f4aab9b93da966e17950f4b4c756d05103bcabaa86fd4da1f9f6c7b93dd32deb",
+      "bodySha256": "3d63300af6ba593e31962bd9133121ea21a675ea702fea4125e60ccc90f41f16",
       "programs": [
         "gglab.shader.forward-pbr"
       ],
@@ -1576,6 +1585,7 @@
       "count": 7,
       "bodySha256": "ad762544054c32e7606c94e9d54f72b63aff199ee523cec18f0ca3209d949678",
       "programs": [
+        "gglab.shader.gi-field",
         "gglab.shader.gi-probe-update",
         "gglab.shader.ray-scene"
       ],
@@ -1631,6 +1641,7 @@
       "count": 1,
       "bodySha256": "aae321ecc4a2ac98d7a6afaf53616057342e656f96eb28f775da99abd7a092db",
       "programs": [
+        "gglab.shader.gi-field",
         "gglab.shader.gi-probe-update"
       ],
       "kind": "recovery",
@@ -1649,6 +1660,7 @@
       "count": 4,
       "bodySha256": "cdc2b1f6acb77b1392c53182d1d986d896ed1aab65176bca4364ad3eea155348",
       "programs": [
+        "gglab.shader.gi-field",
         "gglab.shader.gi-probe-update"
       ],
       "kind": "recovery",
@@ -1711,6 +1723,7 @@
       "function": "Trace",
       "count": 1,
       "programs": [
+        "gglab.shader.gi-field",
         "gglab.shader.gi-probe-update"
       ],
       "claim": "production",
@@ -1722,6 +1735,7 @@
       "function": "StoreTexel",
       "count": 2,
       "programs": [
+        "gglab.shader.gi-field",
         "gglab.shader.gi-probe-update"
       ],
       "claim": "production",

@@ -12,7 +12,7 @@ namespace gglab
 	class GIProbeUpdateWorkload final
 	{
 	public:
-		static constexpr size_t ProgramCount = 5;
+		static constexpr size_t ProgramCount = 6;
 		GIProbeUpdateWorkload(std::shared_ptr<RayScene> scene, GIProbeUpdateProfile profile,
 			bool field = false) noexcept;
 		~GIProbeUpdateWorkload();
@@ -23,7 +23,8 @@ namespace gglab
 			const RenderServices& services) noexcept;
 		void AddPasses(RenderGraph& graph, const RenderFrameContext& frame,
 			const RenderServices& services, const RaySceneGraphResources& scene,
-			std::shared_ptr<GIFieldUpdateState> fieldUpdate = {}) noexcept;
+			std::shared_ptr<GIFieldUpdateState> fieldUpdate = {}, bool compose = false) noexcept;
+		void ExportFieldResources(RenderGraph& graph) noexcept;
 
 	private:
 		struct State;

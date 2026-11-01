@@ -27,7 +27,7 @@ cbuffer Parameters : register(b2)
 	uint IrradianceIndex;
 	uint DistanceIndex;
 	uint StateIndex;
-	uint TargetsPadding;
+	uint ClassificationIndex;
 	uint TransmittanceIndex;
 	uint AtmosphereSampler;
 	uint LightingPadding;
@@ -94,6 +94,11 @@ float3 OctahedralDirection(uint2 texel, uint size)
 
 void InvalidateUpdate(uint error, uint probe, uint element)
 {
+	if (ClassificationIndex != 0xffffffffu)
+	{
+		RWTexture2DArray<uint> classification = ResourceDescriptorHeap[NonUniformResourceIndex(ClassificationIndex)];
+		InterlockedOr(classification[uint3(0, 0, 0)], GIProbeFieldInvalidBit);
+	}
 	uint previous;
 	InterlockedCompareExchange(ProbeUpdateStatus[0].x, GIUpdateErrorNone, error, previous);
 	if (previous == GIUpdateErrorNone)
@@ -122,6 +127,11 @@ void Initialize(uint3 id : SV_DispatchThreadID)
 	if (id.x < GridSize.x && id.y < GridSize.z && id.z < GridSize.y)
 	{
 		ProbeState()[id] = 0.0.xxxx;
+		if (ClassificationIndex != 0xffffffffu)
+		{
+			RWTexture2DArray<uint> classification = ResourceDescriptorHeap[NonUniformResourceIndex(ClassificationIndex)];
+			classification[id] = GIProbeUnclassified;
+		}
 	}
 	// All ray slots are defined once, including probes outside a partial update.
 	const uint linearIndex = id.x + GridSize.x * GIProbeDistanceTileWidth *
@@ -146,6 +156,57 @@ bool IsUpdateBlocked(uint thread)
 	GroupMemoryBarrierWithGroupSync();
 	return UpdateBlocked != GIUpdateErrorNone;
 }
+
+// Classification uses a fixed, unrotated set, independent of update ray count
+// and history. Only safe owner replacement can change this static geometry.
+[numthreads(GIProbeGroupThreads, 1, 1)]
+void Classify(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
+{
+	if (IsUpdateBlocked(thread))
+	{
+		return;
+	}
+	const uint probe = group.x;
+	uint4 counts = 0;
+	if (thread < GIProbeClassificationRays)
+	{
+		const float z = 1.0 - 2.0 * ((float)(thread) + 0.5) / (float)(GIProbeClassificationRays);
+		const float angle = TWO_PI * (frac((float)(thread) * ProbeGoldenAngleTurns + 0.5) - 0.5);
+		const float radius = sqrt(max(0.0, 1.0 - z * z));
+		RayDesc ray;
+		ray.Origin = GridMinimum + ProbeSpacing * (float3)(ProbeCoordinate(probe).xzy);
+		ray.Direction = float3(radius * cos(angle), radius * sin(angle), z);
+		ray.TMin = 0.0;
+		ray.TMax = MaximumDistance;
+		GIHit hit;
+		const uint outcome = GITraceHit(ray, SceneCounts, hit, false);
+		counts.x = outcome == GIHitBackface ? 1u : 0u;
+		if (outcome == GIHitInvalid)
+		{
+			InvalidateUpdate(GIUpdateErrorInvalidRay, probe, thread);
+			counts.y = 1;
+		}
+	}
+	QueryCounts[thread] = counts;
+	GroupMemoryBarrierWithGroupSync();
+	for (uint stride = GIProbeGroupThreads / 2; stride != 0; stride >>= 1)
+	{
+		if (thread < stride)
+		{
+			QueryCounts[thread] += QueryCounts[thread + stride];
+		}
+		GroupMemoryBarrierWithGroupSync();
+	}
+	if (thread == 0)
+	{
+		RWTexture2DArray<uint> classification = ResourceDescriptorHeap[NonUniformResourceIndex(ClassificationIndex)];
+		const uint value = QueryCounts[0].y != 0 ? GIProbeUnclassified :
+			QueryCounts[0].x > GIProbeClassificationRays / 4 ? GIProbeInactive : GIProbeActive;
+		// Preserve a concurrently reported failure at texel zero.
+		InterlockedOr(classification[ProbeCoordinate(probe)], value);
+	}
+}
+
 [numthreads(GIProbeGroupThreads, 1, 1)]
 void Trace(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 {

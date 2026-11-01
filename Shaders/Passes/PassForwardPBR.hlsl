@@ -9,6 +9,7 @@
 #include <Lighting/AmbientOcclusion.hlsli>
 #include <Lighting/WorldSunTransmittance.hlsli>
 #include <Lighting/ForwardPlus.hlsli>
+#include <Lighting/GIFieldSampling.hlsli>
 #include <Lighting/DirectionalShadowVisibility.hlsli>
 #include <Lighting/DirectionalShadowData.hlsli>
 #include <PBR/DirectLighting.hlsli>
@@ -31,6 +32,7 @@ struct ForwardPBRPassParameters
 	uint2 ForwardPlusGlobalLightIndices23;
 	uint GTAOTextureIndex;
 	uint GTAOFlags;
+	GIFieldSamplingParameters GIField;
 };
 
 ConstantBuffer<ForwardPBRPassParameters> g_Pass : register(b2);
@@ -162,21 +164,44 @@ float3 SampleIBLPrefilteredSpecular(float3 reflectWS, float perceptualRoughness)
 		g_Scene.IBLResource.EnvironmentIntensity;
 }
 
-MaterialIBLResponse SampleMaterialEnvironment(PreparedMaterialShading material)
+MaterialIBLResponse SampleMaterialEnvironment(PreparedMaterialShading material,
+	float3 position, float3 vertexNormal, float gtao, out float3 fieldGTAOContribution)
 {
 	MaterialIBLSamples environment;
 	environment.Irradiance = SampleIBLIrradiance(material.Base.NormalWS);
+	float3 removedIrradiance = 0.0.xxx;
+	if (g_Pass.GIField.Enabled != 0)
+	{
+		const GIFieldQuery field = SampleGIField(g_Pass.GIField, position,
+			material.Base.NormalWS, vertexNormal, material.ViewDirectionWS);
+		// A0 applies GTAO to the IBL share before the coverage blend. Blending
+		// visibility after lighting would also attenuate GI at a volume face.
+		removedIrradiance = environment.Irradiance * ((1.0 - field.Coverage) * (1.0 - gtao));
+		environment.Irradiance = lerp(environment.Irradiance * gtao, field.Irradiance, field.Coverage);
+	}
 	environment.BaseSpecular = SampleIBLPrefilteredSpecular(
 		GetMaterialIBLReflection(material), material.Base.EffectivePerceptualRoughness);
 	environment.ClearcoatSpecular = 0.0.xxx;
 	MaterialIBLResponse response = EvaluateBaseMaterialIBL(material, environment);
+	MaterialIBLResponse removed = (MaterialIBLResponse)(0);
+	if (g_Pass.GIField.Enabled != 0)
+	{
+		MaterialIBLSamples removedEnvironment = environment;
+		removedEnvironment.Irradiance = removedIrradiance;
+		removed = EvaluateBaseMaterialIBL(material, removedEnvironment);
+	}
 	if (material.Clearcoat.Factor > 0.0)
 	{
 		const float3 reflection = reflect(-material.ViewDirectionWS, material.Clearcoat.NormalWS);
 		environment.ClearcoatSpecular = SampleIBLPrefilteredSpecular(
 			reflection, material.Clearcoat.PerceptualRoughness);
 		ApplyClearcoatIBL(response, material.Clearcoat, environment.ClearcoatSpecular);
+		if (g_Pass.GIField.Enabled != 0)
+		{
+			ApplyClearcoatIBL(removed, material.Clearcoat, environment.ClearcoatSpecular);
+		}
 	}
+	fieldGTAOContribution = removed.Diffuse;
 	return response;
 }
 
@@ -461,7 +486,12 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 #endif
 
 	const float3 emissive = EvaluateMaterialEmission(surface.Emissive, material.Clearcoat);
-	MaterialIBLResponse ibl = SampleMaterialEnvironment(material);
+	const bool flipVertexNormal = (matData.Flags & MaterialFlagDoubleSided) != 0 && !isFrontFace;
+	const float3 vertexNormal = SafeNormalize(IN.NormalWS, float3(0.0, 1.0, 0.0)) *
+		(flipVertexNormal ? -1.0 : 1.0);
+	const float gtao = LoadGTAO((uint2)(IN.PositionCS.xy));
+	float3 fieldGTAOContribution;
+	MaterialIBLResponse ibl = SampleMaterialEnvironment(material, IN.PositionWS, vertexNormal, gtao, fieldGTAOContribution);
 
 	// AO texture
 	float2 occlusionUV = SelectUV(matData.OcclusionBinding, IN.UV0, IN.UV1);
@@ -470,11 +500,14 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 			occlusionUV).r;
 	float ao = 1.0f + matData.OcclusionStrength * (aoSampled - 1.0f);
 	ao = saturate(ao);
-	const float gtao = LoadGTAO((uint2)(IN.PositionCS.xy));
 	const float3 materialOccludedDiffuseIBL =
 		ibl.Diffuse * ResolveSpecularIBLVisibility(ao);
-	const float3 gtaoContribution = materialOccludedDiffuseIBL * (1.0 - gtao);
-	ibl.Diffuse *= ResolveDiffuseIBLVisibility(ao, gtao);
+	const float3 gtaoContribution = g_Pass.GIField.Enabled != 0 ?
+		fieldGTAOContribution * ResolveSpecularIBLVisibility(ao) :
+		materialOccludedDiffuseIBL * (1.0 - gtao);
+	// Field mode already applied GTAO to its IBL share; material AO still applies
+	// to both diffuse terms. The disabled-field expression keeps its original rounding.
+	ibl.Diffuse *= ResolveDiffuseIBLVisibility(ao, g_Pass.GIField.Enabled != 0 ? 1.0 : gtao);
 	ibl.Specular *= ResolveSpecularIBLVisibility(ao);
 
 	// The final radiance sum must keep its rounding when diagnostic observers are enabled.

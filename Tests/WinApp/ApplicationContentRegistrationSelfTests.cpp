@@ -1657,7 +1657,7 @@ namespace gglab
 	void RunApplicationContentRegistrationSelfTests(SelfTestContext& context) noexcept
 	{
 		// Frozen IDs are an external verification protocol, not enum ordinal capabilities.
-		context.Check(GIReferenceFixtures.size() == 17, "All persisted GI fixtures remain registered");
+		context.Check(GIReferenceFixtures.size() == 19, "All persisted GI fixtures remain registered");
 		for (size_t index = 0; index < GIReferenceFixtures.size(); ++index)
 		{
 			const auto fixture = GIReferenceFixtures[index].m_Id;
@@ -1665,7 +1665,7 @@ namespace gglab
 				IsCoastalGIFixture(fixture) == (index == 11 || index == 12 || index == 15) &&
 				IsGIProbeFixture(fixture) == (index == 14 || index == 15 || index == 16) &&
 				UsesGIPrimaryReceiverMaterials(fixture) == (index >= 10 && index <= 13) &&
-				UsesGIStaticCostPath(fixture) == (index >= 12) &&
+				UsesGIStaticCostPath(fixture) == (index >= 12 && index <= 16) &&
 				IsGIContractFixture(fixture) == (index >= 5),
 				"Named fixture capabilities preserve frozen IDs without ordering-based dispatch");
 		}
@@ -1742,7 +1742,7 @@ namespace gglab
 			"Coordinate conformance selection contributes four stable shader demands");
 		checkSelectedDemand("gglab.lab.ray_query", 54,
 			"Ray-query selection contributes query, preview and pipeline-identity artifacts without changing raster startup demand");
-		checkSelectedDemand("gglab.lab.gi_reference", 60,
+		checkSelectedDemand("gglab.lab.gi_reference", 62,
 			"GI diagnostics opt into receiver/reference/visibility/material shaders without changing ordinary raster startup demand");
 		for (const auto& lab : desktop.m_Labs)
 		{

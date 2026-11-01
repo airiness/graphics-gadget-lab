@@ -31,6 +31,8 @@ namespace gglab
 		uint32_t m_Seed = GIObservationLimits::DefaultSeed;
 		float m_MaximumDistance = 30000;
 		float m_Hysteresis = 0.97f;
+		// Update-only controls can inspect atlases without changing opaque lighting.
+		bool m_EnableReceiverSampling = true;
 		// Analytic fixtures may supply incident constant radiance; geometry is still traced.
 		bool m_ConstantEnvironment = false;
 		std::array<float, 3> m_ConstantRadiance{ 1, 1, 1 };
@@ -67,7 +69,9 @@ namespace gglab
 	// Runtime-owned static world field. Every submitted update covers the whole volume.
 	// Configure/replace only through the safe pipeline path on the owner thread.
 	// Static scene, lighting and shader inputs are sealed at the first update; changing
-	// them requires replacement. This owner does not yet provide lookup or readiness.
+	// them requires replacement. Lookup is single-bounce; readiness remains separate.
+	// Numerical failure rejects production preparation; update-only owners can retain
+	// raw evidence. A GPU failure flag prevents sampling invalid in-place contents.
 	class GIField final
 	{
 	public:
@@ -80,6 +84,11 @@ namespace gglab
 			const RenderServices& services) noexcept;
 		void AddPasses(RenderGraph& graph, const RenderFrameContext& frame,
 			const RenderServices& services, const RaySceneGraphResources& scene) noexcept;
+		// Optional diagnostics consume the recipe's existing private receiver records.
+		void AddReceiverDiagnostics(RenderGraph& graph, const RenderFrameContext& frame,
+			const RenderServices& services) noexcept;
+		// Close graph access only after all opaque/diagnostic consumers declare reads.
+		void ExportResources(RenderGraph& graph) noexcept;
 
 	private:
 		struct State;

@@ -120,7 +120,8 @@ try {
                     $name=if ($accumulate) {'reference-bounded'} else {'reference-stateless'}
                     $path="$directory/$name"
                     New-Item -ItemType Directory -Path $path -Force | Out-Null
-                    $effect=Set-Inputs $session $run @{fixture=7;environment=1;samples=4;batch_samples=4;accumulate=$accumulate}
+                    $effect=Set-Inputs $session $run @{fixture=7;environment=1;samples=4;batch_samples=4;accumulate=$accumulate;
+                        receiver_query_work=([uint32](83 * 1280 * 800))}
                     Write-VerificationJson "$path/effect.json" $effect
                     $capture=Invoke-VerificationSession capture $session @{ExpectedRunIdentity=$run;Timing='after-ready';SettleFrames=12;
                         Products='[{"kind":"resource","targets":[{"resource":"GI.Reference.Irradiance"},{"resource":"GI.Reference.Diagnostics"}]}]';

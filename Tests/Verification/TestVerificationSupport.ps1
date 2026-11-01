@@ -463,6 +463,7 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
     # Keep catalog expectations and leaf fixtures together so their counts cannot drift.
     $gpuLeaves = [ordered]@{
         'gi-field' = 'TestGIField.ps1'
+        'gi-field-sampling' = 'TestGIFieldSampling.ps1'
         'gi-invalid-updates' = 'TestGIInvalidUpdates.ps1'
         'gi-receiver-cache' = 'TestGIReceiverCache.ps1'
         'gi-probe-update' = 'TestGIProbeUpdate.ps1'
@@ -496,7 +497,7 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
         'nonfinite-sites', 'render-graph-schema',
         'resource-export-schema', 'nonfinite-coverage-schema', 'capture-comparison', 'taa-comparison-workflow',
         'capture-bundle-schema', 'gpu-timing-schema', 'parameter-frames-schema', 'gi-reference-contracts',
-        'gi-specular-visibility-contracts', 'gi-probe-update-contracts'
+        'gi-specular-visibility-contracts', 'gi-probe-update-contracts', 'gi-field-sampling-contracts'
     )
     foreach ($leaf in $gpuLeaves.Values) {
         [IO.File]::WriteAllText((Join-Path $runnerTests $leaf), $leafSource, (New-Object Text.UTF8Encoding($false)))
@@ -514,7 +515,7 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
     }
     Check (($gpuResult.suites | Where-Object name -eq 'taa-comparison').steps[0].receipt.python -eq
         'fixture-python-path') 'runner-forwards-selected-python-to-taa-workflow'
-    foreach ($suite in @('session-lifecycle', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-invalid-updates', 'gi-receiver-cache')) {
+    foreach ($suite in @('session-lifecycle', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-field-sampling', 'gi-invalid-updates', 'gi-receiver-cache')) {
         Check (($gpuResult.suites | Where-Object name -eq $suite).steps[0].receipt.python -eq
             'fixture-python-path') "runner-forwards-selected-python-to-$suite"
     }

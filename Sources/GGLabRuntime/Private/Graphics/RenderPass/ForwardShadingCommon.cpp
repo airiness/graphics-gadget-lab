@@ -127,6 +127,13 @@ namespace gglab::forward_shading
 		inputs.m_PrefilteredSpecularCubemap =
 			builder.Read(iblRes.m_PrefilteredSpecularCubemap, RGTextureAccess::Sample);
 		inputs.m_BrdfLut = builder.Read(iblRes.m_BrdfLut, RGTextureAccess::Sample);
+		if (!postTemporal)
+		{
+			if (const auto* field = blackboard.TryGet<RGGIFieldResources>(); field && field->m_Compose)
+			{
+				inputs.m_GIField.Declare(builder, *field, RHIStage::PixelShader);
+			}
+		}
 		if (const auto* constants = blackboard.TryGet<RGForwardAtmosphereConstants>())
 		{
 			inputs.m_AtmosphereSnapshot = constants->m_Snapshot;
@@ -246,6 +253,7 @@ namespace gglab::forward_shading
 			.m_ShadowFlags = inputs.m_ShadowFlags,
 			.m_AtmosphereTransmittanceIndex = atmosphereTransmittanceIndex,
 			.m_AtmosphereSamplerIndex = services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp),
+			.m_GIField = inputs.m_GIField.Resolve(executeContext),
 		};
 	}
 

@@ -105,12 +105,27 @@ namespace gglab
 			if (name == "GI.ProbeUpdate.Irradiance" || name == "GI.Field.Irradiance")
 			{
 				return ResourceExportSemantics{ .m_Role = name.starts_with("GI.Field.") ? "gi-field" : "gi-probe-update", .m_Units = "scene-linear radiance / metres / fractions as described",
-					.m_Space = "probe grid", .m_Description = "RGB: cosine-weighted radiance ratio M; incident E=pi*M. A: initialized texel marker. FP32 octahedral 6x6 interiors with one-texel seam borders. Experimental workload, not a production field certificate." };
+					.m_Space = "probe grid", .m_Description = "RGB: cosine-weighted radiance ratio M; incident E=pi*M. A: initialized texel marker. FP32 octahedral 6x6 interiors with one-texel seam borders. Raw atlas storage does not establish field quality or convergence." };
 			}
 			if (name == "GI.ProbeUpdate.Distance" || name == "GI.Field.Distance")
 			{
 				return ResourceExportSemantics{ .m_Role = name.starts_with("GI.Field.") ? "gi-field" : "gi-probe-update", .m_Units = "scene-linear radiance / metres / fractions as described",
 					.m_Space = "probe grid", .m_Description = "RG: weighted mean and mean-square of min(abs(hit distance), 1.5*length(spacing)). FP32 octahedral 14x14 interiors and one-texel seam borders; cosine-power-50 weights." };
+			}
+			if (name == "GI.Field.Classification")
+			{
+				return ResourceExportSemantics{ .m_Role = "gi-field", .m_Units = "classification enum",
+					.m_Space = "probe grid", .m_Description = "R32Uint: low bits 0 unclassified, 1 Active, 2 Inactive. Texel zero bit 31 mirrors sticky whole-field numerical failure and prevents same-submission GPU sampling. Static preparation uses 32 fixed rays; more than 25 percent single-sided backface hits makes a probe Inactive. Inactive probes never contribute to receiver queries." };
+			}
+			if (name == "GI.Field.ReceiverIrradiance")
+			{
+				return ResourceExportSemantics{ .m_Role = "gi-field-query", .m_Units = "scene-referred RGB irradiance",
+					.m_Space = "opaque raster receiver", .m_Description = "RGB: normalized field E=pi*M before coverage blending or material response, without pre-exposure. A: 1 compatible opaque receiver, 0 background, -1 invalid field. NoValidSupport and OutsideCoverage return zero field irradiance." };
+			}
+			if (name == "GI.Field.ReceiverQuery")
+			{
+				return ResourceExportSemantics{ .m_Role = "gi-field-query", .m_Units = "weight / coverage / support enum",
+					.m_Space = "opaque raster receiver", .m_Description = "RGBA: raw cage weight sum, smooth volume-face coverage, support (1 Valid, 2 LowConfidence, 3 NoValidSupport, 4 OutsideCoverage), compatible opaque marker. Marker -1 with support 0 is a field contract failure, not a support state. Confidence never scales irradiance. Background is all zero; static full updates have no aged contributing probes." };
 			}
 			if (name == "GI.ProbeUpdate.State" || name == "GI.Field.State")
 			{

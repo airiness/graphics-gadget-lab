@@ -13,11 +13,11 @@ namespace gglab::nonfinite
 	inline constexpr uint32_t CounterMagic = 0x4e464354;
 	inline constexpr uint32_t HeaderBytes = 32;
 	inline constexpr uint32_t RecordBytes = 32;
-	inline constexpr uint32_t InventoryLow = 0x0084a3d7;
-	inline constexpr uint32_t InventoryHigh = 0xbf1452d3;
-	inline constexpr std::string_view VariantSuffix = ".nonfinite-counters.0084a3d7bf1452d38fe39de8108a0af3f4bfcc30b72cbd45fc43c5df24dafa7a";
+	inline constexpr uint32_t InventoryLow = 0xa4be36dd;
+	inline constexpr uint32_t InventoryHigh = 0x241f71da;
+	inline constexpr std::string_view VariantSuffix = ".nonfinite-counters.a4be36dd241f71da39c401edfc8e2ca96b9170e81342edf392d79b5ea841752d";
 	inline constexpr uint32_t SiteCount = 81;
-	inline constexpr uint32_t ProgramCount = 30;
+	inline constexpr uint32_t ProgramCount = 31;
 	// The frame injection block follows the site records: point + 1 (zero is none),
 	// IEEE bits, x, y, component, applied count and two reserved words.
 	inline constexpr uint32_t InjectionBytes = 32;
@@ -128,6 +128,7 @@ namespace gglab::nonfinite
 		"gglab.shader.forward-pbr",
 		"gglab.shader.forward-plus-cull",
 		"gglab.shader.forward-plus-validation",
+		"gglab.shader.gi-field",
 		"gglab.shader.gi-probe-update",
 		"gglab.shader.gi-receiver",
 		"gglab.shader.gtao",
