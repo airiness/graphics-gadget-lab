@@ -1,40 +1,19 @@
 #pragma once
-#include "Graphics/Pipeline/GIComputeDispatch.h"
-#include "Graphics/Pipeline/GIReceiverCache.h"
+#include "Graphics/Pipeline/GIObservationSceneIdentity.h"
+#include "Graphics/Pipeline/GITiledObservation.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIObservationLimits.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIReference.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIReferenceTypes.h"
-#include "Graphics/Pipeline/TemporalHistoryTextures.h"
-#include "Graphics/RenderFrameOutcome.h"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <memory>
 
 namespace gglab
 {
-	class RHIDevice;
-
-	// Observation identity must not prolong a Lab's asset interests into AssetManager
-	// shutdown. Query submission leases own snapshots; this weak control-block key
-	// distinguishes recycled addresses even after a scene has expired.
-	struct GIReferenceSceneIdentity
-	{
-		std::weak_ptr<RayScene> m_Owner;
-		uintptr_t m_Address = 0;
-		GIReferenceSceneIdentity() noexcept = default;
-		GIReferenceSceneIdentity(const std::shared_ptr<RayScene>& owner) noexcept :
-			m_Owner(owner), m_Address(reinterpret_cast<uintptr_t>(owner.get())) {}
-		bool operator==(const GIReferenceSceneIdentity& other) const noexcept
-		{
-			return m_Address == other.m_Address && !m_Owner.owner_before(other.m_Owner) &&
-				!other.m_Owner.owner_before(m_Owner);
-		}
-	};
-
 	struct GIReferenceObservationKey
 	{
-		GIReferenceSceneIdentity m_Scene;
+		GIObservationSceneIdentity m_Scene;
 		uint64_t m_SceneRevision = 0;
 		uint64_t m_LightingGeneration = 0;
 		uint64_t m_EnvironmentGeneration = 0;
@@ -77,56 +56,37 @@ namespace gglab
 			Count,
 		};
 		static constexpr size_t SurfaceCount = static_cast<size_t>(SurfaceSlot::Count);
-		using Surface = TemporalHistoryTextures<SurfaceCount>::RenderGraphSurface;
-		using Tile = GIObservationTile;
+		using Surface = GITiledObservation<SurfaceCount>::Surface;
+		using Tile = GITiledObservation<SurfaceCount>::Tile;
 		GIReferenceObservation(RHIDevice& device, PersistentTexturePool& pool) noexcept;
-		~GIReferenceObservation();
-		void BeginFrame(uint64_t serial) noexcept;
+		void BeginFrame(uint64_t serial) noexcept { m_Execution.BeginFrame(serial); }
 		[[nodiscard]] bool Prepare(const GIReferenceObservationKey& key,
 			uint32_t samplesPerBatch, uint32_t sampleWorkBudget,
 			uint32_t queryWorkBudget = GIObservationLimits::MaximumQueryWorkPerSubmission,
 			uint32_t maximumTilePixels = 0,
 			uint32_t receiverQueryBudget = GIObservationLimits::MaximumQueryWorkPerSubmission) noexcept;
-		[[nodiscard]] Tile GetTile() const noexcept { return m_Tile; }
+		[[nodiscard]] Tile GetTile() const noexcept { return m_Execution.GetTile(); }
 		[[nodiscard]] std::array<Surface, SurfaceCount> Import(RenderGraph::RGBuilder& builder) noexcept;
-		void Export(RenderGraph::RGBuilder& builder, const std::array<Surface, SurfaceCount>& surfaces) noexcept;
-		[[nodiscard]] GIReceiverCache& GetReceiverCache() noexcept { return m_ReceiverCache; }
-		void MarkRecorded() noexcept
+		void Export(RenderGraph::RGBuilder& builder,
+			const std::array<Surface, SurfaceCount>& surfaces) noexcept
 		{
-			m_Recorded = true;
-			m_ReceiverCache.MarkRecorded();
+			m_Execution.Export(builder, surfaces);
 		}
+		[[nodiscard]] GIReceiverCache& GetReceiverCache() noexcept { return m_Execution.GetReceiverCache(); }
+		void MarkRecorded() noexcept { m_Execution.MarkRecorded(); }
 		void Settle(const RenderFrameOutcome& outcome) noexcept;
 		void Cancel() noexcept;
 		void Shutdown() noexcept;
 		[[nodiscard]] GIReferenceObservationDiagnostics GetDiagnostics() const noexcept
 		{
-			auto result = m_Diagnostics;
-			result.m_Active = m_Visited;
-			result.m_ReceiverPreparation = m_ReceiverCache.GetProgress();
+			auto result = m_Execution.ProjectProgress<GIReferenceObservationDiagnostics>();
+			result.m_MaximumDepth = m_MaximumDepth;
 			return result;
 		}
 
 	private:
-		void Release() noexcept;
-		RHIDevice& m_Device;
-		PersistentTexturePool& m_Pool;
-		GIReceiverCache m_ReceiverCache;
-		TemporalHistoryTextures<SurfaceCount> m_Textures;
+		GITiledObservation<SurfaceCount> m_Execution;
 		GIReferenceObservationKey m_Key{};
-		GIReferenceObservationDiagnostics m_Diagnostics{};
-		RHIFencePoint m_LastUse{};
-		RHIFencePoint m_PendingFence{};
-		uint64_t m_FrameSerial = 0;
-		bool m_Visited = false;
-		bool m_Exported = false;
-		bool m_Recorded = false;
-		bool m_UnknownCompletion = false;
-		bool m_Settled = false;
-		bool m_SweepActive = false;
-		bool m_PendingInitialized = false;
-		uint32_t m_TileWidth = 0;
-		uint32_t m_TileHeight = 0;
-		Tile m_Tile{};
+		uint32_t m_MaximumDepth = 1;
 	};
 }

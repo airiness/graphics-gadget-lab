@@ -5,6 +5,7 @@ param(
     [string[]]$Rhi = @('dx12','vulkan'),
     [Parameter(Mandatory=$true)][string]$RunDirectory,
     [string]$BaselineDirectory,
+    [switch]$RequireBaselineHistory,
     [string]$Python = 'python',
     [switch]$RequireCache = $true,
     [uint32]$ReceiverQueryWork = 169984,
@@ -148,6 +149,7 @@ try {
     }
     $arguments = @($output)
     if ($BaselineDirectory) { $arguments += @('--baseline', (Resolve-Path $BaselineDirectory).Path) }
+    if ($RequireBaselineHistory) { $arguments += '--require-baseline-history' }
     Invoke-CachePython "$PSScriptRoot/ValidateGIReceiverCache.py" $arguments "$output/arrays.json"
     foreach ($validator in @('ValidateCaptureBundles.py','ValidateResourceExports.py','ValidateRenderGraphExports.py')) {
         Invoke-CachePython "$root/Scripts/Verification/$validator" @($output) "$output/$validator.result.json"
@@ -158,7 +160,8 @@ try {
         (ConvertTo-Json -InputObject @(Get-CacheBinaryIdentity) -Compress)) {
         throw 'Receiver-cache source or binary identities changed during verification.'
     }
-    $result = @{ok=$true;directory=$output;baseline=$BaselineDirectory;receiverQueryWork=$ReceiverQueryWork;
+    $result = @{ok=$true;directory=$output;baseline=$BaselineDirectory;
+        requireBaselineHistory=[bool]$RequireBaselineHistory;receiverQueryWork=$ReceiverQueryWork;
         coastal=[bool]$Coastal;environmentWarnings=$environmentWarnings}
 }
 catch { $result = @{ok=$false;directory=$output;error=$_.Exception.Message} }

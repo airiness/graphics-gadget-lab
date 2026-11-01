@@ -29,8 +29,11 @@ def equal(left, right, label):
             raise AssertionError(f"Changed full array: {label}: {name}")
 
 
-def validate(root, baseline):
+def validate(root, baseline, require_baseline_history=False):
+    if require_baseline_history and not baseline:
+        raise AssertionError("Baseline history comparison requires --baseline")
     checked = 0
+    baseline_history_checked = 0
     for backend in ("dx12", "vulkan"):
         if not (root / backend).exists():
             continue
@@ -39,8 +42,15 @@ def validate(root, baseline):
             equal(first, arrays(directory.parent / "resolve-1"), str(directory.parent))
             if baseline:
                 equal(first, arrays(baseline / directory.relative_to(root)), "before/after " + str(directory))
+            if require_baseline_history and not (directory / "history").exists():
+                raise AssertionError(f"Missing current history: {directory}")
             if (directory / "history").exists():
                 history = arrays(directory / "history")
+                if baseline:
+                    before = baseline / directory.relative_to(root) / "history"
+                    if require_baseline_history or before.exists():
+                        equal(history, arrays(before), "before/after sums/compensation/RNG " + str(directory))
+                        baseline_history_checked += 1
                 equal(history, arrays(directory.parent / "resolve-1/history"),
                       "resolve-only sums/compensation/RNG " + str(directory.parent))
                 opaque = history["GI.Receiver.FaceNormal"][..., 3] == 1
@@ -67,12 +77,14 @@ def validate(root, baseline):
                       backend + " tile/batch sums/compensation/RNG " + stem)
     if not checked:
         raise AssertionError("No receiver-cache controls")
-    print(f"Receiver-cache full-array checks passed ({checked} controls)")
+    print(f"Receiver-cache full-array checks passed ({checked} controls, "
+          f"{baseline_history_checked} before/after history comparisons)")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root", type=Path)
     parser.add_argument("--baseline", type=Path)
+    parser.add_argument("--require-baseline-history", action="store_true")
     args = parser.parse_args()
-    validate(args.root, args.baseline)
+    validate(args.root, args.baseline, args.require_baseline_history)

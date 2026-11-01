@@ -2,6 +2,7 @@
 #include "AssetTestServices.h"
 #include "Graphics/Pipeline/GIReferenceObservation.h"
 #include "Graphics/Pipeline/GIComputeDispatch.h"
+#include "Graphics/Pipeline/GIObservationSceneIdentity.h"
 #include "Graphics/Pipeline/RaySceneShaderBindings.h"
 #include "Graphics/Pipeline/GISpecularVisibilityObservation.h"
 #include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
@@ -423,8 +424,8 @@ namespace gglab
 			const std::weak_ptr<RayScene> sceneObserver = sceneOwner;
 			key.m_Scene = sceneOwner;
 			auto sharedScenes = std::make_shared<std::array<RayScene, 2>>();
-			const GIReferenceSceneIdentity firstAlias(std::shared_ptr<RayScene>(sharedScenes, &(*sharedScenes)[0]));
-			const GIReferenceSceneIdentity secondAlias(std::shared_ptr<RayScene>(sharedScenes, &(*sharedScenes)[1]));
+			const GIObservationSceneIdentity firstAlias(std::shared_ptr<RayScene>(sharedScenes, &(*sharedScenes)[0]));
+			const GIObservationSceneIdentity secondAlias(std::shared_ptr<RayScene>(sharedScenes, &(*sharedScenes)[1]));
 			context.Check(!(firstAlias == secondAlias),
 				"Aliased scene objects sharing an owner still have distinct observation identities");
 			auto identicalKey = key;
@@ -855,6 +856,169 @@ namespace gglab
 			device.SetFencesComplete(true);
 			observation.Shutdown();
 			textures.Tick();
+		}
+
+		void RunGITiledObservationTests(SelfTestContext& context) noexcept
+		{
+			asset_test::TestRHIDevice device;
+			PersistentTexturePool textures(&device);
+			TransientResourcePool transients(&device);
+			const RHIFencePoint fence{ RHIFenceHandle(0, 1), 1 };
+			const auto record = [&](auto& observation, bool markRecorded = true) noexcept
+				{
+					RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &transients });
+					struct Data {};
+					graph.AddPass<Data>("TiledObservationContract", RGPassEncoderType::Compute,
+						[&](RenderGraph::RGBuilder& builder, Data&)
+						{
+							GGLAB_UNUSED(observation.GetReceiverCache().Import(builder));
+							auto surfaces = observation.Import(builder);
+							for (auto& surface : surfaces)
+							{
+								if (observation.GetDiagnostics().m_SubmittedSamples != 0)
+								{
+									GGLAB_UNUSED(builder.Read(surface.m_Previous,
+										RGTextureAccess::Sample, RHIStage::ComputeShader));
+								}
+								if (observation.GetDiagnostics().m_BatchSamples != 0)
+								{
+									if (observation.GetTile().m_BeginSweep)
+									{
+										builder.WriteInPlace(surface.m_Next,
+											RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+									}
+									else
+									{
+										builder.ReadWriteInPlace(surface.m_Next,
+											RGTextureAccess::StorageReadWrite, RHIStage::ComputeShader);
+									}
+								}
+							}
+							observation.Export(builder, surfaces);
+							builder.SideEffect();
+						});
+					context.Check(graph.Compile(), "Tiled observation exports retain defined history states");
+					if (markRecorded)
+					{
+						observation.MarkRecorded();
+					}
+				};
+			const auto checkObservation = [&](auto& observation, auto key, auto prepare,
+				uint32_t textureCount) noexcept
+				{
+					using Status = decltype(observation.GetDiagnostics().m_Status);
+					observation.BeginFrame(1);
+					context.Check(prepare(key, 47, 0) && observation.GetTile().m_Width == 19 &&
+						observation.GetTile().m_Height == 2 && observation.GetDiagnostics().m_TileCount == 6,
+						"Normalized non-divisible query work preserves full-width tiles and edge rows");
+					record(observation, false);
+					observation.Settle({ RenderFrameOutcomeKind::Submitted, 1, fence });
+					context.Check(observation.GetDiagnostics().m_SubmittedTiles == 0 &&
+						observation.GetDiagnostics().m_ReceiverPreparation.m_SubmittedPixels == 0,
+						"Exports alone cannot publish history or receiver preparation");
+					observation.BeginFrame(2);
+					GGLAB_UNUSED(prepare(key, 47, 0));
+					observation.MarkRecorded();
+					observation.Settle({ RenderFrameOutcomeKind::Submitted, 2, fence });
+					context.Check(observation.GetDiagnostics().m_SubmittedTiles == 0 &&
+						observation.GetDiagnostics().m_ReceiverPreparation.m_SubmittedPixels == 0,
+						"Recording alone cannot publish unexported history or receiver preparation");
+					observation.BeginFrame(3);
+					GGLAB_UNUSED(prepare(key, 47, 0));
+					record(observation);
+					observation.Settle({ RenderFrameOutcomeKind::Submitted, 3, fence });
+					observation.BeginFrame(4);
+					const auto generation = observation.GetDiagnostics().m_Generation;
+					context.Check(!prepare(key, 5, 1) && observation.GetDiagnostics().m_BatchSamples == 0 &&
+						observation.GetDiagnostics().m_SubmittedTiles == 1 &&
+						observation.GetDiagnostics().m_Generation == generation,
+						"A reduced execution budget rejects an active tile without resetting its sweep");
+					context.Check(prepare(key, 47, 1) && observation.GetTile().m_X == 0 &&
+						observation.GetTile().m_Y == 2 && observation.GetTile().m_Width == 19 &&
+						observation.GetTile().m_Height == 2 && observation.GetDiagnostics().m_TileCount == 6,
+						"Restoring work resumes the same tile; new partition preferences wait");
+					record(observation);
+					observation.Settle({ RenderFrameOutcomeKind::Submitted, 4, fence });
+					for (uint64_t serial = 5; serial <= 8; ++serial)
+					{
+						observation.BeginFrame(serial);
+						GGLAB_UNUSED(prepare(key, 47, 1));
+						record(observation);
+						observation.Settle({ RenderFrameOutcomeKind::Submitted, serial, fence });
+					}
+					observation.BeginFrame(9);
+					context.Check(prepare(key, 47, 1) && observation.GetDiagnostics().m_CompletedSamples == 1 &&
+						observation.GetDiagnostics().m_CommittedVersion == 1 &&
+						observation.GetDiagnostics().m_Generation == generation &&
+						observation.GetDiagnostics().m_TileCount == 209 &&
+						observation.GetTile().m_Width == 1 && observation.GetTile().m_Height == 1,
+						"Only a full sweep publishes history and adopts new partition preferences");
+					observation.Cancel();
+					textures.Tick();
+					key.m_Samples = 1;
+					observation.BeginFrame(10);
+					GGLAB_UNUSED(prepare(key, 1000, 0));
+					record(observation);
+					observation.Settle({ RenderFrameOutcomeKind::Submitted, 10, fence });
+					observation.BeginFrame(11);
+					context.Check(prepare(key, 1000, 0) &&
+						observation.GetDiagnostics().m_Status == Status::Completed &&
+						observation.GetDiagnostics().m_BatchSamples == 0,
+						"Completed status projects without scheduling further sample work");
+					record(observation);
+					device.SetFencesComplete(false);
+					observation.Settle({ RenderFrameOutcomeKind::Failed, 11, { fence.m_Fence, 2 } });
+					context.Check(observation.GetDiagnostics().m_Status == Status::Failed &&
+						observation.GetDiagnostics().m_CommittedVersion == 1,
+						"A failed read-only resolve cannot publish a new history version");
+					observation.Cancel();
+					textures.Tick();
+					context.Check(textures.GetDiagnostics().m_PendingRetirementTextureCount == textureCount,
+						"Failed read-only resolves retain every history and receiver surface through last use");
+					device.SetFencesComplete(true);
+					observation.Shutdown();
+					textures.Tick();
+				};
+			GIReferenceObservation reference(device, textures);
+			checkObservation(reference, GIReferenceObservationKey{ .m_Width = 19, .m_Height = 11,
+				.m_Samples = 3, .m_MaximumDepth = 3 },
+				[&](const auto& key, uint32_t work, uint32_t tile)
+				{
+					return reference.Prepare(key, 3, work, work * 6 + 5, tile);
+				}, 16);
+			GISpecularVisibilityObservation visibility(device, textures);
+			checkObservation(visibility, GISpecularVisibilityKey{ .m_Width = 19, .m_Height = 11, .m_Samples = 3 },
+				[&](const auto& key, uint32_t work, uint32_t tile)
+				{
+					return visibility.Prepare(key, 3, work * 2 + 1, tile);
+				}, 12);
+
+			reference.BeginFrame(12);
+			visibility.BeginFrame(12);
+			GGLAB_UNUSED(reference.Prepare({ .m_Width = 8, .m_Height = 8, .m_Samples = 1 },
+				1, 64, 128, 0, gi_shader::GIReceiverMaximumQueries));
+			GGLAB_UNUSED(visibility.Prepare({ .m_Width = 8, .m_Height = 8, .m_Samples = 1 }, 1, 128));
+			record(reference);
+			record(visibility);
+			device.SetFencesComplete(false);
+			reference.Settle({ RenderFrameOutcomeKind::CompletionUnknown, 12, {} });
+			visibility.Settle({ RenderFrameOutcomeKind::Submitted, 12, fence });
+			reference.Cancel();
+			device.SetFencesComplete(true);
+			visibility.BeginFrame(13);
+			GGLAB_UNUSED(visibility.Prepare({ .m_Width = 8, .m_Height = 8, .m_Samples = 1 }, 1, 128));
+			context.Check(reference.GetDiagnostics().m_Status == GIReferenceObservationStatus::Failed &&
+				reference.GetDiagnostics().m_ReceiverPreparation.m_SubmittedPixels == 0 &&
+				visibility.GetDiagnostics().m_Status == GISpecularVisibilityStatus::Completed &&
+				visibility.GetDiagnostics().m_CompletedSamples == 1 &&
+				visibility.GetDiagnostics().m_ReceiverPreparation.m_CompletedPixels == 64,
+				"Shared execution code keeps poisoning, receiver preparation and completion observation-local");
+			reference.Shutdown();
+			visibility.Shutdown();
+			textures.Tick();
+			context.Check(textures.GetDiagnostics().m_ActiveTextureCount == 0 &&
+				textures.GetDiagnostics().m_PendingRetirementTextureCount == 0,
+				"Independent checked teardown releases every shared-core instance");
 		}
 
 		void RunGIReceiverCacheTests(SelfTestContext& context) noexcept
@@ -1722,6 +1886,7 @@ namespace gglab
 		RunGIReferenceObservationTests(context);
 		RunSpecularVisibilityTests(context);
 		RunGIReferenceTilingTests(context);
+		RunGITiledObservationTests(context);
 		RunGIReceiverCacheTests(context);
 		RunTriangleTests(context);
 		RunInstanceTests(context);

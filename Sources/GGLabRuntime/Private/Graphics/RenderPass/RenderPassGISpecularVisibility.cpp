@@ -11,6 +11,8 @@
 #include "GGLabRuntime/Graphics/Pipeline/SceneConstantBindings.h"
 #include "GGLabRuntime/Graphics/Pipeline/ScopedConstantBindings.h"
 #include "GGLabRuntime/Graphics/RayScene.h"
+#include "GGLabRuntime/Graphics/RenderContexts.h"
+#include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPass/IBLGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
