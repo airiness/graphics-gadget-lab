@@ -17,28 +17,25 @@ state. Frame execution and settlement are in the [frame map](Frame_Execution_Map
 
 ## Session servicing
 
-The pipe server wakes the platform owner when a request is queued. Application
-services queries, cancellation and stop while AppRuntime is Suspended, without
-rendering a frame. Its platform wait observes window events, automation idle
-expiry and the earliest capture selection deadline. Developer sessions have no
-idle expiry. AppRuntime exposes frame-free deadline servicing through
-`GetNextControlDeadline` and `ServiceControlDeadlines` in
+The pipe server wakes the platform owner for queued requests. While Suspended,
+Application services queries, cancellation and stop without rendering. Its wait
+observes window events, automation idle expiry and AppRuntime's capture deadline
+through `GetNextControlDeadline` / `ServiceControlDeadlines` in
 [runtime services](../../Sources/GGLabAppRuntime/GGLabAppRuntimeServices.cpp).
+Developer sessions have no idle expiry.
 
-A predicate capture keeps one absolute admission deadline across readiness,
-settling, capacity waits and retries. An issued frame settles first; successful
-submission ends the deadline. Expiry returns `FrameSelectionExpired`, releases
-active-job capacity and retains the receipt until consumption. Issued Runtime work
-keeps its resources until drained. Commands and timeout options are described in
+Predicate captures share one admission deadline across waits and retries. Issued
+frames settle before expiry; successful submission ends the deadline. Expiry
+releases active-job capacity but retains the result receipt and any undrained
+Runtime work. Commands and timeout results belong to
 [session jobs](../../.agents/skills/gglab-frame-capture/references/session-jobs.md).
 
 ## Host override writers
 
 [ParameterRequest.h](../../Sources/GGLabAppRuntime/Parameters/ParameterRequest.h)
-defines Assign, Pin and RemoveOverride. WinAppHost and scheduled parameter events
-submit these requests through AppRuntime to `SessionParameterControl`, which owns
-admission, safe application and result retention. External requests share sequence
-exclusion and one retained result slot.
+defines Assign, Pin and RemoveOverride. WinAppHost and scheduled events submit
+requests through AppRuntime to `SessionParameterControl`, which owns admission,
+safe application, sequence exclusion and result retention.
 
 [HostViewParameterSource](../../Sources/GGLabAppRuntime/Parameters/HostViewParameterSource.cpp)
 owns Host view override storage. Prepared writes commit at `OnFrameReady`.
@@ -61,9 +58,8 @@ The Deferred `environment.profile` source and Lab authoring affect inherited val
 
 AppRuntime supplies an owned, read-only
 [ViewControlSnapshot](../../Sources/GGLabAppRuntime/Parameters/ViewControlSnapshot.h)
-for each tooling Draw. It separates inherited values/sources, exact Host override
-presence/value, Host-resolved values and the current frame plan after masks.
-The previous frame retains its own control stamp, outcome and temporal consumers.
+for each tooling Draw. It separates inherited values, explicit Host overrides and
+the masked frame plan; the previous frame keeps its own control stamp and outcome.
 Observation leaves parameter tracking and revisions unchanged.
 
 [View control widgets](../../Sources/WinAppHost/DevTools/DevelopGui/ViewControlWidgets.cpp)
@@ -77,16 +73,13 @@ tooling-owned terminal results even when the panel is closed.
 
 ## Protected Lab/profile assignments
 
-`assign` carries a single-domain request with `ParameterRequest::m_ExpectedDomain`.
-AppRuntime checks the run; Session control checks the domain stamp at admission
-and safe commit. The stamp covers Session binding, Lab owner/value revisions,
+AppRuntime checks run identity; Session control checks the requested domain stamp
+at admission and safe commit. The stamp covers Session binding, Lab revisions,
 [World lighting authoring](../../Sources/GGLabRuntime/Public/GGLabRuntime/Core/World.h)
-and [environment intent](../../Sources/GGLabRuntime/Private/Graphics/EnvironmentLightingSystem.cpp).
-Environment bake publication has a separate lifecycle.
-
-Control conflicts and commits are recorded in `m_DomainOperation`; effect receipts
-track application and submitted-frame consumption. Rebuilds use the
-[content continuation](#content-activation-and-continuation) path. Client usage is in
+and [environment intent](../../Sources/GGLabRuntime/Private/Graphics/EnvironmentLightingSystem.cpp),
+separately from bake publication. Control commits and submitted-frame effects have
+separate receipts. Rebuilds use [content continuation](#content-activation-and-continuation);
+the wire contract is in
 [protected assignments](../../.agents/skills/gglab-frame-capture/references/session-parameters.md#protected-labprofile-assignment).
 
 ## Display-view resolution
@@ -125,8 +118,8 @@ Reference sampling and sequence settings patches are mutually exclusive.
 `DescribeHostView` reports inherited and Host-resolved values before sequence or
 reference masks. `status.frame` reports the latest frame's projection and outcome.
 Parameter discovery, mutations, captures and sequences enable lazy tracking.
-The parameter revision tracks effective changes for effects and settling;
-`hostViewRevision` tracks override structure independently.
+The parameter revision tracks effective changes for effects and settling,
+independently of the override revision described [above](#host-override-writers).
 
 ## Content activation and continuation
 
@@ -134,11 +127,10 @@ The parameter revision tracks effective changes for effects and settling;
 uses DemoManager's active-content identity before and after content update.
 Replacement and shutdown clear Host overrides while their old owner is alive.
 
-A Session-owned Rebuild can retain them when a non-terminal batch waits for
-content, the Demo and LabRuntime owners match, and its source accepts the new
-identity through `ContinuesContentChange`. Continuation rebinds Lab/profile
-sources with `continueView: true`. Other replacements supersede old batches and
-clear the override set.
+A Session-owned Rebuild can retain overrides for a waiting non-terminal batch
+when Demo/LabRuntime owners match and the source accepts `ContinuesContentChange`.
+Continuation rebinds Lab/profile sources; other replacements supersede old batches
+and clear overrides.
 
 ## Frame evidence
 
@@ -164,10 +156,9 @@ frame issues and a contradiction fails. Retries evaluate the same predicate on
 new frames; issued attempts retain their own snapshot through readback.
 
 [Run checks](../../Sources/WinAppHost/Application/Control/ApplicationControlProtocol.cpp)
-precede admission and handle lookup, keeping job and batch IDs scoped to their
-process. `OnFrameBuilt` checks effects against the built view and frozen scene/table
-identities. Lab projections borrow that scene and frame serial only for the current build;
-a missing frame input is unknown, never a reason to read live authoring storage.
+scope job and batch handles to their process before admission or lookup.
+`OnFrameBuilt` checks effects against the built view and frozen scene/table identities.
+Lab projections borrow only current-build inputs; missing inputs remain unknown.
 `OnFrameSubmitted` records consumption only after a successful EndFrame.
 
 Full [graph exports](../../Sources/GGLabRuntime/Private/Diagnostics/Builders/RenderGraphSnapshotJson.cpp)

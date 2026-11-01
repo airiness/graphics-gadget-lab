@@ -182,19 +182,17 @@ Each frame derives one private outcome from the Renderer path and the RHI result
 | Discarded | GI reference observation → field CPU update state → specular visibility observation → live/bake atmosphere → IBL scheduler → last submitted fence → temporal transaction → graph retirement → Runtime capture |
 | CompletionUnknown | Retain GI reference observation → invalidate field CPU update state → retain specular visibility observation → poison → fail/retain Runtime capture → retain live/bake atmosphere → abort IBL scheduling → abort/invalidate temporal state; no ordinary graph retirement |
 
-GI receiver preparation can span submissions and advances only on Submitted.
-Preparation-only and resolve-only frames do not advance samples, tile cursors or RNG;
-later sampling submissions wait for preparation completion.
+Renderer-owned GI observations advance receiver preparation and sampling only on
+Submitted. Preparation-only and resolve-only frames leave sample, tile and RNG
+progress unchanged; sampling waits for preparation completion. Accumulation and
+RNG state publish atomically after a complete spatial sweep; partial sweeps resolve
+the previous complete result. GPU completion gates subsequent tiles and capture
+readiness. Cancellation retires resources through the last-use fence; unknown
+completion retains them through checked teardown.
 
-Both Renderer-owned GI observations advance pending tile cursors only on Submitted. The first
-tile defines all pending pixels; later tiles preserve them with declared ReadWrite access.
-Sums, compensation and any mutable RNG state publish together only after a complete spatial
-sweep has submitted. GPU completion gates each subsequent tile and capture readiness;
-partial sweeps resolve the previous complete sample count. Cancellation retires resources
-through the last-use fence; unknown completion retains them through checked teardown.
-Observation scene identity uses a weak control-block key; query/build submission leases
-retain the immutable snapshot and texture interests selected by its material-input mode.
-Observations do not extend content asset ownership into AssetManager shutdown.
+Observation identity does not retain content assets. Query/build submission leases
+retain the immutable scene snapshot and selected material texture interests;
+observations do not extend asset ownership into AssetManager shutdown.
 
 `GIField` publishes update progress through deferred CPU commits. Failed or
 CompletionUnknown invalidates its in-place contents; Discarded preserves the prior

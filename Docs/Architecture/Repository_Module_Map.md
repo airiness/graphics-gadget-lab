@@ -35,9 +35,7 @@ metadata. The source roots below locate the C++ items.
 | [ShaderRuntimeIntegrationTests](../../Projects/ShaderRuntimeIntegrationTests/ShaderRuntimeIntegrationTests.vcxproj) | [Tests/ShaderRuntimeIntegration](../../Tests/ShaderRuntimeIntegration) | Privileged Shader/Runtime integration tests |
 | [GGLabVulkanQualification](../../Projects/GGLabVulkanQualification/GGLabVulkanQualification.vcxproj) | [Sources/GGLabVulkanQualification](../../Sources/GGLabVulkanQualification) | Standalone Vulkan hardware qualification and headless contracts |
 
-`GGLabFoundationHeaderSelfContainment.targets` generates the Foundation probes
-inside that test project's intermediate directory. Vendored DirectXTex is a
-separate solution project under `Externals/Vender`, outside this first-party set.
+Vendored DirectXTex is a separate solution project under `Externals/Vender`.
 
 ### Shader source ownership
 
@@ -53,18 +51,14 @@ feature rather than the executable that requests it:
 | `ShaderCompiler` | `shadertoolsconfig.json` source-tooling configuration |
 
 [ShaderProjectOwnership.psm1](../../Scripts/ShaderProjectOwnership.psm1) defines
-routing for [SyncShadersToVS.ps1](../../Scripts/SyncShadersToVS.ps1) and the boundary
-validator. Synchronization regenerates shader membership and filters; validation
-rejects missing, duplicate, stale or incorrectly owned items. New shader categories
-need an explicit routing policy. Shared shader consumption does not add a C++
-project reference: qualification can consume the coordinate-conformance source
-without linking WinAppHost.
+feature-domain routing for [SyncShadersToVS.ps1](../../Scripts/SyncShadersToVS.ps1)
+and the boundary validator. Synchronization generates shader membership and filters.
+Shared shader consumption does not imply a C++ project reference or ownership.
 
-These IDE items retain their artifact-only presentation condition and remain
-excluded from MSBuild shader compilation by `Directory.Build.targets`. Shader-domain
-build records and compilation policy remain authoritative. WinApp still deploys
-the development source directory through `LinkShaderDirectory.targets`; deployment
-does not make it the source owner.
+Shader IDE items are conditional on the build profile and excluded from MSBuild
+shader compilation by `Directory.Build.targets`; Shader-domain build records own
+compilation policy. WinApp deploys development sources through
+`LinkShaderDirectory.targets` independently of source ownership.
 
 ## Declared project references
 
@@ -128,7 +122,7 @@ Shared properties and project imports define these build profiles:
 
 | Input | Declared effect and evidence |
 | --- | --- |
-| Debug / Develop / Release, x64 | All eighteen first-party projects declare these configurations. [GGLabBuildBaseline.props](../../PropertySheets/GGLabBuildBaseline.props), directly or through [Common.props](../../PropertySheets/Common.props), supplies the shared build policy. `NapaVoxelCore` keeps its own C++20 build identity |
+| Debug / Develop / Release, x64 | First-party projects declare these configurations. [GGLabBuildBaseline.props](../../PropertySheets/GGLabBuildBaseline.props), directly or through [Common.props](../../PropertySheets/Common.props), supplies the shared build policy. `NapaVoxelCore` keeps its own C++20 build identity |
 | `GGLAB_ENABLE_VULKAN` | Defaults to 1 in [VulkanImport.props](../../PropertySheets/VulkanImport.props). `!=0` enables SDK inputs, Runtime/WinAppHost Vulkan sources, the host presentation test and the two [V] references. Qualification's Shader-directory/DXC imports and target also require `!=0` |
 | `GGLAB_ARTIFACT_ONLY_RUNTIME` | [WinAppBuildProfile.props](../../PropertySheets/WinAppBuildProfile.props) isolates normal/artifact-only outputs and intermediates for all three Windows host targets. `!=1` includes development Shader startup/process sources and tests; WinApp also retains its conditional Shader/asset deployment imports |
 | `GGLAB_USE_PCH` | WinAppHost owns the PCH and disables it for `=0`; both executables use no PCH. The shared host profile separates no-PCH intermediates within each normal/artifact-only profile |

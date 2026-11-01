@@ -48,15 +48,12 @@ Atlas ID: atlas.runtime.render-pipeline
 - **Implementation:** [Forward+ recipe](../../../Sources/GGLabRuntime/Private/Graphics/RenderPipeline/RenderPipelineForwardPlus.cpp)
   and its [factory](../../../Sources/GGLabRuntime/Private/Graphics/RenderPipeline/RenderPipelineForwardPlusFactory.cpp).
 - **GI receivers:** `RenderPipelineForwardPlusCreateInfo::m_EnableGIReceiver` selects
-  the Runtime-owned [receiver pass](../../../Sources/GGLabRuntime/Private/Graphics/RenderPass/RenderPassGIReceiver.cpp)
-  before the temporal boundary. It requires Native, unjittered rendering with TAA
-  off; receiver records and the paired raster-position tap stay Private. Both
-  query diagnostics share the primary-matching helper in `GIRayScene.hlsli`.
-- **GI reference:** the optional reference pass uses the Renderer-owned
-  [observation](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIReferenceObservation.h) and its
-  [receiver cache](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIReceiverCache.h).
-  Sum/RNG pairs commit at settlement and retire by fence; read-only progress uses
-  [GIReferenceTypes.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GIReferenceTypes.h).
+  the Runtime-owned [receiver pass](../../../Sources/GGLabRuntime/Private/Graphics/RenderPass/RenderPassGIReceiver.cpp);
+  receiver records and paired raster positions stay Private.
+- **GI reference:** Public [configuration](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GIReference.h)
+  selects the Renderer-owned [observation](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIReferenceObservation.h);
+  [GIReferenceTypes.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GIReferenceTypes.h)
+  exposes read-only progress.
 - **Probe update:** Public [configuration and diagnostics](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h)
   for the optional Runtime [experiment](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIProbeUpdate.cpp),
   selected by `RenderPipelineForwardPlusCreateInfo::m_GIProbeUpdate`.
@@ -64,15 +61,19 @@ Atlas ID: atlas.runtime.render-pipeline
   the Runtime [owner](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIField.cpp),
   with Public [configuration and diagnostics](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GIField.h).
   Renderer owns its [CPU settlement participant](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIFieldState.h).
+  Opaque Forward shading and receiver diagnostics share the
+  [field lookup](../../../Shaders/Lighting/GIFieldSampling.hlsli) through Private
+  [graph resources](../../../Sources/GGLabRuntime/Private/Graphics/RenderPass/GIFieldGraphResources.h).
 - **Specular visibility:** Public [configuration/progress](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GISpecularVisibility.h)
   selects an independent Renderer-owned [observation](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GISpecularVisibilityObservation.h)
   and [pre-temporal pass](../../../Sources/GGLabRuntime/Private/Graphics/RenderPass/RenderPassGISpecularVisibility.cpp).
-  Both GI observations use the Private
-  [tiled execution core](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GITiledObservation.h).
+  Both GI observations use the Private [tiled execution core](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GITiledObservation.h)
+  and [receiver cache](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIReceiverCache.h).
 - **Lifetime:** a Lab session owns its pipeline through `LabSessionBase`. The Forward+
   recipe owns its Runtime passes and the scene extension it was created with.
-- **Boundary:** [pass ownership](../Runtime_Boundaries_Map.md#pass-ownership); the
-  scene extension runs after temporal integration.
+- **Boundary:** [composition](../Runtime_Boundaries_Map.md#runtime-owned-passes) owns
+  GI stage placement and [pass ownership](../Runtime_Boundaries_Map.md#pass-ownership).
+  The scene extension runs after temporal integration.
   Runtime owns persistent preview textures; the Host GUI declares sampled reads
   through [Public preview graph outputs](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/PostProcess/PostProcessPreviewGraphResources.h).
   The pipeline exports previews after all overlay consumers declare their reads.
