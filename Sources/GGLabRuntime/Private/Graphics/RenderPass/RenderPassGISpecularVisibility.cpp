@@ -1,5 +1,6 @@
 #include "Graphics/RenderPass/RenderPassGISpecularVisibility.h"
 #include "Graphics/Pipeline/GISpecularVisibilityObservation.h"
+#include "Graphics/Pipeline/GIObservationHistoryViews.h"
 #include "Graphics/Pipeline/GIComputeDispatch.h"
 #include "Graphics/Pipeline/RaySceneQuery.h"
 #include "Graphics/RenderPass/GIReceiverGraphResources.h"
@@ -233,8 +234,7 @@ namespace gglab
 			RGTextureViewId m_RasterPosition;
 			RGTextureViewId m_BrdfLut;
 			std::array<RGTextureViewId, OutputNames.size()> m_Outputs{};
-			std::array<RGTextureViewId, GISpecularVisibilityObservation::SurfaceCount> m_Previous{};
-			std::array<RGTextureViewId, GISpecularVisibilityObservation::SurfaceCount> m_Next{};
+			GIObservationHistoryViews<GISpecularVisibilityObservation::SurfaceCount> m_History;
 			GIReceiverCache::Views m_ReceiverCache{};
 			Parameters m_Parameters;
 		};
@@ -303,26 +303,9 @@ namespace gglab
 				data.m_Parameters.m_ReceiverCacheCount = progress.m_ReceiverPreparation.m_BatchPixels;
 				data.m_Parameters.m_ReceiverCacheReady = progress.m_ReceiverPreparation.m_Ready ? 1u : 0u;
 				auto surfaces = observation->Import(builder);
-				for (size_t index = 0; index < surfaces.size(); ++index)
-				{
-					if (progress.m_SubmittedSamples != 0)
-					{
-						data.m_Previous[index] = read(surfaces[index].m_Previous);
-					}
-					if (progress.m_BatchSamples != 0)
-					{
-						auto& next = surfaces[index].m_Next;
-						if (tile.m_BeginSweep)
-						{
-							builder.WriteInPlace(next, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
-						}
-						else
-						{
-							builder.ReadWriteInPlace(next, RGTextureAccess::StorageReadWrite, RHIStage::ComputeShader);
-						}
-						data.m_Next[index] = builder.CreateView<RHITextureViewType::UnorderedAccess>(next);
-					}
-				}
+				data.m_History = DeclareGIObservationHistoryViews(builder, surfaces,
+					{ .m_PreviousValid = progress.m_SubmittedSamples != 0,
+						.m_Writing = progress.m_BatchSamples != 0, .m_BeginSweep = tile.m_BeginSweep });
 				observation->Export(builder, surfaces);
 				builder.SideEffect();
 			},
@@ -359,15 +342,15 @@ namespace gglab
 				{
 					parameters.m_Outputs[index] = execute.GetViewDescriptor(data.m_Outputs[index]).m_Index;
 				}
-				for (size_t index = 0; index < data.m_Previous.size(); ++index)
+				for (size_t index = 0; index < data.m_History.m_Previous.size(); ++index)
 				{
 					if (parameters.m_SubmittedSamples != 0)
 					{
-						parameters.m_Previous[index] = execute.GetViewDescriptor(data.m_Previous[index]).m_Index;
+						parameters.m_Previous[index] = execute.GetViewDescriptor(data.m_History.m_Previous[index]).m_Index;
 					}
 					if (parameters.m_SampleCount != 0)
 					{
-						parameters.m_Next[index] = execute.GetViewDescriptor(data.m_Next[index]).m_Index;
+						parameters.m_Next[index] = execute.GetViewDescriptor(data.m_History.m_Next[index]).m_Index;
 					}
 				}
 				for (size_t index = 0; index < data.m_ReceiverCache.size(); ++index)

@@ -3,6 +3,8 @@
 #include "Graphics/Pipeline/GIReferenceObservation.h"
 #include "Graphics/Pipeline/GIComputeDispatch.h"
 #include "Graphics/Pipeline/GIObservationSceneIdentity.h"
+#include "Graphics/Pipeline/GIObservationHistoryViews.h"
+#include "Graphics/RenderGraph/RGExecutionPlan.h"
 #include "Graphics/Pipeline/RaySceneQuery.h"
 #include "Graphics/Pipeline/GISpecularVisibilityObservation.h"
 #include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
@@ -1044,6 +1046,150 @@ namespace gglab
 			textures.Tick();
 		}
 
+		template <size_t SurfaceCount>
+		void RunGIObservationHistoryViewTests(SelfTestContext& context) noexcept
+		{
+			struct Case
+			{
+				GIObservationHistoryAccess m_Access;
+				bool m_PendingDefined = false;
+				bool m_Compiles = true;
+			};
+			constexpr std::array cases
+			{
+				Case{ { false, false, false }, false }, // Preparation only.
+				Case{ { false, true, true }, false },   // First tile of the first sweep.
+				Case{ { false, true, false }, true },   // Later tile before any published estimate.
+				Case{ { true, true, true }, false },    // First tile of a new sweep.
+				Case{ { true, true, false }, true },    // Later tile with a published estimate.
+				Case{ { false, false, false }, true },  // Pending first sweep, no sampling.
+				Case{ { true, false, false }, false },  // Completed read-only resolve.
+				Case{ { true, false, false }, true },   // Pending later sweep, read-only resolve.
+				Case{ { false, false, true }, false },  // Preparation does not initialize pending contents.
+				Case{ { false, true, false }, false, false }, // Later tiles require defined pending data.
+			};
+			asset_test::TestRHIDevice device;
+			TransientResourcePool pool(&device);
+			for (const auto& test : cases)
+			{
+				RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+				std::array<typename TemporalHistoryTextures<SurfaceCount>::RenderGraphSurface, SurfaceCount> surfaces;
+				std::array<RHIFormat, SurfaceCount> formats{};
+				GIObservationHistoryViews<SurfaceCount> views;
+				bool versionsMatch = true;
+				bool fullWritesMatch = true;
+				struct Empty {};
+				graph.AddPass<Empty>("ObservationHistoryViews", RGPassEncoderType::Compute,
+					[&](RenderGraph::RGBuilder& builder, Empty&)
+					{
+						for (size_t index = 0; index < surfaces.size(); ++index)
+						{
+							formats[index] = SurfaceCount == GIReferenceObservation::SurfaceCount &&
+								index == static_cast<size_t>(GIReferenceObservation::SurfaceSlot::RandomState) ?
+									RHIFormat::R32Uint :
+									RHIFormat::R32G32B32A32Float;
+							const RHITextureDesc desc{ .m_Format = formats[index],
+								.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::UnorderedAccess,
+								.m_Extent = { 8, 8, 1 } };
+							surfaces[index].m_Previous = builder.ImportTexture(
+								("History.Previous." + std::to_string(index)).c_str(),
+								device.CreateTexture({ .m_Desc = desc }, {}), desc, RGTextureAccess::None,
+								test.m_Access.m_PreviousValid ? RGContentValidity::Defined : RGContentValidity::Undefined);
+							surfaces[index].m_Next = builder.ImportTexture(
+								("History.Next." + std::to_string(index)).c_str(),
+								device.CreateTexture({ .m_Desc = desc }, {}), desc, RGTextureAccess::None,
+								test.m_PendingDefined ? RGContentValidity::Defined : RGContentValidity::Undefined);
+						}
+						// The first Write can reuse an unread import's version; ReadWrite creates a new one.
+						const auto imported = surfaces;
+						views = DeclareGIObservationHistoryViews(builder, surfaces, test.m_Access);
+						for (size_t index = 0; index < surfaces.size(); ++index)
+						{
+							const auto nextVersion = imported[index].m_Next.GetVersion() +
+								(test.m_Access.m_Writing && !test.m_Access.m_BeginSweep ? 1 : 0);
+							versionsMatch &= surfaces[index].m_Previous == imported[index].m_Previous &&
+								surfaces[index].m_Next.GetHandle() == imported[index].m_Next.GetHandle() &&
+								surfaces[index].m_Next.GetVersion() == nextVersion;
+							fullWritesMatch &= TemporalHistoryTextures<SurfaceCount>::IsFullyWritten(builder,
+								surfaces[index]) == test.m_Access.m_Writing;
+							if (test.m_Access.m_PreviousValid)
+							{
+								builder.Export(surfaces[index].m_Previous, RGTextureAccess::None);
+							}
+							if (test.m_Access.m_Writing || test.m_PendingDefined)
+							{
+								builder.Export(surfaces[index].m_Next, RGTextureAccess::None);
+							}
+						}
+						builder.SideEffect();
+					});
+				context.Check(versionsMatch && fullWritesMatch,
+					"History recipes update only written next versions and satisfy the owner's full-write gate");
+				const bool compiled = graph.Compile();
+				context.Check(compiled == test.m_Compiles,
+					"History preparation, sampling and resolve compile; undefined continuation remains rejected");
+				if (!compiled || !test.m_Compiles)
+				{
+					continue;
+				}
+				const auto& plan = *graph.GetExecutionPlan();
+				const auto& pass = plan.GetPasses().front();
+				const size_t expected = SurfaceCount *
+					(static_cast<size_t>(test.m_Access.m_PreviousValid) +
+						static_cast<size_t>(test.m_Access.m_Writing));
+				bool accessesMatch = pass.m_Accesses.size() == expected;
+				for (const auto& access : pass.m_Accesses)
+				{
+					const bool previous = access.m_Resource.Value() % 2 == 0;
+					const auto dependency = previous ?
+						RGDependencyAccess::Read :
+						test.m_Access.m_BeginSweep ?
+							RGDependencyAccess::Write :
+							RGDependencyAccess::ReadWrite;
+					const auto usage = previous ?
+						RGTextureAccess::Sample :
+						test.m_Access.m_BeginSweep ?
+							RGTextureAccess::StorageWrite :
+							RGTextureAccess::StorageReadWrite;
+					accessesMatch &= access.m_DependencyAccess == dependency &&
+						access.m_AccessValue == static_cast<uint64_t>(usage) &&
+						access.m_Stages == RHIStage::ComputeShader &&
+						(previous ? test.m_Access.m_PreviousValid : test.m_Access.m_Writing);
+					const auto& resource = plan.GetResources()[access.m_Resource.Value()];
+					accessesMatch &= resource.m_FinalState == CommonRHIResourceState();
+				}
+				context.Check(accessesMatch,
+					"History accesses preserve sampled reads, first-tile Write, later ReadWrite and final common states");
+				const auto matchesView = [&](RGTextureViewId id, bool present, RGTextureId resource,
+					RHITextureViewType type, RHIFormat format) noexcept
+					{
+						if (!present)
+						{
+							return !id.IsValid();
+						}
+						if (!id.IsValid() || id.Value() >= plan.GetTextureViews().size())
+						{
+							return false;
+						}
+						const auto& view = plan.GetTextureViews()[id.Value()];
+						// Inherit each surface's format, including the reference's integer RNG surface.
+						return view.m_Resource.Value() == resource.GetHandle().Value() &&
+							view.m_Desc.m_Type == type && view.m_Desc.m_Format == RHIFormat::Unknown &&
+							graph.GetTextureDesc(resource).m_Format == format;
+					};
+				bool viewsMatch = plan.GetTextureViews().size() == expected;
+				for (size_t index = 0; index < surfaces.size(); ++index)
+				{
+					viewsMatch &= matchesView(views.m_Previous[index], test.m_Access.m_PreviousValid,
+						surfaces[index].m_Previous, RHITextureViewType::ShaderResource, formats[index]);
+					viewsMatch &= matchesView(views.m_Next[index], test.m_Access.m_Writing,
+						surfaces[index].m_Next, RHITextureViewType::UnorderedAccess, formats[index]);
+				}
+				context.Check(viewsMatch,
+					"History views preserve every surface's resource, format and SRV/UAV role without unused views");
+			}
+		}
+
 		void RunGITiledObservationTests(SelfTestContext& context) noexcept
 		{
 			asset_test::TestRHIDevice device;
@@ -2073,6 +2219,8 @@ namespace gglab
 		RunGIReferenceObservationTests(context);
 		RunSpecularVisibilityTests(context);
 		RunGIReferenceTilingTests(context);
+		RunGIObservationHistoryViewTests<GIReferenceObservation::SurfaceCount>(context);
+		RunGIObservationHistoryViewTests<GISpecularVisibilityObservation::SurfaceCount>(context);
 		RunGITiledObservationTests(context);
 		RunGIReceiverCacheTests(context);
 		RunTriangleTests(context);

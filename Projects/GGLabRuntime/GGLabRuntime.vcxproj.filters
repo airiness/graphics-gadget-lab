@@ -1319,6 +1319,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIFieldState.h">
       <Filter>Private\Graphics\Pipeline</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIObservationHistoryViews.h">
+      <Filter>Private\Graphics\Pipeline</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIObservationSceneIdentity.h">
       <Filter>Private\Graphics\Pipeline</Filter>
     </ClInclude>

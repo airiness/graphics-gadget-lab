@@ -1,5 +1,6 @@
 #include "Graphics/RenderPass/RenderPassGIReference.h"
 #include "Graphics/Pipeline/GIReferenceObservation.h"
+#include "Graphics/Pipeline/GIObservationHistoryViews.h"
 #include "Graphics/Pipeline/GIComputeDispatch.h"
 #include "Graphics/Pipeline/RaySceneQuery.h"
 #include "GGLabRuntime/Graphics/Pipeline/RaySceneHitMaterial.h"
@@ -285,8 +286,7 @@ namespace gglab
 			std::array<RGTextureViewId, OutputNames.size()> m_Outputs{};
 			TypedConstantSnapshot<AtmosphereGPU> m_Atmosphere;
 			Parameters m_Parameters;
-			std::array<RGTextureViewId, GIReferenceObservation::SurfaceCount> m_Previous{};
-			std::array<RGTextureViewId, GIReferenceObservation::SurfaceCount> m_Next{};
+			GIObservationHistoryViews<GIReferenceObservation::SurfaceCount> m_History;
 			GIReceiverCache::Views m_ReceiverCache{};
 		};
 		graph.AddPass<PassData>(PassInfo.m_TypeName.c_str(), RGPassEncoderType::Compute,
@@ -380,28 +380,9 @@ namespace gglab
 					data.m_Parameters.m_BeginSweep = tile.m_BeginSweep ? 1u : 0u;
 					data.m_Parameters.m_EndSweep = tile.m_EndSweep ? 1u : 0u;
 					auto surfaces = observation->Import(builder);
-					for (size_t index = 0; index < surfaces.size(); ++index)
-					{
-						if (progress.m_SubmittedSamples != 0)
-						{
-							data.m_Previous[index] = readTexture(surfaces[index].m_Previous);
-						}
-						if (progress.m_BatchSamples != 0)
-						{
-							auto& next = surfaces[index].m_Next;
-							if (tile.m_BeginSweep)
-							{
-								// The first tile initializes the entire pending version.
-								builder.WriteInPlace(next, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
-							}
-							else
-							{
-								// Preserve defined pixels written by preceding tile submissions.
-								builder.ReadWriteInPlace(next, RGTextureAccess::StorageReadWrite, RHIStage::ComputeShader);
-							}
-							data.m_Next[index] = builder.CreateView<RHITextureViewType::UnorderedAccess>(next);
-						}
-					}
+					data.m_History = DeclareGIObservationHistoryViews(builder, surfaces,
+						{ .m_PreviousValid = progress.m_SubmittedSamples != 0,
+							.m_Writing = progress.m_BatchSamples != 0, .m_BeginSweep = tile.m_BeginSweep });
 					observation->Export(builder, surfaces);
 				}
 				builder.SideEffect();
@@ -431,11 +412,11 @@ namespace gglab
 				parameters.m_SunIrradiance = execute.GetViewDescriptor(data.m_SunIrradiance).m_Index;
 				parameters.m_EnvironmentIrradiance = execute.GetViewDescriptor(data.m_EnvironmentIrradiance).m_Index;
 				parameters.m_PathDiagnostics = execute.GetViewDescriptor(data.m_PathDiagnostics).m_Index;
-				for (size_t index = 0; index < data.m_Previous.size(); ++index)
+				for (size_t index = 0; index < data.m_History.m_Previous.size(); ++index)
 				{
 					if (parameters.m_SampleBegin != 0)
 					{
-						const auto descriptor = execute.GetViewDescriptor(data.m_Previous[index]).m_Index;
+						const auto descriptor = execute.GetViewDescriptor(data.m_History.m_Previous[index]).m_Index;
 						if (index < parameters.m_Previous.size())
 						{
 							parameters.m_Previous[index] = descriptor;
@@ -447,7 +428,7 @@ namespace gglab
 					}
 					if (parameters.m_ObservationEnabled && parameters.m_SampleCount != 0)
 					{
-						const auto descriptor = execute.GetViewDescriptor(data.m_Next[index]).m_Index;
+						const auto descriptor = execute.GetViewDescriptor(data.m_History.m_Next[index]).m_Index;
 						if (index < parameters.m_Next.size())
 						{
 							parameters.m_Next[index] = descriptor;
