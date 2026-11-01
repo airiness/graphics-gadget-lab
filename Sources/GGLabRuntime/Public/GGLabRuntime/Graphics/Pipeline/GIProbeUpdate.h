@@ -24,6 +24,8 @@ namespace gglab
 		static constexpr uint32_t MaximumArrayLayers = 32;
 		static constexpr uint32_t RayCountStep = 64;
 		static constexpr uint32_t MaximumRaysPerProbe = 256;
+		static constexpr uint32_t DefaultIrradianceInteriorWidth = 6;
+		static constexpr uint32_t MaximumIrradianceInteriorWidth = 30;
 		static constexpr uint32_t FullUpdateDivisor = 1;
 		static constexpr uint32_t PartialUpdateDivisor = 4;
 		static constexpr uint32_t MaximumUpdateCount = 1'000'000;
@@ -35,6 +37,8 @@ namespace gglab
 		std::array<uint32_t, 3> m_Counts{ 33, 10, 39 };
 		std::array<float, 3> m_Minimum{ -17.25f, -1.5f, -23.25f };
 		float m_Spacing = 1;
+		// The bordered irradiance tile is 8, 16 or 32 texels wide.
+		uint32_t m_IrradianceInteriorWidth = GIProbeUpdateLimits::DefaultIrradianceInteriorWidth;
 		uint32_t m_RaysPerProbe = GIProbeUpdateLimits::MaximumRaysPerProbe;
 		uint32_t m_UpdateDivisor = GIProbeUpdateLimits::FullUpdateDivisor;
 		// A declared full refresh every N updates; zero keeps the fixed divisor.

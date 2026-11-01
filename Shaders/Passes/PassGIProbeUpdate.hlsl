@@ -4,6 +4,7 @@
 #include <Common/VertexTransform.hlsli>
 #include <Lighting/GIHitLighting.hlsli>
 #include <Lighting/GIShaderConstants.hlsli>
+#include <Lighting/GISampling.hlsli>
 
 StructuredBuffer<float4> ProbeRayInput : register(t11);
 RWStructuredBuffer<float4> ProbeRayOutput : register(u1);
@@ -36,7 +37,7 @@ cbuffer Parameters : register(b2)
 	float Hysteresis;
 	uint RotateDirections;
 	uint TraversalOnly;
-	uint Padding;
+	uint IrradianceInteriorWidth;
 };
 
 static const float ProbeGoldenAngleTurns = 0.3819660112501051;
@@ -58,13 +59,21 @@ RWTexture2DArray<float4> ProbeState()
 {
 	return ResourceDescriptorHeap[NonUniformResourceIndex(StateIndex)];
 }
+uint IrradianceTileWidth()
+{
+	return IrradianceInteriorWidth + 2 * GIProbeBorderWidth;
+}
+uint IrradianceInteriorTexels()
+{
+	return IrradianceInteriorWidth * IrradianceInteriorWidth;
+}
 uint3 ProbeCoordinate(uint probe)
 {
 	// Atlas XY is world XZ; array layers are world Y.
 	return uint3(probe % GridSize.x, (probe / GridSize.x) % GridSize.z,
 		probe / (GridSize.x * GridSize.z));
 }
-float3 ProbeDirection(uint ray)
+float3 ProbeDirection(uint probe, uint ray)
 {
 	const float z = 1.0 - 2.0 * ((float)(ray) + 0.5) / (float)(RaysPerProbe);
 	// Bound sin/cos arguments: large-angle error is amplified at grazing texels.
@@ -74,6 +83,20 @@ float3 ProbeDirection(uint ray)
 	precise float angle = phase * TWO_PI;
 	const float radius = sqrt(max(0.0, 1.0 - z * z));
 	float3 direction = float3(radius * cos(angle), radius * sin(angle), z);
+	if (ClassificationIndex != 0xffffffffu)
+	{
+		// A common rotation correlates every cage corner's narrow-emitter error.
+		// Decorrelate both probes and updates: nearby CPU seeds otherwise permute
+		// overlapping histories. The experiment keeps its common directions.
+		const uint update = RotateDirections != 0 ? GIHash(UpdateIndex) : 0;
+		uint state = GIHash(probe ^ update);
+		const float u = GIRandom(state);
+		const float v = TWO_PI * GIRandom(state);
+		const float w = TWO_PI * GIRandom(state);
+		const float4 rotation = float4(sqrt(1.0 - u) * sin(v), sqrt(1.0 - u) * cos(v),
+			sqrt(u) * sin(w), sqrt(u) * cos(w));
+		direction += 2.0 * cross(rotation.xyz, cross(rotation.xyz, direction) + rotation.w * direction);
+	}
 	if (RotateDirections != 0)
 	{
 		direction += 2.0 * cross(Rotation.xyz, cross(Rotation.xyz, direction) + Rotation.w * direction);
@@ -114,8 +137,8 @@ void Initialize(uint3 id : SV_DispatchThreadID)
 	{
 		ProbeUpdateStatus[0] = uint4(GIUpdateErrorNone, 0xffffffffu, 0xffffffffu, 0xffffffffu);
 	}
-	if (id.x < GridSize.x * GIProbeIrradianceTileWidth &&
-		id.y < GridSize.z * GIProbeIrradianceTileWidth && id.z < GridSize.y)
+	if (id.x < GridSize.x * IrradianceTileWidth() &&
+		id.y < GridSize.z * IrradianceTileWidth() && id.z < GridSize.y)
 	{
 		IrradianceAtlas()[id] = 0.0.xxxx;
 	}
@@ -134,10 +157,10 @@ void Initialize(uint3 id : SV_DispatchThreadID)
 		}
 	}
 	// All ray slots are defined once, including probes outside a partial update.
-	const uint linearIndex = id.x + GridSize.x * GIProbeDistanceTileWidth *
-		(id.y + GridSize.z * GIProbeDistanceTileWidth * id.z);
+	const uint width = max(IrradianceTileWidth(), GIProbeDistanceTileWidth);
+	const uint linearIndex = id.x + GridSize.x * width * (id.y + GridSize.z * width * id.z);
 	const uint capacity = ProbeCount * RaysPerProbe;
-	const uint threads = ProbeCount * GIProbeDistanceTileWidth * GIProbeDistanceTileWidth;
+	const uint threads = ProbeCount * width * width;
 	for (uint index = linearIndex; index < capacity; index += threads)
 	{
 		ProbeRayOutput[index] = 0.0.xxxx;
@@ -222,7 +245,7 @@ void Trace(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 	const float mip = ConstantEnvironment == 0 ? GIEnvironmentMip(0) : 0.0;
 	for (uint index = thread; index < RaysPerProbe; index += GIProbeGroupThreads)
 	{
-		const float3 direction = ProbeDirection(index);
+		const float3 direction = ProbeDirection(probe, index);
 		float3 radiance = ConstantRadiance;
 		float distance = MaximumDistance;
 		uint outcome = GIHitMiss;
@@ -314,9 +337,9 @@ groupshared float4 SharedRays[GIProbeMaximumRays];
 groupshared float3 SharedDirections[GIProbeMaximumRays];
 float4 IntegrateTexel(uint probe, uint texel, bool useShared)
 {
-	const bool irradiance = texel < GIProbeIrradianceInteriorTexels;
-	const uint side = irradiance ? GIProbeIrradianceInteriorWidth : GIProbeDistanceInteriorWidth;
-	const uint linearIndex = irradiance ? texel : texel - GIProbeIrradianceInteriorTexels;
+	const bool irradiance = texel < IrradianceInteriorTexels();
+	const uint side = irradiance ? IrradianceInteriorWidth : GIProbeDistanceInteriorWidth;
+	const uint linearIndex = irradiance ? texel : texel - IrradianceInteriorTexels();
 	const float3 direction = OctahedralDirection(uint2(linearIndex % side, linearIndex / side), side);
 	float3 radiance = 0.0.xxx;
 	float2 moments = 0.0.xx;
@@ -338,10 +361,10 @@ float4 IntegrateTexel(uint probe, uint texel, bool useShared)
 void StoreTexel(uint probe, uint texel, float4 value)
 {
 	const uint3 coordinate = ProbeCoordinate(probe);
-	if (texel < GIProbeIrradianceInteriorTexels)
+	if (texel < IrradianceInteriorTexels())
 	{
-		const uint3 target = uint3(coordinate.xy * GIProbeIrradianceTileWidth + GIProbeBorderWidth +
-			uint2(texel % GIProbeIrradianceInteriorWidth, texel / GIProbeIrradianceInteriorWidth), coordinate.z);
+		const uint3 target = uint3(coordinate.xy * IrradianceTileWidth() + GIProbeBorderWidth +
+			uint2(texel % IrradianceInteriorWidth, texel / IrradianceInteriorWidth), coordinate.z);
 		const float4 previous = NonFiniteInject(NF_INJECT_PASS_GI_PROBE_UPDATE_STORETEXEL_HISTORY,
 			uint2(probe, texel), IrradianceAtlas()[target]);
 		if (!all(isfinite(NonFiniteObserveValue(NF_SITE_GI_PROBE_UPDATE_STORETEXEL_ISFINITE, previous))))
@@ -359,7 +382,7 @@ void StoreTexel(uint probe, uint texel, float4 value)
 	}
 	else
 	{
-		const uint index = texel - GIProbeIrradianceInteriorTexels;
+		const uint index = texel - IrradianceInteriorTexels();
 		const uint3 target = uint3(coordinate.xy * GIProbeDistanceTileWidth + GIProbeBorderWidth +
 			uint2(index % GIProbeDistanceInteriorWidth, index / GIProbeDistanceInteriorWidth), coordinate.z);
 		const float2 previous = NonFiniteInject(NF_INJECT_PASS_GI_PROBE_UPDATE_STORETEXEL_HISTORY,
@@ -389,10 +412,11 @@ void BlendDirect(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 	const uint probe = FirstProbe + group.x;
 	for (uint ray = thread; ray < RaysPerProbe; ray += GIProbeGroupThreads)
 	{
-		SharedDirections[ray] = ProbeDirection(ray);
+		SharedDirections[ray] = ProbeDirection(probe, ray);
 	}
 	GroupMemoryBarrierWithGroupSync();
-	for (uint texel = thread; texel < GIProbeInteriorTexels; texel += GIProbeGroupThreads)
+	for (uint texel = thread; texel < IrradianceInteriorTexels() + GIProbeDistanceInteriorTexels;
+		texel += GIProbeGroupThreads)
 	{
 		StoreTexel(probe, texel, IntegrateTexel(probe, texel, false));
 	}
@@ -409,10 +433,11 @@ void BlendShared(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 	for (uint ray = thread; ray < RaysPerProbe; ray += GIProbeGroupThreads)
 	{
 		SharedRays[ray] = ProbeRayInput[probe * RaysPerProbe + ray];
-		SharedDirections[ray] = ProbeDirection(ray);
+		SharedDirections[ray] = ProbeDirection(probe, ray);
 	}
 	GroupMemoryBarrierWithGroupSync();
-	for (uint texel = thread; texel < GIProbeInteriorTexels; texel += GIProbeGroupThreads)
+	for (uint texel = thread; texel < IrradianceInteriorTexels() + GIProbeDistanceInteriorTexels;
+		texel += GIProbeGroupThreads)
 	{
 		StoreTexel(probe, texel, IntegrateTexel(probe, texel, true));
 	}
@@ -452,11 +477,13 @@ void Borders(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 	}
 	const uint probe = FirstProbe + group.x;
 	const uint3 coordinate = ProbeCoordinate(probe);
-	for (uint index = thread; index < GIProbeTileTexels; index += GIProbeGroupThreads)
+	const uint irradianceTexels = IrradianceTileWidth() * IrradianceTileWidth();
+	for (uint index = thread; index < irradianceTexels + GIProbeDistanceTileWidth * GIProbeDistanceTileWidth;
+		index += GIProbeGroupThreads)
 	{
-		const bool irradiance = index < GIProbeIrradianceTileTexels;
-		const uint width = irradiance ? GIProbeIrradianceTileWidth : GIProbeDistanceTileWidth;
-		const uint linearIndex = irradiance ? index : index - GIProbeIrradianceTileTexels;
+		const bool irradiance = index < irradianceTexels;
+		const uint width = irradiance ? IrradianceTileWidth() : GIProbeDistanceTileWidth;
+		const uint linearIndex = irradiance ? index : index - irradianceTexels;
 		const uint2 local = uint2(linearIndex % width, linearIndex / width);
 		if (local.x != 0 && local.y != 0 && local.x != width - 1 && local.y != width - 1)
 		{

@@ -105,7 +105,7 @@ namespace gglab
 			if (name == "GI.ProbeUpdate.Irradiance" || name == "GI.Field.Irradiance")
 			{
 				return ResourceExportSemantics{ .m_Role = name.starts_with("GI.Field.") ? "gi-field" : "gi-probe-update", .m_Units = "scene-linear radiance / metres / fractions as described",
-					.m_Space = "probe grid", .m_Description = "RGB: cosine-weighted radiance ratio M; incident E=pi*M. A: initialized texel marker. FP32 octahedral 6x6 interiors with one-texel seam borders. Raw atlas storage does not establish field quality or convergence." };
+					.m_Space = "probe grid", .m_Description = "RGB: cosine-weighted radiance ratio M; incident E=pi*M. A: initialized texel marker. FP32 octahedral interiors with one-texel seam borders; tile dimensions follow the active profile. Raw atlas storage does not establish field quality or convergence." };
 			}
 			if (name == "GI.ProbeUpdate.Distance" || name == "GI.Field.Distance")
 			{

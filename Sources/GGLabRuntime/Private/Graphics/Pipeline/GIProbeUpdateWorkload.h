@@ -23,7 +23,8 @@ namespace gglab
 			const RenderServices& services) noexcept;
 		void AddPasses(RenderGraph& graph, const RenderFrameContext& frame,
 			const RenderServices& services, const RaySceneGraphResources& scene,
-			std::shared_ptr<GIFieldUpdateState> fieldUpdate = {}, bool compose = false) noexcept;
+			std::shared_ptr<GIFieldUpdateState> fieldUpdate = {}, bool compose = false,
+			float viewBias = 0.3f) noexcept;
 		void ExportFieldResources(RenderGraph& graph) noexcept;
 
 	private:

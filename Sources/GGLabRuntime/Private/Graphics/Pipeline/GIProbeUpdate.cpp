@@ -1,6 +1,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h"
 #include "Graphics/Pipeline/GIProbeUpdateWorkload.h"
 
+#include <bit>
 #include <cmath>
 #include <utility>
 
@@ -21,6 +22,9 @@ namespace gglab
 		}
 		return count >= profile.m_UpdateDivisor && count <= GIProbeUpdateLimits::MaximumProbeCount &&
 			profile.m_Counts[1] <= GIProbeUpdateLimits::MaximumArrayLayers &&
+			profile.m_IrradianceInteriorWidth >= GIProbeUpdateLimits::DefaultIrradianceInteriorWidth &&
+			profile.m_IrradianceInteriorWidth <= GIProbeUpdateLimits::MaximumIrradianceInteriorWidth &&
+			std::has_single_bit(profile.m_IrradianceInteriorWidth + 2u) &&
 			profile.m_RaysPerProbe >= GIProbeUpdateLimits::RayCountStep &&
 			profile.m_RaysPerProbe <= GIProbeUpdateLimits::MaximumRaysPerProbe &&
 			profile.m_RaysPerProbe % GIProbeUpdateLimits::RayCountStep == 0 &&

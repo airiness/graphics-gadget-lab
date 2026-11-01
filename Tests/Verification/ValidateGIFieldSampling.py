@@ -7,6 +7,8 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from ValidateGIReferenceLighting import f4_oracle, masks as reference_masks
+
 
 def require(condition, message):
     if not condition:
@@ -32,13 +34,18 @@ def bilinear(atlas, probes, directions, interior):
     return result
 
 
-def oracle(position, normal, vertex, camera, minimum, spacing, counts, irradiance, distance, classes):
+def oracle(position, normal, vertex, camera, minimum, spacing, counts, irradiance, distance, classes,
+           view_bias=.3):
+    interior = irradiance.shape[2]//counts[0]-2
+    require(interior in (6, 14, 30) and irradiance.shape ==
+            (counts[1], counts[2]*(interior+2), counts[0]*(interior+2), 4),
+            "Invalid irradiance atlas layout")
     grid = (position - minimum) / spacing
     edge = np.minimum(grid, counts-1-grid).min(axis=1).clip(0, 1)
     coverage = edge*edge*(3-2*edge)
     view = camera-position
     view /= np.linalg.norm(view, axis=1)[:, None]
-    biased = position + spacing*(.1*vertex+.3*view)
+    biased = position + spacing*(.1*vertex+view_bias*view)
     cage = np.minimum(np.maximum((biased-minimum)/spacing, 0), counts-1)
     lower = np.minimum(np.floor(cage).astype(int), counts-2)
     f = (cage-lower).clip(0, 1)
@@ -63,7 +70,7 @@ def oracle(position, normal, vertex, camera, minimum, spacing, counts, irradianc
         weight = np.where(weight < .2, weight**3/.2**2, weight)
         weight *= (classes[probe[:, 1], probe[:, 2], probe[:, 0], 0] == 1) & (coverage > 0)
         total += weight
-        energy += weight[:, None]*bilinear(irradiance, probe, normal, 6)[:, :3]
+        energy += weight[:, None]*bilinear(irradiance, probe, normal, interior)[:, :3]
     energy *= np.pi/np.where(total > 0, total, 1)[:, None]
     support = np.where(coverage == 0, 4, np.where(total == 0, 3, np.where(total < .05, 2, 1)))
     return energy, np.column_stack((total, coverage, support, np.ones(len(total))))
@@ -74,6 +81,8 @@ def volume(fixture):
         return np.array([-3., -3., -3.]), .5, np.array([13, 13, 13])
     if fixture in (2, 3):
         return np.array([-4., -2., -4.]), 1., np.array([9, 9, 9])
+    if fixture == 4:
+        return np.array([-3.125, -1.3125, -3.0625]), .375, np.array([18, 18, 18])
     if fixture in (17, 18):
         return np.array([-1., -1., -1.]), .5, np.array([5, 5, 5])
     if fixture == 15:
@@ -101,6 +110,9 @@ def inspect(directory, case):
     require(classes.dtype == np.dtype("<u4") and np.isin(classes, [1, 2]).all(), "Unclassified probes reached a query")
     minimum, spacing, counts = volume(case["fixture"])
     require(classes.shape == (counts[1], counts[2], counts[0], 1), "Classification grid differs")
+    tile = 32 if case["fixture"] == 4 else 8
+    require(values["GI.Field.Irradiance"].shape == (counts[1], counts[2]*tile, counts[0]*tile, 4),
+            "Fixture irradiance angular profile differs")
     position = values["GI.Receiver.Position"][0]
     normal = values["GI.Receiver.ShadingNormal"][0, ..., :3]
     vertex = values["GI.Receiver.VertexNormal"][0, ..., :3]
@@ -115,7 +127,8 @@ def inspect(directory, case):
     camera = np.asarray(frame["camera"]["position"], dtype=np.float64)
     expected, expected_query = oracle(position.reshape(-1, 4)[coords, :3].astype(float),
         normal.reshape(-1, 3)[coords].astype(float), vertex.reshape(-1, 3)[coords].astype(float),
-        camera, minimum, spacing, counts, values["GI.Field.Irradiance"], values["GI.Field.Distance"], classes)
+        camera, minimum, spacing, counts, values["GI.Field.Irradiance"], values["GI.Field.Distance"], classes,
+        view_bias=.15 if case["fixture"] == 4 else .3)
     actual = energy.reshape(-1, 4)[coords, :3]
     actual_query = query.reshape(-1, 4)[coords]
     scaled = float(np.max(np.abs(actual-expected)/np.maximum(1., np.abs(expected))))
@@ -164,14 +177,27 @@ def inspect(directory, case):
                 np.max(np.abs(position[covered, :3]-reference_position[covered, :3])) < 1e-4,
                 "Matched reference receivers changed")
         ref_energy = reference_values["GI.Reference.Irradiance"]
-        floor = covered & (np.abs(position[..., 1]) < 1e-4) & (np.abs(position[..., 0]) <= 1.5) & \
-            (position[..., 2] >= -1.5) & (position[..., 2] <= .5)
-        require(floor.any() and np.all(ref_energy[floor, 3] == 1), "Invalid or empty F4 comparison ROI")
-        field_mean, ref_mean = energy[floor, :3].mean(0), ref_energy[floor, :3].mean(0)
         luminance = np.array([.2126, .7152, .0722])
-        error = float(abs(field_mean@luminance-ref_mean@luminance)/max(ref_mean@luminance, 1e-6))
-        quality = dict(gate="F4 one-bounce area-mean energy within 10%", error=error, passed=error <= .1,
-                       fieldMean=field_mean.tolist(), referenceMean=ref_mean.tolist(),
+        rois = {}
+        for name, roi in reference_masks(case, reference_values, reference_record["frame"]["camera"]).items():
+            require(roi.any() and np.all(covered[roi]) and np.all(ref_energy[roi, 3] == 1),
+                    f"Invalid or empty F4 comparison ROI: {name}")
+            field_mean = energy[roi, :3].astype(float).mean(0)
+            ref_mean = ref_energy[roi, :3].astype(float).mean(0)
+            sun, sky = f4_oracle(position[roi, :3].astype(float), case["view"] == "F4_Floor")
+            analytic_mean = (sun+sky).mean(0)
+            bias = float((field_mean-ref_mean)@luminance/max(ref_mean@luminance, 1e-6))
+            analytic_bias = float((field_mean-analytic_mean)@luminance/max(analytic_mean@luminance, 1e-6))
+            chromaticity_error = float(np.max(np.abs(field_mean[:2]/max(field_mean.sum(), 1e-6)-
+                                                     ref_mean[:2]/max(ref_mean.sum(), 1e-6))))
+            rois[name] = dict(pixels=int(roi.sum()), fieldMean=field_mean.tolist(),
+                             referenceMean=ref_mean.tolist(), analyticMean=analytic_mean.tolist(),
+                             relativeBias=bias, analyticRelativeBias=analytic_bias,
+                             chromaticityError=chromaticity_error,
+                             passed=abs(bias) <= .1 and chromaticity_error <= .02)
+        quality = dict(gate="F4 one-bounce per-ROI energy within 10% and chromaticity within 0.02",
+                       error=max(abs(row["relativeBias"]) for row in rois.values()),
+                       passed=all(row["passed"] for row in rois.values()), rois=rois,
                        referenceDepth=1, referenceSamples=1024, referenceConvergenceQualified=False)
     return dict(id=case["id"], fixture=case["fixture"], checkedPixels=len(coords), scaledError=scaled,
                 meanIrradiance=mean.tolist(), active=int((classes == 1).sum()), inactive=int((classes == 2).sum()),
@@ -228,6 +254,8 @@ def validate(root):
         require(all(np.max(np.abs(mean/plane_means[0]-1)) < .01 for mean in plane_means[1:]),
                 "Exposure or primary albedo changed scene-referred field irradiance")
         for control in ("plane", "coastal"):
+            if control not in {case["id"] for case in cases}:
+                continue
             images = {arm: np.asarray(Image.open(next((root/backend/control/arm).glob("*.png"))).convert("RGB"))
                       for arm in ("on", "update-only", "off")}
             require(np.array_equal(images["update-only"], images["off"]), "Update-only field changed production shading")
@@ -246,8 +274,11 @@ def self_test():
     points = np.array([[1., 1., 1.], [.5, 1., 1.], [-1., 1., 1.]])
     normals = np.tile([0., 1., 0.], (3, 1))
     args = (points, normals, normals, np.array([1., 3., -3.]), np.zeros(3), 1., counts, atlas, moments, classes)
-    energy, query = oracle(*args)
-    require(np.allclose(energy[:2], np.pi) and np.array_equal(energy[2], np.zeros(3)), "Constant radiance units/coverage")
+    for width in (6, 14, 30):
+        resized = np.ones((3, 3*(width+2), 3*(width+2), 4))
+        energy, query = oracle(*args[:7], resized, *args[8:])
+        require(np.allclose(energy[:2], np.pi) and np.array_equal(energy[2], np.zeros(3)),
+                f"Constant radiance units/coverage at angular width {width}")
     require(np.allclose(query[:, 1], [1, .5, 0]) and query[2, 2] == 4, "Coverage uses an unbiassed world surface")
     classes[:] = 2
     energy, query = oracle(*args)

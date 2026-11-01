@@ -9,7 +9,8 @@
 namespace gglab
 {
 	[[nodiscard]] inline bool IsGIUpdateStatusValid(const GIUpdateStatus& status,
-		uint32_t probes, uint32_t rays, uint64_t submittedUpdates) noexcept
+		uint32_t probes, uint32_t rays, uint64_t submittedUpdates,
+		uint32_t irradianceInteriorWidth = gi_shader::GIProbeIrradianceInteriorWidth) noexcept
 	{
 		if (status.m_Error == GIUpdateError::None)
 		{
@@ -17,8 +18,10 @@ namespace gglab
 		}
 		const bool known = status.m_Error == GIUpdateError::InvalidRay ||
 			status.m_Error == GIUpdateError::InvalidHistory || status.m_Error == GIUpdateError::InvalidBlend;
+		const uint32_t interiorTexels = irradianceInteriorWidth * irradianceInteriorWidth +
+			gi_shader::GIProbeDistanceInteriorTexels;
 		return known && status.m_Probe < probes && status.m_Update < submittedUpdates &&
-			status.m_Element < (status.m_Error == GIUpdateError::InvalidRay ? rays : gi_shader::GIProbeInteriorTexels);
+			status.m_Element < (status.m_Error == GIUpdateError::InvalidRay ? rays : interiorTexels);
 	}
 
 	// CPU state only: neither deferred commits nor Renderer settlement own GPU objects.

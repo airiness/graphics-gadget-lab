@@ -907,6 +907,20 @@ namespace gglab
 					{
 						info.m_Volume = { .m_Counts = { 9, 9, 9 }, .m_Minimum = { -4, -2, -4 } };
 					}
+					else if (fixture == GIReferenceFixture::SunlitColoredRoom)
+					{
+						// Keep valid layers close to the floor and back wall rather than
+						// interpolating across a layer classified inside the frozen shell.
+						// An X plane also lands on the opening's inner jamb (x=1).
+						info.m_Volume = { .m_Counts = { 18, 18, 18 },
+							.m_Minimum = { -3.125f, -1.3125f, -3.0625f }, .m_Spacing = 0.375f };
+						// Near-floor probes need finer angular storage to avoid mixing
+						// strong below-horizon floor light into the upward hemisphere.
+						info.m_IrradianceInteriorWidth = 30;
+						// The narrow sunlit jamb needs a longer static integration window.
+						info.m_Hysteresis = 0.998f;
+						info.m_ViewBias = 0.15f;
+					}
 					else
 					{
 						info.m_Volume = { .m_Counts = { 7, 7, 7 }, .m_Minimum = { -3, -1, -3 } };

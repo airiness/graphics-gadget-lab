@@ -3,6 +3,7 @@
 param(
     [string[]]$Configuration = @('Develop'),
     [string[]]$Rhi = @('dx12','vulkan'),
+    [string[]]$CaseId = @(),
     [string]$OutputDirectory,
     [string]$RunDirectory,
     [string]$Python = 'python',
@@ -27,10 +28,16 @@ $cases = @(
     @{id='sealed';fixture=2;view='F2_Interior';ev100=10;albedo=0},
     @{id='thin';fixture=3;view='F3_Interior';ev100=10;albedo=0},
     @{id='sunroom';fixture=4;view='F4_Floor';ev100=10;albedo=0},
+    @{id='sunroom-back';fixture=4;view='F4_Back';ev100=10;albedo=0},
     @{id='coverage';fixture=17;view='Contract_FieldCoverage';ev100=10;albedo=0},
     @{id='unsupported';fixture=18;view='Contract_FieldUnsupported';ev100=10;albedo=0},
     @{id='coastal';fixture=15;view='GI_InteriorExterior';ev100=15;albedo=0}
 )
+if ($CaseId.Count) {
+    $CaseId = @($CaseId | ForEach-Object { $_ -split ',' })
+    if (@($CaseId | Where-Object { $_ -notin $cases.id }).Count) { throw 'Unknown field sampling case.' }
+    $cases = @($cases | Where-Object { $_.id -in $CaseId })
+}
 function Source-Identity {
     Get-VerificationSourceIdentity $root @('Sources','Shaders','Tests/Verification','Scripts/Verification','Schemas','Projects','PropertySheets')
 }
@@ -60,6 +67,10 @@ try {
             Write-VerificationJson "$output/$backend/start.json" $start
             if ($start.ownership -ne 'created') { throw 'Field sampling requires an owned session.' }
             $run = $start.runIdentity
+            # Session readiness precedes activation of the parameter source.
+            $null = Wait-VerificationCondition -Poll {
+                Invoke-VerificationSession status $session @{ExpectedRunIdentity=$run}
+            } -Until { param($r) $r.frame -and $r.frame.ready } -TimeoutSeconds $TimeoutSeconds
             foreach ($case in $cases) {
                 $directory = "$output/$backend/$($case.id)"
                 New-Item -ItemType Directory -Path $directory -Force | Out-Null
@@ -71,8 +82,9 @@ try {
                     'GI.Receiver.VertexNormal','GI.Receiver.ShadingNormal' | ForEach-Object { @{resource=$_} })
                 # All eight payload slots belong to the paired lookup group. Images are
                 # separate settled frames and do not claim exact same-frame provenance.
+                $settleFrames = if ($case.fixture -eq 4) { 3072 } else { 512 }
                 $capture = Invoke-VerificationSession export $session @{ExpectedRunIdentity=$run;View=$case.view;
-                    Targets=(ConvertTo-Json -InputObject $targets -Compress);IncludeGraph=$true;SettleFrames=512;
+                    Targets=(ConvertTo-Json -InputObject $targets -Compress);IncludeGraph=$true;SettleFrames=$settleFrames;
                     OutputDirectory="$directory/lookup";TimeoutSeconds=$TimeoutSeconds}
                 if ($capture.status -ne 'completed' -or $capture.publication -ne 'Published') { throw 'Field lookup did not publish.' }
                 Write-VerificationJson "$directory/lookup/receipt.json" $capture
@@ -87,7 +99,7 @@ try {
                         Write-VerificationJson "$directory/$arm/receipt.json" $image
                     }
                 }
-                if ($case.id -eq 'sunroom') {
+                if ($case.fixture -eq 4) {
                     $referenceEffect = Set-Inputs $session $run @{field_enabled=$false;probe_enabled=$true;
                         samples=1024;depth=1;batch_samples=64;accumulate=$true}
                     Write-VerificationJson "$directory/reference-effect.json" $referenceEffect
@@ -102,8 +114,18 @@ try {
                 }
                 Write-Verbose "$backend $($case.id) field lookup published"
             }
+            # Publish the requested environment before sealing a static field. Consumed
+            # parameter effects alone do not establish asynchronous IBL publication.
             $null = Set-Inputs $session $run @{fixture=17;environment=1;ev100=0;
-                field_enabled=$true;field_sampling=$true;probe_enabled=$true}
+                field_enabled=$false;probe_enabled=$false}
+            $environmentReady = Invoke-VerificationSession capture $session @{ExpectedRunIdentity=$run;
+                View='Contract_FieldCoverage';SettleFrames=0;
+                OutputDirectory="$output/$backend/a0/environment-ready";TimeoutSeconds=$TimeoutSeconds}
+            if ($environmentReady.status -ne 'completed' -or $environmentReady.publication -ne 'Published') {
+                throw 'A0 environment did not reach published readiness.'
+            }
+            Write-VerificationJson "$output/$backend/a0/environment-ready/receipt.json" $environmentReady
+            $null = Set-Inputs $session $run @{field_enabled=$true;field_sampling=$true;probe_enabled=$true}
             foreach ($enabled in @($false,$true)) {
                 $arm = if ($enabled) {'gtao-on'} else {'gtao-off'}
                 $hostEffect = Invoke-VerificationSession set $session @{ExpectedRunIdentity=$run;WaitConsumed=$true;
@@ -139,7 +161,7 @@ try {
     Write-VerificationJson "$output/binaries-final.json" $finalBinaries
     Assert-VerificationIdentity $sources $finalSources 'Field sampling sources changed during verification.'
     Assert-VerificationIdentity $binaries $finalBinaries 'Field sampling binaries changed during verification.' -Depth 2
-    Write-VerificationJson "$output/result.json" @{status='passed';backends=$Rhi;observations=($Rhi.Count*($cases.Count+9));lookupContractsPassed=$true;
+    Write-VerificationJson "$output/result.json" @{status='passed';backends=$Rhi;observations=@(Get-ChildItem -LiteralPath $output -Recurse -Filter receipt.json).Count;lookupContractsPassed=$true;
         staticFieldQualityQualified=$false;readinessQualified=$false}
 } catch {
     Write-VerificationJson "$output/result.json" @{status='failed';error=[string]$_}

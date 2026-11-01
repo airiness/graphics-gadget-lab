@@ -38,7 +38,7 @@ namespace gglab
 		[[nodiscard]] GIFieldSamplingParameters Resolve(RGExecuteContext& execute) const noexcept
 		{
 			auto result = m_Parameters;
-			if (result.m_Enabled != 0)
+			if (result.m_IrradianceInteriorWidth != 0)
 			{
 				result.m_Irradiance = execute.GetViewDescriptor(m_Views[0]).m_Index;
 				result.m_Distance = execute.GetViewDescriptor(m_Views[1]).m_Index;

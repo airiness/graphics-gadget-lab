@@ -605,6 +605,17 @@ namespace gglab
 				context.Check(!IsGIUpdateStatusValid(status, 8, 256, 1),
 					"An out-of-range atlas error is a corrupt readback");
 			}
+			for (uint32_t width : { 14u, 30u })
+			{
+				status = { GIUpdateError::InvalidHistory, 0, 0,
+					width * width + gi_shader::GIProbeDistanceInteriorTexels - 1 };
+				context.Check(IsGIUpdateStatusValid(status, 8, 64, 1, width) &&
+					!IsGIUpdateStatusValid(status, 8, 64, 1),
+					"Numerical verdicts use this owner's angular profile, not the default atlas size");
+				++status.m_Element;
+				context.Check(!IsGIUpdateStatusValid(status, 8, 64, 1, width),
+					"The first texel beyond a higher-resolution atlas is still a corrupt readback");
+			}
 			status = { static_cast<GIUpdateError>(UINT32_MAX), 0, 0, 0 };
 			context.Check(!IsGIUpdateStatusValid(status, 8, 256, 1),
 				"Unknown GPU status codes never become clean completion");
@@ -613,6 +624,35 @@ namespace gglab
 			context.Check(!ValidateGIFieldCreateInfo(info), "A field cannot prepare without a scene owner");
 			info.m_RayScene = std::make_shared<RayScene>();
 			context.Check(ValidateGIFieldCreateInfo(info), "The Coastal full-update field profile is valid");
+			for (uint32_t width : { 6u, 14u, 30u })
+			{
+				auto angular = info;
+				angular.m_IrradianceInteriorWidth = width;
+				context.Check(ValidateGIFieldCreateInfo(angular),
+					"Explicit power-of-two bordered irradiance profiles are admitted");
+			}
+			for (uint32_t width : { 0u, 5u, 7u, 8u, 13u, 15u, 16u, 31u, UINT32_MAX })
+			{
+				auto angular = info;
+				angular.m_IrradianceInteriorWidth = width;
+				context.Check(!ValidateGIFieldCreateInfo(angular),
+					"Unsupported angular profiles reject before dispatch or allocation");
+			}
+			for (float bias : { 0.0f, 0.1f, 0.3f, 1.0f })
+			{
+				auto biased = info;
+				biased.m_ViewBias = bias;
+				context.Check(ValidateGIFieldCreateInfo(biased),
+					"Bounded viewer offsets are explicit static-field profile controls");
+			}
+			for (float bias : { -0.1f, 1.1f, std::numeric_limits<float>::infinity(),
+				std::numeric_limits<float>::quiet_NaN() })
+			{
+				auto biased = info;
+				biased.m_ViewBias = bias;
+				context.Check(!ValidateGIFieldCreateInfo(biased),
+					"Nonfinite or unbounded viewer offsets reject before allocation");
+			}
 			for (uint32_t count : { 0u, 1u, 129u })
 			{
 				auto invalid = info;

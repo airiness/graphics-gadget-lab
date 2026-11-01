@@ -170,7 +170,7 @@ MaterialIBLResponse SampleMaterialEnvironment(PreparedMaterialShading material,
 	MaterialIBLSamples environment;
 	environment.Irradiance = SampleIBLIrradiance(material.Base.NormalWS);
 	float3 removedIrradiance = 0.0.xxx;
-	if (g_Pass.GIField.Enabled != 0)
+	if (g_Pass.GIField.IrradianceInteriorWidth != 0)
 	{
 		const GIFieldQuery field = SampleGIField(g_Pass.GIField, position,
 			material.Base.NormalWS, vertexNormal, material.ViewDirectionWS);
@@ -184,7 +184,7 @@ MaterialIBLResponse SampleMaterialEnvironment(PreparedMaterialShading material,
 	environment.ClearcoatSpecular = 0.0.xxx;
 	MaterialIBLResponse response = EvaluateBaseMaterialIBL(material, environment);
 	MaterialIBLResponse removed = (MaterialIBLResponse)(0);
-	if (g_Pass.GIField.Enabled != 0)
+	if (g_Pass.GIField.IrradianceInteriorWidth != 0)
 	{
 		MaterialIBLSamples removedEnvironment = environment;
 		removedEnvironment.Irradiance = removedIrradiance;
@@ -196,7 +196,7 @@ MaterialIBLResponse SampleMaterialEnvironment(PreparedMaterialShading material,
 		environment.ClearcoatSpecular = SampleIBLPrefilteredSpecular(
 			reflection, material.Clearcoat.PerceptualRoughness);
 		ApplyClearcoatIBL(response, material.Clearcoat, environment.ClearcoatSpecular);
-		if (g_Pass.GIField.Enabled != 0)
+		if (g_Pass.GIField.IrradianceInteriorWidth != 0)
 		{
 			ApplyClearcoatIBL(removed, material.Clearcoat, environment.ClearcoatSpecular);
 		}
@@ -502,12 +502,13 @@ float4 PSMain(ForwardCoverageVSOutput IN, bool isFrontFace : SV_IsFrontFace) : S
 	ao = saturate(ao);
 	const float3 materialOccludedDiffuseIBL =
 		ibl.Diffuse * ResolveSpecularIBLVisibility(ao);
-	const float3 gtaoContribution = g_Pass.GIField.Enabled != 0 ?
+	const float3 gtaoContribution = g_Pass.GIField.IrradianceInteriorWidth != 0 ?
 		fieldGTAOContribution * ResolveSpecularIBLVisibility(ao) :
 		materialOccludedDiffuseIBL * (1.0 - gtao);
 	// Field mode already applied GTAO to its IBL share; material AO still applies
 	// to both diffuse terms. The disabled-field expression keeps its original rounding.
-	ibl.Diffuse *= ResolveDiffuseIBLVisibility(ao, g_Pass.GIField.Enabled != 0 ? 1.0 : gtao);
+	ibl.Diffuse *= ResolveDiffuseIBLVisibility(ao,
+		g_Pass.GIField.IrradianceInteriorWidth != 0 ? 1.0 : gtao);
 	ibl.Specular *= ResolveSpecularIBLVisibility(ao);
 
 	// The final radiance sum must keep its rounding when diagnostic observers are enabled.

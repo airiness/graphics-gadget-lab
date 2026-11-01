@@ -5,13 +5,13 @@
 struct GIFieldSamplingParameters
 {
 	uint3 Counts;
-	uint Enabled;
+	uint IrradianceInteriorWidth;
 	float3 Minimum;
 	float Spacing;
 	uint Irradiance;
 	uint Distance;
 	uint Classification;
-	uint Padding;
+	float ViewBias;
 };
 
 struct GIFieldQuery
@@ -43,9 +43,9 @@ float3 GIFieldAtlasPosition(uint3 probe, float3 direction, uint interior)
 	return float3(texel - 0.5, (float)(probe.y));
 }
 
-float3 GIFieldIrradiance(Texture2DArray<float4> atlas, uint3 probe, float3 direction)
+float3 GIFieldIrradiance(Texture2DArray<float4> atlas, uint3 probe, float3 direction, uint interior)
 {
-	const float3 position = GIFieldAtlasPosition(probe, direction, GIProbeIrradianceInteriorWidth);
+	const float3 position = GIFieldAtlasPosition(probe, direction, interior);
 	const int3 texel = (int3)(floor(position));
 	const float2 fraction = frac(position.xy);
 	return lerp(lerp(atlas.Load(int4(texel, 0)).rgb,
@@ -82,7 +82,7 @@ GIFieldQuery SampleGIField(GIFieldSamplingParameters field, float3 position,
 	GIFieldQuery result = (GIFieldQuery)(0);
 	result.Support = GIFieldOutsideCoverage;
 	result.Compatible = 1;
-	if (field.Enabled == 0)
+	if (field.IrradianceInteriorWidth == 0)
 	{
 		return result;
 	}
@@ -106,7 +106,7 @@ GIFieldQuery SampleGIField(GIFieldSamplingParameters field, float3 position,
 	{
 		return result;
 	}
-	const float3 biased = position + field.Spacing * (0.1 * vertexNormal + 0.3 * viewDirection);
+	const float3 biased = position + field.Spacing * (0.1 * vertexNormal + field.ViewBias * viewDirection);
 	const float3 cage = clamp((biased - field.Minimum) / field.Spacing,
 		0.0.xxx, (float3)(field.Counts - 1));
 	const uint3 lower = min((uint3)(floor(cage)), field.Counts - 2);
@@ -146,7 +146,8 @@ GIFieldQuery SampleGIField(GIFieldSamplingParameters field, float3 position,
 			weight = weight * weight * weight / (0.2 * 0.2);
 		}
 		result.Weight += weight;
-		result.Irradiance += weight * GIFieldIrradiance(irradiance, probe, shadingNormal);
+		result.Irradiance += weight * GIFieldIrradiance(irradiance, probe, shadingNormal,
+			field.IrradianceInteriorWidth);
 	}
 	if (result.Weight == 0.0)
 	{

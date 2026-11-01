@@ -46,6 +46,7 @@ namespace gglab
 			result.m_Counts = info.m_Volume.m_Counts;
 			result.m_Minimum = info.m_Volume.m_Minimum;
 			result.m_Spacing = info.m_Volume.m_Spacing;
+			result.m_IrradianceInteriorWidth = info.m_IrradianceInteriorWidth;
 			result.m_RaysPerProbe = info.m_RaysPerProbe;
 			result.m_Seed = info.m_Seed;
 			result.m_MaximumDistance = info.m_MaximumDistance;
@@ -59,7 +60,8 @@ namespace gglab
 
 	bool ValidateGIFieldCreateInfo(const GIFieldCreateInfo& info) noexcept
 	{
-		if (!info.m_RayScene || !ValidateGIProbeUpdateProfile(UpdateProfile(info)))
+		if (!info.m_RayScene || !ValidateGIProbeUpdateProfile(UpdateProfile(info)) ||
+			!std::isfinite(info.m_ViewBias) || info.m_ViewBias < 0 || info.m_ViewBias > 1)
 		{
 			return false;
 		}
@@ -220,7 +222,7 @@ namespace gglab
 		const bool tracked = services.m_GIFieldFrameState->Track(m_State->m_Update, frame.m_FrameSerial);
 		GGLAB_ASSERT_MSG(tracked, "A GI field must participate in exactly one matching renderer frame.");
 		m_State->m_Workload.AddPasses(graph, frame, services, scene, m_State->m_Update,
-			m_State->m_Info.m_EnableReceiverSampling);
+			m_State->m_Info.m_EnableReceiverSampling, m_State->m_Info.m_ViewBias);
 	}
 
 	void GIField::AddReceiverDiagnostics(RenderGraph& graph, const RenderFrameContext& frame,

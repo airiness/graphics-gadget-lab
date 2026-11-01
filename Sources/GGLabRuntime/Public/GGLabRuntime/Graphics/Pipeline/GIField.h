@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIObservationLimits.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIUpdateStatus.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "GGLabRuntime/Graphics/RHI/RHIResource.h"
@@ -27,10 +28,13 @@ namespace gglab
 	{
 		std::shared_ptr<RayScene> m_RayScene;
 		GIFieldVolumeDescriptor m_Volume;
+		uint32_t m_IrradianceInteriorWidth = GIProbeUpdateLimits::DefaultIrradianceInteriorWidth;
 		uint32_t m_RaysPerProbe = 256;
 		uint32_t m_Seed = GIObservationLimits::DefaultSeed;
 		float m_MaximumDistance = 30000;
 		float m_Hysteresis = 0.97f;
+		// Viewer-directed query offset, in probe spacings; normal bias remains 0.1.
+		float m_ViewBias = 0.3f;
 		// Update-only controls can inspect atlases without changing opaque lighting.
 		bool m_EnableReceiverSampling = true;
 		// Analytic fixtures may supply incident constant radiance; geometry is still traced.

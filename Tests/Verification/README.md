@@ -193,6 +193,11 @@ The suite uses Native 320x200 and fixed update settling, not GI readiness.
 An A0 comparison uses paired HDR/field/receiver/IBL data and GTAO visibility to
 check that the volume-edge blend attenuates only the IBL share. The unsupported
 cage is a separate classification/query contract, not frozen F10 qualification.
+F4 includes floor, separate red/green-adjacent submasks and back-wall measurements
+against matched D=1 receivers and an independent quadrature oracle. Its precision
+profile settles for 3,072 submitted frames; this is not a Ready/stability certificate.
+Use `TestGIFieldSampling.ps1 -CaseId sunroom,sunroom-back` for a scoped rerun;
+A0 controls still run, with environment publication completed before field creation.
 Its F1/F2/F4 quality measurements preserve passing and failing thresholds in
 `validation.json`; engineering lookup success does not grant static-field quality,
 reference convergence, target-extent acceptance or complete GI performance.

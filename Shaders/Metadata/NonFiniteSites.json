@@ -1061,7 +1061,7 @@
       "function": "global",
       "operation": "SanitizeHDRColor",
       "count": 2,
-      "bodySha256": "3d63300af6ba593e31962bd9133121ea21a675ea702fea4125e60ccc90f41f16",
+      "bodySha256": "01db30394524a66676a3efaa66a4e77331438d8c78a4fe601c5d81146ab55a51",
       "programs": [
         "gglab.shader.forward-pbr"
       ],
@@ -1639,7 +1639,7 @@
       "function": "Trace",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "aae321ecc4a2ac98d7a6afaf53616057342e656f96eb28f775da99abd7a092db",
+      "bodySha256": "cdbbe0c6cfde95db1133b38cd7abdd600c3b1a48e0de418fda7a3a9e14759dcd",
       "programs": [
         "gglab.shader.gi-field",
         "gglab.shader.gi-probe-update"
@@ -1658,7 +1658,7 @@
       "function": "StoreTexel",
       "operation": "isfinite",
       "count": 4,
-      "bodySha256": "cdc2b1f6acb77b1392c53182d1d986d896ed1aab65176bca4364ad3eea155348",
+      "bodySha256": "c8267ddff7393cbf77aaf37c6d8a354484bad8623188f1af6178648ca33f80e1",
       "programs": [
         "gglab.shader.gi-field",
         "gglab.shader.gi-probe-update"

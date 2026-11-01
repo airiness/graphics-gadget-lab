@@ -67,9 +67,15 @@ namespace gglab
 			SurfaceInfo{ "GI.ProbeUpdate.State", 1, RHIFormat::R32G32B32A32Float, 4 * sizeof(float) },
 			SurfaceInfo{ "GI.Field.Classification", 1, RHIFormat::R32Uint, sizeof(uint32_t) },
 		};
-		uint64_t LogicalSurfaceBytes(uint32_t probes, const SurfaceInfo& surface) noexcept
+		uint32_t SurfaceTileWidth(const GIProbeUpdateProfile& profile, size_t index) noexcept
 		{
-			return uint64_t(probes) * surface.m_TileWidth * surface.m_TileWidth * surface.m_TexelBytes;
+			return index == static_cast<size_t>(ProbeSurface::Irradiance) ?
+				profile.m_IrradianceInteriorWidth + 2 * gi_shader::GIProbeBorderWidth :
+				Surfaces[index].m_TileWidth;
+		}
+		uint64_t LogicalSurfaceBytes(uint32_t probes, const SurfaceInfo& surface, uint32_t width) noexcept
+		{
+			return uint64_t(probes) * width * width * surface.m_TexelBytes;
 		}
 
 		constexpr LayoutBindingKey RayInputKey{ 0x906 };
@@ -79,6 +85,7 @@ namespace gglab
 		constexpr uint32_t RayInputRegister = 11; // t11; ray-scene records occupy t5-t10.
 		constexpr uint32_t RayOutputRegister = 1; // u1.
 		static_assert(GIProbeUpdateLimits::MaximumRaysPerProbe == gi_shader::GIProbeMaximumRays);
+		static_assert(GIProbeUpdateLimits::DefaultIrradianceInteriorWidth == gi_shader::GIProbeIrradianceInteriorWidth);
 		static_assert(sizeof(GIUpdateStatus) == gi_shader::GIUpdateStatusBytes);
 		static_assert(uint32_t(GIUpdateError::InvalidRay) == gi_shader::GIUpdateErrorInvalidRay &&
 			uint32_t(GIUpdateError::InvalidHistory) == gi_shader::GIUpdateErrorInvalidHistory &&
@@ -132,10 +139,11 @@ namespace gglab
 			float m_Hysteresis = 0;
 			uint32_t m_RotateDirections = 0;
 			uint32_t m_TraversalOnly = 0;
-			uint32_t m_Padding = 0;
+			uint32_t m_IrradianceInteriorWidth = 0;
 		};
 		static_assert(sizeof(Parameters) == 144 && offsetof(Parameters, m_Targets) == 80 &&
-			offsetof(Parameters, m_Rotation) == 112 && offsetof(Parameters, m_Hysteresis) == 128);
+			offsetof(Parameters, m_Rotation) == 112 && offsetof(Parameters, m_Hysteresis) == 128 &&
+			offsetof(Parameters, m_IrradianceInteriorWidth) == 140);
 
 		// Borrowed handles only: submissions and the workload retain the actual buffers.
 		struct StatusReadback
@@ -153,6 +161,7 @@ namespace gglab
 			bool m_StorageInitialized = false;
 			bool m_CompletionFailed = false;
 			uint32_t m_RaysPerProbe = 0;
+			uint32_t m_IrradianceInteriorWidth = 0;
 			void Poll() noexcept
 			{
 				for (auto& slot : m_Readbacks)
@@ -184,7 +193,8 @@ namespace gglab
 					GIUpdateStatus status;
 					std::memcpy(&status, mapped, sizeof(status));
 					m_Device->UnmapBuffer(slot.m_Buffer, {});
-					if (!IsGIUpdateStatusValid(status, m_Diagnostics.m_ProbeCount, m_RaysPerProbe, slot.m_Update))
+					if (!IsGIUpdateStatusValid(status, m_Diagnostics.m_ProbeCount, m_RaysPerProbe,
+						slot.m_Update, m_IrradianceInteriorWidth))
 					{
 						m_CompletionFailed = true;
 						m_Diagnostics.m_Failed = true;
@@ -284,7 +294,8 @@ namespace gglab
 					continue;
 				}
 				const auto& surface = Surfaces[index];
-				const auto logicalBytes = LogicalSurfaceBytes(result.m_ProbeCount, surface);
+				const auto logicalBytes = LogicalSurfaceBytes(result.m_ProbeCount, surface,
+					SurfaceTileWidth(m_State->m_Profile, index));
 				result.m_Allocations.push_back({ logicalBytes,
 					resources->m_Device->QueryTextureAllocationFacts(resources->m_Textures[index].Get()) });
 			}
@@ -429,10 +440,11 @@ namespace gglab
 					continue;
 				}
 				const auto& surface = Surfaces[index];
+				const uint32_t width = SurfaceTileWidth(profile, index);
 				auto& desc = resources->m_Descriptions[index];
 				desc = { .m_Format = surface.m_Format,
 					.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::UnorderedAccess | RHITextureUsage::CopySource,
-					.m_Extent = { profile.m_Counts[0] * surface.m_TileWidth, profile.m_Counts[2] * surface.m_TileWidth, 1 },
+					.m_Extent = { profile.m_Counts[0] * width, profile.m_Counts[2] * width, 1 },
 					.m_ArraySize = static_cast<uint16_t>(profile.m_Counts[1]), .m_DebugName = state.m_Field ? FieldSurfaces[index] : surface.m_Name };
 				if (!device.QueryTextureSupport(desc).IsSupported())
 				{
@@ -443,7 +455,7 @@ namespace gglab
 				{
 					return RenderFrameValidationResult::ContractFailure("Probe atlas allocation failed");
 				}
-				diagnostics.m_FieldLogicalBytes += LogicalSurfaceBytes(probes, surface);
+				diagnostics.m_FieldLogicalBytes += LogicalSurfaceBytes(probes, surface, width);
 			}
 			resources->m_StatusDesc = { .m_SizeInBytes = sizeof(GIUpdateStatus),
 				.m_StrideInBytes = sizeof(GIUpdateStatus),
@@ -470,6 +482,7 @@ namespace gglab
 			}
 			diagnostics.m_StatusReadbackSlots = slots;
 			state.m_Progress->m_RaysPerProbe = profile.m_RaysPerProbe;
+			state.m_Progress->m_IrradianceInteriorWidth = profile.m_IrradianceInteriorWidth;
 			diagnostics.m_FieldLogicalBytes += sizeof(GIUpdateStatus);
 			state.m_Progress->m_Device = &device;
 			state.m_Resources = std::move(resources);
@@ -540,7 +553,7 @@ namespace gglab
 
 	void GIProbeUpdateWorkload::AddPasses(RenderGraph& graph, const RenderFrameContext& frame,
 		const RenderServices& services, const RaySceneGraphResources& scene,
-		std::shared_ptr<GIFieldUpdateState> fieldUpdate, bool compose) noexcept
+		std::shared_ptr<GIFieldUpdateState> fieldUpdate, bool compose, float viewBias) noexcept
 	{
 		auto& state = *m_State;
 		if (!state.m_Profile.m_ConstantEnvironment)
@@ -698,7 +711,8 @@ namespace gglab
 							.m_TraverseScene = profile.m_TraverseScene ? 1u : 0u,
 							.m_Rotation = Rotation(profile.m_Seed ^ (profile.m_RotateDirections ? update : 0u)),
 							.m_Hysteresis = profile.m_Hysteresis, .m_RotateDirections = profile.m_RotateDirections ? 1u : 0u,
-							.m_TraversalOnly = profile.m_TraversalOnly ? 1u : 0u };
+							.m_TraversalOnly = profile.m_TraversalOnly ? 1u : 0u,
+							.m_IrradianceInteriorWidth = profile.m_IrradianceInteriorWidth };
 						builder.SideEffect();
 					},
 					[=, this, &frame, &services](RGExecuteContext& execute, PassData& data)
@@ -758,9 +772,11 @@ namespace gglab
 						}
 						if (stage == ProbeStage::Initialize)
 						{
+							const uint32_t width = std::max(SurfaceTileWidth(profile, 0),
+								gi_shader::GIProbeDistanceTileWidth);
 							commands->Dispatch(
-								profile.m_Counts[0] * gi_shader::GIProbeDistanceTileWidth / gi_shader::GIQueryGroupWidth,
-								profile.m_Counts[2] * gi_shader::GIProbeDistanceTileWidth / gi_shader::GIQueryGroupHeight,
+								profile.m_Counts[0] * width / gi_shader::GIQueryGroupWidth,
+								profile.m_Counts[2] * width / gi_shader::GIQueryGroupHeight,
 								profile.m_Counts[1]);
 						}
 						else
@@ -837,7 +853,7 @@ namespace gglab
 				});
 		}
 		graph.AddPass<Empty>(state.m_Field ? "GI.Field.QueryResources" : "GI.ProbeUpdate.Publish",
-			[imported, profile, compose, field = state.m_Field, &services](RenderGraph::RGBuilder& builder, Empty&)
+			[imported, profile, compose, viewBias, field = state.m_Field, &services](RenderGraph::RGBuilder& builder, Empty&)
 			{
 				// The next frame imports these persistent resources in the exported states.
 				if (!field)
@@ -855,8 +871,10 @@ namespace gglab
 				if (field)
 				{
 					builder.GetBlackboard().Create<RGGIFieldResources>() = {
-						.m_Parameters = { .m_Counts = profile.m_Counts, .m_Enabled = 1,
-							.m_Minimum = profile.m_Minimum, .m_Spacing = profile.m_Spacing },
+						.m_Parameters = { .m_Counts = profile.m_Counts,
+							.m_IrradianceInteriorWidth = profile.m_IrradianceInteriorWidth,
+							.m_Minimum = profile.m_Minimum, .m_Spacing = profile.m_Spacing,
+							.m_ViewBias = viewBias },
 						.m_Textures = { imported->m_Textures[0], imported->m_Textures[1], imported->m_Textures[3] },
 						.m_State = imported->m_Textures[2], .m_Rays = imported->m_Rays,
 						.m_Status = imported->m_Status,
