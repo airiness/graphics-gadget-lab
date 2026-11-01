@@ -353,26 +353,22 @@ namespace gglab
 						parameters.m_Next[index] = execute.GetViewDescriptor(data.m_History.m_Next[index]).m_Index;
 					}
 				}
-				for (size_t index = 0; index < data.m_ReceiverCache.size(); ++index)
-				{
-					if (data.m_ReceiverCache[index].IsValid())
-					{
-						parameters.m_ReceiverCache[index] = execute.GetViewDescriptor(data.m_ReceiverCache[index]).m_Index;
-					}
-				}
+				parameters.m_ReceiverCache = GIReceiverCache::ResolveDescriptors(execute, data.m_ReceiverCache);
 				const uint32_t receiverQueries = parameters.m_ReceiverCacheCount != 0 ?
 					gi_shader::GIReceiverMaximumQueries : 0u;
-				const auto rows = GIQueryRowsPerDispatch(parameters.m_Size[0], parameters.m_SampleCount,
-					GIObservationLimits::VisibilityQueriesPerSample, receiverQueries);
-				for (uint32_t row = 0; row < parameters.m_Size[1]; row += rows)
-				{
-					parameters.m_RowOffset = row;
-					if (!commands->SetConstantBufferData(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+				if (!RecordGIQueryDispatches(*commands,
+					{ .m_Width = parameters.m_Size[0], .m_Height = parameters.m_Size[1],
+						.m_Samples = parameters.m_SampleCount,
+						.m_QueriesPerSample = GIObservationLimits::VisibilityQueriesPerSample,
+						.m_ReceiverQueriesPerPixel = receiverQueries },
+					[&](uint32_t row) noexcept
 					{
-						return;
-					}
-					commands->Dispatch((parameters.m_Size[0] + GIQueryGroupWidth - 1) / GIQueryGroupWidth,
-						(std::min(rows, parameters.m_Size[1] - row) + GIQueryGroupHeight - 1) / GIQueryGroupHeight, 1);
+						parameters.m_RowOffset = row;
+						return commands->SetConstantBufferData(
+							static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters);
+					}))
+				{
+					return;
 				}
 				services.m_GISpecularVisibilityObservation->MarkRecorded();
 			});

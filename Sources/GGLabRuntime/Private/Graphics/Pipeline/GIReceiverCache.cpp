@@ -122,6 +122,21 @@ namespace gglab
 		return views;
 	}
 
+	std::array<uint32_t, GIReceiverCache::SurfaceCount> GIReceiverCache::ResolveDescriptors(
+		const RGExecuteContext& execute, const Views& views) noexcept
+	{
+		// Unimported caches (including stateless reference work) keep their zero descriptors.
+		std::array<uint32_t, SurfaceCount> descriptors{};
+		for (size_t index = 0; index < views.size(); ++index)
+		{
+			if (views[index].IsValid())
+			{
+				descriptors[index] = execute.GetViewDescriptor(views[index]).m_Index;
+			}
+		}
+		return descriptors;
+	}
+
 	bool GIReceiverCache::CanSample() const noexcept
 	{
 		// A small image may prepare and sample in the same invocation. A multi-frame

@@ -26,6 +26,8 @@ namespace gglab
 		void BeginFrame(uint64_t serial) noexcept;
 		[[nodiscard]] bool Prepare(uint32_t width, uint32_t height, uint32_t queryBudget) noexcept;
 		[[nodiscard]] Views Import(RenderGraph::RGBuilder& builder) noexcept;
+		[[nodiscard]] static std::array<uint32_t, SurfaceCount> ResolveDescriptors(
+			const RGExecuteContext& execute, const Views& views) noexcept;
 		void MarkRecorded() noexcept { m_Recorded = true; }
 		void Settle(const RenderFrameOutcome& outcome) noexcept;
 		void Release() noexcept;

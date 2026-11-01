@@ -208,6 +208,196 @@ namespace gglab
 				"Shared ray bindings append t5-t10 after the actual inherited parameter order");
 		}
 
+		void RunGIQueryRecordingTests(SelfTestContext& context) noexcept
+		{
+			// Logical recording only: no native dispatches or snapshots are submitted.
+			class DispatchCommands final : public RHIComputeCommandContext
+			{
+			public:
+				RHICommandContextHandle GetHandle() const noexcept override { return {}; }
+				RHIQueueType GetQueueType() const noexcept override { return RHIQueueType::Graphics; }
+				void TrackTextureUse(RHITextureHandle) noexcept override {}
+				void TrackBufferUse(RHIBufferHandle) noexcept override {}
+				void TextureBarrier(std::span<const RHITextureBarrier>) noexcept override {}
+				void BufferBarrier(std::span<const RHIBufferBarrier>) noexcept override {}
+				void FlushBarriers() noexcept override {}
+				void CopyBuffer(RHIBufferHandle, uint64_t, RHIBufferHandle, uint64_t, uint64_t) noexcept override {}
+				void CopyTextureToBuffer(const RHITextureToBufferCopy&) noexcept override {}
+				void SetPipeline(RHIPipelineHandle) noexcept override {}
+				void SetDescriptorTable(const RHIDescriptorTableBinding&) noexcept override {}
+				bool SetConstantBuffer(uint32_t, const RHIConstantBufferBinding&) noexcept override { return false; }
+				void SetInlineConstantWords(uint32_t, std::span<const uint32_t>, uint32_t) noexcept override {}
+				void SetReadOnlyBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
+				void SetReadWriteBuffer(uint32_t, RHIBufferHandle, uint64_t) noexcept override {}
+				void Dispatch(uint32_t x, uint32_t y, uint32_t z) noexcept override
+				{
+					m_Dispatches.push_back({ m_Row, x, y, z });
+					if (m_Dispatches.size() - 1 == m_FailedDispatch)
+					{
+						RejectRecording();
+					}
+				}
+				uint32_t m_Row = 0;
+				uint32_t m_FailedDispatch = UINT32_MAX;
+				std::vector<std::array<uint32_t, 4>> m_Dispatches;
+			};
+			struct Case
+			{
+				GIQueryDispatchInfo m_Info;
+				std::vector<std::array<uint32_t, 4>> m_Dispatches;
+			};
+			const std::array cases
+			{
+				Case{ { 19, 11, 7, 2, 0 }, { { 0, 3, 2, 1 } } },
+				Case{ { 1024, 131, 64, 2, 0 },
+					{ { 0, 128, 8, 1 }, { 64, 128, 8, 1 }, { 128, 128, 1, 1 } } },
+				Case{ { 1024, 201, 0, 0, 83 },
+					{ { 0, 128, 12, 1 }, { 96, 128, 12, 1 }, { 192, 128, 2, 1 } } },
+				Case{ { 1024, 65, 64, 2, 83 },
+					{ { 0, 128, 4, 1 }, { 32, 128, 4, 1 }, { 64, 128, 1, 1 } } },
+				Case{ { 1024, 16385, 0, 512, 0 },
+					{ { 0, 128, 1024, 1 }, { 8192, 128, 1024, 1 }, { 16384, 128, 1, 1 } } },
+				Case{ { 16384, 19, 4096, 512, 0 },
+					{ { 0, 2048, 1, 1 }, { 8, 2048, 1, 1 }, { 16, 2048, 1, 1 } } },
+			};
+			for (const auto& test : cases)
+			{
+				DispatchCommands commands;
+				uint32_t uploads = 0;
+				bool ordered = true;
+				const bool recorded = RecordGIQueryDispatches(commands, test.m_Info,
+					[&](uint32_t row) noexcept
+					{
+						ordered &= uploads == commands.m_Dispatches.size();
+						++uploads;
+						commands.m_Row = row;
+						return true;
+					});
+				context.Check(recorded && ordered && uploads == test.m_Dispatches.size() &&
+					commands.m_Dispatches == test.m_Dispatches,
+					"Full-viewport query recording preserves row offsets, work caps, group rounding and upload order");
+			}
+			for (const auto& info : { GIQueryDispatchInfo{ .m_Height = 1 }, GIQueryDispatchInfo{ .m_Width = 1 } })
+			{
+				DispatchCommands commands;
+				bool uploaded = false;
+				const bool recorded = RecordGIQueryDispatches(commands, info,
+					[&](uint32_t) noexcept
+					{
+						uploaded = true;
+						return true;
+					});
+				context.Check(!recorded && !uploaded && commands.HasRecordingError() && commands.m_Dispatches.empty(),
+					"Empty query extents reject before constants, division or dispatch");
+			}
+			enum class Failure
+			{
+				BeforeRecording,
+				Constants,
+				ConstantsRecordingError,
+				FirstDispatch,
+				LastDispatch,
+			};
+			struct FailureCase
+			{
+				Failure m_Failure;
+				uint32_t m_Uploads;
+				uint32_t m_Dispatches;
+			};
+			constexpr std::array failures
+			{
+				FailureCase{ Failure::BeforeRecording, 0, 0 },
+				FailureCase{ Failure::Constants, 2, 1 },
+				FailureCase{ Failure::ConstantsRecordingError, 2, 1 },
+				FailureCase{ Failure::FirstDispatch, 1, 1 },
+				FailureCase{ Failure::LastDispatch, 3, 3 },
+			};
+			for (const auto& test : failures)
+			{
+				DispatchCommands commands;
+				commands.m_FailedDispatch = test.m_Failure == Failure::FirstDispatch ?
+					0u :
+					test.m_Failure == Failure::LastDispatch ? 2u : UINT32_MAX;
+				if (test.m_Failure == Failure::BeforeRecording)
+				{
+					commands.RejectRecording();
+				}
+				uint32_t uploads = 0;
+				const bool recorded = RecordGIQueryDispatches(commands, cases[1].m_Info,
+					[&](uint32_t row) noexcept
+					{
+						++uploads;
+						commands.m_Row = row;
+						if (test.m_Failure == Failure::ConstantsRecordingError && row == 64)
+						{
+							commands.RejectRecording();
+						}
+						return test.m_Failure != Failure::Constants || row != 64;
+					});
+				context.Check(!recorded && uploads == test.m_Uploads && commands.m_Dispatches.size() == test.m_Dispatches,
+					"Constant failures and recording errors, including the final dispatch, never report complete recording");
+			}
+
+			RGDeferredCommitList emptyCommits;
+			const RGExecuteContext emptyExecute(emptyCommits, {});
+			context.Check(GIReceiverCache::ResolveDescriptors(emptyExecute, {}) == std::array<uint32_t, 4>{},
+				"Unimported receiver caches preserve zero descriptors without querying an execution device");
+			asset_test::TestRHIDevice device;
+			TransientResourcePool pool(&device);
+			for (const bool writing : { false, true })
+			{
+				RenderGraph graph({ .m_Device = &device, .m_TransientResourcePool = &pool });
+				graph.AddPass<GIReceiverCache::Views>("CacheDescriptors", RGPassEncoderType::Compute,
+					[&](RenderGraph::RGBuilder& builder, GIReceiverCache::Views& views)
+					{
+						for (size_t index = 0; index < views.size(); ++index)
+						{
+							const RHITextureDesc desc{ .m_Format = index < 2 ? RHIFormat::R32G32B32A32Float : RHIFormat::R32Uint,
+								.m_Usage = RHITextureUsage::Sampled | RHITextureUsage::UnorderedAccess, .m_Extent = { 8, 8, 1 } };
+							auto texture = builder.ImportTexture(("Cache.Descriptor." + std::to_string(index)).c_str(),
+								device.CreateTexture({ .m_Desc = desc }, {}), desc, RGTextureAccess::None, RGContentValidity::Defined);
+							if (writing)
+							{
+								builder.WriteInPlace(texture, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+								views[index] = builder.CreateView<RHITextureViewType::UnorderedAccess>(texture);
+							}
+							else
+							{
+								views[index] = builder.CreateView<RHITextureViewType::ShaderResource>(
+									builder.Read(texture, RGTextureAccess::Sample, RHIStage::ComputeShader));
+							}
+						}
+						builder.SideEffect();
+					},
+					[&](RGExecuteContext& execute, GIReceiverCache::Views& views)
+					{
+						// The fake device gives each descriptor lookup a fresh consecutive index.
+						const auto first = execute.GetViewDescriptor(views[0]).m_Index;
+						context.Check(GIReceiverCache::ResolveDescriptors(execute, views) ==
+							std::array<uint32_t, 4>{ first + 1, first + 2, first + 3, first + 4 },
+							"Receiver descriptors resolve all SRV/UAV slots in the existing order");
+						auto partial = views;
+						partial[1].Reset();
+						partial[3].Reset();
+						context.Check(GIReceiverCache::ResolveDescriptors(execute, partial) ==
+							std::array<uint32_t, 4>{ first + 5, 0, first + 6, 0 },
+							"Missing receiver views keep zero slots rather than compacting or resolving invalid ids");
+						context.Check(GIReceiverCache::ResolveDescriptors(execute, {}) == std::array<uint32_t, 4>{} &&
+							execute.GetViewDescriptor(views[0]).m_Index == first + 7,
+							"Empty receiver mappings do not publish or consume descriptors");
+					});
+				context.Check(graph.Compile(), "Receiver descriptor resolution accepts both read and preparation views");
+				if (graph.GetExecutionPlan())
+				{
+					DispatchCommands commands;
+					RGDeferredCommitList commits;
+					RGExecuteContext execute(commits, { .m_DirectComputeCommandContext = &commands });
+					graph.Execute(execute);
+					graph.Retire({});
+				}
+			}
+		}
+
 		void RunRaySceneQueryTests(SelfTestContext& context) noexcept
 		{
 			class QueryCommands final : public RHIComputeCommandContext
@@ -2213,6 +2403,7 @@ namespace gglab
 		RunGIReceiverPreparationTests(context);
 		RunGIReferenceInputTests(context);
 		RunGISharedContractTests(context);
+		RunGIQueryRecordingTests(context);
 		RunRaySceneQueryTests(context);
 		RunProbeUpdateProfileTests(context);
 		RunGIFieldTests(context);
