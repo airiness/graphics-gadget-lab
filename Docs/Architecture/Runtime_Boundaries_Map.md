@@ -66,10 +66,11 @@ submission and completion follow [frame settlement](Frame_Execution_Map.md#frame
 Non-constant probe environments consume the requested IBL publication. Persistent
 resource exports define the next frame's import state, including after updates stop.
 
-Field scene, lighting and shader inputs are sealed; changes require replacement
-through the safe pipeline path. Opaque shading and receiver diagnostics share the
-field query. Coverage blends field irradiance with diffuse IBL before material
-response; GTAO applies to the IBL share. Consumers declare reads before final export.
+Scene and shader changes require field replacement. With readiness enabled,
+published lighting changes refresh irradiance in place.
+Opaque shading and receiver diagnostics share the field query. Coverage blends
+field irradiance with diffuse IBL before material response; GTAO applies to the
+IBL share. Consumers declare reads before final export.
 
 `RenderPresentationAccess` exposes immutable progress and transient-pool snapshots;
 [`RayScene::GetMemorySnapshot`](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RayScene.h)

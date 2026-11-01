@@ -48,6 +48,9 @@ namespace gglab
 		const LabParameterId FixtureId("gi_reference.fixture");
 		const LabParameterId FieldEnabledId("gi_reference.field_enabled");
 		const LabParameterId FieldSamplingId("gi_reference.field_sampling");
+		const LabParameterId FieldReadinessId("gi_reference.field_readiness");
+		const LabParameterId FieldRefreshNoiseId("gi_reference.field_refresh_noise");
+		const LabParameterId FieldSteadyNoiseId("gi_reference.field_steady_noise");
 		const LabParameterId ProbeEnabledId("gi_reference.probe_enabled");
 		const LabParameterId ProbeRaysId("gi_reference.probe_rays");
 		const LabParameterId ProbeDivisorId("gi_reference.probe_divisor");
@@ -136,6 +139,10 @@ namespace gglab
 				m_World(world), m_Assets(assets), m_Scene(field->GetRayScene()),
 				m_Raster(CreateRenderPipelineForwardPlus({ .m_EnableGIReceiver = true, .m_GIField = std::move(field) })) {}
 			std::string_view GetName() const noexcept override { return "GI fixed-depth reference"; }
+			GIFieldCaptureState GetGIFieldCaptureState() const noexcept override
+			{
+				return m_Raster->GetGIFieldCaptureState();
+			}
 			ResolvedTemporalFramePlan ResolveTemporalFramePlan(TemporalFramePlanResolveInfo info) const noexcept override
 			{
 				return m_Raster->ResolveTemporalFramePlan(info);
@@ -297,6 +304,17 @@ namespace gglab
 		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldEnabledId, .m_Name = "Static field update owner",
 			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
 			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = false }));
+		for (const auto& [id, name] : std::array{
+			std::pair{ FieldRefreshNoiseId, "Measured refresh change noise" },
+			std::pair{ FieldSteadyNoiseId, "Measured steady change noise" } })
+		{
+			GGLAB_UNUSED(parameters.Add({ .m_Id = id, .m_Name = name, .m_Group = "GI field",
+				.m_Type = LabParameterType::Float, .m_Impact = LabChangeImpact::RestartSession,
+				.m_DefaultValue = 0.0f, .m_MinValue = LabValue(0.0f), .m_MaxValue = LabValue(1000000.0f) }));
+		}
+		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldReadinessId, .m_Name = "Observe field readiness and refresh",
+			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
+			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = true }));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldSamplingId, .m_Name = "Compose field diffuse irradiance",
 			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
 			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = true }));
@@ -329,7 +347,8 @@ namespace gglab
 		const bool coastal = IsCoastalGIFixture(fixture);
 		const float exposure = static_cast<float>(GetParameters().Get(ExposureId, int32_t(10)));
 		Color albedo = Color::White;
-		if (fixture == GIReferenceFixture::ThickWallRoom || fixture == GIReferenceFixture::ThinWallRoom)
+		if (fixture == GIReferenceFixture::ThickWallRoom || fixture == GIReferenceFixture::ThinWallRoom ||
+			fixture == GIReferenceFixture::BlackField)
 		{
 			albedo = Color(0.5f, 0.5f, 0.5f, 1.0f);
 		}
@@ -519,7 +538,7 @@ namespace gglab
 		else
 		{
 			// Frozen specification v1; disjoint solid interiors, shared boundaries.
-			const float t = fixture == GIReferenceFixture::ThickWallRoom ? 1.0f : 0.2f;
+			const float t = (fixture == GIReferenceFixture::ThickWallRoom || fixture == GIReferenceFixture::BlackField) ? 1.0f : 0.2f;
 			std::vector<std::pair<Vector3, Vector3>> solids
 			{
 				{ Vector3(-2 - t, -t, -2 - t), Vector3(2 + t, 0, 2 + t) },
@@ -554,7 +573,8 @@ namespace gglab
 				GGLAB_UNUSED(primitive::Cube::Create(primitiveInfo));
 			}
 			m_Assets.TrackModel(ProceduralCubeModelID, "Frozen room shell", 1.0f);
-			const auto prefix = fixture == GIReferenceFixture::ThickWallRoom ? "F2" : "F3";
+			const auto prefix = fixture == GIReferenceFixture::ThickWallRoom || fixture == GIReferenceFixture::BlackField ?
+				"F2" : "F3";
 			if (fixture == GIReferenceFixture::SunlitColoredRoom)
 			{
 				// With the frozen opening/direction, sunlight reaches the floor before
@@ -654,7 +674,8 @@ namespace gglab
 		// Match that exact constant in the independent direct-input contract.
 		const float radiance = fixture == GIReferenceFixture::SunlitColoredRoom ?
 			0.1f :
-			fixture == GIReferenceFixture::SunTransport || fixture == GIReferenceFixture::OffCameraSunBlocker ?
+			fixture == GIReferenceFixture::SunTransport || fixture == GIReferenceFixture::OffCameraSunBlocker ||
+			fixture == GIReferenceFixture::BlackField ?
 				0.0f :
 				fixture == GIReferenceFixture::PublishedEnvironment ? (128.0f + 0.5f) / 128.0f : 1.0f;
 		reference.m_ConstantRadiance = { radiance, radiance, radiance };
@@ -878,13 +899,17 @@ namespace gglab
 			{
 				GIFieldCreateInfo info{ .m_RayScene = m_RayScene };
 				info.m_EnableReceiverSampling = GetParameters().Get(FieldSamplingId, true);
+				info.m_Readiness.m_Enabled = GetParameters().Get(FieldReadinessId, true);
+				info.m_Readiness.m_NoiseSigma = GetParameters().Get(FieldRefreshNoiseId, 0.0f);
+				info.m_Readiness.m_SteadyNoiseSigma = GetParameters().Get(FieldSteadyNoiseId, 0.0f);
 				info.m_RaysPerProbe = GetParameters().Get(ProbeRaysId, uint32_t(256));
 				info.m_Seed = GetParameters().Get(SeedId, GIObservationLimits::DefaultSeed);
 				if (!IsCoastalGIFixture(fixture))
 				{
 					info.m_ConstantEnvironment = ResolveEnvironment(GetParameters(), fixture) ==
 						GIReferenceEnvironment::DirectConstant;
-					const float radiance = fixture == GIReferenceFixture::SunlitColoredRoom ? 0.1f : 1.0f;
+					const float radiance = fixture == GIReferenceFixture::BlackField ? 0.0f :
+						fixture == GIReferenceFixture::SunlitColoredRoom ? 0.1f : 1.0f;
 					info.m_ConstantRadiance = { radiance, radiance, radiance };
 					if (fixture == GIReferenceFixture::ProbeFurnace || fixture == GIReferenceFixture::ProbeSlab)
 					{
@@ -903,7 +928,8 @@ namespace gglab
 						info.m_Volume = { .m_Counts = { 5, 5, 5 },
 							.m_Minimum = { -1, -1, -1 }, .m_Spacing = 0.5f };
 					}
-					else if (fixture == GIReferenceFixture::ThickWallRoom || fixture == GIReferenceFixture::ThinWallRoom)
+					else if (fixture == GIReferenceFixture::ThickWallRoom || fixture == GIReferenceFixture::ThinWallRoom ||
+						fixture == GIReferenceFixture::BlackField)
 					{
 						info.m_Volume = { .m_Counts = { 9, 9, 9 }, .m_Minimum = { -4, -2, -4 } };
 					}
@@ -1308,6 +1334,14 @@ namespace gglab
 				field.m_SceneRevision, field.m_LightingGeneration, field.m_EnvironmentGeneration,
 				field.m_ProbeCount, field.m_RayCapacityBytes, field.m_FieldLogicalBytes,
 				field.m_Initialized ? 1 : 0, field.m_Invalid ? 1 : 0, field.m_StatusReadbackSlots) });
+			const auto& readiness = field.m_Readiness;
+			diagnostics.m_Metrics.push_back({ "GI field readiness", std::format(
+				"state={};enabled={};refresh={};completed={};readyUpdate={};activeBlocks={};excludedBlocks={};quietBlocks={};"
+				"maximumChange={};threshold={};noiseSigma={};irradianceFloor={};hysteresis={}",
+				GetGIFieldReadinessName(readiness.m_State), readiness.m_Enabled, readiness.m_Refreshing,
+				readiness.m_CompletedUpdates, readiness.m_ReadyUpdate, readiness.m_ActiveBlocks,
+				readiness.m_ExcludedBlocks, readiness.m_QuietBlocks, readiness.m_MaximumChange,
+				readiness.m_Threshold, readiness.m_NoiseSigma, readiness.m_IrradianceFloor, readiness.m_Hysteresis) });
 			diagnostics.m_Metrics.push_back({ "GI field update status", std::format(
 				"error={};probe={};update={};element={}", uint32_t(field.m_UpdateStatus.m_Error),
 				field.m_UpdateStatus.m_Probe, field.m_UpdateStatus.m_Update, field.m_UpdateStatus.m_Element) });

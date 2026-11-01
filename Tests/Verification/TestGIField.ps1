@@ -56,7 +56,7 @@ try {
             if ($start.ownership -ne 'created') { throw 'Field verification requires an owned session.' }
             $run=$start.runIdentity
             foreach ($fixture in @(14,16,15)) {
-                $effect=Set-Inputs $session $run @{fixture=$fixture;probe_enabled=$false;field_enabled=$true;field_sampling=$false;
+                $effect=Set-Inputs $session $run @{fixture=$fixture;probe_enabled=$false;field_enabled=$true;field_readiness=$false;field_sampling=$false;
                     probe_rays=256;probe_allocation_diagnostics=$true;ev100=15}
                 foreach ($step in @('off','activate','steady','replace','release','reactivate')) {
                     if ($step -in @('activate','reactivate')) { $effect=Set-Inputs $session $run @{probe_enabled=$true} }

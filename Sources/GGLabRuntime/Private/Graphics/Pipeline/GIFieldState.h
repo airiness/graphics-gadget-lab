@@ -2,12 +2,199 @@
 #include "Graphics/RenderFrameOutcome.h"
 #include "Graphics/GIShaderConstants.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIUpdateStatus.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIFieldReadiness.h"
 
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <span>
+#include <vector>
 
 namespace gglab
 {
+	// Two float4 records per probe, following one float4 field header on the GPU.
+	struct GIFieldProbeChange
+	{
+		std::array<float, 4> m_RecentChanges{};
+		float m_Luminance = 0;
+		float m_Change = 0;
+		float m_Active = 0;
+		uint32_t m_Updates = 0;
+	};
+	static_assert(sizeof(GIFieldProbeChange) == 32);
+
+	class GIFieldReadinessEstimator final
+	{
+	public:
+		void Reset(std::array<uint32_t, 3> counts, GIFieldReadinessSettings settings,
+			bool lightingRefresh = false) noexcept
+		{
+			m_Counts = counts;
+			m_Settings = settings;
+			m_LightingRefresh = lightingRefresh;
+			m_Snapshot = { .m_State = lightingRefresh ? GIFieldReadinessState::Settling : GIFieldReadinessState::Initializing,
+				.m_Enabled = settings.m_Enabled, .m_Refreshing = settings.m_Enabled,
+				.m_NoiseSigma = settings.m_NoiseSigma,
+				.m_Threshold = std::max(gi_shader::GIFieldReadinessMinimumThreshold, 3 * settings.m_NoiseSigma),
+				.m_Hysteresis = settings.m_RefreshHysteresis };
+			const uint32_t width = gi_shader::GIFieldReadinessBlockWidth;
+			const uint32_t blocks = ((counts[0] + width - 1) / width) *
+				((counts[1] + width - 1) / width) * ((counts[2] + width - 1) / width);
+			m_QuietUpdates.assign(blocks, 0);
+			for (auto& sums : m_NoiseSquares)
+			{
+				sums.assign(uint64_t(counts[0]) * counts[1] * counts[2], 0);
+			}
+			m_NoiseSamples = {};
+			m_ModeUpdates = 0;
+			m_HasMode = false;
+		}
+		[[nodiscard]] const GIFieldReadinessSnapshot& GetSnapshot() const noexcept { return m_Snapshot; }
+		bool Observe(uint64_t update, float floor, std::span<const GIFieldProbeChange> probes, float hysteresis = 0.5f, bool refresh = true) noexcept
+		{
+			if (!m_Settings.m_Enabled || update <= m_Snapshot.m_CompletedUpdates)
+			{
+				return false;
+			}
+			if (update != m_Snapshot.m_CompletedUpdates + 1 || !std::isfinite(floor) || floor < gi_shader::GIFieldReadinessAbsoluteFloor ||
+				probes.size() != uint64_t(m_Counts[0]) * m_Counts[1] * m_Counts[2])
+			{
+				m_Snapshot.m_Failed = true;
+				return false;
+			}
+			if (m_HasMode && refresh != m_RefreshMode)
+			{
+				std::fill(m_QuietUpdates.begin(), m_QuietUpdates.end(), 0);
+				m_ModeUpdates = 0;
+			}
+			m_HasMode = true;
+			m_RefreshMode = refresh;
+			++m_ModeUpdates;
+			m_Snapshot.m_Hysteresis = hysteresis;
+			m_Snapshot.m_NoiseSigma = refresh ? m_Settings.m_NoiseSigma : m_Settings.m_SteadyNoiseSigma;
+			m_Snapshot.m_Threshold = std::max(gi_shader::GIFieldReadinessMinimumThreshold, 3 * m_Snapshot.m_NoiseSigma);
+			m_Snapshot.m_CompletedUpdates = update;
+			m_Snapshot.m_IrradianceFloor = floor;
+			m_Snapshot.m_ActiveBlocks = 0;
+			m_Snapshot.m_ExcludedBlocks = 0;
+			m_Snapshot.m_QuietBlocks = 0;
+			m_Snapshot.m_MaximumChange = 0;
+			const uint32_t warming = m_LightingRefresh ? gi_shader::GIFieldReadinessChangeSpan :
+				std::max(gi_shader::GIFieldReadinessMinimumWarmUpdates,
+					uint32_t(std::ceil(1.0 / (1.0 - m_Settings.m_RefreshHysteresis))));
+			const uint32_t width = gi_shader::GIFieldReadinessBlockWidth;
+			uint32_t block = 0;
+			for (uint32_t y = 0; y < m_Counts[1]; y += width)
+			{
+				for (uint32_t z = 0; z < m_Counts[2]; z += width)
+				{
+					for (uint32_t x = 0; x < m_Counts[0]; x += width, ++block)
+					{
+						std::array<float, 64> changes{};
+						size_t active = 0;
+						for (uint32_t py = y; py < std::min(y + width, m_Counts[1]); ++py)
+						{
+							for (uint32_t pz = z; pz < std::min(z + width, m_Counts[2]); ++pz)
+							{
+								for (uint32_t px = x; px < std::min(x + width, m_Counts[0]); ++px)
+								{
+									const auto& probe = probes[px + m_Counts[0] * (pz + m_Counts[2] * py)];
+									if (!std::isfinite(probe.m_Change) || probe.m_Change < 0 ||
+										!std::isfinite(probe.m_Luminance) || probe.m_Luminance < 0 ||
+										(probe.m_Active != 0 && probe.m_Active != 1) || probe.m_Updates != update)
+									{
+										m_Snapshot.m_Failed = true;
+										return false;
+									}
+									if (probe.m_Active != 0)
+									{
+										changes[active++] = probe.m_Change;
+									}
+								}
+							}
+						}
+						if (active == 0)
+						{
+							++m_Snapshot.m_ExcludedBlocks;
+							continue;
+						}
+						++m_Snapshot.m_ActiveBlocks;
+						std::sort(changes.begin(), changes.begin() + active);
+						const float maximum = changes[active - 1];
+						m_Snapshot.m_MaximumChange = std::max(m_Snapshot.m_MaximumChange, maximum);
+						const size_t percentile = (95 * active + 99) / 100 - 1;
+						const bool quiet = update >= warming && changes[percentile] <= m_Snapshot.m_Threshold &&
+							maximum <= 3 * m_Snapshot.m_Threshold;
+						m_QuietUpdates[block] = quiet ? std::min(m_QuietUpdates[block] + 1, gi_shader::GIFieldReadinessQuietUpdates) : 0;
+						m_Snapshot.m_QuietBlocks += m_QuietUpdates[block] >= gi_shader::GIFieldReadinessQuietUpdates ? 1 : 0;
+					}
+				}
+			}
+			// Report a bounded frozen-input noise experiment; never feed its result back
+			// into this owner's thresholds. A separate profile must explicitly adopt it.
+			const size_t mode = refresh ? 0 : 1;
+			if (m_ModeUpdates >= gi_shader::GIFieldReadinessMinimumWarmUpdates && m_NoiseSamples[mode] < gi_shader::GIFieldReadinessNoiseSamples)
+			{
+				++m_NoiseSamples[mode];
+				double maximum = 0;
+				for (size_t index = 0; index < probes.size(); ++index)
+				{
+					const auto& probe = probes[index];
+					if (probe.m_Active != 0)
+					{
+						m_NoiseSquares[mode][index] += double(probe.m_Change) * probe.m_Change;
+						maximum = std::max(maximum, m_NoiseSquares[mode][index]);
+					}
+				}
+				const float estimate = static_cast<float>(std::sqrt(maximum / m_NoiseSamples[mode]));
+				if (refresh)
+				{
+					m_Snapshot.m_RefreshNoiseEstimate = estimate;
+					m_Snapshot.m_RefreshNoiseSamples = m_NoiseSamples[mode];
+				}
+				else
+				{
+					m_Snapshot.m_SteadyNoiseEstimate = estimate;
+					m_Snapshot.m_SteadyNoiseSamples = m_NoiseSamples[mode];
+				}
+			}
+			const bool ready = (m_Snapshot.m_ActiveBlocks == 0 || update >= warming) &&
+				m_Snapshot.m_QuietBlocks == m_Snapshot.m_ActiveBlocks;
+			if (ready)
+			{
+				if (m_Snapshot.m_State != GIFieldReadinessState::Ready)
+				{
+					m_Snapshot.m_ReadyUpdate = update;
+				}
+				m_Snapshot.m_State = GIFieldReadinessState::Ready;
+				m_Snapshot.m_Refreshing = false;
+			}
+			else
+			{
+				m_Snapshot.m_ReadyUpdate = 0;
+				m_Snapshot.m_State = update >= gi_shader::GIFieldReadinessTimeoutUpdates ? GIFieldReadinessState::Unconverged :
+					update < warming && !m_LightingRefresh ? GIFieldReadinessState::Warming : GIFieldReadinessState::Settling;
+				m_Snapshot.m_Refreshing = m_Snapshot.m_Refreshing && update < gi_shader::GIFieldReadinessTimeoutUpdates;
+			}
+			return true;
+		}
+
+	private:
+		std::array<uint32_t, 3> m_Counts{};
+		GIFieldReadinessSettings m_Settings;
+		GIFieldReadinessSnapshot m_Snapshot;
+		std::vector<uint32_t> m_QuietUpdates;
+		std::array<std::vector<double>, 2> m_NoiseSquares;
+		std::array<uint32_t, 2> m_NoiseSamples{};
+		uint32_t m_ModeUpdates = 0;
+		bool m_HasMode = false;
+		bool m_RefreshMode = true;
+		bool m_LightingRefresh = false;
+	};
+
 	[[nodiscard]] inline bool IsGIUpdateStatusValid(const GIUpdateStatus& status,
 		uint32_t probes, uint32_t rays, uint64_t submittedUpdates,
 		uint32_t irradianceInteriorWidth = gi_shader::GIProbeIrradianceInteriorWidth) noexcept

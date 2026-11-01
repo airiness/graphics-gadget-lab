@@ -72,7 +72,7 @@ function Test-ProductionRejection([string]$Backend, [string]$Directory) {
             Timing='after-ready';SettleFrames=1;OutputDirectory="$Directory/warmup";TimeoutSeconds=$TimeoutSeconds}
         if ($warmup.publication -ne 'Published') { throw 'Production rejection content warmup failed.' }
         Write-VerificationJson "$Directory/warmup.json" $warmup
-        Set-Inputs @{fixture=1;field_enabled=$true;field_sampling=$true;probe_enabled=$false;ev100=10}
+        Set-Inputs @{fixture=1;field_enabled=$true;field_readiness=$false;field_sampling=$true;probe_enabled=$false;ev100=10}
         $inject = @{point='pass-gi-probe-update.trace.sample';value='NaN';x=0;y=5;component=1} | ConvertTo-Json -Compress
         $null = Invoke-VerificationSession watch $session @{WatchMode='report';WatchClaims=@('production');Inject=$inject}
         $activationError = $null
@@ -122,6 +122,9 @@ try {
             Write-VerificationJson "$directory/start.json" $start
             if ($start.ownership -ne 'created') { throw 'GI injection requires an owned session.' }
             $run = $start.runIdentity
+            $null = Wait-VerificationCondition -Poll {
+                Invoke-VerificationSession status $session @{ExpectedRunIdentity=$run}
+            } -Until { param($r) $r.frame -and $r.frame.ready } -TimeoutSeconds $TimeoutSeconds
             foreach ($mode in @('direct','shared','field')) {
                 $prefix = if ($mode -eq 'field') { 'GI.Field' } else { 'GI.ProbeUpdate' }
                 foreach ($case in $cases) {
@@ -130,7 +133,7 @@ try {
                     Write-VerificationJson "$path/case.json" $case
                     $null = Invoke-VerificationSession watch $session @{WatchOff=$true}
                     $fixture = if ($mode -eq 'field') { 16 } else { 14 }
-                    Set-Inputs @{fixture=$fixture;probe_enabled=$false;field_enabled=($mode -eq 'field');field_sampling=$false;
+                    Set-Inputs @{fixture=$fixture;probe_enabled=$false;field_enabled=($mode -eq 'field');field_readiness=$false;field_sampling=$false;
                         probe_shared_blend=($mode -ne 'direct');probe_updates=0;probe_rays=256;ev100=15}
                     if ($case.error -eq 2) {
                         if ($mode -eq 'field') {

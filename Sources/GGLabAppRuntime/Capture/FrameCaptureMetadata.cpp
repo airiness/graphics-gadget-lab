@@ -637,6 +637,38 @@ namespace gglab
 			writer.EndObject();
 		}
 		writer.EndArray();
+
+		if (metadata.m_Readiness.m_GIField)
+		{
+			const auto& field = *metadata.m_Readiness.m_GIField;
+			const auto& readiness = field.m_Readiness;
+			writer.BeginObject("giField");
+			writer.Unsigned("schemaVersion", 1);
+			writer.Unsigned("generation", field.m_Generation);
+			writer.Unsigned("sceneRevision", field.m_SceneRevision);
+			writer.Unsigned("lightingGeneration", field.m_LightingGeneration);
+			writer.Unsigned("environmentGeneration", field.m_EnvironmentGeneration);
+			writer.Bool("enabled", readiness.m_Enabled);
+			writer.String("state", GetGIFieldReadinessName(readiness.m_State));
+			writer.Bool("refreshing", readiness.m_Refreshing);
+			writer.Bool("failed", readiness.m_Failed);
+			writer.Unsigned("completedUpdates", readiness.m_CompletedUpdates);
+			writer.Unsigned("readyUpdate", readiness.m_ReadyUpdate);
+			writer.Unsigned("activeBlocks", readiness.m_ActiveBlocks);
+			writer.Unsigned("excludedBlocks", readiness.m_ExcludedBlocks);
+			writer.Unsigned("quietBlocks", readiness.m_QuietBlocks);
+			writer.Number("maximumChange", readiness.m_MaximumChange);
+			writer.Number("threshold", readiness.m_Threshold);
+			writer.Number("noiseSigma", readiness.m_NoiseSigma);
+			writer.Number("refreshNoiseEstimate", readiness.m_RefreshNoiseEstimate);
+			writer.Number("steadyNoiseEstimate", readiness.m_SteadyNoiseEstimate);
+			writer.Unsigned("refreshNoiseSamples", readiness.m_RefreshNoiseSamples);
+			writer.Unsigned("steadyNoiseSamples", readiness.m_SteadyNoiseSamples);
+			writer.Number("irradianceFloor", readiness.m_IrradianceFloor);
+			writer.Number("hysteresis", readiness.m_Hysteresis);
+			writer.EndObject();
+		}
+
 		writer.EndObject();
 
 		const FrameCaptureTemporalState& temporal = metadata.m_Temporal;

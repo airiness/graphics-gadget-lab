@@ -177,6 +177,7 @@ namespace gglab
 			ShaderProgramBuildRecord{ &GIProbeBlendSharedCompute, L"Passes/PassGIProbeUpdate.hlsl", L"BlendShared" },
 			ShaderProgramBuildRecord{ &GIProbeBordersCompute, L"Passes/PassGIProbeUpdate.hlsl", L"Borders" },
 			ShaderProgramBuildRecord{ &GIProbeClassifyCompute, L"Passes/PassGIProbeUpdate.hlsl", L"Classify" },
+			ShaderProgramBuildRecord{ &GIFieldReadinessFloorCompute, L"Passes/PassGIProbeUpdate.hlsl", L"ReadinessFloor" },
 			ShaderProgramBuildRecord{ &GIFieldLookupCompute, L"Passes/PassGIFieldLookup.hlsl", L"CSMain" },
 			ShaderProgramBuildRecord{ &GIReceiverPixel, L"Passes/PassGIReceiver.hlsl", L"PSMain" },
 			ShaderProgramBuildRecord{ &GIReceiverPositionPixel, L"Passes/PassGIReceiver.hlsl", L"PSPosition" },

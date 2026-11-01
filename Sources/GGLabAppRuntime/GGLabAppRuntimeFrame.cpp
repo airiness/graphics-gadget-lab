@@ -746,6 +746,22 @@ namespace gglab
 				validation.m_Reason, validation.m_Detail.empty() ? "" : ", detail=",
 				validation.m_Detail));
 		}
+		const auto field = renderPipeline.GetGIFieldCaptureState();
+		if (field.m_Generation != 0)
+		{
+			captureFrameState.m_Readiness.m_GIField = field;
+			const auto& readiness = field.m_Readiness;
+			if (readiness.m_Enabled)
+			{
+				captureFrameState.m_Readiness.Add("gi-field",
+					readiness.m_Failed || readiness.m_State == GIFieldReadinessState::Unconverged ? FrameCaptureGateState::Failed :
+						readiness.m_State == GIFieldReadinessState::Ready ? FrameCaptureGateState::Ready : FrameCaptureGateState::Pending,
+					std::format("Field {}: {}, {} completed updates, {}/{} quiet blocks, {} excluded; threshold {}, max change {}",
+						field.m_Generation, GetGIFieldReadinessName(readiness.m_State), readiness.m_CompletedUpdates,
+						readiness.m_QuietBlocks, readiness.m_ActiveBlocks, readiness.m_ExcludedBlocks,
+						readiness.m_Threshold, readiness.m_MaximumChange), "gi-field", field.m_Generation);
+			}
+		}
 		const auto reference = services.m_Presentation->GetGIReferenceObservationDiagnostics();
 		if (reference.m_Active)
 		{

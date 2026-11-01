@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Graphics/RenderContexts.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIFieldReadiness.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
 
 #include <cstdint>
@@ -78,6 +79,7 @@ namespace gglab
 		virtual ~RenderPipelineBase() = default;
 
 		virtual std::string_view GetName() const noexcept = 0;
+		[[nodiscard]] virtual GIFieldCaptureState GetGIFieldCaptureState() const noexcept { return {}; }
 
 		virtual ResolvedTemporalFramePlan ResolveTemporalFramePlan(
 			TemporalFramePlanResolveInfo info) const noexcept

@@ -61,6 +61,7 @@ Atlas ID: atlas.runtime.render-pipeline
   the Runtime [owner](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIField.cpp),
   with Public [configuration and diagnostics](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GIField.h).
   Renderer owns its [CPU settlement participant](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIFieldState.h).
+  `GetGIFieldCaptureState` supplies Runtime readiness to AppRuntime's capture gate.
   Opaque Forward shading and receiver diagnostics share the
   [field lookup](../../../Shaders/Lighting/GIFieldSampling.hlsli) through Private
   [graph resources](../../../Sources/GGLabRuntime/Private/Graphics/RenderPass/GIFieldGraphResources.h).

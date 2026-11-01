@@ -79,6 +79,10 @@ namespace gglab
 		~RenderPipelineForwardPlus() override = default;
 
 		std::string_view GetName() const noexcept override { return "ForwardPlus"; }
+		GIFieldCaptureState GetGIFieldCaptureState() const noexcept override
+		{
+			return m_GIField ? m_GIField->GetCaptureState() : GIFieldCaptureState{};
+		}
 		ResolvedTemporalFramePlan ResolveTemporalFramePlan(
 			TemporalFramePlanResolveInfo info) const noexcept override;
 

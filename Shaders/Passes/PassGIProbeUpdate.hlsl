@@ -9,6 +9,7 @@
 StructuredBuffer<float4> ProbeRayInput : register(t11);
 RWStructuredBuffer<float4> ProbeRayOutput : register(u1);
 RWStructuredBuffer<uint4> ProbeUpdateStatus : register(u2);
+RWStructuredBuffer<float4> ProbeReadiness : register(u3);
 
 // Field order matches GIProbeUpdateWorkload.cpp::Parameters, including explicit padding.
 cbuffer Parameters : register(b2)
@@ -38,6 +39,10 @@ cbuffer Parameters : register(b2)
 	uint RotateDirections;
 	uint TraversalOnly;
 	uint IrradianceInteriorWidth;
+	uint ReadinessEnabled;
+	uint ReadinessEpoch;
+	float DistanceHysteresis;
+	uint ReadinessDistance;
 };
 
 static const float ProbeGoldenAngleTurns = 0.3819660112501051;
@@ -154,6 +159,17 @@ void Initialize(uint3 id : SV_DispatchThreadID)
 		{
 			RWTexture2DArray<uint> classification = ResourceDescriptorHeap[NonUniformResourceIndex(ClassificationIndex)];
 			classification[id] = GIProbeUnclassified;
+		}
+	}
+	if (ReadinessEnabled != 0)
+	{
+		const uint linearIndex = id.x + GridSize.x * max(IrradianceTileWidth(), GIProbeDistanceTileWidth) *
+			(id.y + GridSize.z * max(IrradianceTileWidth(), GIProbeDistanceTileWidth) * id.z);
+		const uint threads = ProbeCount * max(IrradianceTileWidth(), GIProbeDistanceTileWidth) *
+			max(IrradianceTileWidth(), GIProbeDistanceTileWidth);
+		for (uint element = linearIndex; element < 1 + 2 * ProbeCount; element += threads)
+		{
+			ProbeReadiness[element] = 0.0.xxxx;
 		}
 	}
 	// All ray slots are defined once, including probes outside a partial update.
@@ -333,6 +349,92 @@ void Trace(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 	}
 }
 
+groupshared uint ReadinessCounts[GIProbeGroupThreads];
+groupshared uint ReadinessActive;
+groupshared uint ReadinessLow;
+groupshared uint ReadinessHigh;
+[numthreads(GIProbeGroupThreads, 1, 1)]
+void ReadinessFloor(uint thread : SV_GroupIndex)
+{
+	if (IsUpdateBlocked(thread))
+	{
+		return;
+	}
+	RWTexture2DArray<uint> classification = ResourceDescriptorHeap[NonUniformResourceIndex(ClassificationIndex)];
+	uint active = 0;
+	for (uint probe = thread; probe < ProbeCount; probe += GIProbeGroupThreads)
+	{
+		active += classification[ProbeCoordinate(probe)] == GIProbeActive ? 1u : 0u;
+	}
+	ReadinessCounts[thread] = active;
+	GroupMemoryBarrierWithGroupSync();
+	for (uint stride = GIProbeGroupThreads / 2; stride != 0; stride >>= 1)
+	{
+		if (thread < stride)
+		{
+			ReadinessCounts[thread] += ReadinessCounts[thread + stride];
+		}
+		GroupMemoryBarrierWithGroupSync();
+	}
+	if (thread == 0)
+	{
+		ReadinessActive = ReadinessCounts[0];
+		ReadinessLow = 0;
+		ReadinessHigh = 0x7f7fffffu;
+	}
+	GroupMemoryBarrierWithGroupSync();
+	if (ReadinessActive == 0)
+	{
+		if (thread == 0)
+		{
+			ProbeReadiness[0] = float4(GIFieldReadinessAbsoluteFloor, 0, 0, (float)(GIFieldReadinessChangeSpan));
+		}
+		return;
+	}
+	// Positive finite floats have monotonically ordered bit patterns.
+	for (uint bit = 0; bit < 31; ++bit)
+	{
+		const uint middle = ReadinessLow + (ReadinessHigh - ReadinessLow) / 2;
+		uint count = 0;
+		for (uint probe = thread; probe < ProbeCount; probe += GIProbeGroupThreads)
+		{
+			if (classification[ProbeCoordinate(probe)] == GIProbeActive &&
+				asuint(ProbeReadiness[2 + 2 * probe].x) <= middle)
+			{
+				++count;
+			}
+		}
+		ReadinessCounts[thread] = count;
+		GroupMemoryBarrierWithGroupSync();
+		for (uint stride = GIProbeGroupThreads / 2; stride != 0; stride >>= 1)
+		{
+			if (thread < stride)
+			{
+				ReadinessCounts[thread] += ReadinessCounts[thread + stride];
+			}
+			GroupMemoryBarrierWithGroupSync();
+		}
+		if (thread == 0)
+		{
+			if (ReadinessCounts[0] > ReadinessActive / 2)
+			{
+				ReadinessHigh = middle;
+			}
+			else
+			{
+				ReadinessLow = middle + 1;
+			}
+		}
+		GroupMemoryBarrierWithGroupSync();
+	}
+	if (thread == 0)
+	{
+		const float median = ReadinessActive == 0 ? 0.0 : asfloat(ReadinessLow);
+		ProbeReadiness[0] = float4(max(GIFieldReadinessAbsoluteFloor, GIFieldReadinessRelativeFloor * median), median, (float)(ReadinessActive), (float)(GIFieldReadinessChangeSpan));
+	}
+}
+
+groupshared float2 ReadinessMeasures[GIProbeGroupThreads];
 groupshared float4 SharedRays[GIProbeMaximumRays];
 groupshared float3 SharedDirections[GIProbeMaximumRays];
 float4 IntegrateTexel(uint probe, uint texel, bool useShared)
@@ -358,7 +460,7 @@ float4 IntegrateTexel(uint probe, uint texel, bool useShared)
 		float4(radiance / max(sum, ProbeMinimumIntegrationWeight), 1) :
 		float4(moments / max(sum, ProbeMinimumIntegrationWeight), 0, 0);
 }
-void StoreTexel(uint probe, uint texel, float4 value)
+float2 StoreTexel(uint probe, uint texel, float4 value)
 {
 	const uint3 coordinate = ProbeCoordinate(probe);
 	if (texel < IrradianceInteriorTexels())
@@ -370,15 +472,22 @@ void StoreTexel(uint probe, uint texel, float4 value)
 		if (!all(isfinite(NonFiniteObserveValue(NF_SITE_GI_PROBE_UPDATE_STORETEXEL_ISFINITE, previous))))
 		{
 			InvalidateUpdate(GIUpdateErrorInvalidHistory, probe, texel);
-			return;
+			return 0.0.xx;
 		}
 		const float3 blended = lerp(value.xyz, previous.xyz, Hysteresis);
 		if (!all(isfinite(NonFiniteObserveValue(NF_SITE_GI_PROBE_UPDATE_STORETEXEL_ISFINITE, blended))))
 		{
 			InvalidateUpdate(GIUpdateErrorInvalidBlend, probe, texel);
-			return;
+			return 0.0.xx;
 		}
 		IrradianceAtlas()[target] = float4(blended, 1);
+		if (ReadinessEnabled != 0)
+		{
+			const float3 change = abs(blended - previous.xyz) * PI /
+				max(previous.xyz * PI, ProbeReadiness[0].x.xxx);
+			return float2(max(change.x, max(change.y, change.z)),
+				dot(blended * PI, float3(0.2126, 0.7152, 0.0722)));
+		}
 	}
 	else
 	{
@@ -390,16 +499,21 @@ void StoreTexel(uint probe, uint texel, float4 value)
 		if (!all(isfinite(NonFiniteObserveValue(NF_SITE_GI_PROBE_UPDATE_STORETEXEL_ISFINITE, previous))))
 		{
 			InvalidateUpdate(GIUpdateErrorInvalidHistory, probe, texel);
-			return;
+			return 0.0.xx;
 		}
-		const float2 blended = lerp(value.xy, previous, Hysteresis);
+		const float2 blended = lerp(value.xy, previous, DistanceHysteresis);
 		if (!all(isfinite(NonFiniteObserveValue(NF_SITE_GI_PROBE_UPDATE_STORETEXEL_ISFINITE, blended))))
 		{
 			InvalidateUpdate(GIUpdateErrorInvalidBlend, probe, texel);
-			return;
+			return 0.0.xx;
 		}
 		DistanceAtlas()[target] = blended;
+		if (ReadinessEnabled != 0 && ReadinessDistance != 0)
+		{
+			return float2(abs(blended.x - previous.x) / ProbeSpacing, 0);
+		}
 	}
+	return 0.0.xx;
 }
 [numthreads(GIProbeGroupThreads, 1, 1)]
 void BlendDirect(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
@@ -436,10 +550,38 @@ void BlendShared(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 		SharedDirections[ray] = ProbeDirection(probe, ray);
 	}
 	GroupMemoryBarrierWithGroupSync();
+	float2 measure = 0.0.xx;
 	for (uint texel = thread; texel < IrradianceInteriorTexels() + GIProbeDistanceInteriorTexels;
 		texel += GIProbeGroupThreads)
 	{
-		StoreTexel(probe, texel, IntegrateTexel(probe, texel, true));
+		const float2 measurement = StoreTexel(probe, texel, IntegrateTexel(probe, texel, true));
+		measure.x = max(measure.x, measurement.x);
+		measure.y += measurement.y;
+	}
+	if (ReadinessEnabled != 0)
+	{
+		ReadinessMeasures[thread] = measure;
+		GroupMemoryBarrierWithGroupSync();
+		for (uint stride = GIProbeGroupThreads / 2; stride != 0; stride >>= 1)
+		{
+			if (thread < stride)
+			{
+				ReadinessMeasures[thread].x = max(ReadinessMeasures[thread].x, ReadinessMeasures[thread + stride].x);
+				ReadinessMeasures[thread].y += ReadinessMeasures[thread + stride].y;
+			}
+			GroupMemoryBarrierWithGroupSync();
+		}
+		if (thread == 0)
+		{
+			const uint elapsed = UpdateIndex - ReadinessEpoch;
+			float4 changes = elapsed == 0 ? 0.0.xxxx : ProbeReadiness[1 + 2 * probe];
+			changes[elapsed % GIFieldReadinessChangeSpan] = ReadinessMeasures[0].x;
+			ProbeReadiness[1 + 2 * probe] = changes;
+			RWTexture2DArray<uint> classification = ResourceDescriptorHeap[NonUniformResourceIndex(ClassificationIndex)];
+			ProbeReadiness[2 + 2 * probe] = float4(ReadinessMeasures[0].y / (float)(IrradianceInteriorTexels()),
+				dot(changes, (1.0 / (float)(GIFieldReadinessChangeSpan)).xxxx), classification[ProbeCoordinate(probe)] == GIProbeActive ? 1.0 : 0.0,
+				asfloat(elapsed + 1));
+		}
 	}
 }
 uint2 BorderSource(uint2 pixel, uint side)

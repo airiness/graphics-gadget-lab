@@ -3,6 +3,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/GIObservationLimits.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIUpdateStatus.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIFieldReadiness.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 
@@ -37,6 +38,7 @@ namespace gglab
 		float m_ViewBias = 0.3f;
 		// Update-only controls can inspect atlases without changing opaque lighting.
 		bool m_EnableReceiverSampling = true;
+		GIFieldReadinessSettings m_Readiness;
 		// Analytic fixtures may supply incident constant radiance; geometry is still traced.
 		bool m_ConstantEnvironment = false;
 		std::array<float, 3> m_ConstantRadiance{ 1, 1, 1 };
@@ -62,6 +64,7 @@ namespace gglab
 		uint32_t m_ProbeCount = 0;
 		uint32_t m_StatusReadbackSlots = 0;
 		GIUpdateStatus m_UpdateStatus;
+		GIFieldReadinessSnapshot m_Readiness;
 		bool m_Initialized = false;
 		bool m_Invalid = false;
 		std::string m_Reason;
@@ -72,8 +75,10 @@ namespace gglab
 
 	// Runtime-owned static world field. Every submitted update covers the whole volume.
 	// Configure/replace only through the safe pipeline path on the owner thread.
-	// Static scene, lighting and shader inputs are sealed at the first update; changing
-	// them requires replacement. Lookup is single-bounce; readiness remains separate.
+	// Static scene and shader inputs require replacement. With readiness enabled,
+	// published lighting changes retain history and restart irradiance-only refresh;
+	// fixed-settling diagnostics retain the sealed-lighting contract. Lookup remains
+	// single-bounce; observed readiness does not establish reference convergence.
 	// Numerical failure rejects production preparation; update-only owners can retain
 	// raw evidence. A GPU failure flag prevents sampling invalid in-place contents.
 	class GIField final
@@ -84,6 +89,7 @@ namespace gglab
 		GGLAB_DELETE_COPYABLE_MOVABLE(GIField);
 		[[nodiscard]] std::shared_ptr<RayScene> GetRayScene() const noexcept;
 		[[nodiscard]] GIFieldDiagnostics GetDiagnostics(bool allocations = false) const noexcept;
+		[[nodiscard]] GIFieldCaptureState GetCaptureState() const noexcept;
 		[[nodiscard]] RenderFrameValidationResult Prepare(const RenderFrameContext& frame,
 			const RenderServices& services) noexcept;
 		void AddPasses(RenderGraph& graph, const RenderFrameContext& frame,

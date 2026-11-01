@@ -177,6 +177,8 @@ namespace gglab::shader_programs
 		"gglab.shader.gi-probe-update", "compute.borders", ShaderStage::Compute };
 	inline const ShaderProgramRef GIProbeClassifyCompute{
 		"gglab.shader.gi-field", "compute.classify", ShaderStage::Compute };
+	inline const ShaderProgramRef GIFieldReadinessFloorCompute{
+		"gglab.shader.gi-field", "compute.readiness-floor", ShaderStage::Compute };
 	inline const ShaderProgramRef GIFieldLookupCompute{
 		"gglab.shader.gi-field", "compute.lookup-diagnostics", ShaderStage::Compute };
 	inline const ShaderProgramRef GIReceiverPixel{

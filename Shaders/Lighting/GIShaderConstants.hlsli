@@ -12,6 +12,17 @@ namespace gglab::gi_shader
 static const uint GIQueryGroupWidth = 8;
 static const uint GIQueryGroupHeight = 8;
 
+static const uint GIFieldReadinessBlockWidth = 4;
+static const uint GIFieldReadinessChangeSpan = 4;
+static const uint GIFieldReadinessMinimumWarmUpdates = 34;
+static const uint GIFieldReadinessQuietUpdates = 30;
+static const uint GIFieldReadinessNoiseSamples = 64;
+static const uint GIFieldReadinessTimeoutUpdates = 240;
+static const float GIFieldReadinessAbsoluteFloor = 1.0e-3f;
+static const float GIFieldReadinessRelativeFloor = 1.0e-3f;
+static const float GIFieldReadinessMinimumThreshold = 0.01f;
+
+
 static const uint RaySceneOpaqueMask = 1u;
 static const uint RaySceneVertexStride = 56;
 static const uint RayScenePositionOffset = 0;

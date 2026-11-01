@@ -91,6 +91,11 @@ namespace gglab
 					.m_Space = "Native unjittered observation",
 					.m_Description = "PositionError: world XYZ and geometric origin error. FaceMatch: oriented face XYZ and primary match kind (1 centre, 2 envelope, 6 raster; 3 invalid, 4 different surface, 5 miss). Instance/Primitive: exact uint IDs. Zero marks background or unprocessed pixels. A partially prepared cache is not a complete receiver product; consult receiver preparation progress. Logical storage is 40 bytes/pixel, excluding native alignment and replacement overlap." };
 			}
+			if (name == "GI.Field.Readiness")
+			{
+				return ResourceExportSemantics{ .m_Role = "gi-field-readiness", .m_Units = "relative change / scene-referred lux / uint bits",
+					.m_Space = "field refresh epoch", .m_Description = "v1 float4 records: header (positive irradiance floor, previous Active-probe upper median E luminance, Active count, span=4); then two records per X-fastest/Z/Y probe: four recent per-update texel/channel maxima; (mean E luminance, four-update mean change, Active flag, uint update count reinterpreted as float bits). Includes normalized distance-mean change after hard reset. Observed stationarity is not reference convergence or temporal RMS." };
+			}
 			if (name == "GI.ProbeUpdate.UpdateStatus" || name == "GI.Field.UpdateStatus")
 			{
 				return ResourceExportSemantics{ .m_Role = "gi-update-status", .m_Units = "integer error and indices",
@@ -274,6 +279,11 @@ namespace gglab
 					target.m_Address.m_Resource == "GI.Field.Rays")
 				{
 					static constexpr std::array fields{ GpuBufferFieldLayout{ "radianceDistance", 0, GpuBufferScalar::Float32, 4 } };
+					layout = { 16, fields };
+				}
+				if (target.m_Address.m_Resource == "GI.Field.Readiness")
+				{
+					static constexpr std::array fields{ GpuBufferFieldLayout{ "record", 0, GpuBufferScalar::Float32, 4 } };
 					layout = { 16, fields };
 				}
 				if (target.m_Address.m_Resource == "GI.ProbeUpdate.UpdateStatus" ||

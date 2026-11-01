@@ -1,6 +1,8 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h"
 
+#include "GGLabRuntime/Graphics/Pipeline/GIFieldReadiness.h"
+
 #include <cstddef>
 
 namespace gglab
@@ -12,15 +14,17 @@ namespace gglab
 	class GIProbeUpdateWorkload final
 	{
 	public:
-		static constexpr size_t ProgramCount = 6;
+		static constexpr size_t ProgramCount = 7;
 		GIProbeUpdateWorkload(std::shared_ptr<RayScene> scene, GIProbeUpdateProfile profile,
-			bool field = false) noexcept;
+			bool field = false, GIFieldReadinessSettings readiness = {}) noexcept;
 		~GIProbeUpdateWorkload();
 		[[nodiscard]] std::shared_ptr<RayScene> GetRayScene() const noexcept;
 		[[nodiscard]] GIProbeUpdateDiagnostics GetDiagnostics(bool allocations = false) const noexcept;
 		[[nodiscard]] std::array<uint64_t, ProgramCount> GetShaderGenerations() const noexcept;
 		[[nodiscard]] RenderFrameValidationResult Prepare(const RenderFrameContext& frame,
 			const RenderServices& services) noexcept;
+		[[nodiscard]] GIFieldReadinessSnapshot GetReadiness() const noexcept;
+		void RefreshLighting() noexcept;
 		void AddPasses(RenderGraph& graph, const RenderFrameContext& frame,
 			const RenderServices& services, const RaySceneGraphResources& scene,
 			std::shared_ptr<GIFieldUpdateState> fieldUpdate = {}, bool compose = false,

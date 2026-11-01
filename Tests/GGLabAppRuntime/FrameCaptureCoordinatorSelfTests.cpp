@@ -2029,6 +2029,18 @@ namespace gglab
 				.m_TotalTime = std::numeric_limits<double>::infinity(),
 			};
 			metadata.m_Readiness.Add("ibl", FrameCaptureGateState::Pending, "Baking.");
+			metadata.m_Readiness.m_GIField = GIFieldCaptureState{
+				.m_Generation = 73, .m_SceneRevision = 19, .m_LightingGeneration = 11,
+				.m_EnvironmentGeneration = 7,
+				.m_Readiness = { .m_State = GIFieldReadinessState::Ready, .m_Enabled = true,
+					.m_Refreshing = false, .m_CompletedUpdates = 84, .m_ReadyUpdate = 54 } };
+			const auto fieldJson = nlohmann::json::parse(SerializeFrameCaptureMetadata(metadata));
+			context.Check(fieldJson["readiness"]["giField"]["schemaVersion"] == 1 &&
+				fieldJson["readiness"]["giField"]["generation"] == 73 &&
+				fieldJson["readiness"]["giField"]["completedUpdates"] == 84 &&
+				fieldJson["readiness"]["giField"]["state"] == "Ready",
+				"Field readiness and generation are serialized from the frozen frame snapshot");
+
 			const std::string json = SerializeFrameCaptureMetadata(metadata);
 			context.Check(
 				json.find("\"note\": \"line\\nbreak\\ttab\\\\slash\\u0001\"") != std::string::npos &&

@@ -584,6 +584,105 @@ namespace gglab
 
 		void RunGIFieldTests(SelfTestContext& context) noexcept
 		{
+			GIFieldReadinessEstimator estimator;
+			const std::array<uint32_t, 3> readinessCounts{ 5, 5, 5 };
+			GIFieldReadinessSettings readinessSettings;
+			std::vector<GIFieldProbeChange> changes(125);
+			const auto observe = [&](uint32_t update, float change, bool active = true)
+				{
+					for (auto& probe : changes)
+					{
+						probe.m_Active = active ? 1.0f : 0.0f;
+						probe.m_Updates = update;
+						probe.m_Change = change;
+					}
+					return estimator.Observe(update, 0.001f, changes);
+				};
+			estimator.Reset(readinessCounts, readinessSettings);
+			context.Check(estimator.GetSnapshot().m_State == GIFieldReadinessState::Initializing,
+				"A replacement field starts without a readiness certificate");
+			for (uint32_t update = 1; update <= 62; ++update)
+			{
+				context.Check(observe(update, 0), "Finite black-field measurements advance in order");
+			}
+			context.Check(estimator.GetSnapshot().m_State != GIFieldReadinessState::Ready,
+				"Warm-up and thirty quiet updates cannot be replaced by elapsed submissions");
+			context.Check(observe(63, 0) && estimator.GetSnapshot().m_State == GIFieldReadinessState::Ready &&
+				estimator.GetSnapshot().m_QuietBlocks == 8 && estimator.GetSnapshot().m_ReadyUpdate == 63,
+				"The exact-black field becomes Ready with a positive scene-referred denominator");
+			context.Check(!observe(63, 0) && estimator.GetSnapshot().m_ReadyUpdate == 63,
+				"Repeated polls cannot advance quiet-update counts");
+			context.Check(observe(64, 0.2f) && estimator.GetSnapshot().m_State == GIFieldReadinessState::Settling,
+				"Observed changes revoke Ready without changing shading");
+			for (uint32_t update = 65; update <= 240; ++update)
+			{
+				context.Check(observe(update, 0.2f), "Nonquiet measurements remain valid diagnostic data");
+			}
+			context.Check(estimator.GetSnapshot().m_State == GIFieldReadinessState::Unconverged &&
+				!estimator.GetSnapshot().m_Refreshing,
+				"The timeout ends refresh and preserves an explicit Unconverged verdict");
+			for (uint32_t update = 241; update <= 270; ++update)
+			{
+				context.Check(observe(update, 0), "Unconverged fields continue to be measured");
+			}
+			context.Check(estimator.GetSnapshot().m_State == GIFieldReadinessState::Ready,
+				"A timed-out field can later establish thirty quiet completed updates");
+			estimator.Reset(readinessCounts, readinessSettings);
+			for (uint32_t update = 1; update <= 4; ++update)
+			{
+				context.Check(observe(update, 0, false), "Excluded blocks preserve finite observation records");
+			}
+			context.Check(estimator.GetSnapshot().m_ExcludedBlocks == 8 &&
+				estimator.GetSnapshot().m_State == GIFieldReadinessState::Ready,
+				"Blocks without Active probes are reported and do not block readiness");
+			estimator.Reset(readinessCounts, readinessSettings);
+			context.Check(!observe(2, 0) && estimator.GetSnapshot().m_Failed,
+				"Missing completed measurements cannot silently accumulate quiet time");
+			estimator.Reset(readinessCounts, readinessSettings);
+			changes[0].m_Change = std::numeric_limits<float>::quiet_NaN();
+			for (auto& probe : changes)
+			{
+				probe.m_Updates = 1;
+			}
+			context.Check(!estimator.Observe(1, 0.001f, changes) && estimator.GetSnapshot().m_Failed,
+				"Nonfinite readiness records are contract failures, including excluded probes");
+			estimator.Reset(readinessCounts, readinessSettings);
+			context.Check(!estimator.Observe(1, 0, changes),
+				"An all-black field never admits a zero irradiance floor");
+
+			context.Check(estimator.GetSnapshot().m_NoiseSigma == 0,
+				"Measured noise never silently changes this owner's threshold profile");
+			GIFieldReadinessSettings noisySettings{ .m_NoiseSigma = 0.1f, .m_SteadyNoiseSigma = 0.001f };
+			estimator.Reset(readinessCounts, noisySettings);
+			for (uint32_t update = 1; update <= 63; ++update)
+			{
+				context.Check(observe(update, 0.2f), "Explicitly measured refresh noise is an immutable input");
+			}
+			context.Check(estimator.GetSnapshot().m_State == GIFieldReadinessState::Ready &&
+				estimator.GetSnapshot().m_RefreshNoiseSamples == 30 &&
+				std::abs(estimator.GetSnapshot().m_RefreshNoiseEstimate - 0.2f) < 1.0e-6f,
+				"The reported per-probe RMS matches a constant frozen-input change stream");
+			for (auto& probe : changes)
+			{
+				probe.m_Updates = 64;
+			}
+			context.Check(estimator.Observe(64, 0.001f, changes, 0.97f, false) &&
+				estimator.GetSnapshot().m_Threshold == 0.01f &&
+				estimator.GetSnapshot().m_State == GIFieldReadinessState::Settling,
+				"Changing alpha selects its own noise input and restarts the quiet hold");
+
+			estimator.Reset(readinessCounts, noisySettings);
+			for (auto& probe : changes)
+			{
+				probe.m_Updates = 1;
+			}
+			context.Check(estimator.Observe(1, 0.001f, changes, 0.5f, false) &&
+				estimator.GetSnapshot().m_NoiseSigma == noisySettings.m_SteadyNoiseSigma,
+				"Equal refresh and steady alpha still select the explicitly declared phase noise");
+			estimator.Reset(readinessCounts, readinessSettings, true);
+			context.Check(estimator.GetSnapshot().m_State == GIFieldReadinessState::Settling &&
+				estimator.GetSnapshot().m_CompletedUpdates == 0 && estimator.GetSnapshot().m_ReadyUpdate == 0,
+				"A published lighting refresh keeps field history but starts a new Settling epoch");
 			GIUpdateStatus status;
 			context.Check(IsGIUpdateStatusValid(status, 8, 256, 1),
 				"Clean GPU status has no stale error coordinates");

@@ -75,7 +75,7 @@ try {
                 $directory = "$output/$backend/$($case.id)"
                 New-Item -ItemType Directory -Path $directory -Force | Out-Null
                 $effect = Set-Inputs $session $run @{fixture=$case.fixture;ev100=$case.ev100;albedo=$case.albedo;
-                    field_enabled=$true;field_sampling=$true;probe_enabled=$true}
+                    field_enabled=$true;field_readiness=$false;field_sampling=$true;probe_enabled=$true}
                 Write-VerificationJson "$directory/effect.json" $effect
                 $targets = @('GI.Field.Irradiance','GI.Field.Distance','GI.Field.Classification',
                     'GI.Field.ReceiverIrradiance','GI.Field.ReceiverQuery','GI.Receiver.Position',
@@ -125,7 +125,7 @@ try {
                 throw 'A0 environment did not reach published readiness.'
             }
             Write-VerificationJson "$output/$backend/a0/environment-ready/receipt.json" $environmentReady
-            $null = Set-Inputs $session $run @{field_enabled=$true;field_sampling=$true;probe_enabled=$true}
+            $null = Set-Inputs $session $run @{field_enabled=$true;field_readiness=$false;field_sampling=$true;probe_enabled=$true}
             foreach ($enabled in @($false,$true)) {
                 $arm = if ($enabled) {'gtao-on'} else {'gtao-off'}
                 $hostEffect = Invoke-VerificationSession set $session @{ExpectedRunIdentity=$run;WaitConsumed=$true;

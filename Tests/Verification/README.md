@@ -179,6 +179,30 @@ fixtures through `gi_reference.field_enabled`. Field mode uses full updates, Sha
 blending and rotating directions. Runtime `ray-query-contracts` covers field
 descriptors and CPU settlement.
 
+### Field readiness
+
+`RunVerification.ps1 -Suite gi-field-readiness` runs F1 plane, F2, F4, an excluded-block
+control and F10 black field on both RHIs. It compares the GPU's
+Active-probe median floor, four-update change records and small-fixture atlas
+deltas with an independent FP64 oracle. After-ready jobs wait for the Runtime
+`gi-field` gate; Unconverged fails the waiting job. Explicit next-frame diagnostics
+retain timed-out measurements. Engineering success and the 120-update readiness
+quality gate are reported separately in `validation.json`.
+
+`readiness.giField` schema v1 freezes field/scene/lighting/environment identities,
+the completed epoch-relative update and Ready update, block counts, floor,
+threshold, noise input and effective hysteresis. Readiness means observed
+stationarity, not reference convergence or a temporal-RMS certificate. The default
+zero noise input retains the experimental 1% threshold; it is not a noise
+calibration. The readiness suite first records separate frozen-input refresh/steady
+per-probe RMS change estimates (up to 64 measurements after warm-up), preserves
+the uncalibrated gate result, then explicitly adopts both measured inputs through
+`field_refresh_noise` / `field_steady_noise` and reruns with another seed. These
+bounded noise estimates are not reference or temporal-quality certificates.
+`gi_reference.field_readiness=false` explicitly selects the previous
+fixed-settling diagnostic path, without this gate or refresh policy. The existing
+field/sampling/injection suites select that path to preserve their estimator.
+
 ### Static field sampling
 
 `RunVerification.ps1 -Suite gi-field-sampling` runs hidden DX12/Vulkan receiver

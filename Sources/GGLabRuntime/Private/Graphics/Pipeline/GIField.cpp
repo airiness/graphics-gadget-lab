@@ -61,7 +61,12 @@ namespace gglab
 	bool ValidateGIFieldCreateInfo(const GIFieldCreateInfo& info) noexcept
 	{
 		if (!info.m_RayScene || !ValidateGIProbeUpdateProfile(UpdateProfile(info)) ||
-			!std::isfinite(info.m_ViewBias) || info.m_ViewBias < 0 || info.m_ViewBias > 1)
+			!std::isfinite(info.m_ViewBias) || info.m_ViewBias < 0 || info.m_ViewBias > 1 ||
+			!std::isfinite(info.m_Readiness.m_NoiseSigma) || info.m_Readiness.m_NoiseSigma < 0 ||
+			!std::isfinite(3 * info.m_Readiness.m_NoiseSigma) ||
+			!std::isfinite(3 * info.m_Readiness.m_SteadyNoiseSigma) || info.m_Readiness.m_SteadyNoiseSigma < 0 ||
+			!std::isfinite(info.m_Readiness.m_RefreshHysteresis) ||
+			info.m_Readiness.m_RefreshHysteresis < 0 || info.m_Readiness.m_RefreshHysteresis >= 1)
 		{
 			return false;
 		}
@@ -96,7 +101,7 @@ namespace gglab
 		ResolvedRenderPipeline m_LookupPipeline;
 		uint64_t m_LookupGeneration = 0;
 		State(GIFieldCreateInfo info) noexcept :
-			m_Info(std::move(info)), m_Workload(m_Info.m_RayScene, UpdateProfile(m_Info), true) {}
+			m_Info(std::move(info)), m_Workload(m_Info.m_RayScene, UpdateProfile(m_Info), true, m_Info.m_Readiness) {}
 	};
 
 	GIField::GIField(GIFieldCreateInfo info) noexcept :
@@ -120,15 +125,27 @@ namespace gglab
 			.m_ProbeCount = update.m_ProbeCount,
 			.m_StatusReadbackSlots = update.m_StatusReadbackSlots,
 			.m_UpdateStatus = update.m_UpdateStatus,
+			.m_Readiness = state.m_Workload.GetReadiness(),
 			.m_Initialized = update.m_Initialized,
 			.m_Invalid = state.m_Update->IsInvalid() || update.m_Failed,
 			.m_Reason = state.m_Update->IsInvalid() ? "GI field submission failed or completion is unknown" : update.m_Reason,
 		};
+		result.m_Readiness.m_Failed = result.m_Readiness.m_Failed || result.m_Invalid;
 		for (const auto& allocation : update.m_Allocations)
 		{
 			result.m_Allocations.push_back({ allocation.m_LogicalBytes, allocation.m_Allocation });
 		}
 		return result;
+	}
+
+	GIFieldCaptureState GIField::GetCaptureState() const noexcept
+	{
+		const auto diagnostics = GetDiagnostics();
+		return { .m_Generation = diagnostics.m_Generation,
+			.m_SceneRevision = diagnostics.m_SceneRevision,
+			.m_LightingGeneration = diagnostics.m_LightingGeneration,
+			.m_EnvironmentGeneration = diagnostics.m_EnvironmentGeneration,
+			.m_Readiness = diagnostics.m_Readiness };
 	}
 
 	RenderFrameValidationResult GIField::Prepare(const RenderFrameContext& frame,
@@ -197,11 +214,16 @@ namespace gglab
 		const uint64_t environment = state.m_Info.m_ConstantEnvironment ?
 			0 : services.m_Environment->GetBakingStatus().m_ActiveGeneration;
 		const auto shaders = state.m_Workload.GetShaderGenerations();
-		if (state.m_Sealed && (revision != state.m_SceneRevision || lighting != state.m_LightingGeneration ||
-			environment != state.m_EnvironmentGeneration || shaders != state.m_ShaderGenerations))
+		if (state.m_Sealed && (revision != state.m_SceneRevision || shaders != state.m_ShaderGenerations ||
+			(!state.m_Info.m_Readiness.m_Enabled && (lighting != state.m_LightingGeneration ||
+				environment != state.m_EnvironmentGeneration))))
 		{
 			return RenderFrameValidationResult::ContractFailure(
 				"Static GI field inputs changed; replace the field through the safe pipeline path");
+		}
+		if (state.m_Sealed && (lighting != state.m_LightingGeneration || environment != state.m_EnvironmentGeneration))
+		{
+			state.m_Workload.RefreshLighting();
 		}
 		state.m_SceneRevision = revision;
 		state.m_LightingGeneration = lighting;

@@ -30,6 +30,7 @@ namespace gglab
 		ProbeSlab = 16,
 		FieldCoverage = 17,
 		FieldUnsupportedCage = 18,
+		BlackField = 19,
 	};
 
 	struct GIReferenceFixtureDescription
@@ -58,6 +59,7 @@ namespace gglab
 		GIReferenceFixtureDescription{ GIReferenceFixture::ProbeSlab, "Contract: probe slab" },
 		GIReferenceFixtureDescription{ GIReferenceFixture::FieldCoverage, "Contract: field coverage" },
 		GIReferenceFixtureDescription{ GIReferenceFixture::FieldUnsupportedCage, "Contract: unsupported field cage" },
+		GIReferenceFixtureDescription{ GIReferenceFixture::BlackField, "F10 black field" },
 	};
 
 	constexpr bool IsCoastalGIFixture(GIReferenceFixture fixture) noexcept

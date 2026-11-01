@@ -1998,6 +1998,36 @@ namespace gglab
 
 		const FrameCaptureFrameState& frame = *status.m_Frame;
 		const FrameCaptureCameraState& camera = frame.m_Camera;
+		Json giField;
+		if (frame.m_Readiness.m_GIField)
+		{
+			const auto& field = *frame.m_Readiness.m_GIField;
+			const auto& readiness = field.m_Readiness;
+			giField = {
+				{ "schemaVersion", 1 },
+				{ "generation", field.m_Generation },
+				{ "sceneRevision", field.m_SceneRevision },
+				{ "lightingGeneration", field.m_LightingGeneration },
+				{ "environmentGeneration", field.m_EnvironmentGeneration },
+				{ "enabled", readiness.m_Enabled },
+				{ "state", GetGIFieldReadinessName(readiness.m_State) },
+				{ "refreshing", readiness.m_Refreshing },
+				{ "failed", readiness.m_Failed },
+				{ "completedUpdates", readiness.m_CompletedUpdates },
+				{ "readyUpdate", readiness.m_ReadyUpdate },
+				{ "activeBlocks", readiness.m_ActiveBlocks },
+				{ "excludedBlocks", readiness.m_ExcludedBlocks },
+				{ "quietBlocks", readiness.m_QuietBlocks },
+				{ "maximumChange", readiness.m_MaximumChange },
+				{ "threshold", readiness.m_Threshold },
+				{ "noiseSigma", readiness.m_NoiseSigma },
+				{ "refreshNoiseEstimate", readiness.m_RefreshNoiseEstimate },
+				{ "steadyNoiseEstimate", readiness.m_SteadyNoiseEstimate },
+				{ "refreshNoiseSamples", readiness.m_RefreshNoiseSamples },
+				{ "steadyNoiseSamples", readiness.m_SteadyNoiseSamples },
+				{ "irradianceFloor", readiness.m_IrradianceFloor },
+				{ "hysteresis", readiness.m_Hysteresis } };
+		}
 		response["frame"] = {
 			{ "backend", frame.m_Backend },
 			{ "demoId", frame.m_DemoId },
@@ -2007,6 +2037,7 @@ namespace gglab
 			{ "ready", frame.m_Readiness.IsReady() },
 			{ "settledFrames", status.m_SettledFrames },
 			{ "gates", SerializeGates(frame.m_Readiness) },
+			{ "giField", std::move(giField) },
 			{ "camera",{
 				{ "name", camera.m_Name },
 				{ "position", camera.m_Position },
