@@ -153,6 +153,7 @@ namespace gglab
 		[[nodiscard]] CaptureCancelResult CancelJob(uint64_t jobId) noexcept;
 		[[nodiscard]] bool HasFrameResourceExports() const noexcept;
 		[[nodiscard]] std::optional<GIProbeInspectionRequest> GetFrameGIProbeInspection() const noexcept;
+		[[nodiscard]] std::optional<GIReceiverInspectionRequest> GetFrameGIReceiverInspection() const noexcept;
 		// Issued deliveries from earlier frames may still be awaiting readback.
 		[[nodiscard]] bool HasFrameGraphExports(uint64_t frameSerial) const noexcept;
 		[[nodiscard]] bool HasNonFiniteInstrumentation() const noexcept { return m_Capture && m_Capture->HasNonFiniteInstrumentation(); }
@@ -276,6 +277,8 @@ namespace gglab
 			std::optional<PostProcessDebugTap>& diagnosticTap) noexcept;
 		[[nodiscard]] bool SelectGIProbeInspection(CaptureJob& job,
 			const FrameCaptureFrameState& state) noexcept;
+		[[nodiscard]] bool SelectGIReceiverInspection(CaptureJob& job,
+			const FrameCaptureFrameState& state) noexcept;
 		void Issue(ProductDelivery& entry, const FrameCaptureFrameState& state,
 			bool preAdmitted = false) noexcept;
 		void FailPlan(CaptureJob& job, std::string failure, std::string_view failureCode = {}) noexcept;
@@ -327,6 +330,7 @@ namespace gglab
 		std::vector<DrainingWrite> m_DrainingWrites;
 		std::optional<FrameCaptureFrameState> m_LastFrameState;
 		std::optional<GIProbeInspectionRequest> m_FrameGIProbeInspection;
+		std::optional<GIReceiverInspectionRequest> m_FrameGIReceiverInspection;
 		uint32_t m_SettledFrames = 0;
 		// Every frame of the current settle key so far had every gate ready.
 		bool m_HistoryReady = false;

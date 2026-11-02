@@ -1,5 +1,8 @@
 #pragma once
 #include <Lighting/GIShaderConstants.hlsli>
+#if defined(GGLAB_GI_FIELD_QUERY_DIAGNOSTICS)
+#include <Lighting/GIFieldQueryDiagnostics.hlsli>
+#endif
 
 // Matches Graphics/Pipeline/GIFieldSampling.h, including every 16-byte row.
 struct GIFieldSamplingParameters
@@ -76,9 +79,18 @@ float2 GIFieldDistanceStatistics(Texture2DArray<float2> atlas, uint3 probe, floa
 	return float2(mean, variance);
 }
 
+#if defined(GGLAB_GI_FIELD_QUERY_DIAGNOSTICS)
+GIFieldQuery SampleGIField(GIFieldSamplingParameters field, float3 position,
+	float3 shadingNormal, float3 vertexNormal, float3 viewDirection,
+	bool inspect, out GIFieldQueryDiagnostics observation)
+#else
 GIFieldQuery SampleGIField(GIFieldSamplingParameters field, float3 position,
 	float3 shadingNormal, float3 vertexNormal, float3 viewDirection)
+#endif
 {
+#if defined(GGLAB_GI_FIELD_QUERY_DIAGNOSTICS)
+	observation = (GIFieldQueryDiagnostics)(0);
+#endif
 	GIFieldQuery result = (GIFieldQuery)(0);
 	result.Support = GIFieldOutsideCoverage;
 	result.Compatible = 1;
@@ -111,6 +123,13 @@ GIFieldQuery SampleGIField(GIFieldSamplingParameters field, float3 position,
 		0.0.xxx, (float3)(field.Counts - 1));
 	const uint3 lower = min((uint3)(floor(cage)), field.Counts - 2);
 	const float3 fraction = saturate(cage - (float3)(lower));
+#if defined(GGLAB_GI_FIELD_QUERY_DIAGNOSTICS)
+	if (inspect)
+	{
+		observation.BiasedPosition = biased;
+		observation.CageEvaluated = 1;
+	}
+#endif
 	Texture2DArray<float4> irradiance = ResourceDescriptorHeap[NonUniformResourceIndex(field.Irradiance)];
 	Texture2DArray<float2> distance = ResourceDescriptorHeap[NonUniformResourceIndex(field.Distance)];
 	[unroll]
@@ -118,7 +137,20 @@ GIFieldQuery SampleGIField(GIFieldSamplingParameters field, float3 position,
 	{
 		const uint3 offset = uint3(corner & 1u, (corner >> 1u) & 1u, (corner >> 2u) & 1u);
 		const uint3 probe = lower + offset;
-		if (classification.Load(int4(probe.xzy, 0)) != GIProbeActive)
+		const uint probeClassification = classification.Load(int4(probe.xzy, 0));
+#if defined(GGLAB_GI_FIELD_QUERY_DIAGNOSTICS)
+		if (inspect)
+		{
+			observation.Corners[corner].Coordinate = probe;
+			observation.Corners[corner].Classification = probeClassification;
+			observation.Corners[corner].WorldPosition = field.Minimum + field.Spacing * (float3)(probe);
+			const float3 factors = lerp(1.0 - fraction, fraction, (float3)(offset));
+			observation.Corners[corner].TrilinearFactors = factors;
+			observation.Corners[corner].TrilinearWeight = factors.x * factors.y * factors.z;
+			observation.Corners[corner].Reason = 1;
+		}
+#endif
+		if (probeClassification != GIProbeActive)
 		{
 			continue;
 		}
@@ -128,6 +160,11 @@ GIFieldQuery SampleGIField(GIFieldSamplingParameters field, float3 position,
 		const float3 trilinear = lerp(1.0 - fraction, fraction, (float3)(offset));
 		const float backface = (dot(directionToProbe, shadingNormal) + 1.0) * 0.5;
 		float weight = trilinear.x * trilinear.y * trilinear.z * (backface * backface + 0.2);
+#if defined(GGLAB_GI_FIELD_QUERY_DIAGNOSTICS)
+		const float preVisibility = weight;
+		float diagnosticVisibility = 1.0;
+		float diagnosticVariance = 0.0;
+#endif
 		const float3 probeToBiased = biased - probePosition;
 		const float receiverDistance = length(probeToBiased);
 		const float3 visibilityDirection = receiverDistance > 1.0e-10 ?
@@ -140,14 +177,39 @@ GIFieldQuery SampleGIField(GIFieldSamplingParameters field, float3 position,
 			const float delta = receiverDistance - statistics.x;
 			const float visibility = variance / (variance + delta * delta);
 			weight *= visibility * visibility * visibility;
+#if defined(GGLAB_GI_FIELD_QUERY_DIAGNOSTICS)
+			diagnosticVisibility = visibility * visibility * visibility;
+			diagnosticVariance = variance;
+#endif
 		}
+#if defined(GGLAB_GI_FIELD_QUERY_DIAGNOSTICS)
+		const float preCrush = weight;
+#endif
 		if (weight < 0.2)
 		{
 			weight = weight * weight * weight / (0.2 * 0.2);
 		}
 		result.Weight += weight;
-		result.Irradiance += weight * GIFieldIrradiance(irradiance, probe, shadingNormal,
-			field.IrradianceInteriorWidth);
+		const float3 atlasM = GIFieldIrradiance(irradiance, probe, shadingNormal, field.IrradianceInteriorWidth);
+		result.Irradiance += weight * atlasM;
+#if defined(GGLAB_GI_FIELD_QUERY_DIAGNOSTICS)
+		if (inspect)
+		{
+			observation.Corners[corner].AtlasM = atlasM;
+			observation.Corners[corner].BackfaceFactor = backface * backface + 0.2;
+			observation.Corners[corner].MeanDistance = statistics.x;
+			observation.Corners[corner].Variance = statistics.y;
+			observation.Corners[corner].ReceiverDistance = receiverDistance;
+			observation.Corners[corner].Visibility = diagnosticVisibility;
+			observation.Corners[corner].PreVisibilityWeight = preVisibility;
+			observation.Corners[corner].PreCrushWeight = preCrush;
+			observation.Corners[corner].RawWeight = weight;
+			observation.Corners[corner].UsedVariance = diagnosticVariance;
+			observation.Corners[corner].SamplingEvaluated = 1;
+			observation.Corners[corner].Reason = weight > 0.0 ? 4 :
+				observation.Corners[corner].TrilinearWeight == 0.0 ? 2 : 3;
+		}
+#endif
 	}
 	if (result.Weight == 0.0)
 	{
@@ -157,5 +219,28 @@ GIFieldQuery SampleGIField(GIFieldSamplingParameters field, float3 position,
 	// Divide the weighted sum first: pi/W can overflow for a valid tiny cage.
 	result.Irradiance = (result.Irradiance / result.Weight) * 3.14159265358979323846;
 	result.Support = result.Weight < 0.05 ? GIFieldLowConfidence : GIFieldValid;
+#if defined(GGLAB_GI_FIELD_QUERY_DIAGNOSTICS)
+	if (inspect)
+	{
+		[unroll]
+		for (uint corner = 0; corner < 8; ++corner)
+		{
+			const float normalized = observation.Corners[corner].RawWeight / result.Weight;
+			observation.Corners[corner].NormalizedWeight = normalized;
+			observation.Corners[corner].NormalizationAvailable = 1;
+			observation.Corners[corner].ContributionE =
+				observation.Corners[corner].AtlasM * normalized * 3.14159265358979323846;
+		}
+	}
+#endif
 	return result;
 }
+
+#if defined(GGLAB_GI_FIELD_QUERY_DIAGNOSTICS)
+GIFieldQuery SampleGIField(GIFieldSamplingParameters field, float3 position,
+	float3 shadingNormal, float3 vertexNormal, float3 viewDirection)
+{
+	GIFieldQueryDiagnostics unused;
+	return SampleGIField(field, position, shadingNormal, vertexNormal, viewDirection, false, unused);
+}
+#endif

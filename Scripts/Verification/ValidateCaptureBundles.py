@@ -4,6 +4,7 @@ import argparse
 import copy
 import json
 import ValidateGIProbeInspection as probes
+import ValidateGIReceiverInspection as receivers
 import struct
 import tempfile
 import zlib
@@ -124,6 +125,7 @@ def validate(path, bundle_validator=None):
 				raise ValueError("Resource files disagree with the array inventory")
 			frame = metadata["frame"]
 		probes.validate(frame, validator("GIProbeInspection.schema.json"))
+		receivers.validate(frame, validator("GIReceiverInspection.schema.json"))
 		if source in ("graph", "resource-export"):
 			if product["diagnosticTap"] is not None:
 				raise ValueError("Numerical/graph products cannot name an image tap")

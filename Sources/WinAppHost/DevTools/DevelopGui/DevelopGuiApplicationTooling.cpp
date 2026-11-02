@@ -114,6 +114,7 @@ namespace gglab
 				guiContext.m_ViewControlActions = context.m_ViewControlActions;
 				guiContext.m_GIFieldSummary = context.m_GIFieldSummary;
 				guiContext.m_GIProbeInspection = context.m_GIProbeInspection;
+				guiContext.m_GIReceiverInspection = context.m_GIReceiverInspection;
 				guiContext.m_Diagnostics = context.m_Diagnostics;
 				guiContext.m_DiagnosticsControl = context.m_DiagnosticsControl;
 				guiContext.m_EnvironmentLighting = context.m_EnvironmentLighting;

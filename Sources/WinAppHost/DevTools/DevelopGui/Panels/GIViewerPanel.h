@@ -14,5 +14,8 @@ namespace gglab
 	private:
 		bool m_Frozen = false;
 		std::array<int, 3> m_ProbeCoordinate{};
+		std::array<int, 2> m_ReceiverPixel{};
+		bool m_ReceiverMarkers = true;
+		int m_ReceiverCorner = 0;
 	};
 }

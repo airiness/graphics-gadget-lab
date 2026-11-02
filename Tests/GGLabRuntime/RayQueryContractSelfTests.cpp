@@ -583,6 +583,66 @@ namespace gglab
 			}
 		}
 
+		void RunGIReceiverObservationTests(SelfTestContext& context) noexcept
+		{
+			GIReceiverViewSnapshot first{ .m_RenderExtent = { 320, 200 }, .m_DisplayExtent = { 320, 200 },
+				.m_ReceiversAvailable = true, .m_Supported = true };
+			first = AdvanceGIReceiverView({}, first);
+			context.Check(first.m_Revision == 1 && AdvanceGIReceiverView(first, first).m_Revision == 1,
+				"A logical receiver view stays bound across ordinary frame advancement");
+			auto moved = first;
+			moved.m_CameraPosition[0] = 1;
+			moved = AdvanceGIReceiverView(first, moved);
+			context.Check(moved.m_Revision == 2, "Camera movement invalidates earlier pixel bindings");
+			auto resized = moved;
+			resized.m_RenderExtent[0] = 640;
+			resized.m_DisplayExtent[0] = 640;
+			resized = AdvanceGIReceiverView(moved, resized);
+			context.Check(resized.m_Revision == 3, "Receiver extent changes advance the logical view revision");
+			GIFieldSummary summary{ .m_Field = { .m_Generation = 7, .m_RefreshEpoch = 2, .m_EpochOriginUpdate = 80 },
+				.m_Counts = { 2, 2, 2 }, .m_ReceiverView = first };
+			GIReceiverInspectionRequest request{ .m_Pixel = { 160, 100 }, .m_ExpectedGeneration = 7,
+				.m_ExpectedViewRevision = 1, .m_ExpectedRefreshEpoch = 2 };
+			context.Check(MatchesGIReceiverInspection(request, summary), "A receiver request binds its field and logical view");
+			summary.m_ReceiverView = moved;
+			context.Check(!MatchesGIReceiverInspection(request, summary), "A newer camera cannot satisfy an old pixel request");
+			summary.m_ReceiverView = first;
+			request.m_Pixel[0] = 320;
+			context.Check(!MatchesGIReceiverInspection(request, summary), "Out-of-bounds pixels reject without clamping");
+			request.m_Pixel[0] = 160;
+			std::vector<uint8_t> bytes(GIReceiverInspectionBytes);
+			std::array<uint32_t, 4> header{ GIReceiverInspectionMagic,
+				uint32_t(GIReceiverInspectionValidity::NoValidSupport), 1, 0 };
+			std::memcpy(bytes.data(), header.data(), 16);
+			const std::array<uint32_t, 4> profile{ 2, 2, 2, 6 };
+			std::memcpy(bytes.data() + 8 * 16, profile.data(), 16);
+			std::array<GIReceiverCorner, 8> corners{};
+			for (uint32_t index = 0; index < corners.size(); ++index)
+			{
+				corners[index].m_Coordinate = { index & 1, (index >> 1) & 1, (index >> 2) & 1 };
+				corners[index].m_Classification = 2;
+				corners[index].m_Reason = GIReceiverCornerReason::NotActive;
+			}
+			std::memcpy(bytes.data() + 9 * 16, corners.data(), sizeof(corners));
+			const GIObservationStamp stamp{ .m_Field = summary.m_Field,
+				.m_Kind = GIObservationKind::ReceiverContribution, .m_ProducingFrame = 913,
+				.m_FieldUpdate = 85, .m_ReadinessUpdate = 5 };
+			const auto result = DecodeGIReceiverInspection(request, stamp, first, bytes);
+			context.Check(result->m_Validity == GIReceiverInspectionValidity::NoValidSupport && result->m_CageEvaluated &&
+				result->m_Corners[7].m_Coordinate == std::array<uint32_t, 3>{ 1, 1, 1 } &&
+				result->m_Corners[7].m_NormalizationAvailable == 0,
+				"A bounded receiver payload preserves every corner and normalization availability");
+			context.Check(DecodeGIReceiverInspection(request, stamp, moved, bytes)->m_Validity ==
+				GIReceiverInspectionValidity::MalformedPayload, "Payload decoding checks the bound logical view");
+			const float nan = std::numeric_limits<float>::quiet_NaN();
+			std::memcpy(bytes.data() + 9 * 16 + offsetof(GIReceiverCorner, m_AtlasM), &nan, sizeof(nan));
+			context.Check(DecodeGIReceiverInspection(request, stamp, first, bytes)->m_Validity ==
+				GIReceiverInspectionValidity::InvalidNumerics && std::isfinite(result->m_Corners[0].m_AtlasM[0]),
+				"Invalid numerical evidence is explicit and retained CPU observations survive readback reuse");
+			context.Check(DecodeGIReceiverInspection(request, stamp, first, std::span(bytes).first(16))->m_Validity ==
+				GIReceiverInspectionValidity::MalformedPayload, "A truncated GPU record cannot publish a valid receiver");
+		}
+
 		void RunGIFieldTests(SelfTestContext& context) noexcept
 		{
 			GIFieldReadinessEstimator estimator;
@@ -2603,6 +2663,7 @@ namespace gglab
 		RunRaySceneQueryTests(context);
 		RunProbeUpdateProfileTests(context);
 		RunGIFieldTests(context);
+		RunGIReceiverObservationTests(context);
 		RunGIReferenceObservationTests(context);
 		RunSpecularVisibilityTests(context);
 		RunGIReferenceTilingTests(context);

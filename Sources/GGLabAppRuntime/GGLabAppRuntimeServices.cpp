@@ -38,7 +38,7 @@
 namespace gglab
 {
 	GGLabAppRuntime::GGLabAppRuntime() noexcept :
-		m_ToolingViewControl(*this), m_ToolingGIProbeInspection(*this) {}
+		m_ToolingViewControl(*this), m_ToolingGIProbeInspection(*this), m_ToolingGIReceiverInspection(*this) {}
 
 	GGLabAppRuntime::~GGLabAppRuntime() noexcept
 	{
@@ -64,6 +64,7 @@ namespace gglab
 		// reserved receipt remains in the coordinator until explicit host consumption.
 		m_FrameCapture->PublishAppRuntimeJobResults();
 		m_ToolingGIProbeInspection.Update();
+		m_ToolingGIReceiverInspection.Update();
 	}
 
 	CaptureAdmission GGLabAppRuntime::TrySubmitCaptureJob(CapturePlan&& plan) noexcept

@@ -3,6 +3,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIFieldReadiness.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIFieldObservation.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIReceiverObservation.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalFramePlan.h"
 
 #include <cstdint>
@@ -82,6 +83,7 @@ namespace gglab
 		virtual std::string_view GetName() const noexcept = 0;
 		[[nodiscard]] virtual GIFieldCaptureState GetGIFieldCaptureState() const noexcept { return {}; }
 		virtual void SetGIProbeInspection(std::optional<GIProbeInspectionRequest>) noexcept {}
+		virtual void SetGIReceiverInspection(std::optional<GIReceiverInspectionRequest>) noexcept {}
 
 		virtual ResolvedTemporalFramePlan ResolveTemporalFramePlan(
 			TemporalFramePlanResolveInfo info) const noexcept

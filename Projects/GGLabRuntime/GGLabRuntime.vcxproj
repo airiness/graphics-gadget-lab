@@ -679,6 +679,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIField.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIFieldReadiness.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIFieldObservation.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIReceiverObservation.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIUpdateStatus.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIProbeUpdateWorkload.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIFieldState.h" />
@@ -950,6 +951,7 @@
     <None Include="..\..\Shaders\Lighting\DirectionalShadowVisibility.hlsli" />
     <None Include="..\..\Shaders\Lighting\EnvironmentImportanceSampling.hlsli" />
     <None Include="..\..\Shaders\Lighting\ForwardPlus.hlsli" />
+    <None Include="..\..\Shaders\Lighting\GIFieldQueryDiagnostics.hlsli" />
     <None Include="..\..\Shaders\Lighting\GIFieldSampling.hlsli" />
     <None Include="..\..\Shaders\Lighting\GIHitLighting.hlsli" />
     <None Include="..\..\Shaders\Lighting\GIHitMaterial.hlsli" />
@@ -988,6 +990,8 @@
     <FxCompile Include="..\..\Shaders\Passes\PassGIProbeInspection.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassGIProbeUpdate.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassGIReceiver.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassGIReceiverInspection.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassGIReceiverMarkers.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassGIReference.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassGISpecularVisibility.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassGTAO.hlsl" />

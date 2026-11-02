@@ -2078,6 +2078,72 @@ namespace gglab
 				"A fresh epoch has no relabelled measurement or invented classification counts");
 		}
 
+		void RunGIReceiverInspectionTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("receiver-inspection");
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(), .m_WriteOnCallingThread = true });
+			CaptureTestJobs jobs(coordinator, context);
+			const auto plan = [](uint32_t x, uint64_t viewRevision = 4)
+				{
+					CapturePlan result;
+					result.m_RequiredProducts = { ResourceCaptureProduct{ { { .m_Resource = "GI.Field.ReceiverInspection" } } } };
+					result.m_GIReceiverInspection = GIReceiverInspectionRequest{ .m_Pixel = { x, 10 },
+						.m_ExpectedGeneration = 73, .m_ExpectedViewRevision = viewRevision };
+					return result;
+				};
+			auto summary = std::make_shared<GIFieldSummary>();
+			summary->m_Field = { .m_Generation = 73, .m_RefreshEpoch = 2, .m_EpochOriginUpdate = 80 };
+			summary->m_Counts = { 4, 4, 4 };
+			summary->m_SubmittedUpdates = 82;
+			summary->m_InspectionAvailable = true;
+			summary->m_ReceiverView = { .m_Revision = 4, .m_RenderExtent = { 64, 32 }, .m_DisplayExtent = { 64, 32 },
+				.m_ReceiversAvailable = true, .m_Supported = true };
+			auto state = MakeFrameState(false);
+			state.m_Readiness.m_GIField = GIFieldCaptureState{ .m_Generation = 73, .m_Summary = summary };
+			const auto first = jobs.Admit(plan(10));
+			const auto second = jobs.Admit(plan(11));
+			const auto stale = jobs.Admit(plan(10, 3));
+			coordinator.BeginFrame(state);
+			context.Check(control.m_Issued.size() == 1 && coordinator.GetFrameGIReceiverInspection() &&
+				coordinator.GetFrameGIReceiverInspection()->m_Pixel[0] == 10 &&
+				coordinator.GetJobSnapshot(second)->m_Stage == CaptureJobStage::Waiting,
+				"Receiver queries share ordinary jobs and defer conflicting pixels before freezing a frame");
+			coordinator.OnFrameSubmitted();
+			const auto failures = jobs.TakeResults();
+			context.Check(failures.size() == 1 && failures[0].m_JobId == stale &&
+				failures[0].m_FailureCode == "GIReceiverIdentityMismatch", "Stale view bindings fail explicitly");
+			control.Complete(control.m_Issued.front().m_Id);
+			coordinator.Update();
+			const auto completed = jobs.TakeResults();
+			context.Check(completed.size() == 1 && completed[0].m_JobId == first && completed[0].m_Products[0].m_Metadata &&
+				completed[0].m_Products[0].m_Metadata->m_GIReceiverObservation->m_FieldUpdate == 83 &&
+				completed[0].m_Products[0].m_Metadata->m_GIReceiverObservation->m_ReadinessUpdate == 3 &&
+				completed[0].m_Products[0].m_Metadata->m_GIReceiverInspection->m_Validity == GIReceiverInspectionValidity::MalformedPayload,
+				"Fence-completed transport freezes field/view stamps and preserves malformed evidence as invalid");
+			GGLAB_UNUSED(coordinator.CancelJob(second));
+			GGLAB_UNUSED(jobs.TakeResults());
+			auto unsupported = std::make_shared<GIFieldSummary>(*summary);
+			unsupported->m_ReceiverView.m_Supported = false;
+			state.m_Readiness.m_GIField->m_Summary = unsupported;
+			const auto unsupportedId = jobs.Admit(plan(10));
+			++state.m_FrameSerial;
+			coordinator.BeginFrame(state);
+			const auto unavailable = jobs.TakeResults();
+			context.Check(unavailable.size() == 1 && unavailable[0].m_JobId == unsupportedId &&
+				unavailable[0].m_FailureCode == "GIReceiverViewUnsupported" && !coordinator.GetFrameGIReceiverInspection(),
+				"Unsupported receiver views reject without changing TAA, resolution or scheduling GPU work");
+			GIReceiverInspectionResult zero;
+			zero.m_Validity = GIReceiverInspectionValidity::NoValidSupport;
+			zero.m_CageEvaluated = true;
+			zero.m_Corners[0].m_Reason = GIReceiverCornerReason::NotActive;
+			const auto json = nlohmann::json::parse(SerializeGIReceiverInspection(zero));
+			context.Check(json["corners"].size() == 8 && json["corners"][0]["normalizedWeight"].is_null() &&
+				json["corners"][0]["visibility"].is_null() && !json["normalizationReason"].is_null(),
+				"Zero total weight and excluded sampling remain unavailable rather than fabricated zeros");
+		}
+
 		void RunMetadataSerializationTests(SelfTestContext& context) noexcept
 		{
 			FrameCaptureMetadata metadata{
@@ -5642,6 +5708,7 @@ namespace gglab
 		RunPublicationShutdownTests(context);
 		RunMetadataSerializationTests(context);
 		RunGIProbeInspectionTests(context);
+		RunGIReceiverInspectionTests(context);
 		RunFrameSequenceTests(context);
 		RunFrameSequenceBackPressureTests(context);
 		RunSequenceJobOwnershipTests(context);

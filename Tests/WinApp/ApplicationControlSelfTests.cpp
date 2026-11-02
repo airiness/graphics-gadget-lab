@@ -13,6 +13,7 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
@@ -220,6 +221,23 @@ namespace gglab
 					"Malformed coordinates and unbound identities reject before job admission");
 			}
 			const auto graph = ParseApplicationControlRequest(R"({"protocol":4,"id":50,"command":"graph","summary":true})");
+			const auto receiver = ParseApplicationControlRequest(
+				R"({"protocol":4,"id":52,"command":"capture","timing":"next-frame","giReceiverInspection":{"pixel":[160,100],"expectedGeneration":7,"expectedViewRevision":4,"markers":true}})");
+			context.Check(receiver.m_Request && receiver.m_Request->m_Capture.m_GIReceiverInspection &&
+				receiver.m_Request->m_Capture.m_GIReceiverInspection->m_Pixel == std::array<uint32_t, 2>{ 160, 100 } &&
+				receiver.m_Request->m_Capture.m_GIReceiverInspection->m_ExpectedViewRevision == 4 &&
+				std::get<ResourceCaptureProduct>(receiver.m_Request->m_Capture.m_RequiredProducts.back()).m_Targets[0].m_Resource ==
+					"GI.Field.ReceiverInspection", "Receiver requests add their bounded semantic resource to the existing plan");
+			for (std::string_view invalid : {
+				R"({"pixel":[-1,0],"expectedGeneration":1,"expectedViewRevision":4})",
+				R"({"pixel":[0,0],"expectedGeneration":1,"expectedViewRevision":0})",
+				R"({"pixel":[0,0],"expectedGeneration":1,"expectedViewRevision":4,"markers":1})",
+				R"({"pixel":[0,0],"expectedGeneration":1,"expectedViewRevision":4,"unknown":true})" })
+			{
+				context.Check(!ParseApplicationControlRequest(std::format(
+					R"({{"protocol":4,"id":52,"command":"capture","giReceiverInspection":{}}})", invalid)).m_Request,
+					"Malformed receiver coordinates, view bindings and unknown controls reject before admission");
+			}
 			context.Check(graph.m_Request && graph.m_Request->m_Command == ApplicationControlCommand::Graph &&
 				std::get<GraphCaptureProduct>(graph.m_Request->m_Capture.m_RequiredProducts[0]).m_Summary,
 				"Graph builds a required graph product with a typed summary flag");

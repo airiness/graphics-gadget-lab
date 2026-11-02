@@ -14,6 +14,7 @@
 #include "Parameters/ViewControlActions.h"
 #include "Capture/FrameCaptureCoordinator.h"
 #include "Capture/GIProbeInspectionControl.h"
+#include "Capture/GIReceiverInspectionControl.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderingSettingsDiagnosticsSnapshot.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
@@ -64,6 +65,25 @@ namespace gglab
 			bool IsPending() const noexcept override { return false; }
 			std::shared_ptr<const GIProbeInspectionResult> GetResult() const noexcept override { return m_Result; }
 			const std::string& GetStatus() const noexcept override { return m_Status; }
+		};
+
+		class GIReceiverProbe final : public GIReceiverInspectionControlBase
+		{
+		public:
+			std::optional<GIReceiverInspectionRequest> m_Request;
+			std::shared_ptr<const GIReceiverInspectionResult> m_Result;
+			std::string m_Status = "Fixture receiver";
+			std::string m_ImagePath;
+			bool Inspect(GIReceiverInspectionRequest request) noexcept override
+			{
+				m_Request = request;
+				return true;
+			}
+			void Cancel() noexcept override { m_Result.reset(); }
+			bool IsPending() const noexcept override { return false; }
+			std::shared_ptr<const GIReceiverInspectionResult> GetResult() const noexcept override { return m_Result; }
+			const std::string& GetStatus() const noexcept override { return m_Status; }
+			const std::string& GetImagePath() const noexcept override { return m_ImagePath; }
 		};
 
 		void RunGIViewerPanelChecks(SelfTestContext& context) noexcept
@@ -137,6 +157,28 @@ namespace gglab
 			context.Check(historicalText.find("Historical field/selection") != std::string::npos &&
 				historicalText.find("frame 913") != std::string::npos,
 				"Retained GPU values show their historical identity after a field replacement");
+			GIReceiverProbe receiver;
+			gui.m_GIReceiverInspection = &receiver;
+			fieldSummary.m_ReceiverView = { .m_Revision = 3, .m_RenderExtent = { 320, 200 },
+				.m_DisplayExtent = { 320, 200 }, .m_ReceiversAvailable = true, .m_Supported = true };
+			ImGui::ActivateItemByID(ImHashStr("Receiver contribution inspection", 0, ImHashStr("GIViewerFixture")));
+			GGLAB_UNUSED(draw());
+			ImGui::ActivateItemByID(ImHashStr("Inspect receiver", 0, ImHashStr("GIViewerFixture")));
+			GGLAB_UNUSED(draw());
+			context.Check(receiver.m_Request && receiver.m_Request->m_ExpectedGeneration == 73 &&
+				receiver.m_Request->m_ExpectedViewRevision == 3 && receiver.m_Request->m_Markers,
+				"The receiver GUI binds the displayed logical field/view and requests a paired marker capture");
+			auto zero = std::make_shared<GIReceiverInspectionResult>();
+			zero->m_Validity = GIReceiverInspectionValidity::NoValidSupport;
+			zero->m_CageEvaluated = true;
+			zero->m_Observation.m_Field = fieldSummary.m_Field;
+			zero->m_Observation.m_ProducingFrame = 123;
+			zero->m_View.m_Revision = 2;
+			receiver.m_Result = zero;
+			const auto receiverText = draw();
+			context.Check(receiverText.find("Historical field/view/selection") != std::string::npos &&
+				receiverText.find("Normalization unavailable") != std::string::npos,
+				"Receiver tables retain historical source identity and explain zero-weight normalization");
 			LabSessionLog log;
 			LabSnapshot snapshot;
 			snapshot.m_ActiveLabName = "GI Reference";

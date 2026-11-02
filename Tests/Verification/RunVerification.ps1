@@ -54,6 +54,7 @@ $catalog = @(
     @{ name = 'gi-probe-update-contracts'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/ValidateGIProbeUpdate.py'; arguments = @('--self-test') }) },
     @{ name = 'gi-field'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIField.ps1' }) },
     @{ name = 'gi-probe-inspection'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIProbeInspection.ps1' }) },
+    @{ name = 'gi-receiver-inspection'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIReceiverInspection.ps1' }) },
     @{ name = 'gi-field-readiness'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIFieldReadiness.ps1' }) },
     @{ name = 'gi-field-sampling'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIFieldSampling.ps1' }) },
     @{ name = 'gi-field-sampling-contracts'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/ValidateGIFieldSampling.py'; arguments = @('--self-test') }) },

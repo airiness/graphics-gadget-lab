@@ -5,6 +5,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/GIUpdateStatus.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIFieldReadiness.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIFieldObservation.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIReceiverObservation.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 
@@ -93,8 +94,11 @@ namespace gglab
 		[[nodiscard]] GIFieldCaptureState GetCaptureState() const noexcept;
 		void SetProbeInspection(std::optional<GIProbeInspectionRequest> request) noexcept;
 		void AddProbeInspection(RenderGraph& graph, const RenderFrameContext& frame) noexcept;
+		void SetReceiverInspection(std::optional<GIReceiverInspectionRequest> request) noexcept;
+		void AddReceiverInspection(RenderGraph& graph, const RenderFrameContext& frame) noexcept;
+		void AddReceiverMarkers(RenderGraph& graph, const RenderFrameContext& frame) noexcept;
 		[[nodiscard]] RenderFrameValidationResult Prepare(const RenderFrameContext& frame,
-			const RenderServices& services) noexcept;
+			const RenderServices& services, bool receiversAvailable = false) noexcept;
 		void AddPasses(RenderGraph& graph, const RenderFrameContext& frame,
 			const RenderServices& services, const RaySceneGraphResources& scene) noexcept;
 		// Optional diagnostics consume the recipe's existing private receiver records.

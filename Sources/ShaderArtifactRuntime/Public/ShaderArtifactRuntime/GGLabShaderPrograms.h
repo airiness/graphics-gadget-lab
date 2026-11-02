@@ -183,6 +183,12 @@ namespace gglab::shader_programs
 		"gglab.shader.gi-field", "compute.lookup-diagnostics", ShaderStage::Compute };
 	inline const ShaderProgramRef GIProbeInspectionCompute{
 		"gglab.shader.gi-field", "compute.probe-inspection", ShaderStage::Compute };
+	inline const ShaderProgramRef GIReceiverInspectionCompute{
+		"gglab.shader.gi-field", "compute.receiver-inspection", ShaderStage::Compute };
+	inline const ShaderProgramRef GIReceiverMarkersVertex{
+		"gglab.shader.gi-field", "vertex.receiver-markers", ShaderStage::Vertex };
+	inline const ShaderProgramRef GIReceiverMarkersPixel{
+		"gglab.shader.gi-field", "pixel.receiver-markers", ShaderStage::Pixel };
 	inline const ShaderProgramRef GIReceiverPixel{
 		"gglab.shader.gi-receiver", "pixel.receiver", ShaderStage::Pixel };
 	inline const ShaderProgramRef GIReceiverPositionPixel{

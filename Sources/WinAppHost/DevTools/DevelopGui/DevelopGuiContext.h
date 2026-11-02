@@ -40,6 +40,7 @@ namespace gglab
 	struct ViewControlSnapshot;
 	class ViewControlActionsBase;
 	class GIProbeInspectionControlBase;
+	class GIReceiverInspectionControlBase;
 	struct GIFieldSummary;
 
 	class DevelopGuiStateStore;
@@ -82,6 +83,7 @@ namespace gglab
 		ViewControlActionsBase* m_ViewControlActions = nullptr;
 		const GIFieldSummary* m_GIFieldSummary = nullptr;
 		GIProbeInspectionControlBase* m_GIProbeInspection = nullptr;
+		GIReceiverInspectionControlBase* m_GIReceiverInspection = nullptr;
 		DevelopGuiSystem* m_DevelopGuiSystem = nullptr;
 		DevelopGuiRegistry* m_PanelRegistry = nullptr;
 		// Borrowed from the active authoring owner for this draw.

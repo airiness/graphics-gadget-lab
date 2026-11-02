@@ -42,6 +42,7 @@ namespace gglab
 	struct ViewControlSnapshot;
 	class ViewControlActionsBase;
 	class GIProbeInspectionControlBase;
+	class GIReceiverInspectionControlBase;
 	struct GIFieldSummary;
 
 	struct ApplicationToolingInputCapture
@@ -117,6 +118,7 @@ namespace gglab
 		ViewControlActionsBase* m_ViewControlActions = nullptr;
 		const GIFieldSummary* m_GIFieldSummary = nullptr;
 		GIProbeInspectionControlBase* m_GIProbeInspection = nullptr;
+		GIReceiverInspectionControlBase* m_GIReceiverInspection = nullptr;
 	};
 
 	enum class ApplicationToolingFrameEndReason : uint8_t

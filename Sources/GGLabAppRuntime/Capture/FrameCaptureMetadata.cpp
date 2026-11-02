@@ -537,10 +537,34 @@ namespace gglab
 		{
 			return {
 				{ "field", GIIdentityJson(stamp.m_Field) },
-				{ "kind", stamp.m_Kind == GIObservationKind::ProbeAtlas ? "probe-atlas" : "completed-readiness" },
+				{ "kind", stamp.m_Kind == GIObservationKind::ReceiverContribution ? "receiver-contribution" :
+					stamp.m_Kind == GIObservationKind::ProbeAtlas ? "probe-atlas" : "completed-readiness" },
 				{ "producingFrame", stamp.m_ProducingFrame },
 				{ "fieldUpdate", stamp.m_FieldUpdate },
 				{ "readinessUpdate", stamp.m_ReadinessUpdate } };
+		}
+		nlohmann::json GIReceiverViewJson(const GIReceiverViewSnapshot& view)
+		{
+			return {
+				{ "revision", view.m_Revision },
+				{ "viewId", view.m_ViewId },
+				{ "renderExtent", view.m_RenderExtent },
+				{ "displayExtent", view.m_DisplayExtent },
+				{ "cameraPosition", view.m_CameraPosition },
+				{ "view", view.m_View },
+				{ "projection", view.m_Projection },
+				{ "viewProjection", view.m_ViewProjection },
+				{ "matrixConvention", "row-major-row-vector" },
+				{ "clipDepthRange", { 0, 1 } },
+				{ "pixelConvention", "top-left-integer-center" },
+				{ "jitterPixels", view.m_JitterPixels },
+				{ "nearFar", view.m_NearFar },
+				{ "reversedDepth", view.m_ReversedDepth },
+				{ "receiversAvailable", view.m_ReceiversAvailable },
+				{ "temporalAA", view.m_TemporalAA },
+				{ "supported", view.m_Supported },
+				{ "receiverAttachmentLogicalBytes", view.m_ReceiverAttachmentBytes },
+				{ "lookupDiagnosticLogicalBytes", view.m_LookupDiagnosticBytes } };
 		}
 	}
 
@@ -559,6 +583,7 @@ namespace gglab
 			{ "invalid", summary.m_Invalid },
 			{ "inspectionAvailable", summary.m_InspectionAvailable },
 			{ "classificationCounts", nullptr },
+			{ "receiverView", GIReceiverViewJson(summary.m_ReceiverView) },
 			{ "completedMeasurement", summary.m_CompletedMeasurement ?
 				GIStampJson(*summary.m_CompletedMeasurement) : nlohmann::json(nullptr) } }.dump();
 	}
@@ -586,11 +611,98 @@ namespace gglab
 			{ "distance", result.m_Distance } }.dump();
 	}
 
+	std::string SerializeGIReceiverInspection(const GIReceiverInspectionResult& result) noexcept
+	{
+		using Json = nlohmann::json;
+		Json corners = Json::array();
+		if (result.m_CageEvaluated)
+		{
+			for (const auto& corner : result.m_Corners)
+			{
+				const bool sampled = corner.m_SamplingEvaluated == 1;
+				corners.push_back({
+					{ "coordinate", corner.m_Coordinate },
+					{ "classification", corner.m_Classification },
+					{ "worldPosition", corner.m_WorldPosition },
+					{ "reason", GetGIReceiverCornerReasonName(corner.m_Reason) },
+					{ "samplingEvaluated", sampled },
+					{ "trilinearFactors", corner.m_TrilinearFactors },
+					{ "trilinearWeight", corner.m_TrilinearWeight },
+					{ "backfaceFactor", sampled ? Json(corner.m_BackfaceFactor) : Json(nullptr) },
+					{ "atlasM", sampled ? Json(corner.m_AtlasM) : Json(nullptr) },
+					{ "meanDistance", sampled ? Json(corner.m_MeanDistance) : Json(nullptr) },
+					{ "variance", sampled ? Json(corner.m_Variance) : Json(nullptr) },
+					{ "usedVariance", sampled ? Json(corner.m_UsedVariance) : Json(nullptr) },
+					{ "receiverDistance", sampled ? Json(corner.m_ReceiverDistance) : Json(nullptr) },
+					{ "visibility", sampled ? Json(corner.m_Visibility) : Json(nullptr) },
+					{ "preVisibilityWeight", sampled ? Json(corner.m_PreVisibilityWeight) : Json(nullptr) },
+					{ "preCrushWeight", sampled ? Json(corner.m_PreCrushWeight) : Json(nullptr) },
+					{ "rawWeight", corner.m_RawWeight },
+					{ "normalizedWeight", corner.m_NormalizationAvailable == 1 ? Json(corner.m_NormalizedWeight) : Json(nullptr) },
+					{ "contributionE", corner.m_NormalizationAvailable == 1 ? Json(corner.m_ContributionE) : Json(nullptr) } });
+			}
+		}
+		const bool receiver = result.m_Validity != GIReceiverInspectionValidity::Background &&
+			result.m_Validity != GIReceiverInspectionValidity::MalformedPayload;
+		return Json{
+			{ "schemaVersion", 1 },
+			{ "request", {
+				{ "pixel", result.m_Request.m_Pixel },
+				{ "expectedGeneration", result.m_Request.m_ExpectedGeneration },
+				{ "expectedViewRevision", result.m_Request.m_ExpectedViewRevision },
+				{ "expectedViewId", result.m_Request.m_ExpectedViewId },
+				{ "expectedRefreshEpoch", result.m_Request.m_ExpectedRefreshEpoch ?
+					Json(*result.m_Request.m_ExpectedRefreshEpoch) : Json(nullptr) },
+				{ "markers", result.m_Request.m_Markers } } },
+			{ "observation", GIStampJson(result.m_Observation) },
+			{ "view", GIReceiverViewJson(result.m_View) },
+			{ "validity", GetGIReceiverInspectionValidityName(result.m_Validity) },
+			{ "cageEvaluated", result.m_CageEvaluated },
+			{ "support", result.m_Support },
+			{ "compatible", result.m_Compatible },
+			{ "position", receiver ? Json(result.m_Position) : Json(nullptr) },
+			{ "biasedPosition", result.m_CageEvaluated ? Json(result.m_BiasedPosition) : Json(nullptr) },
+			{ "vertexNormal", receiver ? Json(result.m_VertexNormal) : Json(nullptr) },
+			{ "shadingNormal", receiver ? Json(result.m_ShadingNormal) : Json(nullptr) },
+			{ "viewDirection", receiver ? Json(result.m_ViewDirection) : Json(nullptr) },
+			{ "coverage", receiver ? Json(result.m_Coverage) : Json(nullptr) },
+			{ "totalWeight", receiver ? Json(result.m_TotalWeight) : Json(nullptr) },
+			{ "normalizationReason", result.m_TotalWeight > 0 ? Json(nullptr) : Json("NoPositiveTotalWeight") },
+			{ "irradianceE", receiver ? Json(result.m_IrradianceE) : Json(nullptr) },
+			{ "ordinaryIrradianceE", receiver ? Json(result.m_OrdinaryIrradianceE) : Json(nullptr) },
+			{ "ordinaryWeight", receiver ? Json(result.m_OrdinaryWeight) : Json(nullptr) },
+			{ "fieldProfile", {
+				{ "counts", result.m_Counts },
+				{ "spacing", result.m_Spacing },
+				{ "irradianceInteriorWidth", result.m_IrradianceInteriorWidth },
+				{ "normalBias", 0.1f },
+				{ "viewBias", result.m_ViewBias } } },
+			{ "units", {
+				{ "position", "world-units" },
+				{ "distance", "world-units" },
+				{ "variance", "world-units-squared" },
+				{ "irradiance", "scene-referred-irradiance-E" },
+				{ "weights", "dimensionless" } } },
+			{ "payloadBytes", GIReceiverInspectionBytes },
+			{ "markerMode", result.m_Request.m_Markers ? "gpu-xray" : "off" },
+			{ "corners", std::move(corners) } }.dump();
+	}
+
 	std::string SerializeFrameCaptureMetadata(const FrameCaptureMetadata& metadata) noexcept
 	{
 		JsonWriter writer;
 		writer.BeginObject();
 		writer.Unsigned("schemaVersion", FrameCaptureMetadataSchemaVersion);
+		if (metadata.m_GIReceiverObservation && metadata.m_GIReceiverView)
+		{
+			writer.Json("giReceiverObservation", nlohmann::json{
+				{ "stamp", GIStampJson(*metadata.m_GIReceiverObservation) },
+				{ "view", GIReceiverViewJson(*metadata.m_GIReceiverView) } }.dump());
+		}
+		if (metadata.m_GIReceiverInspection)
+		{
+			writer.Json("giReceiverInspection", SerializeGIReceiverInspection(*metadata.m_GIReceiverInspection));
+		}
 		if (metadata.m_GIProbeObservation)
 		{
 			writer.Json("giProbeObservation", GIStampJson(*metadata.m_GIProbeObservation).dump());

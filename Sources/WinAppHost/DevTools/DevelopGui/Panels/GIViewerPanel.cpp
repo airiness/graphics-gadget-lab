@@ -4,6 +4,8 @@
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
 #include "Capture/GIProbeInspectionControl.h"
+#include "Capture/GIReceiverInspectionControl.h"
+#include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <algorithm>
 #include <array>
@@ -125,6 +127,168 @@ namespace gglab
 				ImGui::TreePop();
 			}
 		}
+		void DrawReceiverInspection(DevelopGuiContext& context, std::array<int, 2>& pixel,
+			bool& markers, int& selectedCorner) noexcept
+		{
+			if (!ImGui::CollapsingHeader("Receiver contribution inspection"))
+			{
+				return;
+			}
+			const auto* summary = context.m_GIFieldSummary;
+			auto* control = context.m_GIReceiverInspection;
+			if (!summary || !control)
+			{
+				ImGui::TextDisabled("Receiver inspection is unavailable.");
+				return;
+			}
+			const auto& view = summary->m_ReceiverView;
+			ImGui::Text("View %u revision %llu | %u x %u | Native, unjittered, TAA off",
+				view.m_ViewId, view.m_Revision, view.m_DisplayExtent[0], view.m_DisplayExtent[1]);
+			ImGui::Text("Attachment logical sizes: receiver %.2f MiB | lookup %.2f MiB",
+				double(view.m_ReceiverAttachmentBytes) / (1024 * 1024), double(view.m_LookupDiagnosticBytes) / (1024 * 1024));
+			ImGui::TextDisabled("Query payload: 1,168 bytes | paired X-ray markers use 114 procedural vertices");
+			if (!view.m_Supported)
+			{
+				ImGui::TextWrapped("Requires existing receiver attachments, Native rendering, no jitter and TAA off.");
+			}
+			if (ImGui::InputInt2("Receiver pixel (top-left x,y)", pixel.data()))
+			{
+				control->Cancel();
+			}
+			if (ImGui::Button("Use view center"))
+			{
+				pixel = { int(view.m_DisplayExtent[0] / 2), int(view.m_DisplayExtent[1] / 2) };
+				control->Cancel();
+			}
+			if (ImGui::Checkbox("Capture X-ray contribution markers", &markers))
+			{
+				control->Cancel();
+			}
+			GIReceiverInspectionRequest request{ .m_Pixel = { uint32_t(pixel[0]), uint32_t(pixel[1]) },
+				.m_ExpectedGeneration = summary->m_Field.m_Generation,
+				.m_ExpectedViewRevision = view.m_Revision, .m_ExpectedViewId = view.m_ViewId,
+				.m_ExpectedRefreshEpoch = summary->m_Field.m_RefreshEpoch, .m_Markers = markers };
+			ImGui::BeginDisabled(control->IsPending() || !view.m_Supported || !summary->m_InspectionAvailable ||
+				!MatchesGIReceiverInspection(request, *summary));
+			if (ImGui::Button("Inspect receiver"))
+			{
+				GGLAB_UNUSED(control->Inspect(request));
+			}
+			ImGui::EndDisabled();
+			ImGui::SameLine();
+			if (ImGui::Button("Clear receiver"))
+			{
+				control->Cancel();
+			}
+			ImGui::TextWrapped("%s", control->GetStatus().c_str());
+			if (!control->GetImagePath().empty() && ImGui::Button("Copy paired image path"))
+			{
+				ImGui::SetClipboardText(control->GetImagePath().c_str());
+			}
+			const auto result = control->GetResult();
+			if (!result)
+			{
+				return;
+			}
+			const bool historical = result->m_Observation.m_Field != summary->m_Field ||
+				result->m_View.m_Revision != view.m_Revision || result->m_Request.m_Pixel != request.m_Pixel;
+			ImGui::Text("%s | source frame %llu | U=%llu | view revision %llu",
+				historical ? "Historical field/view/selection" : "Completed GPU observation",
+				result->m_Observation.m_ProducingFrame, result->m_Observation.m_FieldUpdate, result->m_View.m_Revision);
+			ImGui::Text("%s | coverage %.6g | total weight %.6g | support %u",
+				GetGIReceiverInspectionValidityName(result->m_Validity).data(), result->m_Coverage,
+				result->m_TotalWeight, result->m_Support);
+			ImGui::Text("Receiver: %.4f, %.4f, %.4f | biased: %.4f, %.4f, %.4f",
+				result->m_Position[0], result->m_Position[1], result->m_Position[2],
+				result->m_BiasedPosition[0], result->m_BiasedPosition[1], result->m_BiasedPosition[2]);
+			ImGui::Text("Scene-referred E: %.6g, %.6g, %.6g", result->m_IrradianceE[0],
+				result->m_IrradianceE[1], result->m_IrradianceE[2]);
+			ImGui::TextDisabled("Markers: cyan receiver, magenta bias, red inactive, blue/yellow normalized weight");
+			if (!result->m_CageEvaluated)
+			{
+				ImGui::TextDisabled("Probe cage was not evaluated for this query outcome.");
+				return;
+			}
+			if (result->m_TotalWeight == 0)
+			{
+				ImGui::TextDisabled("Normalization unavailable: no positive total weight.");
+			}
+			if (ImGui::BeginTable("ReceiverCorners", 9, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+				ImGuiTableFlags_ScrollX | ImGuiTableFlags_SizingFixedFit))
+			{
+				for (const char* name : { "Coordinate", "Reason", "Trilinear", "Backface", "Visibility cubed",
+					"Before crush", "Raw weight", "Normalized", "Contribution E (RGB)" })
+				{
+					ImGui::TableSetupColumn(name);
+				}
+				ImGui::TableHeadersRow();
+				for (size_t index = 0; index < result->m_Corners.size(); ++index)
+				{
+					const auto& corner = result->m_Corners[index];
+					ImGui::TableNextRow();
+					if (int(index) == selectedCorner)
+					{
+						ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, ImGui::GetColorU32(ImGuiCol_Header));
+					}
+					ImGui::TableNextColumn();
+					ImGui::Text("%u,%u,%u", corner.m_Coordinate[0], corner.m_Coordinate[1], corner.m_Coordinate[2]);
+					if (ImGui::IsItemClicked())
+					{
+						selectedCorner = int(index);
+					}
+					ImGui::TableNextColumn();
+					ImGui::TextUnformatted(GetGIReceiverCornerReasonName(corner.m_Reason).data());
+					ImGui::TableNextColumn();
+					ImGui::Text("%.6g", corner.m_TrilinearWeight);
+					for (float value : { corner.m_BackfaceFactor, corner.m_Visibility, corner.m_PreCrushWeight })
+					{
+						ImGui::TableNextColumn();
+						if (corner.m_SamplingEvaluated == 1)
+						{
+							ImGui::Text("%.6g", value);
+						}
+						else
+						{
+							ImGui::TextUnformatted("Unavailable");
+						}
+					}
+					ImGui::TableNextColumn();
+					ImGui::Text("%.6g", corner.m_RawWeight);
+					ImGui::TableNextColumn();
+					if (corner.m_NormalizationAvailable == 1)
+					{
+						ImGui::Text("%.6g", corner.m_NormalizedWeight);
+						ImGui::TableNextColumn();
+						ImGui::Text("%.6g, %.6g, %.6g", corner.m_ContributionE[0], corner.m_ContributionE[1], corner.m_ContributionE[2]);
+					}
+					else
+					{
+						ImGui::TextUnformatted("Unavailable");
+						ImGui::TableNextColumn();
+						ImGui::TextUnformatted("Unavailable");
+					}
+				}
+				ImGui::EndTable();
+			}
+			ImGui::TextDisabled("Select a coordinate for distance and atlas details.");
+			if (selectedCorner >= 0 && size_t(selectedCorner) < result->m_Corners.size())
+			{
+				const auto& corner = result->m_Corners[selectedCorner];
+				ImGui::Text("Probe position: %.5g, %.5g, %.5g | classification %u",
+					corner.m_WorldPosition[0], corner.m_WorldPosition[1], corner.m_WorldPosition[2], corner.m_Classification);
+				if (corner.m_SamplingEvaluated == 1)
+				{
+					ImGui::Text("Mean distance %.7g | receiver distance %.7g | variance %.7g | used variance %.7g",
+						corner.m_MeanDistance, corner.m_ReceiverDistance, corner.m_Variance, corner.m_UsedVariance);
+					ImGui::Text("Atlas M: %.7g, %.7g, %.7g | pre-visibility weight %.7g",
+						corner.m_AtlasM[0], corner.m_AtlasM[1], corner.m_AtlasM[2], corner.m_PreVisibilityWeight);
+				}
+				else
+				{
+					ImGui::TextDisabled("Distance statistics and atlas sampling were not evaluated for this corner.");
+				}
+			}
+		}
 	}
 
 	void GIViewerPanel::Draw(DevelopGuiContext& context) noexcept
@@ -132,6 +296,7 @@ namespace gglab
 		ImGui::SetWindowPos(ImVec2(460, 45), ImGuiCond_FirstUseEver);
 		ImGui::SetWindowSize(ImVec2(760, 660), ImGuiCond_FirstUseEver);
 		DrawProbeInspection(context, m_ProbeCoordinate);
+		DrawReceiverInspection(context, m_ReceiverPixel, m_ReceiverMarkers, m_ReceiverCorner);
 		const auto* view = context.m_PostProcessPreview;
 		auto* control = context.m_PostProcessPreviewControl;
 		if (!view || !control)

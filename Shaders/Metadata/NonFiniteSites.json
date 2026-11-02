@@ -1670,6 +1670,24 @@
         "fp16Maximum": "report"
       },
       "rationale": "Reject non-finite history or blend results before any persistent atlas store; retain a sticky field-generation failure instead of substituting or dropping the sample."
+    },
+    {
+      "id": "gi-receiver-inspection.csmain.isfinite",
+      "source": "Passes/PassGIReceiverInspection.hlsl",
+      "function": "CSMain",
+      "operation": "isfinite",
+      "count": 3,
+      "bodySha256": "5a06897670f6d5a4e6f532e0b7c344a1f1c8b558ce0c335095b9793f59048a0a",
+      "programs": [
+        "gglab.shader.gi-field"
+      ],
+      "kind": "validity",
+      "evidence": "report-only",
+      "policy": {
+        "negative": "expected",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Tag non-finite receiver query or view-direction data as InvalidNumerics and suppress its markers while retaining the raw inspection records. This diagnostic validity check does not replace values or repair production field history."
     }
   ],
   "injectionPoints": [

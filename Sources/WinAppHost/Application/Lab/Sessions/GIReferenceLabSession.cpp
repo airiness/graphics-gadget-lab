@@ -147,6 +147,10 @@ namespace gglab
 			{
 				m_Raster->SetGIProbeInspection(std::move(request));
 			}
+			void SetGIReceiverInspection(std::optional<GIReceiverInspectionRequest> request) noexcept override
+			{
+				m_Raster->SetGIReceiverInspection(std::move(request));
+			}
 			ResolvedTemporalFramePlan ResolveTemporalFramePlan(TemporalFramePlanResolveInfo info) const noexcept override
 			{
 				return m_Raster->ResolveTemporalFramePlan(info);

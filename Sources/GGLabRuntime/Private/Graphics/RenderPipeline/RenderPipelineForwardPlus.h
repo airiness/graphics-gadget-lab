@@ -90,6 +90,13 @@ namespace gglab
 				m_GIField->SetProbeInspection(std::move(request));
 			}
 		}
+		void SetGIReceiverInspection(std::optional<GIReceiverInspectionRequest> request) noexcept override
+		{
+			if (m_GIField)
+			{
+				m_GIField->SetReceiverInspection(std::move(request));
+			}
+		}
 		ResolvedTemporalFramePlan ResolveTemporalFramePlan(
 			TemporalFramePlanResolveInfo info) const noexcept override;
 

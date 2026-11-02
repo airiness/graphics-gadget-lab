@@ -2237,6 +2237,9 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIProbeUpdate.h">
       <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIReceiverObservation.h">
+      <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIReceiverPreparation.h">
       <Filter>Public\GGLabRuntime\Graphics\Pipeline</Filter>
     </ClInclude>
@@ -2653,6 +2656,12 @@
     <FxCompile Include="..\..\Shaders\Passes\PassGIReceiver.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassGIReceiverInspection.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassGIReceiverMarkers.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassGIReference.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
@@ -2809,6 +2818,9 @@
       <Filter>Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\Shaders\Lighting\ForwardPlus.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
+    <None Include="..\..\Shaders\Lighting\GIFieldQueryDiagnostics.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>
     <None Include="..\..\Shaders\Lighting\GIFieldSampling.hlsli">

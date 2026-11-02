@@ -537,6 +537,7 @@ namespace gglab
 			if (m_GIField)
 			{
 				m_GIField->AddReceiverDiagnostics(rg, context, services);
+				m_GIField->AddReceiverInspection(rg, context);
 			}
 		}
 		if (m_GIProbeUpdate)
@@ -607,6 +608,10 @@ namespace gglab
 
 		// Always-visible debug geometry is composed after all back-buffer previews.
 		m_DebugDrawOverlayPass.AddPass(rg, context, services);
+		if (m_GIField)
+		{
+			m_GIField->AddReceiverMarkers(rg, context);
+		}
 
 		if (services.m_OverlayExtension)
 		{
@@ -861,7 +866,7 @@ namespace gglab
 				{
 					return RenderFrameValidationResult::ContractFailure("GI field requires one shared scene and an exclusive update workload");
 				}
-				result = m_GIField->Prepare(context, services);
+				result = m_GIField->Prepare(context, services, m_EnableGIReceiver);
 				if (!result.IsReady())
 				{
 					return result;

@@ -1131,6 +1131,47 @@ namespace gglab
 					}
 					capture.m_GIProbeInspection = inspection;
 				}
+				else if (key == "giReceiverInspection" && !graph && !resources)
+				{
+					if (!value.is_object() || !value.contains("pixel") || !value.contains("expectedGeneration") ||
+						!value.contains("expectedViewRevision"))
+					{
+						return "giReceiverInspection requires pixel, expectedGeneration and expectedViewRevision.";
+					}
+					for (const auto& [name, field] : value.items())
+					{
+						if (name != "pixel" && name != "expectedGeneration" && name != "expectedViewRevision" &&
+							name != "expectedViewId" && name != "expectedRefreshEpoch" && name != "markers")
+						{
+							return "Unknown giReceiverInspection field.";
+						}
+					}
+					const auto& pixel = value["pixel"];
+					if (!pixel.is_array() || pixel.size() != 2 ||
+						!std::ranges::all_of(pixel, [](const Json& axis)
+							{ return axis.is_number_unsigned() && axis.get<uint64_t>() <= UINT32_MAX; }) ||
+						!value["expectedGeneration"].is_number_unsigned() || value["expectedGeneration"] == 0 ||
+						!value["expectedViewRevision"].is_number_unsigned() || value["expectedViewRevision"] == 0 ||
+						(value.contains("expectedViewId") && (!value["expectedViewId"].is_number_unsigned() ||
+							value["expectedViewId"].get<uint64_t>() > UINT32_MAX)) ||
+						(value.contains("expectedRefreshEpoch") && (!value["expectedRefreshEpoch"].is_number_unsigned() ||
+							value["expectedRefreshEpoch"] == 0)) ||
+						(value.contains("markers") && !value["markers"].is_boolean()))
+					{
+						return "Invalid receiver pixel, expected identity or markers flag.";
+					}
+					GIReceiverInspectionRequest inspection{
+						.m_Pixel = pixel.get<std::array<uint32_t, 2>>(),
+						.m_ExpectedGeneration = value["expectedGeneration"].get<uint64_t>(),
+						.m_ExpectedViewRevision = value["expectedViewRevision"].get<uint64_t>(),
+						.m_ExpectedViewId = value.value("expectedViewId", 0u),
+						.m_Markers = value.value("markers", true) };
+					if (value.contains("expectedRefreshEpoch"))
+					{
+						inspection.m_ExpectedRefreshEpoch = value["expectedRefreshEpoch"].get<uint64_t>();
+					}
+					capture.m_GIReceiverInspection = inspection;
+				}
 				else if (key == "requiredFrameState")
 				{
 					if (std::string error =
@@ -1147,24 +1188,37 @@ namespace gglab
 			}
 			const auto addInspectionTarget = [&capture]()
 				{
-					if (!capture.m_GIProbeInspection)
+					std::vector<std::string> names;
+					if (capture.m_GIProbeInspection)
 					{
-						return;
+						names.push_back("GI.Field.ProbeInspection");
 					}
-					for (auto& product : capture.m_RequiredProducts)
+					if (capture.m_GIReceiverInspection)
 					{
-						if (auto* resource = std::get_if<ResourceCaptureProduct>(&product))
+						names.push_back("GI.Field.ReceiverInspection");
+					}
+					for (const auto& name : names)
+					{
+						ResourceCaptureProduct* resource = nullptr;
+						for (auto& product : capture.m_RequiredProducts)
 						{
-							if (!std::ranges::any_of(resource->m_Targets, [](const auto& target)
-								{ return target.m_Resource == "GI.Field.ProbeInspection"; }))
+							if (auto* candidate = std::get_if<ResourceCaptureProduct>(&product))
 							{
-								resource->m_Targets.push_back({ .m_Resource = "GI.Field.ProbeInspection" });
+								resource = candidate;
+								break;
 							}
-							return;
+						}
+						if (!resource)
+						{
+							capture.m_RequiredProducts.push_back(ResourceCaptureProduct{});
+							resource = std::get_if<ResourceCaptureProduct>(&capture.m_RequiredProducts.back());
+						}
+						if (!std::ranges::any_of(resource->m_Targets, [&name](const auto& target)
+							{ return target.m_Resource == name; }))
+						{
+							resource->m_Targets.push_back({ .m_Resource = name });
 						}
 					}
-					capture.m_RequiredProducts.push_back(ResourceCaptureProduct{
-						{ { .m_Resource = "GI.Field.ProbeInspection" } } });
 				};
 			if (explicitProducts)
 			{
@@ -1871,6 +1925,15 @@ namespace gglab
 				{ "maxItems", ApplicationControlMaxParameterItems },
 				{ "resultConsumption", "explicit" } } },
 			{ "captureJobs", true },
+			{ "giReceiverInspection", {
+				{ "version", 1 },
+				{ "summary", "frame.giField.summary.receiverView" },
+				{ "request", "capture.giReceiverInspection" },
+				{ "result", "products[].metadata.giReceiverInspection" },
+				{ "payloadBytes", GIReceiverInspectionBytes },
+				{ "pixelConvention", "top-left-integer-center" },
+				{ "viewSupport", "native-unjittered-taa-off-existing-receivers" },
+				{ "markers", "gpu-xray-composited" } } },
 			{ "giProbeInspection", {
 				{ "version", 1 },
 				{ "summary", "frame.giField.summary" },

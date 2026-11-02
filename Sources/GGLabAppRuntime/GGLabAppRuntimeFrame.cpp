@@ -818,6 +818,7 @@ namespace gglab
 			std::nullopt;
 		m_FrameCapture->BeginFrame(std::move(captureFrameState));
 		renderPipeline.SetGIProbeInspection(m_FrameCapture->GetFrameGIProbeInspection());
+		renderPipeline.SetGIReceiverInspection(m_FrameCapture->GetFrameGIReceiverInspection());
 		m_FrameCapture->SetFrameSceneInputs(frame.m_FrameSerial, {
 			.m_Exposure = capturedView.m_Exposure,
 			.m_PostProcess = capturedView.m_PostProcess,
@@ -938,6 +939,7 @@ namespace gglab
 				.m_ViewControlActions = &m_ToolingViewControl,
 				.m_GIFieldSummary = field.m_Summary.get(),
 				.m_GIProbeInspection = &m_ToolingGIProbeInspection,
+				.m_GIReceiverInspection = &m_ToolingGIReceiverInspection,
 			};
 			toolingFrame.Draw(toolingContext);
 		}

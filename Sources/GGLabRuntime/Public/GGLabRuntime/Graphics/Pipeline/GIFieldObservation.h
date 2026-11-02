@@ -28,6 +28,7 @@ namespace gglab
 	{
 		CompletedReadiness,
 		ProbeAtlas,
+		ReceiverContribution,
 	};
 
 	struct GIObservationStamp
@@ -38,6 +39,41 @@ namespace gglab
 		uint64_t m_FieldUpdate = 0;
 		uint64_t m_ReadinessUpdate = 0;
 	};
+
+	struct GIReceiverViewSnapshot
+	{
+		uint64_t m_Revision = 0;
+		uint32_t m_ViewId = 0;
+		std::array<uint32_t, 2> m_RenderExtent{};
+		std::array<uint32_t, 2> m_DisplayExtent{};
+		std::array<float, 3> m_CameraPosition{};
+		// Row-major matrices for row-vector multiplication; clip depth is [0,1].
+		std::array<float, 16> m_View{};
+		std::array<float, 16> m_Projection{};
+		std::array<float, 16> m_ViewProjection{};
+		std::array<float, 2> m_JitterPixels{};
+		std::array<float, 2> m_NearFar{};
+		uint64_t m_ReceiverAttachmentBytes = 0;
+		uint64_t m_LookupDiagnosticBytes = 0;
+		bool m_ReversedDepth = false;
+		bool m_ReceiversAvailable = false;
+		bool m_TemporalAA = false;
+		bool m_Supported = false;
+		bool operator==(const GIReceiverViewSnapshot&) const = default;
+	};
+
+	// The revision follows logical camera/configuration changes, not frame advancement.
+	// The revision follows logical camera/configuration changes, not frame advancement.
+	[[nodiscard]] inline GIReceiverViewSnapshot AdvanceGIReceiverView(
+		const GIReceiverViewSnapshot& previous, GIReceiverViewSnapshot next) noexcept
+	{
+		next.m_Revision = previous.m_Revision;
+		if (next != previous)
+		{
+			++next.m_Revision;
+		}
+		return next;
+	}
 
 	// Published together on the Runtime owner thread. Copies retain CPU values only.
 	struct GIFieldSummary
@@ -53,6 +89,7 @@ namespace gglab
 		bool m_Initialized = false;
 		bool m_Invalid = false;
 		bool m_InspectionAvailable = false;
+		GIReceiverViewSnapshot m_ReceiverView;
 	};
 
 	struct GIProbeInspectionRequest

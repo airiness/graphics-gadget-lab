@@ -12,6 +12,7 @@
 #include "Parameters/ParameterRequest.h"
 #include "Parameters/ViewControlActions.h"
 #include "Capture/GIProbeInspectionControl.h"
+#include "Capture/GIReceiverInspectionControl.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
 #include "GGLabRuntime/Graphics/RenderServicesView.h"
@@ -347,6 +348,7 @@ namespace gglab
 		std::unique_ptr<SessionParameterControl> m_ParameterControl;
 		ToolingViewControl m_ToolingViewControl;
 		ToolingGIProbeInspection m_ToolingGIProbeInspection;
+		ToolingGIReceiverInspection m_ToolingGIReceiverInspection;
 		// Frozen after content update; shared by parameters and this frame's planning.
 		uint64_t m_ActiveContentIdentity = 0;
 		// Results already routed to the sequence, awaiting host publication.
