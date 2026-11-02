@@ -2144,6 +2144,79 @@ namespace gglab
 				"Zero total weight and excluded sampling remain unavailable rather than fabricated zeros");
 		}
 
+		void RunGIInspectionCancellationTests(SelfTestContext& context) noexcept
+		{
+			for (bool receiver : { false, true })
+			{
+				for (bool submitted : { false, true })
+				{
+					TemporaryDirectory directory("inspection-close");
+					FakeCaptureControl control;
+					FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+						.m_DefaultOutputDirectory = directory.GetPath(), .m_WriteOnCallingThread = true });
+					CaptureTestJobs guiJobs(coordinator, context);
+					CaptureTestJobs sessionJobs(coordinator, context);
+					auto summary = std::make_shared<GIFieldSummary>();
+					summary->m_Field = { .m_Generation = 73, .m_RefreshEpoch = 2 };
+					summary->m_Counts = { 4, 4, 4 };
+					summary->m_InspectionAvailable = true;
+					summary->m_ReceiverView = { .m_Revision = 4, .m_RenderExtent = { 32, 32 },
+						.m_DisplayExtent = { 32, 32 }, .m_ReceiversAvailable = true, .m_Supported = true };
+					auto state = MakeFrameState(false);
+					state.m_Readiness.m_GIField = GIFieldCaptureState{ .m_Generation = 73, .m_Summary = summary };
+					CapturePlan plan;
+					if (receiver)
+					{
+						plan.m_RequiredProducts = { ResourceCaptureProduct{
+							{ { .m_Resource = "GI.Field.ReceiverInspection" } } } };
+						plan.m_GIReceiverInspection = GIReceiverInspectionRequest{ .m_Pixel = { 10, 10 },
+							.m_ExpectedGeneration = 73, .m_ExpectedViewRevision = 4 };
+					}
+					else
+					{
+						plan.m_RequiredProducts = { ResourceCaptureProduct{
+							{ { .m_Resource = "GI.Field.ProbeInspection" } } } };
+						plan.m_GIProbeInspection = GIProbeInspectionRequest{ .m_Coordinate = { 1, 0, 0 },
+							.m_ExpectedGeneration = 73 };
+					}
+					const auto gui = guiJobs.Admit(plan);
+					const auto session = sessionJobs.Admit(plan);
+					if (submitted)
+					{
+						coordinator.BeginFrame(state);
+						coordinator.OnFrameSubmitted();
+					}
+					context.Check(coordinator.CancelJob(gui) == CaptureCancelResult::Cancelled &&
+						coordinator.GetIntakeSnapshot().m_DrainingRuntimeRequests == (submitted ? 1u : 0u),
+						"Closing an inspection cancels its own receipt and retains only submitted work for drain");
+					const auto cancelled = guiJobs.TakeResults();
+					context.Check(cancelled.size() == 1 && cancelled[0].m_JobId == gui &&
+						cancelled[0].m_Status == CaptureJobStatus::Cancelled &&
+						cancelled[0].m_Publication == CaptureJobPublication::NotPublished && sessionJobs.TakeResults().empty(),
+						"GUI cancellation can be consumed independently while the session inspection remains active");
+					if (!submitted)
+					{
+						coordinator.BeginFrame(state);
+						coordinator.OnFrameSubmitted();
+					}
+					context.Check(control.m_Issued.size() == (submitted ? 2u : 1u),
+						"An inspection closed before issue schedules no GPU work and preserves the session request");
+					for (const auto& issued : control.m_Issued)
+					{
+						control.Complete(issued.m_Id);
+					}
+					coordinator.Update();
+					const auto completed = sessionJobs.TakeResults();
+					context.Check(completed.size() == 1 && completed[0].m_JobId == session &&
+						completed[0].m_Status == CaptureJobStatus::Completed &&
+						completed[0].m_Publication == CaptureJobPublication::Published && guiJobs.TakeResults().empty() &&
+						coordinator.GetIntakeSnapshot().m_DrainingRuntimeRequests == 0 &&
+						control.GetUnfinishedRequestCount() == 0,
+						"Late GPU completion drains without reviving the closed inspection or consuming the session result");
+				}
+			}
+		}
+
 		void RunMetadataSerializationTests(SelfTestContext& context) noexcept
 		{
 			FrameCaptureMetadata metadata{
@@ -5709,6 +5782,7 @@ namespace gglab
 		RunMetadataSerializationTests(context);
 		RunGIProbeInspectionTests(context);
 		RunGIReceiverInspectionTests(context);
+		RunGIInspectionCancellationTests(context);
 		RunFrameSequenceTests(context);
 		RunFrameSequenceBackPressureTests(context);
 		RunSequenceJobOwnershipTests(context);

@@ -2,6 +2,7 @@
 
 #include "DevTools/DevToolsRuntime.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
+#include "DevTools/DevelopGui/DevelopGuiRegistry.h"
 #include "DevTools/DevelopGui/Panels/RenderingSettingsPanel.h"
 #include "DevTools/DevelopGui/Panels/TemporalAAInspectorPanel.h"
 #include "DevTools/DevelopGui/Panels/GTAOInspectorPanel.h"
@@ -23,8 +24,10 @@
 #include <imgui_internal.h>
 
 #include <array>
+#include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 
 namespace gglab
 {
@@ -56,12 +59,17 @@ namespace gglab
 			std::optional<GIProbeInspectionRequest> m_Request;
 			std::shared_ptr<const GIProbeInspectionResult> m_Result;
 			std::string m_Status = "Fixture inspection";
+			uint32_t m_Cancellations = 0;
 			bool Inspect(GIProbeInspectionRequest request) noexcept override
 			{
 				m_Request = request;
 				return true;
 			}
-			void Cancel() noexcept override { m_Result.reset(); }
+			void Cancel() noexcept override
+			{
+				++m_Cancellations;
+				m_Result.reset();
+			}
 			bool IsPending() const noexcept override { return false; }
 			std::shared_ptr<const GIProbeInspectionResult> GetResult() const noexcept override { return m_Result; }
 			const std::string& GetStatus() const noexcept override { return m_Status; }
@@ -74,12 +82,17 @@ namespace gglab
 			std::shared_ptr<const GIReceiverInspectionResult> m_Result;
 			std::string m_Status = "Fixture receiver";
 			std::string m_ImagePath;
+			uint32_t m_Cancellations = 0;
 			bool Inspect(GIReceiverInspectionRequest request) noexcept override
 			{
 				m_Request = request;
 				return true;
 			}
-			void Cancel() noexcept override { m_Result.reset(); }
+			void Cancel() noexcept override
+			{
+				++m_Cancellations;
+				m_Result.reset();
+			}
 			bool IsPending() const noexcept override { return false; }
 			std::shared_ptr<const GIReceiverInspectionResult> GetResult() const noexcept override { return m_Result; }
 			const std::string& GetStatus() const noexcept override { return m_Status; }
@@ -179,6 +192,67 @@ namespace gglab
 			context.Check(receiverText.find("Historical field/view/selection") != std::string::npos &&
 				receiverText.find("Normalization unavailable") != std::string::npos,
 				"Receiver tables retain historical source identity and explain zero-weight normalization");
+			DevelopGuiRegistry registry;
+			registry.RegisterPanel(std::make_unique<GIViewerPanel>());
+			const auto drawRegistry = [&]()
+				{
+					ImGui::NewFrame();
+					registry.DrawMenuBar();
+					registry.DrawPanels(gui);
+					ImGui::EndFrame();
+				};
+			GGLAB_UNUSED(registry.OpenPanel("Rendering/GI Viewer"));
+			drawRegistry();
+			drawRegistry();
+			ImGuiWindow* viewerWindow = nullptr;
+			for (auto* window : ImGui::GetCurrentContext()->Windows)
+			{
+				if (std::string_view(window->Name).starts_with("GI Viewer##"))
+				{
+					viewerWindow = window;
+					break;
+				}
+			}
+			context.Check(viewerWindow != nullptr, "The registered GI Viewer creates its real window");
+			if (viewerWindow)
+			{
+				const auto probeCancellations = inspection.m_Cancellations;
+				const auto receiverCancellations = receiver.m_Cancellations;
+				ImGui::SetWindowCollapsed(viewerWindow, true);
+				drawRegistry();
+				context.Check(inspection.m_Cancellations == probeCancellations &&
+					receiver.m_Cancellations == receiverCancellations,
+					"Collapsing the GI Viewer preserves its inspection requests");
+				ImGui::SetWindowCollapsed(viewerWindow, false);
+				drawRegistry();
+				ImGui::ActivateItemByID(viewerWindow->GetID("#CLOSE"));
+				drawRegistry();
+				context.Check(!registry.IsPanelOpen("Rendering/GI Viewer") &&
+					inspection.m_Cancellations == probeCancellations + 1 &&
+					receiver.m_Cancellations == receiverCancellations + 1 &&
+					!inspection.m_Result && !receiver.m_Result,
+					"The GI Viewer close button cancels both owned inspections in the closing frame");
+				drawRegistry();
+				context.Check(inspection.m_Cancellations == probeCancellations + 1 &&
+					receiver.m_Cancellations == receiverCancellations + 1,
+					"A closed GI Viewer does not repeatedly cancel requests on later frames");
+				GGLAB_UNUSED(registry.OpenPanel("Rendering/GI Viewer"));
+				drawRegistry();
+				const auto menuBarId = ImHashStr("##MenuBar", 0, ImHashStr("##MainMenuBar"));
+				ImGui::ActivateItemByID(ImHashStr("Rendering", 0, menuBarId));
+				drawRegistry();
+				auto* menuWindow = ImGui::FindWindowByName("Rendering###Menu_00");
+				context.Check(menuWindow && menuWindow->Active, "The Rendering menu opens through its real menu item");
+				if (menuWindow && menuWindow->Active)
+				{
+					ImGui::ActivateItemByID(menuWindow->GetID(viewerWindow->Name));
+					drawRegistry();
+					context.Check(!registry.IsPanelOpen("Rendering/GI Viewer") &&
+						inspection.m_Cancellations == probeCancellations + 2 &&
+						receiver.m_Cancellations == receiverCancellations + 2,
+						"Closing the GI Viewer from the menu notifies it before the registry skips its draw");
+				}
+			}
 			LabSessionLog log;
 			LabSnapshot snapshot;
 			snapshot.m_ActiveLabName = "GI Reference";

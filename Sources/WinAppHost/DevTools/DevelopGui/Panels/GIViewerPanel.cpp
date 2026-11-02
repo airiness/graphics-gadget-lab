@@ -291,6 +291,18 @@ namespace gglab
 		}
 	}
 
+	void GIViewerPanel::OnClosed(DevelopGuiContext& context) noexcept
+	{
+		if (context.m_GIProbeInspection)
+		{
+			context.m_GIProbeInspection->Cancel();
+		}
+		if (context.m_GIReceiverInspection)
+		{
+			context.m_GIReceiverInspection->Cancel();
+		}
+	}
+
 	void GIViewerPanel::Draw(DevelopGuiContext& context) noexcept
 	{
 		ImGui::SetWindowPos(ImVec2(460, 45), ImGuiCond_FirstUseEver);
