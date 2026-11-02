@@ -44,6 +44,7 @@
 #include <cstdint>
 #include <initializer_list>
 #include <limits>
+#include <cstring>
 #include <memory>
 #include <span>
 #include <string>
@@ -773,6 +774,62 @@ namespace gglab
 			context.Check(!ValidateGIFieldCreateInfo(invalid), "Unsupported ray profiles cannot silently change their work budget");
 			GIField first(info);
 			GIField replacement(info);
+			const auto summary = first.GetCaptureState().m_Summary;
+			for (int query = 0; query < 100; ++query)
+			{
+				context.Check(first.GetCaptureState().m_Summary == summary &&
+					!summary->m_CompletedMeasurement && summary->m_SubmittedUpdates == 0,
+					"Read-only field summary queries retain the published CPU observation");
+			}
+			GIProbeInspectionRequest request{ .m_Coordinate = { 1, 2, 3 },
+				.m_ExpectedGeneration = summary->m_Field.m_Generation, .m_ExpectedRefreshEpoch = 1 };
+			context.Check(MatchesGIProbeInspection(request, *summary) &&
+				!MatchesGIProbeInspection(request, *replacement.GetCaptureState().m_Summary),
+				"A probe coordinate is scoped to its expected field generation");
+			request.m_ExpectedRefreshEpoch = 2;
+			context.Check(!MatchesGIProbeInspection(request, *summary), "An explicitly stale epoch cannot be inspected");
+			request.m_ExpectedRefreshEpoch.reset();
+			request.m_Coordinate[0] = summary->m_Counts[0];
+			context.Check(!MatchesGIProbeInspection(request, *summary), "The first coordinate outside a volume rejects");
+			request.m_Coordinate[0] = 1;
+			for (uint32_t interior : { 6u, 14u, 30u })
+			{
+				const uint32_t width = interior + 2;
+				std::vector<uint8_t> bytes((1 + width * width + 16 * 16) * 16);
+				const std::array<uint32_t, 4> header{ GIProbeInspectionMagic, 1, 0, interior };
+				std::memcpy(bytes.data(), header.data(), sizeof(header));
+				const std::array<float, 4> irradiance{ 3.1415927f, 2, 1, 0 };
+				std::memcpy(bytes.data() + 16, irradiance.data(), sizeof(irradiance));
+				GIObservationStamp stamp{ .m_Field = { .m_Generation = request.m_ExpectedGeneration,
+					.m_RefreshEpoch = 2, .m_EpochOriginUpdate = 81 },
+					.m_Kind = GIObservationKind::ProbeAtlas, .m_ProducingFrame = 913,
+					.m_FieldUpdate = 85, .m_ReadinessUpdate = 4 };
+				const auto decoded = DecodeGIProbeInspection(request, stamp, { 2, 3, 4 }, bytes);
+				context.Check(decoded->m_Validity == GIProbeInspectionValidity::Valid &&
+					decoded->m_Irradiance.size() == width * width && decoded->m_Distance.size() == 256 &&
+					decoded->m_Irradiance[0] == irradiance && decoded->m_Observation.m_ProducingFrame == 913 &&
+					decoded->m_Observation.m_FieldUpdate - decoded->m_Observation.m_Field.m_EpochOriginUpdate == 4,
+					"Bounded inspection preserves decoded E, tile layout and distinct frame/update/epoch identities");
+				auto staleRequest = request;
+				staleRequest.m_ExpectedRefreshEpoch = 1;
+				context.Check(DecodeGIProbeInspection(staleRequest, stamp, {}, bytes)->m_Validity ==
+					GIProbeInspectionValidity::MalformedPayload,
+					"A retained old-epoch request cannot relabel a new epoch's completed payload");
+				auto badStamp = stamp;
+				badStamp.m_ReadinessUpdate = 85;
+				context.Check(DecodeGIProbeInspection(request, badStamp, {}, bytes)->m_Validity ==
+					GIProbeInspectionValidity::MalformedPayload,
+					"Field-lifetime updates cannot be substituted for epoch-relative readiness updates");
+				bytes[0] = 0;
+				context.Check(DecodeGIProbeInspection(request, stamp, {}, bytes)->m_Validity ==
+					GIProbeInspectionValidity::MalformedPayload, "Malformed readback never becomes a valid probe");
+				std::memcpy(bytes.data(), header.data(), sizeof(header));
+				const float invalidValue = std::numeric_limits<float>::quiet_NaN();
+				std::memcpy(bytes.data() + 16, &invalidValue, sizeof(invalidValue));
+				context.Check(DecodeGIProbeInspection(request, stamp, {}, bytes)->m_Validity ==
+					GIProbeInspectionValidity::InvalidNumerics && decoded->m_Irradiance[0] == irradiance,
+					"Non-finite evidence is typed invalid; retained CPU results cannot be overwritten by reuse");
+			}
 			context.Check(first.GetDiagnostics().m_Generation != replacement.GetDiagnostics().m_Generation &&
 				!first.GetDiagnostics().m_Initialized, "Replacement fields have distinct identities and no inherited updates");
 			RenderScene scene;

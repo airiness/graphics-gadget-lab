@@ -120,6 +120,7 @@
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\HostViewParameters.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\ViewControlSnapshot.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\ViewControlActions.cpp" />
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\GIProbeInspectionControl.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\HostViewParameterSource.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\LabParameterSource.cpp" />
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Parameters\LightingProfileParameterSource.cpp" />
@@ -145,6 +146,7 @@
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\CapturePublisher.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\CaptureWriter.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\CapturePlan.h" />
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\GIProbeInspectionControl.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\CaptureJobTypes.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\CaptureBundle.h" />
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\CaptureEnvironment.h" />

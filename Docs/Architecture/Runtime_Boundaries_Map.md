@@ -72,6 +72,13 @@ Opaque shading and receiver diagnostics share the field query. Coverage blends
 field irradiance with diffuse IBL before material response; GTAO applies to the
 IBL share. Consumers declare reads before final export.
 
+AppRuntime forwards a capture-selected probe coordinate through pipeline wrappers
+via `RenderPipelineBase::SetGIProbeInspection`. Runtime extracts the graph-owned
+`GI.Field.ProbeInspection` resource before final field export; resource capture
+publishes its [CPU observation values](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GIFieldObservation.h).
+The [GUI adapter](../../Sources/GGLabAppRuntime/Capture/GIProbeInspectionControl.h)
+owns its capture job and result independently of session jobs.
+
 `RenderPresentationAccess` exposes immutable progress and transient-pool snapshots;
 [`RayScene::GetMemorySnapshot`](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RayScene.h)
 reports scene memory without retaining the observed resources. See the

@@ -1,4 +1,5 @@
 #pragma once
+#include "GGLabRuntime/Graphics/Pipeline/GIFieldObservation.h"
 #include "Capture/FrameCaptureReadiness.h"
 #include "Parameters/HostViewParameters.h"
 #include "Parameters/ParameterFrameState.h"
@@ -204,6 +205,10 @@ namespace gglab
 		std::shared_ptr<const ParameterFrameState> m_Parameters;
 		// Absent when the frame state carried no control evidence.
 		std::optional<FrameCaptureControlState> m_Control;
+		std::optional<GIProbeInspectionRequest> m_GIProbeInspectionRequest;
+		std::optional<GIObservationStamp> m_GIProbeObservation;
+		std::array<float, 3> m_GIProbePosition{};
+		std::shared_ptr<const GIProbeInspectionResult> m_GIProbeInspection;
 	};
 
 	// UTF-8 path text for capture UI, logs and failures; never uses the system code page.
@@ -212,6 +217,8 @@ namespace gglab
 	// Serializes the metadata as schema-versioned UTF-8 JSON.
 	[[nodiscard]] std::string SerializeFrameCaptureMetadata(
 		const FrameCaptureMetadata& metadata) noexcept;
+	[[nodiscard]] std::string SerializeGIFieldSummary(const GIFieldSummary& summary) noexcept;
+	[[nodiscard]] std::string SerializeGIProbeInspection(const GIProbeInspectionResult& result) noexcept;
 	[[nodiscard]] std::string SerializeNonFiniteWatchCoverage(const NonFiniteWatchCoverage& coverage) noexcept;
 	[[nodiscard]] std::string SerializeParameterFrameState(const ParameterFrameState& frame) noexcept;
 }

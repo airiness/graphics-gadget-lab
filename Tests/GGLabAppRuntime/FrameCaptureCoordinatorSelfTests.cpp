@@ -2020,6 +2020,64 @@ namespace gglab
 			}
 		}
 
+		void RunGIProbeInspectionTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("probe-inspection");
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(), .m_WriteOnCallingThread = true });
+			CaptureTestJobs jobs(coordinator, context);
+			const auto plan = [](uint32_t x, uint64_t generation = 73)
+				{
+					CapturePlan result;
+					result.m_RequiredProducts = { ResourceCaptureProduct{
+						{ { .m_Resource = "GI.Field.ProbeInspection" } } } };
+					result.m_GIProbeInspection = GIProbeInspectionRequest{
+						.m_Coordinate = { x, 0, 0 }, .m_ExpectedGeneration = generation,
+						.m_ExpectedRefreshEpoch = 2 };
+					return result;
+				};
+			auto summary = std::make_shared<GIFieldSummary>();
+			summary->m_Field = { .m_Generation = 73, .m_RefreshEpoch = 2, .m_EpochOriginUpdate = 80 };
+			summary->m_Counts = { 4, 4, 4 };
+			summary->m_Spacing = 2;
+			summary->m_SubmittedUpdates = 82;
+			summary->m_InspectionAvailable = true;
+			auto state = MakeFrameState(false);
+			state.m_Readiness.m_GIField = GIFieldCaptureState{ .m_Generation = 73, .m_Summary = summary };
+			const uint64_t first = jobs.Admit(plan(1));
+			const uint64_t second = jobs.Admit(plan(2));
+			const uint64_t stale = jobs.Admit(plan(1, 72));
+			coordinator.BeginFrame(state);
+			context.Check(control.m_Issued.size() == 1 && coordinator.GetFrameGIProbeInspection() &&
+				coordinator.GetFrameGIProbeInspection()->m_Coordinate[0] == 1 &&
+				coordinator.GetJobSnapshot(second)->m_Stage == CaptureJobStage::Waiting,
+				"Next-frame inspection diagnoses non-Ready fields and defers conflicting coordinates before issue");
+			coordinator.OnFrameSubmitted();
+			const auto results = jobs.TakeResults();
+			context.Check(results.size() == 1 && results[0].m_JobId == stale &&
+				results[0].m_FailureCode == "GIProbeIdentityMismatch",
+				"A replacement field cannot silently satisfy an earlier generation's coordinate");
+			context.Check(coordinator.CancelJob(first) == CaptureCancelResult::Cancelled,
+				"Inspection cancellation uses the existing job delivery contract");
+			++state.m_FrameSerial;
+			coordinator.BeginFrame(state);
+			context.Check(coordinator.GetFrameGIProbeInspection() &&
+				coordinator.GetFrameGIProbeInspection()->m_Coordinate[0] == 2,
+				"A queued coordinate gets its own later producing frame");
+			coordinator.OnFrameSubmitted();
+			GGLAB_UNUSED(coordinator.CancelJob(second));
+			auto withoutResource = plan(0);
+			withoutResource.m_RequiredProducts = { ImageCaptureProduct{} };
+			context.Check(coordinator.CheckJobAdmission(withoutResource).m_Reason == CaptureAdmissionReason::InvalidPlan,
+				"A typed inspection cannot omit its required compact resource");
+			const auto summaryJson = nlohmann::json::parse(SerializeGIFieldSummary(*summary));
+			context.Check(summaryJson["completedMeasurement"].is_null() &&
+				summaryJson["field"]["epochOriginUpdate"] == 80 &&
+				summaryJson["classificationCounts"].is_null(),
+				"A fresh epoch has no relabelled measurement or invented classification counts");
+		}
+
 		void RunMetadataSerializationTests(SelfTestContext& context) noexcept
 		{
 			FrameCaptureMetadata metadata{
@@ -5583,6 +5641,7 @@ namespace gglab
 		RunRenamePublicationTests(context);
 		RunPublicationShutdownTests(context);
 		RunMetadataSerializationTests(context);
+		RunGIProbeInspectionTests(context);
 		RunFrameSequenceTests(context);
 		RunFrameSequenceBackPressureTests(context);
 		RunSequenceJobOwnershipTests(context);

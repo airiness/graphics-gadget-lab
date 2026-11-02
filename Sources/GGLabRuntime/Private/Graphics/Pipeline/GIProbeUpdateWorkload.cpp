@@ -161,6 +161,7 @@ namespace gglab
 			RHIBufferHandle m_Buffer;
 			RHIFencePoint m_Fence;
 			uint64_t m_Update = 0;
+			GIObservationStamp m_Observation;
 			float m_Hysteresis = 0;
 			bool m_Refreshing = false;
 		};
@@ -174,6 +175,8 @@ namespace gglab
 			GIFieldReadinessEstimator m_Readiness;
 			GIFieldReadinessSettings m_ReadinessSettings;
 			uint64_t m_ReadinessEpoch = 0;
+			uint64_t m_RefreshEpoch = 1;
+			std::optional<GIObservationStamp> m_CompletedObservation;
 			uint64_t m_ReadbackBytes = sizeof(GIUpdateStatus);
 			bool m_RefreshDistance = true;
 			bool m_CompletionFailed = false;
@@ -220,7 +223,9 @@ namespace gglab
 					std::memcpy(&status, mapped, sizeof(status));
 
 					if (status.m_Error == GIUpdateError::None && m_ReadinessSettings.m_Enabled &&
-						slot.m_Update > m_ReadinessEpoch)
+						slot.m_Update > m_ReadinessEpoch &&
+						slot.m_Observation.m_Field.m_RefreshEpoch == m_RefreshEpoch &&
+						slot.m_Observation.m_Field.m_EpochOriginUpdate == m_ReadinessEpoch)
 					{
 						const auto* bytes = static_cast<const std::byte*>(mapped) + sizeof(GIUpdateStatus);
 						std::array<float, 4> header;
@@ -232,6 +237,10 @@ namespace gglab
 							m_CompletionFailed = true;
 							m_Diagnostics.m_Failed = true;
 							m_Diagnostics.m_Reason = "Invalid or out-of-order field readiness measurement";
+						}
+						else
+						{
+							m_CompletedObservation = slot.m_Observation;
 						}
 					}
 					m_Device->UnmapBuffer(slot.m_Buffer, {});
@@ -331,7 +340,10 @@ namespace gglab
 
 	GIProbeUpdateDiagnostics GIProbeUpdateWorkload::GetDiagnostics(bool includeAllocations) const noexcept
 	{
-		m_State->m_Progress->Poll();
+		if (!m_State->m_Field)
+		{
+			m_State->m_Progress->Poll();
+		}
 		auto result = m_State->m_Progress->m_Diagnostics;
 		if (const auto resources = m_State->m_Resources; includeAllocations && resources)
 		{
@@ -367,7 +379,6 @@ namespace gglab
 
 	GIFieldReadinessSnapshot GIProbeUpdateWorkload::GetReadiness() const noexcept
 	{
-		m_State->m_Progress->Poll();
 		auto snapshot = m_State->m_Progress->m_Readiness.GetSnapshot();
 		snapshot.m_Failed = snapshot.m_Failed || m_State->m_Progress->m_Diagnostics.m_Failed;
 		if (!snapshot.m_Enabled)
@@ -377,10 +388,27 @@ namespace gglab
 		return snapshot;
 	}
 
+	std::optional<GIObservationStamp> GIProbeUpdateWorkload::GetCompletedObservation() const noexcept
+	{
+		return m_State->m_Progress->m_CompletedObservation;
+	}
+
+	uint64_t GIProbeUpdateWorkload::GetRefreshEpoch() const noexcept
+	{
+		return m_State->m_Progress->m_RefreshEpoch;
+	}
+
+	uint64_t GIProbeUpdateWorkload::GetEpochOriginUpdate() const noexcept
+	{
+		return m_State->m_Progress->m_ReadinessEpoch;
+	}
+
 	void GIProbeUpdateWorkload::RefreshLighting() noexcept
 	{
 		auto& progress = *m_State->m_Progress;
 		progress.m_ReadinessEpoch = progress.m_Diagnostics.m_SubmittedUpdates;
+		++progress.m_RefreshEpoch;
+		progress.m_CompletedObservation.reset();
 		progress.m_RefreshDistance = false;
 		progress.m_Readiness.Reset(m_State->m_Profile.m_Counts, progress.m_ReadinessSettings, true);
 	}
@@ -651,7 +679,8 @@ namespace gglab
 
 	void GIProbeUpdateWorkload::AddPasses(RenderGraph& graph, const RenderFrameContext& frame,
 		const RenderServices& services, const RaySceneGraphResources& scene,
-		std::shared_ptr<GIFieldUpdateState> fieldUpdate, bool compose, float viewBias) noexcept
+		std::shared_ptr<GIFieldUpdateState> fieldUpdate, bool compose, float viewBias,
+		GIFieldIdentity identity) noexcept
 	{
 		auto& state = *m_State;
 		if (!state.m_Profile.m_ConstantEnvironment)
@@ -987,10 +1016,16 @@ namespace gglab
 						commands->CopyBuffer(execute.GetBufferHandle(data.m_Destination), sizeof(GIUpdateStatus),
 							execute.GetBufferHandle(data.m_Readiness), 0, resources->m_ReadinessDesc.m_SizeInBytes);
 					}
-					execute.DeferCommit([progress, slot, update, updateHysteresis, refreshing = readiness.m_Refreshing](const RGCommitContext& commit) noexcept
+					const GIObservationStamp observation{ .m_Field = identity, .m_ProducingFrame = frame.m_FrameSerial,
+						.m_FieldUpdate = uint64_t(update) + 1,
+						.m_ReadinessUpdate = uint64_t(update) + 1 - identity.m_EpochOriginUpdate };
+					execute.DeferCommit(
+						[progress, slot, update, updateHysteresis, refreshing = readiness.m_Refreshing, observation]
+						(const RGCommitContext& commit) noexcept
 						{
 							progress->m_Readbacks[slot].m_Fence = commit.m_Fence;
 							progress->m_Readbacks[slot].m_Update = uint64_t(update) + 1;
+							progress->m_Readbacks[slot].m_Observation = observation;
 							progress->m_Readbacks[slot].m_Hysteresis = updateHysteresis;
 							progress->m_Readbacks[slot].m_Refreshing = refreshing;
 						});

@@ -521,11 +521,84 @@ namespace gglab
 			{ "receipts", std::move(receipts) } }.dump(-1, ' ', false, Json::error_handler_t::replace);
 	}
 
+	namespace
+	{
+		nlohmann::json GIIdentityJson(const GIFieldIdentity& field)
+		{
+			return {
+				{ "generation", field.m_Generation },
+				{ "sceneRevision", field.m_SceneRevision },
+				{ "lightingGeneration", field.m_LightingGeneration },
+				{ "environmentGeneration", field.m_EnvironmentGeneration },
+				{ "refreshEpoch", field.m_RefreshEpoch },
+				{ "epochOriginUpdate", field.m_EpochOriginUpdate } };
+		}
+		nlohmann::json GIStampJson(const GIObservationStamp& stamp)
+		{
+			return {
+				{ "field", GIIdentityJson(stamp.m_Field) },
+				{ "kind", stamp.m_Kind == GIObservationKind::ProbeAtlas ? "probe-atlas" : "completed-readiness" },
+				{ "producingFrame", stamp.m_ProducingFrame },
+				{ "fieldUpdate", stamp.m_FieldUpdate },
+				{ "readinessUpdate", stamp.m_ReadinessUpdate } };
+		}
+	}
+
+	std::string SerializeGIFieldSummary(const GIFieldSummary& summary) noexcept
+	{
+		return nlohmann::json{
+			{ "schemaVersion", 1 },
+			{ "field", GIIdentityJson(summary.m_Field) },
+			{ "counts", summary.m_Counts },
+			{ "minimum", summary.m_Minimum },
+			{ "spacing", summary.m_Spacing },
+			{ "positionUnits", "world-units" },
+			{ "irradianceInteriorWidth", summary.m_IrradianceInteriorWidth },
+			{ "submittedUpdates", summary.m_SubmittedUpdates },
+			{ "initialized", summary.m_Initialized },
+			{ "invalid", summary.m_Invalid },
+			{ "inspectionAvailable", summary.m_InspectionAvailable },
+			{ "classificationCounts", nullptr },
+			{ "completedMeasurement", summary.m_CompletedMeasurement ?
+				GIStampJson(*summary.m_CompletedMeasurement) : nlohmann::json(nullptr) } }.dump();
+	}
+
+	std::string SerializeGIProbeInspection(const GIProbeInspectionResult& result) noexcept
+	{
+		return nlohmann::json{
+			{ "schemaVersion", 1 },
+			{ "request", {
+				{ "coordinate", result.m_Request.m_Coordinate },
+				{ "expectedGeneration", result.m_Request.m_ExpectedGeneration },
+				{ "expectedRefreshEpoch", result.m_Request.m_ExpectedRefreshEpoch ?
+					nlohmann::json(*result.m_Request.m_ExpectedRefreshEpoch) : nlohmann::json(nullptr) } } },
+			{ "observation", GIStampJson(result.m_Observation) },
+			{ "worldPosition", result.m_WorldPosition },
+			{ "positionUnits", "world-units" },
+			{ "classification", result.m_Classification },
+			{ "validity", GetGIProbeInspectionValidityName(result.m_Validity) },
+			{ "tileLayout", "row-major-bordered-octahedral" },
+			{ "irradianceUnits", "scene-referred-irradiance-E" },
+			{ "distanceUnits", { "world-units", "world-units-squared" } },
+			{ "irradianceTileWidth", result.m_IrradianceTileWidth },
+			{ "distanceTileWidth", result.m_DistanceTileWidth },
+			{ "irradiance", result.m_Irradiance },
+			{ "distance", result.m_Distance } }.dump();
+	}
+
 	std::string SerializeFrameCaptureMetadata(const FrameCaptureMetadata& metadata) noexcept
 	{
 		JsonWriter writer;
 		writer.BeginObject();
 		writer.Unsigned("schemaVersion", FrameCaptureMetadataSchemaVersion);
+		if (metadata.m_GIProbeObservation)
+		{
+			writer.Json("giProbeObservation", GIStampJson(*metadata.m_GIProbeObservation).dump());
+		}
+		if (metadata.m_GIProbeInspection)
+		{
+			writer.Json("giProbeInspection", SerializeGIProbeInspection(*metadata.m_GIProbeInspection));
+		}
 		writer.Unsigned("requestId", metadata.m_RequestId);
 		if (metadata.m_Parameters)
 		{
@@ -648,6 +721,10 @@ namespace gglab
 			writer.Unsigned("sceneRevision", field.m_SceneRevision);
 			writer.Unsigned("lightingGeneration", field.m_LightingGeneration);
 			writer.Unsigned("environmentGeneration", field.m_EnvironmentGeneration);
+			if (field.m_Summary)
+			{
+				writer.Json("summary", SerializeGIFieldSummary(*field.m_Summary));
+			}
 			writer.Bool("enabled", readiness.m_Enabled);
 			writer.String("state", GetGIFieldReadinessName(readiness.m_State));
 			writer.Bool("refreshing", readiness.m_Refreshing);

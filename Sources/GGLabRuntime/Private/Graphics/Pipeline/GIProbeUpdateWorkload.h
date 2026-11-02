@@ -2,6 +2,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h"
 
 #include "GGLabRuntime/Graphics/Pipeline/GIFieldReadiness.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIFieldObservation.h"
 
 #include <cstddef>
 
@@ -24,11 +25,14 @@ namespace gglab
 		[[nodiscard]] RenderFrameValidationResult Prepare(const RenderFrameContext& frame,
 			const RenderServices& services) noexcept;
 		[[nodiscard]] GIFieldReadinessSnapshot GetReadiness() const noexcept;
+		[[nodiscard]] std::optional<GIObservationStamp> GetCompletedObservation() const noexcept;
+		[[nodiscard]] uint64_t GetRefreshEpoch() const noexcept;
+		[[nodiscard]] uint64_t GetEpochOriginUpdate() const noexcept;
 		void RefreshLighting() noexcept;
 		void AddPasses(RenderGraph& graph, const RenderFrameContext& frame,
 			const RenderServices& services, const RaySceneGraphResources& scene,
 			std::shared_ptr<GIFieldUpdateState> fieldUpdate = {}, bool compose = false,
-			float viewBias = 0.3f) noexcept;
+			float viewBias = 0.3f, GIFieldIdentity identity = {}) noexcept;
 		void ExportFieldResources(RenderGraph& graph) noexcept;
 
 	private:

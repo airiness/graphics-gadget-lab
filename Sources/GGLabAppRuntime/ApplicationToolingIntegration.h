@@ -41,6 +41,8 @@ namespace gglab
 	struct ViewRenderProfile;
 	struct ViewControlSnapshot;
 	class ViewControlActionsBase;
+	class GIProbeInspectionControlBase;
+	struct GIFieldSummary;
 
 	struct ApplicationToolingInputCapture
 	{
@@ -113,6 +115,8 @@ namespace gglab
 		// Owned CPU observation borrowed for Draw only; never a mutable control surface.
 		const ViewControlSnapshot* m_ViewControl = nullptr;
 		ViewControlActionsBase* m_ViewControlActions = nullptr;
+		const GIFieldSummary* m_GIFieldSummary = nullptr;
+		GIProbeInspectionControlBase* m_GIProbeInspection = nullptr;
 	};
 
 	enum class ApplicationToolingFrameEndReason : uint8_t

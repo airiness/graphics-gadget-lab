@@ -678,6 +678,7 @@
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIProbeUpdate.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIField.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIFieldReadiness.h" />
+    <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIFieldObservation.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Public\GGLabRuntime\Graphics\Pipeline\GIUpdateStatus.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIProbeUpdateWorkload.h" />
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\Pipeline\GIFieldState.h" />
@@ -984,6 +985,7 @@
     <FxCompile Include="..\..\Shaders\Passes\PassForwardPlusCull.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassForwardPlusValidation.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassGIFieldLookup.hlsl" />
+    <FxCompile Include="..\..\Shaders\Passes\PassGIProbeInspection.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassGIProbeUpdate.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassGIReceiver.hlsl" />
     <FxCompile Include="..\..\Shaders\Passes\PassGIReference.hlsl" />

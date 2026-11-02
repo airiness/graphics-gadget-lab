@@ -181,6 +181,8 @@ namespace gglab::shader_programs
 		"gglab.shader.gi-field", "compute.readiness-floor", ShaderStage::Compute };
 	inline const ShaderProgramRef GIFieldLookupCompute{
 		"gglab.shader.gi-field", "compute.lookup-diagnostics", ShaderStage::Compute };
+	inline const ShaderProgramRef GIProbeInspectionCompute{
+		"gglab.shader.gi-field", "compute.probe-inspection", ShaderStage::Compute };
 	inline const ShaderProgramRef GIReceiverPixel{
 		"gglab.shader.gi-receiver", "pixel.receiver", ShaderStage::Pixel };
 	inline const ShaderProgramRef GIReceiverPositionPixel{

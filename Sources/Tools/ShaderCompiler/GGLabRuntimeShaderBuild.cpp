@@ -179,6 +179,7 @@ namespace gglab
 			ShaderProgramBuildRecord{ &GIProbeClassifyCompute, L"Passes/PassGIProbeUpdate.hlsl", L"Classify" },
 			ShaderProgramBuildRecord{ &GIFieldReadinessFloorCompute, L"Passes/PassGIProbeUpdate.hlsl", L"ReadinessFloor" },
 			ShaderProgramBuildRecord{ &GIFieldLookupCompute, L"Passes/PassGIFieldLookup.hlsl", L"CSMain" },
+			ShaderProgramBuildRecord{ &GIProbeInspectionCompute, L"Passes/PassGIProbeInspection.hlsl", L"CSMain" },
 			ShaderProgramBuildRecord{ &GIReceiverPixel, L"Passes/PassGIReceiver.hlsl", L"PSMain" },
 			ShaderProgramBuildRecord{ &GIReceiverPositionPixel, L"Passes/PassGIReceiver.hlsl", L"PSPosition" },
 			ShaderProgramBuildRecord{ &RenderGraphComputeReadWrite, L"Passes/PassRenderGraphComputeSmoke.hlsl", L"CSReadWrite" },

@@ -197,6 +197,10 @@ observations do not extend asset ownership into AssetManager shutdown.
 `GIField` publishes update progress through deferred CPU commits. Failed or
 CompletionUnknown invalidates its in-place contents; Discarded preserves the prior
 state. Its completion counter advances only after checked fence completion.
+Field preparation processes completed readbacks on the Runtime owner thread;
+queries return its cached CPU summary. Measurements retain submission-time
+identities and frame/update stamps. Lighting refresh starts a new epoch with
+no completed measurement; readiness accepts only that epoch's records.
 
 On the abort path, capture releases unsubmitted taps after the RHI abort has
 recorded the frame's resource uses.

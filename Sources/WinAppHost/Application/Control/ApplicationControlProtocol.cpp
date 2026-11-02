@@ -1099,6 +1099,38 @@ namespace gglab
 					}
 					capture.m_FrameSelectionTimeout = std::chrono::milliseconds(value.get<uint32_t>());
 				}
+				else if (key == "giProbeInspection" && !graph && !resources)
+				{
+					if (!value.is_object() || !value.contains("coordinate") ||
+						!value.contains("expectedGeneration") || value.size() < 2 || value.size() > 3)
+					{
+						return "giProbeInspection requires coordinate and expectedGeneration; expectedRefreshEpoch is optional.";
+					}
+					for (const auto& [name, field] : value.items())
+					{
+						if (name != "coordinate" && name != "expectedGeneration" && name != "expectedRefreshEpoch")
+						{
+							return "Unknown giProbeInspection field.";
+						}
+					}
+					const auto& coordinate = value["coordinate"];
+					if (!coordinate.is_array() || coordinate.size() != 3 ||
+						!std::ranges::all_of(coordinate, [](const Json& axis)
+							{ return axis.is_number_unsigned() && axis.get<uint64_t>() <= UINT32_MAX; }) ||
+						!value["expectedGeneration"].is_number_unsigned() || value["expectedGeneration"] == 0 ||
+						(value.contains("expectedRefreshEpoch") &&
+							(!value["expectedRefreshEpoch"].is_number_unsigned() || value["expectedRefreshEpoch"] == 0)))
+					{
+						return "Invalid GI probe coordinate or expected identity.";
+					}
+					GIProbeInspectionRequest inspection{ .m_Coordinate = coordinate.get<std::array<uint32_t, 3>>(),
+						.m_ExpectedGeneration = value["expectedGeneration"].get<uint64_t>() };
+					if (value.contains("expectedRefreshEpoch"))
+					{
+						inspection.m_ExpectedRefreshEpoch = value["expectedRefreshEpoch"].get<uint64_t>();
+					}
+					capture.m_GIProbeInspection = inspection;
+				}
 				else if (key == "requiredFrameState")
 				{
 					if (std::string error =
@@ -1113,8 +1145,30 @@ namespace gglab
 					return std::format("Unknown field '{}' for command '{}'.", key, graph ? "graph" : resources ? "export" : "capture");
 				}
 			}
+			const auto addInspectionTarget = [&capture]()
+				{
+					if (!capture.m_GIProbeInspection)
+					{
+						return;
+					}
+					for (auto& product : capture.m_RequiredProducts)
+					{
+						if (auto* resource = std::get_if<ResourceCaptureProduct>(&product))
+						{
+							if (!std::ranges::any_of(resource->m_Targets, [](const auto& target)
+								{ return target.m_Resource == "GI.Field.ProbeInspection"; }))
+							{
+								resource->m_Targets.push_back({ .m_Resource = "GI.Field.ProbeInspection" });
+							}
+							return;
+						}
+					}
+					capture.m_RequiredProducts.push_back(ResourceCaptureProduct{
+						{ { .m_Resource = "GI.Field.ProbeInspection" } } });
+				};
 			if (explicitProducts)
 			{
+				addInspectionTarget();
 				return {};
 			}
 			if (resources)
@@ -1149,6 +1203,7 @@ namespace gglab
 						source == FrameCaptureSource::Scene ? CaptureImageSource::Scene : CaptureImageSource::Composited });
 				}
 			}
+			addInspectionTarget();
 			return {};
 		}
 
@@ -1816,6 +1871,15 @@ namespace gglab
 				{ "maxItems", ApplicationControlMaxParameterItems },
 				{ "resultConsumption", "explicit" } } },
 			{ "captureJobs", true },
+			{ "giProbeInspection", {
+				{ "version", 1 },
+				{ "summary", "frame.giField.summary" },
+				{ "request", "capture.giProbeInspection" },
+				{ "coordinateOrder", "xyz" },
+				{ "maximumBytes", GIProbeInspectionMaximumBytes },
+				{ "result", "products[].metadata.giProbeInspection" },
+				{ "requiredGeneration", true },
+				{ "optionalRefreshEpoch", true } } },
 			{ "requiredProducts", Json::array({ "image", "diagnostic", "graph", "resource" }) },
 			{ "consistency", "SameFrame" },
 			{ "resourceProductsPerJob", 1 },
@@ -2027,6 +2091,10 @@ namespace gglab
 				{ "steadyNoiseSamples", readiness.m_SteadyNoiseSamples },
 				{ "irradianceFloor", readiness.m_IrradianceFloor },
 				{ "hysteresis", readiness.m_Hysteresis } };
+			if (field.m_Summary)
+			{
+				giField["summary"] = Json::parse(SerializeGIFieldSummary(*field.m_Summary));
+			}
 		}
 		response["frame"] = {
 			{ "backend", frame.m_Backend },

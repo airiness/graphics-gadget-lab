@@ -33,6 +33,30 @@ Common wire fields are `timing` (default `after-ready`), `settleFrames` (default
 0-10000), `requiredContentId`, `view`, absolute `outputDirectory`, `label`, `note`.
 There is no wire `wait` or `requestId`.
 
+## DDGI probe observations
+
+Discover `capabilities.giProbeInspection` and read `frame.giField.summary` for
+the cached volume, field identity and completed readiness stamp. A null
+`completedMeasurement` means this epoch has no completed readiness measurement,
+including when readiness is disabled.
+
+`capture -GIProbeInspection` (or `-GIProbeInspectionFile`) accepts
+`coordinate: [x,y,z]`, required `expectedGeneration` and optional
+`expectedRefreshEpoch`. Bind them to the summary and pass `-ExpectedRunIdentity`
+from status. The adapter adds `GI.Field.ProbeInspection` to the required resource
+product. Use `-Timing next-frame` for non-Ready diagnosis. Identity/coordinate
+mismatches report `GIProbeIdentityMismatch`; missing data reports `GIProbeUnavailable`.
+
+Results appear in the resource product's `metadata.giProbeInspection` and the
+artifact's `frame.giProbeInspection`; see the [value schema](../../../../Schemas/GIProbeInspection.schema.json).
+Bordered octahedral tiles contain scene-referred irradiance E and distance
+mean/second moment. Each result carries its request, validity, units and GPU
+observation stamp, independently of the cached readiness stamp. Readiness update
+equals field-lifetime update U minus `epochOriginUpdate`; producing frame is separate.
+
+Native probe payload is at most 20,496 bytes. One distinct coordinate issues per
+frame; conflicting jobs wait for a later frame.
+
 ## Admit, query and consume
 
 Accepted admission returns `reason: None` and a nonzero `jobId`. Busy/Rejected

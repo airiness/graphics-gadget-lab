@@ -25,6 +25,16 @@ namespace gglab
 		const RenderPassInfo LookupPassInfo{ .m_TypeName = "GI.Field.Lookup",
 			.m_DisplayName = "Field receiver query diagnostics", .m_CategoryName = "Global Illumination",
 			.m_Category = RenderPassCategory::Debug, .m_Type = RenderPassType::Compute };
+		const RenderPassInfo InspectionPassInfo{ .m_TypeName = "GI.Field.InspectProbe",
+			.m_DisplayName = "Inspect one field probe", .m_CategoryName = "Global Illumination",
+			.m_Category = RenderPassCategory::Debug, .m_Type = RenderPassType::Compute };
+		struct InspectionParameters
+		{
+			GIFieldSamplingParameters m_Field;
+			std::array<uint32_t, 3> m_Coordinate{};
+			uint32_t m_Output = 0;
+		};
+		static_assert(sizeof(InspectionParameters) == 64 && offsetof(InspectionParameters, m_Output) == 60);
 		struct LookupParameters
 		{
 			GIFieldSamplingParameters m_Field;
@@ -100,12 +110,27 @@ namespace gglab
 		ComputePipelineSlot m_LookupSlot;
 		ResolvedRenderPipeline m_LookupPipeline;
 		uint64_t m_LookupGeneration = 0;
+		std::shared_ptr<const GIFieldSummary> m_Summary;
+		std::optional<GIProbeInspectionRequest> m_Inspection;
+		ComputePipelineSlot m_InspectionSlot;
+		ResolvedRenderPipeline m_InspectionPipeline;
 		State(GIFieldCreateInfo info) noexcept :
 			m_Info(std::move(info)), m_Workload(m_Info.m_RayScene, UpdateProfile(m_Info), true, m_Info.m_Readiness) {}
 	};
 
 	GIField::GIField(GIFieldCreateInfo info) noexcept :
-		m_State(std::make_unique<State>(std::move(info))) {}
+		m_State(std::make_unique<State>(std::move(info)))
+	{
+		auto summary = std::make_shared<GIFieldSummary>();
+		summary->m_Field.m_Generation = m_State->m_Generation;
+		summary->m_Field.m_RefreshEpoch = 1;
+		summary->m_Counts = m_State->m_Info.m_Volume.m_Counts;
+		summary->m_Minimum = m_State->m_Info.m_Volume.m_Minimum;
+		summary->m_Spacing = m_State->m_Info.m_Volume.m_Spacing;
+		summary->m_IrradianceInteriorWidth = m_State->m_Info.m_IrradianceInteriorWidth;
+		summary->m_Readiness = m_State->m_Workload.GetReadiness();
+		m_State->m_Summary = std::move(summary);
+	}
 	GIField::~GIField() = default;
 	std::shared_ptr<RayScene> GIField::GetRayScene() const noexcept { return m_State->m_Info.m_RayScene; }
 
@@ -145,7 +170,7 @@ namespace gglab
 			.m_SceneRevision = diagnostics.m_SceneRevision,
 			.m_LightingGeneration = diagnostics.m_LightingGeneration,
 			.m_EnvironmentGeneration = diagnostics.m_EnvironmentGeneration,
-			.m_Readiness = diagnostics.m_Readiness };
+			.m_Readiness = diagnostics.m_Readiness, .m_Summary = m_State->m_Summary };
 	}
 
 	RenderFrameValidationResult GIField::Prepare(const RenderFrameContext& frame,
@@ -153,6 +178,36 @@ namespace gglab
 	{
 		auto& state = *m_State;
 		state.m_UpdatePrepared = false;
+		// Publish at the owning frame boundary, including failure exits. Readers never
+		// pump GPU completions or attach new identities to an earlier measurement.
+		struct PublishSummary
+		{
+			State& m_State;
+			~PublishSummary()
+			{
+				auto& state = m_State;
+				auto summary = std::make_shared<GIFieldSummary>();
+				const auto diagnostics = state.m_Workload.GetDiagnostics();
+				summary->m_Field = { state.m_Generation, state.m_SceneRevision,
+					state.m_LightingGeneration, state.m_EnvironmentGeneration,
+					state.m_Workload.GetRefreshEpoch(), state.m_Workload.GetEpochOriginUpdate() };
+				summary->m_Counts = state.m_Info.m_Volume.m_Counts;
+				summary->m_Minimum = state.m_Info.m_Volume.m_Minimum;
+				summary->m_Spacing = state.m_Info.m_Volume.m_Spacing;
+				summary->m_IrradianceInteriorWidth = state.m_Info.m_IrradianceInteriorWidth;
+				summary->m_SubmittedUpdates = diagnostics.m_SubmittedUpdates;
+				summary->m_Readiness = state.m_Workload.GetReadiness();
+				summary->m_Invalid = diagnostics.m_Failed || state.m_Update->IsInvalid();
+				summary->m_Initialized = diagnostics.m_Initialized;
+				summary->m_InspectionAvailable = state.m_UpdatePrepared;
+				const auto completed = state.m_Workload.GetCompletedObservation();
+				if (completed && completed->m_Field == summary->m_Field && !summary->m_Invalid)
+				{
+					summary->m_CompletedMeasurement = completed;
+				}
+				state.m_Summary = std::move(summary);
+			}
+		} publication{ state };
 		if (!ValidateGIFieldCreateInfo(state.m_Info) || !services.m_GIFieldFrameState)
 		{
 			return RenderFrameValidationResult::ContractFailure("Invalid GI field descriptor or settlement service");
@@ -205,6 +260,10 @@ namespace gglab
 		state.m_LookupPipeline = state.m_LookupLayout.Resolve(*services.m_PipelineResolver,
 			state.m_LookupSlot, ComputePipelineRecipe{
 				.m_BindingLayout = state.m_LookupLayout.GetNativeLayout(), .m_CSId = lookup }, LookupPassInfo);
+		const auto inspection = services.m_ShaderPrograms->LoadProgram(shader_programs::GIProbeInspectionCompute);
+		state.m_InspectionPipeline = state.m_LookupLayout.Resolve(*services.m_PipelineResolver,
+			state.m_InspectionSlot, ComputePipelineRecipe{
+				.m_BindingLayout = state.m_LookupLayout.GetNativeLayout(), .m_CSId = inspection }, InspectionPassInfo);
 		if (!state.m_LookupPipeline.IsValid())
 		{
 			return RenderFrameValidationResult::ContractFailure("Field lookup pipeline unavailable");
@@ -244,7 +303,7 @@ namespace gglab
 		const bool tracked = services.m_GIFieldFrameState->Track(m_State->m_Update, frame.m_FrameSerial);
 		GGLAB_ASSERT_MSG(tracked, "A GI field must participate in exactly one matching renderer frame.");
 		m_State->m_Workload.AddPasses(graph, frame, services, scene, m_State->m_Update,
-			m_State->m_Info.m_EnableReceiverSampling, m_State->m_Info.m_ViewBias);
+			m_State->m_Info.m_EnableReceiverSampling, m_State->m_Info.m_ViewBias, m_State->m_Summary->m_Field);
 	}
 
 	void GIField::AddReceiverDiagnostics(RenderGraph& graph, const RenderFrameContext& frame,
@@ -314,6 +373,60 @@ namespace gglab
 				}
 			});
 		GGLAB_UNUSED(services);
+	}
+
+	void GIField::SetProbeInspection(std::optional<GIProbeInspectionRequest> request) noexcept
+	{
+		m_State->m_Inspection = std::move(request);
+	}
+
+	void GIField::AddProbeInspection(RenderGraph& graph, const RenderFrameContext& frame) noexcept
+	{
+		auto& state = *m_State;
+		const auto* field = graph.GetBlackboard().TryGet<RGGIFieldResources>();
+		if (!field || !state.m_UpdatePrepared || !state.m_Inspection ||
+			!MatchesGIProbeInspection(*state.m_Inspection, *state.m_Summary) ||
+			!state.m_InspectionPipeline.IsValid())
+		{
+			return;
+		}
+		const auto request = *state.m_Inspection;
+		const uint32_t width = state.m_Info.m_IrradianceInteriorWidth + 2;
+		const uint32_t texels = 1 + width * width + 16 * 16;
+		struct PassData
+		{
+			GIFieldSamplingViews m_Field;
+			RGTextureViewId m_Output;
+		};
+		graph.AddPass<PassData>(InspectionPassInfo.m_TypeName.c_str(), RGPassEncoderType::Compute,
+			[=](RenderGraph::RGBuilder& builder, PassData& data)
+			{
+				data.m_Field.Declare(builder, *field, RHIStage::ComputeShader);
+				auto output = builder.CreateTexture("GI.Field.ProbeInspection", {
+					.m_Format = RHIFormat::R32Uint, .m_Extent = { texels * 4, 1, 1 } });
+				builder.WriteInPlace(output, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+				data.m_Output = builder.CreateView<RHITextureViewType::UnorderedAccess>(output);
+				builder.SideEffect();
+			},
+			[this, &frame, request, texels](RGExecuteContext& execute, PassData& data)
+			{
+				auto& state = *m_State;
+				auto* commands = execute.GetDirectComputeCommandContext();
+				ScopedConstantBindings<RHIComputeCommandContext> constants(*commands,
+					state.m_LookupLayout, state.m_LookupScene);
+				if (!constants.SetPipeline(state.m_InspectionPipeline) ||
+					!constants.Bind(state.m_LookupScene, frame.m_FrameConstants.m_SceneSnapshot))
+				{
+					return;
+				}
+				const InspectionParameters parameters{ .m_Field = data.m_Field.Resolve(execute),
+					.m_Coordinate = request.m_Coordinate,
+					.m_Output = execute.GetViewDescriptor(data.m_Output).m_Index };
+				if (commands->SetConstantBufferData(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+				{
+					commands->Dispatch((texels - 1 + 63) / 64, 1, 1);
+				}
+			});
 	}
 
 	void GIField::ExportResources(RenderGraph& graph) noexcept

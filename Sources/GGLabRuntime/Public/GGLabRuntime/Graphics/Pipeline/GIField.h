@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIUpdateStatus.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIFieldReadiness.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIFieldObservation.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 
@@ -90,6 +91,8 @@ namespace gglab
 		[[nodiscard]] std::shared_ptr<RayScene> GetRayScene() const noexcept;
 		[[nodiscard]] GIFieldDiagnostics GetDiagnostics(bool allocations = false) const noexcept;
 		[[nodiscard]] GIFieldCaptureState GetCaptureState() const noexcept;
+		void SetProbeInspection(std::optional<GIProbeInspectionRequest> request) noexcept;
+		void AddProbeInspection(RenderGraph& graph, const RenderFrameContext& frame) noexcept;
 		[[nodiscard]] RenderFrameValidationResult Prepare(const RenderFrameContext& frame,
 			const RenderServices& services) noexcept;
 		void AddPasses(RenderGraph& graph, const RenderFrameContext& frame,

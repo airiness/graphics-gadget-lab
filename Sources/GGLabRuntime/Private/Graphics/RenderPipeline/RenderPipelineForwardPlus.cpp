@@ -630,6 +630,7 @@ namespace gglab
 		m_AtmospherePass.AddFinishPass(rg);
 		if (m_GIField)
 		{
+			m_GIField->AddProbeInspection(rg, context);
 			m_GIField->ExportResources(rg);
 		}
 

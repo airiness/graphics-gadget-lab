@@ -13,6 +13,7 @@
 #include "Parameters/ViewControlSnapshot.h"
 #include "Parameters/ViewControlActions.h"
 #include "Capture/FrameCaptureCoordinator.h"
+#include "Capture/GIProbeInspectionControl.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderingSettingsDiagnosticsSnapshot.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
@@ -46,6 +47,23 @@ namespace gglab
 				m_Preview.m_ExposureEV = exposure;
 			}
 			void RequestPostProcessPreview(PostProcessPreviewChannel) noexcept override { ++m_Requests; }
+		};
+
+		class GIInspectionProbe final : public GIProbeInspectionControlBase
+		{
+		public:
+			std::optional<GIProbeInspectionRequest> m_Request;
+			std::shared_ptr<const GIProbeInspectionResult> m_Result;
+			std::string m_Status = "Fixture inspection";
+			bool Inspect(GIProbeInspectionRequest request) noexcept override
+			{
+				m_Request = request;
+				return true;
+			}
+			void Cancel() noexcept override { m_Result.reset(); }
+			bool IsPending() const noexcept override { return false; }
+			std::shared_ptr<const GIProbeInspectionResult> GetResult() const noexcept override { return m_Result; }
+			const std::string& GetStatus() const noexcept override { return m_Status; }
 		};
 
 		void RunGIViewerPanelChecks(SelfTestContext& context) noexcept
@@ -98,6 +116,27 @@ namespace gglab
 				ImGui::FindWindowByName("GIViewerFixture")->Size.x >= 760 &&
 				ImGui::FindWindowByName("GIViewerFixture")->Size.y >= 660,
 				"Unavailable GI has an explanation and the first-use Viewer leaves room for its image");
+			GIFieldSummary fieldSummary{ .m_Field = { .m_Generation = 73, .m_RefreshEpoch = 2,
+				.m_EpochOriginUpdate = 80 }, .m_Counts = { 4, 4, 4 }, .m_InspectionAvailable = true };
+			GIInspectionProbe inspection;
+			gui.m_GIFieldSummary = &fieldSummary;
+			gui.m_GIProbeInspection = &inspection;
+			GGLAB_UNUSED(draw());
+			ImGui::ActivateItemByID(ImHashStr("Inspect probe", 0, ImHashStr("GIViewerFixture")));
+			const auto inspectionText = draw();
+			context.Check(inspection.m_Request && inspection.m_Request->m_ExpectedGeneration == 73 &&
+				inspection.m_Request->m_ExpectedRefreshEpoch == 2 &&
+				inspectionText.find("No completed readiness measurement") != std::string::npos,
+				"GUI inspection binds the displayed field identity and keeps pending measurement absence explicit");
+			auto historical = std::make_shared<GIProbeInspectionResult>();
+			historical->m_Observation.m_Field.m_Generation = 72;
+			historical->m_Observation.m_ProducingFrame = 913;
+			historical->m_Observation.m_FieldUpdate = 85;
+			inspection.m_Result = historical;
+			const auto historicalText = draw();
+			context.Check(historicalText.find("Historical field/selection") != std::string::npos &&
+				historicalText.find("frame 913") != std::string::npos,
+				"Retained GPU values show their historical identity after a field replacement");
 			LabSessionLog log;
 			LabSnapshot snapshot;
 			snapshot.m_ActiveLabName = "GI Reference";

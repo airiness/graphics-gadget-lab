@@ -1,4 +1,5 @@
 #pragma once
+#include <memory>
 #include <cstdint>
 #include <string_view>
 
@@ -60,6 +61,7 @@ namespace gglab
 	};
 
 	// Frozen before graph construction, from fence-completed measurement records.
+	struct GIFieldSummary;
 	struct GIFieldCaptureState
 	{
 		uint64_t m_Generation = 0;
@@ -67,5 +69,6 @@ namespace gglab
 		uint64_t m_LightingGeneration = 0;
 		uint64_t m_EnvironmentGeneration = 0;
 		GIFieldReadinessSnapshot m_Readiness;
+		std::shared_ptr<const GIFieldSummary> m_Summary;
 	};
 }

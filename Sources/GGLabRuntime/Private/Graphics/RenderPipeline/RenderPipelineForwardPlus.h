@@ -83,6 +83,13 @@ namespace gglab
 		{
 			return m_GIField ? m_GIField->GetCaptureState() : GIFieldCaptureState{};
 		}
+		void SetGIProbeInspection(std::optional<GIProbeInspectionRequest> request) noexcept override
+		{
+			if (m_GIField)
+			{
+				m_GIField->SetProbeInspection(std::move(request));
+			}
+		}
 		ResolvedTemporalFramePlan ResolveTemporalFramePlan(
 			TemporalFramePlanResolveInfo info) const noexcept override;
 

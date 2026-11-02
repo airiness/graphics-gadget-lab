@@ -3,6 +3,7 @@
 import argparse
 import copy
 import json
+import ValidateGIProbeInspection as probes
 import struct
 import tempfile
 import zlib
@@ -122,6 +123,7 @@ def validate(path, bundle_validator=None):
 			if set(files) != {product["metadata"], *(target["array"] for target in metadata["targets"])}:
 				raise ValueError("Resource files disagree with the array inventory")
 			frame = metadata["frame"]
+		probes.validate(frame, validator("GIProbeInspection.schema.json"))
 		if source in ("graph", "resource-export"):
 			if product["diagnosticTap"] is not None:
 				raise ValueError("Numerical/graph products cannot name an image tap")

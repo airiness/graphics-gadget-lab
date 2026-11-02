@@ -39,6 +39,8 @@ namespace gglab
 	struct ViewRenderSettingsOverrides;
 	struct ViewControlSnapshot;
 	class ViewControlActionsBase;
+	class GIProbeInspectionControlBase;
+	struct GIFieldSummary;
 
 	class DevelopGuiStateStore;
 
@@ -78,6 +80,8 @@ namespace gglab
 		// Borrowed immutable AppRuntime snapshot for this draw only.
 		const ViewControlSnapshot* m_ViewControl = nullptr;
 		ViewControlActionsBase* m_ViewControlActions = nullptr;
+		const GIFieldSummary* m_GIFieldSummary = nullptr;
+		GIProbeInspectionControlBase* m_GIProbeInspection = nullptr;
 		DevelopGuiSystem* m_DevelopGuiSystem = nullptr;
 		DevelopGuiRegistry* m_PanelRegistry = nullptr;
 		// Borrowed from the active authoring owner for this draw.

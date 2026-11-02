@@ -1,5 +1,6 @@
 #pragma once
 #include "DevTools/DevelopGui/DevelopGuiPanel.h"
+#include <array>
 
 namespace gglab
 {
@@ -12,5 +13,6 @@ namespace gglab
 
 	private:
 		bool m_Frozen = false;
+		std::array<int, 3> m_ProbeCoordinate{};
 	};
 }

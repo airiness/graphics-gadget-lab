@@ -3,6 +3,7 @@
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
+#include "Capture/GIProbeInspectionControl.h"
 
 #include <algorithm>
 #include <array>
@@ -32,12 +33,105 @@ namespace gglab
 			const auto found = std::ranges::find(SignalOptions, tap, &SignalOption::m_Tap);
 			return found != SignalOptions.end() ? *found : SignalOptions.front();
 		}
+
+		void DrawProbeInspection(DevelopGuiContext& context, std::array<int, 3>& coordinate) noexcept
+		{
+			if (!ImGui::CollapsingHeader("DDGI probe inspection", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				return;
+			}
+			const auto* summary = context.m_GIFieldSummary;
+			auto* control = context.m_GIProbeInspection;
+			if (!summary || !control)
+			{
+				ImGui::TextDisabled("No DDGI field in the active pipeline.");
+				return;
+			}
+			ImGui::Text("Field %llu | epoch %llu (U0=%llu) | %u x %u x %u",
+				summary->m_Field.m_Generation, summary->m_Field.m_RefreshEpoch,
+				summary->m_Field.m_EpochOriginUpdate, summary->m_Counts[0], summary->m_Counts[1], summary->m_Counts[2]);
+			ImGui::Text("Readiness: %s | completed epoch update %llu | quiet blocks %u/%u",
+				GetGIFieldReadinessName(summary->m_Readiness.m_State).data(),
+				summary->m_Readiness.m_CompletedUpdates, summary->m_Readiness.m_QuietBlocks,
+				summary->m_Readiness.m_ActiveBlocks);
+			if (summary->m_CompletedMeasurement)
+			{
+				ImGui::Text("CPU measurement: frame %llu, field update %llu",
+					summary->m_CompletedMeasurement->m_ProducingFrame,
+					summary->m_CompletedMeasurement->m_FieldUpdate);
+			}
+			else
+			{
+				ImGui::TextDisabled("No completed readiness measurement in this epoch.");
+			}
+			if (ImGui::InputInt3("Probe coordinate (x,y,z)", coordinate.data()))
+			{
+				control->Cancel();
+			}
+			GIProbeInspectionRequest request{
+				.m_Coordinate = { uint32_t(coordinate[0]), uint32_t(coordinate[1]), uint32_t(coordinate[2]) },
+				.m_ExpectedGeneration = summary->m_Field.m_Generation,
+				.m_ExpectedRefreshEpoch = summary->m_Field.m_RefreshEpoch };
+			ImGui::BeginDisabled(control->IsPending() || !summary->m_InspectionAvailable ||
+				!MatchesGIProbeInspection(request, *summary));
+			if (ImGui::Button("Inspect probe"))
+			{
+				GGLAB_UNUSED(control->Inspect(request));
+			}
+			ImGui::EndDisabled();
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel / clear"))
+			{
+				control->Cancel();
+			}
+			ImGui::TextWrapped("%s", control->GetStatus().c_str());
+			const auto result = control->GetResult();
+			if (!result)
+			{
+				return;
+			}
+			const bool historical = result->m_Observation.m_Field != summary->m_Field ||
+				result->m_Request.m_Coordinate != request.m_Coordinate;
+			ImGui::Text("%s | frame %llu | U=%llu, epoch update=%llu | classification %u | %s",
+				historical ? "Historical field/selection" : "Completed GPU observation",
+				result->m_Observation.m_ProducingFrame, result->m_Observation.m_FieldUpdate,
+				result->m_Observation.m_ReadinessUpdate, result->m_Classification,
+				GetGIProbeInspectionValidityName(result->m_Validity).data());
+			ImGui::Text("World position: %.4f, %.4f, %.4f", result->m_WorldPosition[0],
+				result->m_WorldPosition[1], result->m_WorldPosition[2]);
+			ImGui::TextDisabled("Bordered octahedral texels | scene-referred E | no exposure or albedo");
+			for (bool distance : { false, true })
+			{
+				if (!ImGui::TreeNode(distance ? "Distance: mean, second moment (world units, squared units)" :
+					"Irradiance E: R, G, B"))
+				{
+					continue;
+				}
+				const auto& tile = distance ? result->m_Distance : result->m_Irradiance;
+				const uint32_t width = distance ? result->m_DistanceTileWidth : result->m_IrradianceTileWidth;
+				ImGui::BeginChild(distance ? "DistanceTexels" : "IrradianceTexels", ImVec2(0, 180));
+				ImGuiListClipper clipper;
+				clipper.Begin(static_cast<int>(tile.size()));
+				while (clipper.Step())
+				{
+					for (int index = clipper.DisplayStart; index < clipper.DisplayEnd; ++index)
+					{
+						const auto& texel = tile[index];
+						ImGui::Text("[%u,%u] %.7g  %.7g  %.7g", uint32_t(index) % width,
+							uint32_t(index) / width, texel[0], texel[1], texel[2]);
+					}
+				}
+				ImGui::EndChild();
+				ImGui::TreePop();
+			}
+		}
 	}
 
 	void GIViewerPanel::Draw(DevelopGuiContext& context) noexcept
 	{
 		ImGui::SetWindowPos(ImVec2(460, 45), ImGuiCond_FirstUseEver);
 		ImGui::SetWindowSize(ImVec2(760, 660), ImGuiCond_FirstUseEver);
+		DrawProbeInspection(context, m_ProbeCoordinate);
 		const auto* view = context.m_PostProcessPreview;
 		auto* control = context.m_PostProcessPreviewControl;
 		if (!view || !control)

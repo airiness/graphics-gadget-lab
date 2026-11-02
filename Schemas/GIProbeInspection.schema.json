@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gglab.gi-probe-inspection",
+  "title": "GGLab bounded probe inspection v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "request", "observation", "worldPosition", "positionUnits", "classification", "validity", "tileLayout", "irradianceUnits", "distanceUnits", "irradianceTileWidth", "distanceTileWidth", "irradiance", "distance"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "request": {
+      "type": "object", "additionalProperties": false,
+      "required": ["coordinate", "expectedGeneration", "expectedRefreshEpoch"],
+      "properties": {
+        "coordinate": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "integer", "minimum": 0, "maximum": 4294967295}},
+        "expectedGeneration": {"type": "integer", "minimum": 1},
+        "expectedRefreshEpoch": {"type": ["integer", "null"], "minimum": 1}
+      }
+    },
+    "observation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["field", "kind", "producingFrame", "fieldUpdate", "readinessUpdate"],
+      "properties": {
+        "field": {
+          "type": "object", "additionalProperties": false,
+          "required": ["generation", "sceneRevision", "lightingGeneration", "environmentGeneration", "refreshEpoch", "epochOriginUpdate"],
+          "properties": {
+            "generation": {"type": "integer", "minimum": 1},
+            "sceneRevision": {"type": "integer", "minimum": 0},
+            "lightingGeneration": {"type": "integer", "minimum": 0},
+            "environmentGeneration": {"type": "integer", "minimum": 0},
+            "refreshEpoch": {"type": "integer", "minimum": 1},
+            "epochOriginUpdate": {"type": "integer", "minimum": 0}
+          }
+        },
+        "kind": {"const": "probe-atlas"},
+        "producingFrame": {"type": "integer", "minimum": 1},
+        "fieldUpdate": {"type": "integer", "minimum": 1},
+        "readinessUpdate": {"type": "integer", "minimum": 1}
+      }
+    },
+    "worldPosition": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}},
+    "positionUnits": {"const": "world-units"},
+    "classification": {"type": "integer", "minimum": 0},
+    "validity": {"enum": ["Valid", "Inactive", "InvalidField", "InvalidNumerics", "MalformedPayload"]},
+    "tileLayout": {"const": "row-major-bordered-octahedral"},
+    "irradianceUnits": {"const": "scene-referred-irradiance-E"},
+    "distanceUnits": {"const": ["world-units", "world-units-squared"]},
+    "irradianceTileWidth": {"enum": [0, 8, 16, 32]},
+    "distanceTileWidth": {"const": 16},
+    "irradiance": {"type": "array", "maxItems": 1024, "items": {"$ref": "#/$defs/texel"}},
+    "distance": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/texel"}}
+  },
+  "$defs": {
+    "texel": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": ["number", "null"]}}
+  }
+}

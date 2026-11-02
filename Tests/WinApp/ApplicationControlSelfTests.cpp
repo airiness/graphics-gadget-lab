@@ -202,6 +202,23 @@ namespace gglab
 			context.Check(diagnostic.m_Request &&
 				std::get<DiagnosticCaptureProduct>(diagnostic.m_Request->m_Capture.m_RequiredProducts[0]).m_Tap == PostProcessDebugTap::TemporalHistoryWeight,
 				"Diagnostic convenience capture directly builds its typed tap");
+			const auto probe = ParseApplicationControlRequest(
+				R"({"protocol":4,"id":51,"command":"capture","timing":"next-frame","giProbeInspection":{"coordinate":[2,3,4],"expectedGeneration":7,"expectedRefreshEpoch":2}})");
+			context.Check(probe.m_Request && probe.m_Request->m_Capture.m_GIProbeInspection &&
+				probe.m_Request->m_Capture.m_GIProbeInspection->m_Coordinate == std::array<uint32_t, 3>{ 2, 3, 4 } &&
+				probe.m_Request->m_Capture.m_RequiredProducts.size() == 2 &&
+				std::get<ResourceCaptureProduct>(probe.m_Request->m_Capture.m_RequiredProducts.back()).m_Targets[0].m_Resource ==
+					"GI.Field.ProbeInspection", "Typed probe inspection adds the bounded resource to the same-frame job");
+			for (std::string_view invalid : {
+				R"({"coordinate":[-1,0,0],"expectedGeneration":1})",
+				R"({"coordinate":[0,0],"expectedGeneration":1})",
+				R"({"coordinate":[0,0,0],"expectedGeneration":0})",
+				R"({"coordinate":[0,0,0],"expectedGeneration":1,"extra":2})" })
+			{
+				context.Check(!ParseApplicationControlRequest(std::format(
+					R"({{"protocol":4,"id":51,"command":"capture","giProbeInspection":{}}})", invalid)).m_Request,
+					"Malformed coordinates and unbound identities reject before job admission");
+			}
 			const auto graph = ParseApplicationControlRequest(R"({"protocol":4,"id":50,"command":"graph","summary":true})");
 			context.Check(graph.m_Request && graph.m_Request->m_Command == ApplicationControlCommand::Graph &&
 				std::get<GraphCaptureProduct>(graph.m_Request->m_Capture.m_RequiredProducts[0]).m_Summary,
