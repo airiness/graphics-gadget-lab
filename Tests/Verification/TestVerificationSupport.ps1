@@ -454,15 +454,20 @@ switch ($Command) {
     Copy-Item -LiteralPath $runner -Destination $runnerTests
     Copy-Item -LiteralPath (Join-Path $root 'Scripts/Verification/VerificationSupport.psm1') -Destination $runnerTools
     [IO.File]::WriteAllText((Join-Path $runnerBin 'GraphicsGadgetLab.exe'), '')
+    $runnerPython = Join-Path $runnerRepository 'configured python.cmd'
+    [IO.File]::WriteAllText($runnerPython, "@echo inspection-test-python`r`n@exit /b 0`r`n")
     $leafSource = @'
 param([string]$OutputDirectory, [string]$RunDirectory, [string[]]$Configuration, [string[]]$Rhi, [string]$Python)
 Import-Module (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'Scripts/Verification/VerificationSupport.psm1')
 $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory -RunId 'leaf-run-id'
-[Console]::Out.WriteLine((@{ ok=$true; directory=$directory; configuration=$Configuration; rhi=$Rhi; python=$Python } | ConvertTo-Json -Compress))
+$pythonIdentity = if ($Python) { & $Python --version } else { '' }
+[Console]::Out.WriteLine((@{ ok=$true; directory=$directory; configuration=$Configuration; rhi=$Rhi; python=$Python; pythonIdentity=$pythonIdentity } | ConvertTo-Json -Compress))
 '@
     # Keep catalog expectations and leaf fixtures together so their counts cannot drift.
     $gpuLeaves = [ordered]@{
         'gi-field' = 'TestGIField.ps1'
+        'gi-probe-inspection' = 'TestGIProbeInspection.ps1'
+        'gi-receiver-inspection' = 'TestGIReceiverInspection.ps1'
         'gi-field-readiness' = 'TestGIFieldReadiness.ps1'
         'gi-field-sampling' = 'TestGIFieldSampling.ps1'
         'gi-invalid-updates' = 'TestGIInvalidUpdates.ps1'
@@ -504,7 +509,7 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
         [IO.File]::WriteAllText((Join-Path $runnerTests $leaf), $leafSource, (New-Object Text.UTF8Encoding($false)))
     }
     $execution = Invoke-VerificationScript (Join-Path $runnerTests 'RunVerification.ps1') @{
-        Group='gpu'; Python='fixture-python-path'; OutputDirectory=(Join-Path $output 'runner-results') }
+        Group='gpu'; Python=$runnerPython; OutputDirectory=(Join-Path $output 'runner-results') }
     $gpuResult = $execution.output | ConvertFrom-Json
     Check ($execution.exitCode -eq 0 -and $gpuResult.ok -and
         $gpuResult.suites.Count -eq $gpuLeaves.Count -and
@@ -515,10 +520,11 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
             $leafResult.configuration[0] -eq 'Develop' -and $leafResult.rhi.Count -eq 2) "runner-compact-$($suiteResult.name)"
     }
     Check (($gpuResult.suites | Where-Object name -eq 'taa-comparison').steps[0].receipt.python -eq
-        'fixture-python-path') 'runner-forwards-selected-python-to-taa-workflow'
-    foreach ($suite in @('session-lifecycle', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-field-readiness', 'gi-field-sampling', 'gi-invalid-updates', 'gi-receiver-cache')) {
-        Check (($gpuResult.suites | Where-Object name -eq $suite).steps[0].receipt.python -eq
-            'fixture-python-path') "runner-forwards-selected-python-to-$suite"
+        $runnerPython) 'runner-forwards-selected-python-to-taa-workflow'
+    foreach ($suite in @('session-lifecycle', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-probe-inspection', 'gi-receiver-inspection', 'gi-field-readiness', 'gi-field-sampling', 'gi-invalid-updates', 'gi-receiver-cache')) {
+        $leafResult = ($gpuResult.suites | Where-Object name -eq $suite).steps[0].receipt
+        Check ($leafResult.python -eq $runnerPython -and $leafResult.pythonIdentity -eq
+            'inspection-test-python') "runner-forwards-selected-python-to-$suite"
     }
     # Exercise both real producers through the catalog with only native transport and
     # Python stubbed. Keep their source/binary seals, receipts and failure paths real.

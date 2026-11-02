@@ -140,7 +140,7 @@ try {
                     $parameters = @{ OutputDirectory = $directory }
                     if ($item.group -eq 'gpu') {
                         $parameters = @{ RunDirectory = (Join-Path $directory 'run'); Configuration = $config; Rhi = $Rhi }
-                        if ($item.name -in @('taa-comparison', 'session-lifecycle', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-field-readiness', 'gi-field-sampling', 'gi-invalid-updates', 'gi-receiver-cache')) { $parameters.Python = $Python }
+                        if ($item.name -in @('taa-comparison', 'session-lifecycle', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-probe-inspection', 'gi-receiver-inspection', 'gi-field-readiness', 'gi-field-sampling', 'gi-invalid-updates', 'gi-receiver-cache')) { $parameters.Python = $Python }
                     }
                     $execution = Invoke-VerificationScript $path $parameters
                     $text = $execution.output + $execution.error
