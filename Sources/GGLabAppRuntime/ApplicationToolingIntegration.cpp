@@ -6,6 +6,10 @@ namespace gglab
 		const ViewRenderProfile& authored) const noexcept
 	{
 		ViewRenderProfile profile = authored;
+		if (m_GIProbes)
+		{
+			profile.m_GIProbes = *m_GIProbes;
+		}
 		if (m_TemporalAA)
 		{
 			profile.m_TemporalAA = *m_TemporalAA;
@@ -29,6 +33,7 @@ namespace gglab
 	{
 		const auto profile = tooling.ResolveProfile(authored);
 		return { profile, ResolveViewRenderSettings(profile, camera), {
+			.m_GIProbes = tooling.m_GIProbes.has_value(),
 			.m_TemporalAA = tooling.m_TemporalAA.has_value(),
 			.m_GTAO = tooling.m_GTAO.has_value(),
 			.m_Bloom = tooling.m_Bloom.has_value(),

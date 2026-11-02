@@ -12,6 +12,7 @@
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
 #include "Parameters/ViewControlSnapshot.h"
+#include "Parameters/HostViewParameters.h"
 #include "Parameters/ViewControlActions.h"
 #include "Capture/FrameCaptureCoordinator.h"
 #include "Capture/GIProbeInspectionControl.h"
@@ -149,6 +150,29 @@ namespace gglab
 				ImGui::FindWindowByName("GIViewerFixture")->Size.x >= 760 &&
 				ImGui::FindWindowByName("GIViewerFixture")->Size.y >= 660,
 				"Unavailable GI has an explanation and the first-use Viewer leaves room for its image");
+			DevToolsRuntime displayTools;
+			auto& displayOverrides = displayTools.GetViewRenderSettingsOverrides();
+			gui.m_ViewRenderSettingsOverrides = &displayOverrides;
+			ImGui::ActivateItemByID(ImHashStr("Probe array (Classification)", 0, ImHashStr("GIViewerFixture")));
+			GGLAB_UNUSED(draw());
+			ImGui::ActivateItemByID(ImHashStr("Show probe spheres", 0, ImHashStr("GIViewerFixture")));
+			GGLAB_UNUSED(draw());
+			context.Check(displayOverrides.m_GIProbes.m_Enabled && displayOverrides.GetActiveCount() == 1,
+				"The real Viewer checkbox enables only its GUI probe display block");
+			Camera displayCamera(Camera::CreateInfo{});
+			const auto displaySettings = displayTools.CaptureFrameSettings();
+			auto resolvedDisplay = ResolveApplicationViewSettings({}, displayCamera, displaySettings);
+			context.Check(resolvedDisplay.m_ToolingBlocks.m_GIProbes && resolvedDisplay.m_View.m_GIProbes.m_Enabled,
+				"GUI probe settings reach Runtime frame settings with tooling attribution");
+			const std::array sessionDisplay{
+				LabParameterValue{ LabParameterId("view.gi_probes.enabled"), true },
+				LabParameterValue{ LabParameterId("view.gi_probes.budget"), uint32_t(17) } };
+			ApplyHostViewParameters(sessionDisplay, resolvedDisplay.m_View, true);
+			context.Check(resolvedDisplay.m_View.m_GIProbes.m_Budget == 17 &&
+				displayOverrides.m_GIProbes.m_Budget == 2048,
+				"Session display settings override GUI intent without modifying its owned request");
+			ImGui::ActivateItemByID(ImHashStr("Probe array (Classification)", 0, ImHashStr("GIViewerFixture")));
+			GGLAB_UNUSED(draw());
 			GIFieldSummary fieldSummary{ .m_Field = { .m_Generation = 73, .m_RefreshEpoch = 2,
 				.m_EpochOriginUpdate = 80 }, .m_Counts = { 4, 4, 4 }, .m_InspectionAvailable = true,
 				.m_ReceiverInspectionAvailable = true, .m_ReceiverMarkersAvailable = true };
@@ -236,6 +260,7 @@ namespace gglab
 			context.Check(viewerWindow != nullptr, "The registered GI Viewer creates its real window");
 			if (viewerWindow)
 			{
+				displayOverrides.m_GIProbes.m_Enabled = true;
 				const auto probeCancellations = inspection.m_Cancellations;
 				const auto receiverCancellations = receiver.m_Cancellations;
 				ImGui::SetWindowCollapsed(viewerWindow, true);
@@ -252,6 +277,13 @@ namespace gglab
 					receiver.m_Cancellations == receiverCancellations + 1 &&
 					!inspection.m_Result && !receiver.m_Result,
 					"The GI Viewer close button cancels both owned inspections in the closing frame");
+				context.Check(!displayOverrides.m_GIProbes.m_Enabled,
+					"Closing the Viewer releases its GUI probe display request");
+				resolvedDisplay = ResolveApplicationViewSettings({}, displayCamera, displayTools.CaptureFrameSettings());
+				ApplyHostViewParameters(sessionDisplay, resolvedDisplay.m_View, true);
+				context.Check(!resolvedDisplay.m_ToolingBlocks.m_GIProbes &&
+					resolvedDisplay.m_View.m_GIProbes.m_Enabled && resolvedDisplay.m_View.m_GIProbes.m_Budget == 17,
+					"Closing the GUI request preserves independent session display intent");
 				drawRegistry();
 				context.Check(inspection.m_Cancellations == probeCancellations + 1 &&
 					receiver.m_Cancellations == receiverCancellations + 1,
@@ -273,6 +305,7 @@ namespace gglab
 						"Closing the GI Viewer from the menu notifies it before the registry skips its draw");
 				}
 			}
+			gui.m_ViewRenderSettingsOverrides = nullptr;
 			LabSessionLog log;
 			LabSnapshot snapshot;
 			snapshot.m_ActiveLabName = "GI Reference";

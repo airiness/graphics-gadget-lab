@@ -538,7 +538,8 @@ namespace gglab
 			return {
 				{ "field", GIIdentityJson(stamp.m_Field) },
 				{ "kind", stamp.m_Kind == GIObservationKind::ReceiverContribution ? "receiver-contribution" :
-					stamp.m_Kind == GIObservationKind::ProbeAtlas ? "probe-atlas" : "completed-readiness" },
+					stamp.m_Kind == GIObservationKind::ProbeAtlas ? "probe-atlas" :
+					stamp.m_Kind == GIObservationKind::ProbeVisualization ? "probe-visualization" : "completed-readiness" },
 				{ "producingFrame", stamp.m_ProducingFrame },
 				{ "fieldUpdate", stamp.m_FieldUpdate },
 				{ "readinessUpdate", stamp.m_ReadinessUpdate } };
@@ -568,6 +569,58 @@ namespace gglab
 		}
 	}
 
+	namespace
+	{
+		nlohmann::json GIProbeVisualizationSettingsJson(const GIProbeVisualizationSettings& settings)
+		{
+			return {
+				{ "enabled", settings.m_Enabled },
+				{ "bounds", settings.m_Bounds },
+				{ "radiusInSpacings", settings.m_Radius },
+				{ "budget", settings.m_Budget },
+				{ "sliceAxis", settings.m_SliceAxis },
+				{ "layerMinimum", settings.m_LayerMinimum },
+				{ "layerMaximum", settings.m_LayerMaximum },
+				{ "classificationMask", settings.m_ClassificationMask },
+				{ "maximumDistance", settings.m_MaximumDistance } };
+		}
+		nlohmann::json GIProbeVisualizationJson(const GIProbeVisualizationSnapshot& snapshot)
+		{
+			using Json = nlohmann::json;
+			const auto& counts = snapshot.m_CompletedCounts;
+			return {
+				{ "schemaVersion", 1 },
+				{ "mode", "classification" },
+				{ "depthMode", "xray-private-strict-D32" },
+				{ "filterOrderVersion", GIProbeVisualizationFilterVersion },
+				{ "filterOrder", { "stable-id", "slice-inclusive", "classification", "center-distance-inclusive", "sphere-frustum", "first-N" } },
+				{ "settings", GIProbeVisualizationSettingsJson(snapshot.m_Settings) },
+				{ "available", snapshot.m_Available },
+				{ "viewSupported", snapshot.m_ViewSupported },
+				{ "readbackFailed", snapshot.m_ReadbackFailed },
+				{ "privateDepthLogicalBytes", snapshot.m_PrivateDepthLogicalBytes },
+				{ "selectionLogicalBytes", snapshot.m_SelectionLogicalBytes },
+				{ "readbackBufferBytes", snapshot.m_ReadbackBufferBytes },
+				{ "observation", snapshot.m_Observation ? GIStampJson(*snapshot.m_Observation) : Json(nullptr) },
+				{ "countsResource", "GI.Probes.Counts" },
+				{ "orderedIDsResource", "GI.Probes.RenderedIDs" },
+				{ "idLayout", "R32Uint[2,budget]: row0=stable-id, row1=classification; unused=(UINT32_MAX,0)" },
+				{ "highlightCount", 0 },
+				{ "completed", snapshot.m_CompletedObservation ? Json{
+					{ "observation", GIStampJson(*snapshot.m_CompletedObservation) },
+					{ "view", GIReceiverViewJson(snapshot.m_CompletedView) },
+					{ "settings", GIProbeVisualizationSettingsJson(snapshot.m_CompletedSettings) },
+					{ "counts", {
+						{ "enumerated", counts.m_Enumerated },
+						{ "afterSlice", counts.m_AfterSlice },
+						{ "afterClassification", counts.m_AfterClassification },
+						{ "afterDistance", counts.m_AfterDistance },
+						{ "afterFrustum", counts.m_AfterFrustum },
+						{ "rendered", counts.m_Rendered },
+						{ "budgetDropped", counts.m_BudgetDropped } } } } : Json(nullptr) } };
+		}
+	}
+
 	std::string SerializeGIFieldSummary(const GIFieldSummary& summary) noexcept
 	{
 		return nlohmann::json{
@@ -585,6 +638,7 @@ namespace gglab
 			{ "receiverInspectionAvailable", summary.m_ReceiverInspectionAvailable },
 			{ "receiverMarkersAvailable", summary.m_ReceiverMarkersAvailable },
 			{ "classificationCounts", nullptr },
+			{ "probeVisualization", GIProbeVisualizationJson(summary.m_Visualization) },
 			{ "receiverView", GIReceiverViewJson(summary.m_ReceiverView) },
 			{ "completedMeasurement", summary.m_CompletedMeasurement ?
 				GIStampJson(*summary.m_CompletedMeasurement) : nlohmann::json(nullptr) } }.dump();

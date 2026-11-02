@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Pipeline/GIFieldReadiness.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIProbeVisualization.h"
 
 #include <array>
 #include <cmath>
@@ -29,6 +30,7 @@ namespace gglab
 		CompletedReadiness,
 		ProbeAtlas,
 		ReceiverContribution,
+		ProbeVisualization,
 	};
 
 	struct GIObservationStamp
@@ -62,6 +64,13 @@ namespace gglab
 		bool operator==(const GIReceiverViewSnapshot&) const = default;
 	};
 
+	[[nodiscard]] inline bool IsGIProbeVisualizationViewSupported(const GIReceiverViewSnapshot& view) noexcept
+	{
+		return view.m_Revision != 0 && view.m_RenderExtent == view.m_DisplayExtent &&
+			view.m_DisplayExtent[0] != 0 && view.m_DisplayExtent[1] != 0 &&
+			!view.m_TemporalAA && view.m_JitterPixels == std::array<float, 2>{};
+	}
+
 	// The revision follows logical camera/configuration changes, not frame advancement.
 	// The revision follows logical camera/configuration changes, not frame advancement.
 	[[nodiscard]] inline GIReceiverViewSnapshot AdvanceGIReceiverView(
@@ -76,6 +85,22 @@ namespace gglab
 	}
 
 	// Published together on the Runtime owner thread. Copies retain CPU values only.
+	struct GIProbeVisualizationSnapshot
+	{
+		GIProbeVisualizationSettings m_Settings;
+		bool m_Available = false;
+		bool m_ViewSupported = false;
+		bool m_ReadbackFailed = false;
+		uint64_t m_PrivateDepthLogicalBytes = 0;
+		uint64_t m_SelectionLogicalBytes = 0;
+		uint64_t m_ReadbackBufferBytes = 0;
+		std::optional<GIObservationStamp> m_Observation;
+		std::optional<GIObservationStamp> m_CompletedObservation;
+		GIReceiverViewSnapshot m_CompletedView;
+		GIProbeVisualizationSettings m_CompletedSettings;
+		GIProbeVisualizationCounts m_CompletedCounts;
+	};
+
 	struct GIFieldSummary
 	{
 		GIFieldIdentity m_Field;
@@ -92,6 +117,7 @@ namespace gglab
 		bool m_ReceiverInspectionAvailable = false;
 		bool m_ReceiverMarkersAvailable = false;
 		GIReceiverViewSnapshot m_ReceiverView;
+		GIProbeVisualizationSnapshot m_Visualization;
 	};
 
 	struct GIProbeInspectionRequest

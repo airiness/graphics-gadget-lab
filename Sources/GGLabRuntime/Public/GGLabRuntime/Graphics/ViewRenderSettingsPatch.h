@@ -56,6 +56,18 @@ namespace gglab
 
 	struct ViewRenderSettingsPatch
 	{
+		struct GIProbesPatch
+		{
+			std::optional<bool> m_Enabled;
+			std::optional<bool> m_Bounds;
+			std::optional<float> m_Radius;
+			std::optional<uint32_t> m_Budget;
+			std::optional<uint32_t> m_SliceAxis;
+			std::optional<uint32_t> m_LayerMinimum;
+			std::optional<uint32_t> m_LayerMaximum;
+			std::optional<uint32_t> m_ClassificationMask;
+			std::optional<float> m_MaximumDistance;
+		} m_GIProbes;
 		TemporalAASettingsPatch m_TemporalAA;
 		ExposureSettingsPatch m_Exposure;
 		LightingSettingsPatch m_Lighting;

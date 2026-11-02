@@ -610,6 +610,7 @@ namespace gglab
 		m_DebugDrawOverlayPass.AddPass(rg, context, services);
 		if (m_GIField)
 		{
+			m_GIField->AddProbeVisualization(rg, context);
 			m_GIField->AddReceiverMarkers(rg, context);
 		}
 

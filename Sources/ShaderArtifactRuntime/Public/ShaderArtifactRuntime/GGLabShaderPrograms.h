@@ -189,6 +189,12 @@ namespace gglab::shader_programs
 		"gglab.shader.gi-field", "vertex.receiver-markers", ShaderStage::Vertex };
 	inline const ShaderProgramRef GIReceiverMarkersPixel{
 		"gglab.shader.gi-field", "pixel.receiver-markers", ShaderStage::Pixel };
+	inline const ShaderProgramRef GIProbeVisualizationCompute{
+		"gglab.shader.gi-field", "compute.probe-visualization", ShaderStage::Compute };
+	inline const ShaderProgramRef GIProbeVisualizationVertex{
+		"gglab.shader.gi-field", "vertex.probe-visualization", ShaderStage::Vertex };
+	inline const ShaderProgramRef GIProbeVisualizationPixel{
+		"gglab.shader.gi-field", "pixel.probe-visualization", ShaderStage::Pixel };
 	inline const ShaderProgramRef GIReceiverPixel{
 		"gglab.shader.gi-receiver", "pixel.receiver", ShaderStage::Pixel };
 	inline const ShaderProgramRef GIReceiverPositionPixel{

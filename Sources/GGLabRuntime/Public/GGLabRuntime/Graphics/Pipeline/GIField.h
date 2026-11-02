@@ -97,6 +97,7 @@ namespace gglab
 		void SetReceiverInspection(std::optional<GIReceiverInspectionRequest> request) noexcept;
 		void AddReceiverInspection(RenderGraph& graph, const RenderFrameContext& frame) noexcept;
 		void AddReceiverMarkers(RenderGraph& graph, const RenderFrameContext& frame) noexcept;
+		void AddProbeVisualization(RenderGraph& graph, const RenderFrameContext& frame) noexcept;
 		[[nodiscard]] RenderFrameValidationResult Prepare(const RenderFrameContext& frame,
 			const RenderServices& services, bool receiversAvailable = false) noexcept;
 		void AddPasses(RenderGraph& graph, const RenderFrameContext& frame,

@@ -832,6 +832,29 @@ namespace gglab
 			invalid = info;
 			invalid.m_RaysPerProbe = 255;
 			context.Check(!ValidateGIFieldCreateInfo(invalid), "Unsupported ray profiles cannot silently change their work budget");
+			GIProbeVisualizationSettings display{
+				.m_Radius = std::numeric_limits<float>::quiet_NaN(), .m_Budget = UINT32_MAX,
+				.m_SliceAxis = 7, .m_LayerMinimum = 5, .m_LayerMaximum = 3,
+				.m_ClassificationMask = UINT32_MAX, .m_MaximumDistance = -1 };
+			display = ResolveGIProbeVisualizationSettings(display);
+			context.Check(!display.m_Enabled && display.m_Radius == 0.12f &&
+				display.m_Budget == GIProbeVisualizationMaximumBudget && display.m_SliceAxis == 3 &&
+				display.m_ClassificationMask == 15 && display.m_MaximumDistance == 0,
+				"Probe display defaults off and resolves finite, bounded diagnostic settings");
+			context.Check(display.m_LayerMinimum > display.m_LayerMaximum,
+				"An inverted inclusive slice remains empty instead of silently exchanging its endpoints");
+			GIReceiverViewSnapshot displayView{ .m_Revision = 1,
+				.m_RenderExtent = { 640, 400 }, .m_DisplayExtent = { 640, 400 } };
+			context.Check(IsGIProbeVisualizationViewSupported(displayView),
+				"Classification display does not require receiver diagnostic attachments");
+			displayView.m_TemporalAA = true;
+			context.Check(!IsGIProbeVisualizationViewSupported(displayView), "TAA display is explicitly unsupported");
+			displayView.m_TemporalAA = false;
+			displayView.m_JitterPixels[0] = 0.25f;
+			context.Check(!IsGIProbeVisualizationViewSupported(displayView), "A jittered display is explicitly unsupported");
+			displayView.m_JitterPixels = {};
+			displayView.m_RenderExtent[0] = 320;
+			context.Check(!IsGIProbeVisualizationViewSupported(displayView), "Upscaled display is explicitly unsupported");
 			GIField first(info);
 			GIField replacement(info);
 			const auto summary = first.GetCaptureState().m_Summary;

@@ -5499,6 +5499,12 @@ namespace gglab
 			GraphicsPhysicalPipelineKey reversedEqualRecipe{};
 			reversedEqualRecipe.m_DepthPreset = DepthPreset::ReversedZEqualReadOnly;
 			const auto reversedEqual = BuildRHIGraphicsPipelineDesc(reversedEqualRecipe).m_DepthStencil;
+			GraphicsPhysicalPipelineKey probeDepthRecipe{};
+			probeDepthRecipe.m_DepthPreset = DepthPreset::ReversedZStrictWrite;
+			const auto probeDepth = BuildRHIGraphicsPipelineDesc(probeDepthRecipe).m_DepthStencil;
+			context.Check(probeDepth.m_DepthTestEnable && probeDepth.m_DepthWriteEnable &&
+				probeDepth.m_DepthCompareOp == RHICompareOp::Greater,
+				"Probe depth keeps the earliest stable ID at equal D32 depth without changing production coverage");
 			GraphicsPhysicalPipelineKey standardWriteRecipe{};
 			standardWriteRecipe.m_DepthPreset = DepthPreset::StandardZWrite;
 			const auto standardWrite = BuildRHIGraphicsPipelineDesc(standardWriteRecipe).m_DepthStencil;

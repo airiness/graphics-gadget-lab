@@ -1,5 +1,6 @@
 #include "DevTools/DevelopGui/Panels/GIViewerPanel.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
+#include "DevTools/DevToolsRuntime.h"
 #include "DevTools/DevelopGui/DevelopGuiTextureUtils.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
@@ -15,6 +16,95 @@ namespace gglab
 {
 	namespace
 	{
+		void DrawProbeArray(DevelopGuiContext& context) noexcept
+		{
+			if (!ImGui::CollapsingHeader("Probe array (Classification)"))
+			{
+				return;
+			}
+			auto* overrides = context.m_ViewRenderSettingsOverrides;
+			if (!overrides)
+			{
+				ImGui::TextDisabled("Probe display controls are unavailable.");
+				return;
+			}
+			auto& settings = overrides->m_GIProbes;
+			ImGui::Checkbox("Show probe spheres", &settings.m_Enabled);
+			ImGui::SameLine();
+			ImGui::Checkbox("Volume bounds", &settings.m_Bounds);
+			ImGui::SliderFloat("Radius / spacing", &settings.m_Radius, 0.01f, 0.5f, "%.3f");
+			int budget = int(settings.m_Budget);
+			if (ImGui::InputInt("Array budget", &budget))
+			{
+				settings.m_Budget = uint32_t(std::clamp(budget, 1, int(GIProbeVisualizationMaximumBudget)));
+			}
+			int axis = int(settings.m_SliceAxis);
+			if (ImGui::Combo("Slice axis", &axis, "All\0X\0Y\0Z\0"))
+			{
+				settings.m_SliceAxis = uint32_t(axis);
+			}
+			int layers[2]{ int(settings.m_LayerMinimum), int(settings.m_LayerMaximum) };
+			if (ImGui::InputInt2("Inclusive layers", layers))
+			{
+				settings.m_LayerMinimum = uint32_t(std::clamp(layers[0], 0, 65535));
+				settings.m_LayerMaximum = uint32_t(std::clamp(layers[1], 0, 65535));
+			}
+			const std::array names{ "Pending", "Active", "Inactive", "Invalid" };
+			for (uint32_t index = 0; index < names.size(); ++index)
+			{
+				if (index != 0)
+				{
+					ImGui::SameLine();
+				}
+				bool show = (settings.m_ClassificationMask & (1u << index)) != 0;
+				if (ImGui::Checkbox(names[index], &show))
+				{
+					settings.m_ClassificationMask ^= 1u << index;
+				}
+			}
+			ImGui::InputFloat("Maximum center distance (0 = off)", &settings.m_MaximumDistance);
+			settings = ResolveGIProbeVisualizationSettings(settings);
+			ImGui::TextDisabled("X-ray | Native, TAA off | own depth resolves sphere overlaps");
+			ImGui::TextDisabled("Active: solid green | Inactive: dim wire | Pending: gold rings | Invalid: magenta");
+			ImGui::TextDisabled("Closing releases this GUI request. Host/session overrides keep precedence.");
+			const auto* summary = context.m_GIFieldSummary;
+			if (!summary)
+			{
+				ImGui::TextDisabled("No probe field in the active pipeline.");
+				return;
+			}
+			const auto& display = summary->m_Visualization;
+			ImGui::Text("Effective request: %s | budget %u | generation %llu",
+				display.m_Settings.m_Enabled ? "on" : "off", display.m_Settings.m_Budget,
+				static_cast<unsigned long long>(summary->m_Field.m_Generation));
+			if (display.m_Settings.m_Enabled && !display.m_Available)
+			{
+				ImGui::TextDisabled(!display.m_ViewSupported ? "Unsupported view: use Native with TAA off." :
+					"Probe display unavailable: pipeline, field or count readback could not prepare.");
+			}
+			if (display.m_CompletedObservation)
+			{
+				const auto& stamp = *display.m_CompletedObservation;
+				const auto& counts = display.m_CompletedCounts;
+				const bool historical = stamp.m_Field != summary->m_Field ||
+					display.m_CompletedSettings != display.m_Settings ||
+					display.m_CompletedView.m_Revision != summary->m_ReceiverView.m_Revision;
+				ImGui::Text("%s counts at completed frame %llu: %u / %u displayed, %u budget drops",
+					historical ? "Historical" : "Latest", static_cast<unsigned long long>(stamp.m_ProducingFrame),
+					counts.m_Rendered, counts.m_Enumerated, counts.m_BudgetDropped);
+				ImGui::Text("After slice / class / distance / frustum: %u / %u / %u / %u",
+					counts.m_AfterSlice, counts.m_AfterClassification, counts.m_AfterDistance, counts.m_AfterFrustum);
+			}
+			else
+			{
+				ImGui::TextDisabled("No completed display counts yet.");
+			}
+			ImGui::Text("Logical depth %llu B | selection %llu B | count buffers %llu B",
+				static_cast<unsigned long long>(display.m_PrivateDepthLogicalBytes),
+				static_cast<unsigned long long>(display.m_SelectionLogicalBytes),
+				static_cast<unsigned long long>(display.m_ReadbackBufferBytes));
+		}
+
 		struct SignalOption
 		{
 			PostProcessDebugTap m_Tap;
@@ -302,6 +392,10 @@ namespace gglab
 
 	void GIViewerPanel::OnClosed(DevelopGuiContext& context) noexcept
 	{
+		if (context.m_ViewRenderSettingsOverrides)
+		{
+			context.m_ViewRenderSettingsOverrides->m_GIProbes.m_Enabled = false;
+		}
 		if (context.m_GIProbeInspection)
 		{
 			context.m_GIProbeInspection->Cancel();
@@ -316,6 +410,7 @@ namespace gglab
 	{
 		ImGui::SetWindowPos(ImVec2(460, 45), ImGuiCond_FirstUseEver);
 		ImGui::SetWindowSize(ImVec2(760, 660), ImGuiCond_FirstUseEver);
+		DrawProbeArray(context);
 		DrawProbeInspection(context, m_ProbeCoordinate);
 		DrawReceiverInspection(context, m_ReceiverPixel, m_ReceiverMarkers, m_ReceiverCorner);
 		const auto* view = context.m_PostProcessPreview;

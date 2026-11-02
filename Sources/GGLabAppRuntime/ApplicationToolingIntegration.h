@@ -55,6 +55,7 @@ namespace gglab
 	// reused after Lab effects without borrowing the tooling integration.
 	struct ApplicationToolingFrameSettings
 	{
+		std::optional<GIProbeVisualizationSettings> m_GIProbes;
 		std::optional<TemporalAASettings> m_TemporalAA;
 		std::optional<GTAOSettings> m_GTAO;
 		std::optional<BloomSettings> m_Bloom;
@@ -67,6 +68,7 @@ namespace gglab
 	// Whole tooling blocks that replaced the authored profile's settings.
 	struct ApplicationToolingBlocks
 	{
+		bool m_GIProbes = false;
 		bool m_TemporalAA = false;
 		bool m_GTAO = false;
 		bool m_Bloom = false;

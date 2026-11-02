@@ -2,6 +2,7 @@
 #include "GGLabRuntime/Graphics/RayScene.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
 #include "Graphics/Pipeline/GIFieldState.h"
+#include "Graphics/Pipeline/GIProbeVisualization.h"
 #include "Graphics/Pipeline/GIProbeUpdateWorkload.h"
 #include "Graphics/RenderPass/GIFieldGraphResources.h"
 #include "Graphics/RenderPass/GIReceiverGraphResources.h"
@@ -131,6 +132,7 @@ namespace gglab
 	struct GIField::State
 	{
 		GIFieldCreateInfo m_Info;
+		GIProbeVisualization m_Visualization;
 		GIProbeUpdateWorkload m_Workload;
 		std::shared_ptr<GIFieldUpdateState> m_Update = std::make_shared<GIFieldUpdateState>();
 		uint64_t m_Generation = NextGeneration.fetch_add(1, std::memory_order_relaxed);
@@ -224,6 +226,7 @@ namespace gglab
 		struct PublishSummary
 		{
 			State& m_State;
+			uint64_t m_FrameSerial = 0;
 			~PublishSummary()
 			{
 				auto& state = m_State;
@@ -242,6 +245,16 @@ namespace gglab
 				summary->m_Initialized = diagnostics.m_Initialized;
 				summary->m_InspectionAvailable = state.m_UpdatePrepared;
 				summary->m_ReceiverView = state.m_ReceiverView;
+				summary->m_Visualization = state.m_Visualization.GetSnapshot();
+				summary->m_Visualization.m_Available &= state.m_UpdatePrepared;
+				if (summary->m_Visualization.m_Available)
+				{
+					const uint64_t update = summary->m_SubmittedUpdates + (summary->m_Invalid ? 0 : 1);
+					summary->m_Visualization.m_Observation = GIObservationStamp{
+						.m_Field = summary->m_Field, .m_Kind = GIObservationKind::ProbeVisualization,
+						.m_ProducingFrame = m_FrameSerial, .m_FieldUpdate = update,
+						.m_ReadinessUpdate = update - summary->m_Field.m_EpochOriginUpdate };
+				}
 				summary->m_ReceiverInspectionAvailable = state.m_UpdatePrepared &&
 					state.m_ReceiverView.m_Supported && state.m_ReceiverInspectionPipeline.IsValid();
 				summary->m_ReceiverMarkersAvailable = summary->m_ReceiverInspectionAvailable &&
@@ -253,7 +266,7 @@ namespace gglab
 				}
 				state.m_Summary = std::move(summary);
 			}
-		} publication{ state };
+		} publication{ state, frame.m_FrameSerial };
 		if (!ValidateGIFieldCreateInfo(state.m_Info) || !services.m_GIFieldFrameState)
 		{
 			return RenderFrameValidationResult::ContractFailure("Invalid GI field descriptor or settlement service");
@@ -284,6 +297,8 @@ namespace gglab
 				!next.m_TemporalAA && next.m_JitterPixels == std::array<float, 2>{};
 			state.m_ReceiverView = AdvanceGIReceiverView(state.m_ReceiverView, next);
 		}
+		state.m_Visualization.Prepare(frame, services,
+			frame.GetDisplayViewRenderSettings().m_GIProbes, state.m_ReceiverView);
 		if (!state.m_Info.m_ConstantEnvironment)
 		{
 			const auto bake = services.m_Environment->GetBakingStatus();
@@ -630,6 +645,20 @@ namespace gglab
 					commands->Draw(19 * 6, 1, 0);
 				}
 			});
+	}
+
+	void GIField::AddProbeVisualization(RenderGraph& graph, const RenderFrameContext& frame) noexcept
+	{
+		if (!m_State->m_UpdatePrepared)
+		{
+			return;
+		}
+		const auto& summary = *m_State->m_Summary;
+		const uint64_t update = summary.m_SubmittedUpdates + (summary.m_Invalid ? 0 : 1);
+		m_State->m_Visualization.AddPasses(graph, frame, {
+			.m_Field = summary.m_Field, .m_Kind = GIObservationKind::ProbeVisualization,
+			.m_ProducingFrame = frame.m_FrameSerial, .m_FieldUpdate = update,
+			.m_ReadinessUpdate = update - summary.m_Field.m_EpochOriginUpdate });
 	}
 
 	void GIField::ExportResources(RenderGraph& graph) noexcept

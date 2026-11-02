@@ -31,5 +31,7 @@ namespace gglab
 		ReversedZEqualReadOnly,
 		// Writes every covered sample regardless of the stored depth.
 		AlwaysZWrite,
+		// Equal depth retains the first primitive in diagnostic probe ordering.
+		ReversedZStrictWrite,
 	};
 }
