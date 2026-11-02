@@ -11,6 +11,21 @@ def near(a, b, message, relative=5e-5, absolute=2e-5):
     require(math.isfinite(a) and math.isfinite(b) and math.isclose(a, b, rel_tol=relative, abs_tol=absolute), message)
 
 
+def validate_pairing(products):
+    inspections = [frame["giReceiverInspection"] for source, frame in products
+                   if source == "resource-export" and frame.get("giReceiverInspection") is not None]
+    observed = any(frame.get("giReceiverObservation") is not None or
+                   frame.get("giReceiverInspection") is not None for _, frame in products)
+    if not inspections:
+        require(not observed, "Receiver observation requires an inspection resource product")
+        return
+    result = inspections[0]
+    expected = dict(stamp=result["observation"], view=result["view"])
+    for source, frame in products:
+        require(frame.get("giReceiverObservation") == expected,
+                f"Paired {source} product has a missing or mismatched receiver observation")
+
+
 def validate(frame, schema):
     result = frame.get("giReceiverInspection")
     if result is None:
