@@ -11,14 +11,8 @@ namespace gglab
 
 	void Keyboard::Update() noexcept
 	{
-		if (m_GameInput && IsConnected())
-		{
-			auto state = GetState();
-			m_StateTracker.Update(state);
-			return;
-		}
-
-		m_StateTracker.Reset();
+		// An empty device set still publishes releases for the last connected keyboard.
+		m_StateTracker.Update(GetState());
 	}
 
 	bool Keyboard::IsKeyPressed(KeyCode key) const noexcept
@@ -38,17 +32,39 @@ namespace gglab
 
 	void Keyboard::Reset() noexcept
 	{
+		m_Devices.clear();
 		m_StateTracker.Reset();
 	}
 
 	Keyboard::State Keyboard::GetState() noexcept
 	{
 		State state = {};
-
-		ComPtr<IGameInputReading> reading;
-		if (SUCCEEDED(m_GameInput->GetCurrentReading(GameInputKindKeyboard, nullptr, &reading)))
+		if (!m_GameInput)
 		{
-			auto readCount = reading->GetKeyState(MaxKeyStateCount, m_KeyStates);
+			return state;
+		}
+
+		CopyConnectedDevices(m_Devices);
+		for (const ComPtr<IGameInputDevice>& device : m_Devices)
+		{
+			ComPtr<IGameInputReading> reading;
+			const HRESULT result = m_GameInput->GetCurrentReading(
+				GameInputKindKeyboard, device.Get(), &reading);
+			if (FAILED(result))
+			{
+				continue;
+			}
+
+			const uint32_t keyCount = reading->GetKeyCount();
+			if (m_KeyStates.size() < keyCount)
+			{
+				m_KeyStates.resize(keyCount);
+			}
+			const uint32_t readCount = keyCount != 0 ?
+				reading->GetKeyState(keyCount, m_KeyStates.data()) :
+				0;
+			// Each reading belongs to one device. An empty receiver keyboard report
+			// must not clear keys held on another keyboard; union all successful readings.
 			for (uint32_t index = 0; index < readCount; ++index)
 			{
 				auto vk = static_cast<int32_t>(m_KeyStates[index].virtualKey);
