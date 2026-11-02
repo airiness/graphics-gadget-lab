@@ -89,6 +89,8 @@ namespace gglab
 		bool m_Initialized = false;
 		bool m_Invalid = false;
 		bool m_InspectionAvailable = false;
+		bool m_ReceiverInspectionAvailable = false;
+		bool m_ReceiverMarkersAvailable = false;
 		GIReceiverViewSnapshot m_ReceiverView;
 	};
 

@@ -582,6 +582,8 @@ namespace gglab
 			{ "initialized", summary.m_Initialized },
 			{ "invalid", summary.m_Invalid },
 			{ "inspectionAvailable", summary.m_InspectionAvailable },
+			{ "receiverInspectionAvailable", summary.m_ReceiverInspectionAvailable },
+			{ "receiverMarkersAvailable", summary.m_ReceiverMarkersAvailable },
 			{ "classificationCounts", nullptr },
 			{ "receiverView", GIReceiverViewJson(summary.m_ReceiverView) },
 			{ "completedMeasurement", summary.m_CompletedMeasurement ?

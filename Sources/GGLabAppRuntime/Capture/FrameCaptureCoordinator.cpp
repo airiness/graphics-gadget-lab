@@ -1369,9 +1369,14 @@ namespace gglab
 				"GIReceiverViewUnsupported");
 			return false;
 		}
-		if (!summary->m_InspectionAvailable || summary->m_Invalid)
+		if (!summary->m_ReceiverInspectionAvailable || summary->m_Invalid)
 		{
 			FailPlan(job, "GI receiver data is unavailable on the selected frame.", "GIReceiverUnavailable");
+			return false;
+		}
+		if (request->m_Markers && !summary->m_ReceiverMarkersAvailable)
+		{
+			FailPlan(job, "GI receiver markers are unavailable on the selected frame.", "GIReceiverMarkersUnavailable");
 			return false;
 		}
 		return !m_FrameGIReceiverInspection || m_FrameGIReceiverInspection == request;

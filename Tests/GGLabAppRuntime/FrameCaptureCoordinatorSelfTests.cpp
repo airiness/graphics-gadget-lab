@@ -2100,6 +2100,8 @@ namespace gglab
 			summary->m_InspectionAvailable = true;
 			summary->m_ReceiverView = { .m_Revision = 4, .m_RenderExtent = { 64, 32 }, .m_DisplayExtent = { 64, 32 },
 				.m_ReceiversAvailable = true, .m_Supported = true };
+			summary->m_ReceiverInspectionAvailable = true;
+			summary->m_ReceiverMarkersAvailable = true;
 			auto state = MakeFrameState(false);
 			state.m_Readiness.m_GIField = GIFieldCaptureState{ .m_Generation = 73, .m_Summary = summary };
 			const auto first = jobs.Admit(plan(10));
@@ -2134,6 +2136,55 @@ namespace gglab
 			context.Check(unavailable.size() == 1 && unavailable[0].m_JobId == unsupportedId &&
 				unavailable[0].m_FailureCode == "GIReceiverViewUnsupported" && !coordinator.GetFrameGIReceiverInspection(),
 				"Unsupported receiver views reject without changing TAA, resolution or scheduling GPU work");
+			auto numericSummary = std::make_shared<GIFieldSummary>(*summary);
+			numericSummary->m_ReceiverMarkersAvailable = false;
+			state.m_Readiness.m_GIField->m_Summary = numericSummary;
+			const auto markerUnavailable = jobs.Admit(plan(10));
+			auto numericPlan = plan(10);
+			numericPlan.m_GIReceiverInspection->m_Markers = false;
+			const auto numeric = jobs.Admit(numericPlan);
+			const auto ordinary = jobs.Admit({ .m_RequiredProducts = { ResourceCaptureProduct{
+				{ { .m_Resource = "GI.Receiver.Position" } } } } });
+			const auto beforeIssue = control.m_Issued.size();
+			++state.m_FrameSerial;
+			coordinator.BeginFrame(state);
+			coordinator.OnFrameSubmitted();
+			const auto markerFailures = jobs.TakeResults();
+			context.Check(markerFailures.size() == 1 && markerFailures[0].m_JobId == markerUnavailable &&
+				markerFailures[0].m_Status == CaptureJobStatus::Failed &&
+				markerFailures[0].m_Publication == CaptureJobPublication::NotPublished &&
+				markerFailures[0].m_FailureCode == "GIReceiverMarkersUnavailable" &&
+				control.m_Issued.size() == beforeIssue + 2 && coordinator.GetFrameGIReceiverInspection() &&
+				!coordinator.GetFrameGIReceiverInspection()->m_Markers,
+				"Missing marker pipelines reject paired-marker requests before issue while numeric and ordinary captures proceed");
+			for (size_t index = beforeIssue; index < control.m_Issued.size(); ++index)
+			{
+				control.Complete(control.m_Issued[index].m_Id);
+			}
+			coordinator.Update();
+			const auto numericCompleted = jobs.TakeResults();
+			context.Check(numericCompleted.size() == 2 &&
+				std::ranges::all_of(numericCompleted, [=](const auto& result)
+				{
+					return (result.m_JobId == numeric || result.m_JobId == ordinary) &&
+						result.m_Status == CaptureJobStatus::Completed &&
+						result.m_Publication == CaptureJobPublication::Published;
+				}), "Numeric inspection and independent captures publish without the optional marker pipeline");
+			auto querySummary = std::make_shared<GIFieldSummary>(*numericSummary);
+			querySummary->m_ReceiverInspectionAvailable = false;
+			state.m_Readiness.m_GIField->m_Summary = querySummary;
+			const auto queryUnavailable = jobs.Admit(numericPlan);
+			++state.m_FrameSerial;
+			coordinator.BeginFrame(state);
+			const auto queryFailures = jobs.TakeResults();
+			context.Check(queryFailures.size() == 1 && queryFailures[0].m_JobId == queryUnavailable &&
+				queryFailures[0].m_FailureCode == "GIReceiverUnavailable" &&
+				control.m_Issued.size() == beforeIssue + 2 && !coordinator.GetFrameGIReceiverInspection(),
+				"Missing receiver query pipelines fail numeric inspection before scheduling GPU work");
+			const auto supportJson = nlohmann::json::parse(SerializeGIFieldSummary(*querySummary));
+			context.Check(supportJson["inspectionAvailable"] == true &&
+				supportJson["receiverInspectionAvailable"] == false && supportJson["receiverMarkersAvailable"] == false,
+				"Discovery distinguishes field data, receiver query and receiver marker availability");
 			GIReceiverInspectionResult zero;
 			zero.m_Validity = GIReceiverInspectionValidity::NoValidSupport;
 			zero.m_CageEvaluated = true;
@@ -2160,6 +2211,8 @@ namespace gglab
 					summary->m_Field = { .m_Generation = 73, .m_RefreshEpoch = 2 };
 					summary->m_Counts = { 4, 4, 4 };
 					summary->m_InspectionAvailable = true;
+					summary->m_ReceiverInspectionAvailable = true;
+					summary->m_ReceiverMarkersAvailable = true;
 					summary->m_ReceiverView = { .m_Revision = 4, .m_RenderExtent = { 32, 32 },
 						.m_DisplayExtent = { 32, 32 }, .m_ReceiversAvailable = true, .m_Supported = true };
 					auto state = MakeFrameState(false);

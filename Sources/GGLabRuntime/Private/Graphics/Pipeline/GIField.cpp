@@ -242,6 +242,10 @@ namespace gglab
 				summary->m_Initialized = diagnostics.m_Initialized;
 				summary->m_InspectionAvailable = state.m_UpdatePrepared;
 				summary->m_ReceiverView = state.m_ReceiverView;
+				summary->m_ReceiverInspectionAvailable = state.m_UpdatePrepared &&
+					state.m_ReceiverView.m_Supported && state.m_ReceiverInspectionPipeline.IsValid();
+				summary->m_ReceiverMarkersAvailable = summary->m_ReceiverInspectionAvailable &&
+					state.m_ReceiverMarkerPipeline.IsValid();
 				const auto completed = state.m_Workload.GetCompletedObservation();
 				if (completed && completed->m_Field == summary->m_Field && !summary->m_Invalid)
 				{
@@ -524,7 +528,8 @@ namespace gglab
 		const auto* receiver = graph.GetBlackboard().TryGet<RGGIReceiverResources>(GIReceiverResourcesName);
 		if (!field || !receiver || !state.m_UpdatePrepared || !state.m_ReceiverInspection ||
 			!state.m_ReceiverView.m_Supported || !MatchesGIReceiverInspection(*state.m_ReceiverInspection, *state.m_Summary) ||
-			!state.m_ReceiverInspectionPipeline.IsValid())
+			!state.m_Summary->m_ReceiverInspectionAvailable ||
+			(state.m_ReceiverInspection->m_Markers && !state.m_Summary->m_ReceiverMarkersAvailable))
 		{
 			return;
 		}

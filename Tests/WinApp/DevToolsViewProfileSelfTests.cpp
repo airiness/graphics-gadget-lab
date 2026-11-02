@@ -150,7 +150,8 @@ namespace gglab
 				ImGui::FindWindowByName("GIViewerFixture")->Size.y >= 660,
 				"Unavailable GI has an explanation and the first-use Viewer leaves room for its image");
 			GIFieldSummary fieldSummary{ .m_Field = { .m_Generation = 73, .m_RefreshEpoch = 2,
-				.m_EpochOriginUpdate = 80 }, .m_Counts = { 4, 4, 4 }, .m_InspectionAvailable = true };
+				.m_EpochOriginUpdate = 80 }, .m_Counts = { 4, 4, 4 }, .m_InspectionAvailable = true,
+				.m_ReceiverInspectionAvailable = true, .m_ReceiverMarkersAvailable = true };
 			GIInspectionProbe inspection;
 			gui.m_GIFieldSummary = &fieldSummary;
 			gui.m_GIProbeInspection = &inspection;
@@ -181,6 +182,25 @@ namespace gglab
 			context.Check(receiver.m_Request && receiver.m_Request->m_ExpectedGeneration == 73 &&
 				receiver.m_Request->m_ExpectedViewRevision == 3 && receiver.m_Request->m_Markers,
 				"The receiver GUI binds the displayed logical field/view and requests a paired marker capture");
+			receiver.m_Request.reset();
+			fieldSummary.m_ReceiverMarkersAvailable = false;
+			ImGui::ActivateItemByID(ImHashStr("Inspect receiver", 0, ImHashStr("GIViewerFixture")));
+			const auto unavailableMarkers = draw();
+			context.Check(!receiver.m_Request && unavailableMarkers.find("X-ray markers are unavailable") != std::string::npos,
+				"The Viewer disables paired-marker inspection when only numeric querying is available");
+			ImGui::ActivateItemByID(ImHashStr("Capture X-ray contribution markers", 0, ImHashStr("GIViewerFixture")));
+			GGLAB_UNUSED(draw());
+			ImGui::ActivateItemByID(ImHashStr("Inspect receiver", 0, ImHashStr("GIViewerFixture")));
+			GGLAB_UNUSED(draw());
+			context.Check(receiver.m_Request && !receiver.m_Request->m_Markers,
+				"Disabling unavailable markers leaves numeric receiver inspection usable");
+			receiver.m_Request.reset();
+			fieldSummary.m_ReceiverInspectionAvailable = false;
+			ImGui::ActivateItemByID(ImHashStr("Inspect receiver", 0, ImHashStr("GIViewerFixture")));
+			GGLAB_UNUSED(draw());
+			context.Check(!receiver.m_Request, "The Viewer disables inspection when the receiver query is unavailable");
+			fieldSummary.m_ReceiverInspectionAvailable = true;
+			fieldSummary.m_ReceiverMarkersAvailable = true;
 			auto zero = std::make_shared<GIReceiverInspectionResult>();
 			zero->m_Validity = GIReceiverInspectionValidity::NoValidSupport;
 			zero->m_CageEvaluated = true;

@@ -30,7 +30,8 @@ namespace gglab
 		m_Discard = false;
 		m_Result.reset();
 		m_ImagePath.clear();
-		m_Status = "Pending GPU query, paired marker image and publication.";
+		m_Status = request.m_Markers ? "Pending GPU query, paired marker image and publication." :
+			"Pending GPU query, paired image and publication.";
 		return true;
 	}
 
@@ -77,7 +78,9 @@ namespace gglab
 			if (product.m_Metadata && product.m_Metadata->m_GIReceiverInspection)
 			{
 				m_Result = product.m_Metadata->m_GIReceiverInspection;
-				m_Status = "Completed receiver observation and paired marker capture.";
+				m_Status = m_Result->m_Request.m_Markers ?
+					"Completed receiver observation and paired marker capture." :
+					"Completed receiver observation and paired image capture.";
 			}
 			for (const auto& file : product.m_Files)
 			{

@@ -151,6 +151,14 @@ namespace gglab
 			{
 				ImGui::TextWrapped("Requires existing receiver attachments, Native rendering, no jitter and TAA off.");
 			}
+			else if (!summary->m_ReceiverInspectionAvailable)
+			{
+				ImGui::TextDisabled("Receiver inspection is unavailable for this frame.");
+			}
+			else if (markers && !summary->m_ReceiverMarkersAvailable)
+			{
+				ImGui::TextWrapped("X-ray markers are unavailable. Disable markers for numeric inspection.");
+			}
 			if (ImGui::InputInt2("Receiver pixel (top-left x,y)", pixel.data()))
 			{
 				control->Cancel();
@@ -168,7 +176,8 @@ namespace gglab
 				.m_ExpectedGeneration = summary->m_Field.m_Generation,
 				.m_ExpectedViewRevision = view.m_Revision, .m_ExpectedViewId = view.m_ViewId,
 				.m_ExpectedRefreshEpoch = summary->m_Field.m_RefreshEpoch, .m_Markers = markers };
-			ImGui::BeginDisabled(control->IsPending() || !view.m_Supported || !summary->m_InspectionAvailable ||
+			ImGui::BeginDisabled(control->IsPending() || !summary->m_ReceiverInspectionAvailable ||
+				(markers && !summary->m_ReceiverMarkersAvailable) ||
 				!MatchesGIReceiverInspection(request, *summary));
 			if (ImGui::Button("Inspect receiver"))
 			{
