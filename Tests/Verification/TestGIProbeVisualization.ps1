@@ -49,6 +49,23 @@ try {
         @{id='released';enabled=$false;taa=$false;axis=0;low=0;high=65535;mask=15;distance=0.0;budget=2048;bounds=$false}
     )
     Write-VerificationJson "$output/cases.json" $cases
+    $irradianceCases = @(
+        @{id='plane-6';fixture=1;width=6;mode=1;ev=0.0;sceneEV=10.0;environment=0;layer=9;view=''},
+        @{id='plane-ev2';fixture=1;width=6;mode=1;ev=2.0;sceneEV=10.0;environment=0;layer=9;view=''},
+        @{id='plane-scene0';fixture=1;width=6;mode=1;ev=0.0;sceneEV=0.0;environment=0;layer=9;view=''},
+        @{id='plane-classification';fixture=1;width=6;mode=0;ev=2.0;sceneEV=10.0;environment=0;layer=9;view=''},
+        @{id='plane-14';fixture=1;width=14;mode=1;ev=0.0;sceneEV=10.0;environment=0;layer=9;view=''},
+        @{id='plane-30';fixture=1;width=30;mode=1;ev=0.0;sceneEV=10.0;environment=0;layer=9;view=''},
+        @{id='directional-6';fixture=7;width=6;mode=1;ev=0.0;sceneEV=10.0;environment=2;layer=3;view=''},
+        @{id='directional-14';fixture=7;width=14;mode=1;ev=0.0;sceneEV=10.0;environment=2;layer=3;view=''},
+        @{id='directional-30';fixture=7;width=30;mode=1;ev=0.0;sceneEV=10.0;environment=2;layer=3;view=''},
+        @{id='f4-6';fixture=4;width=6;mode=1;ev=-4.0;sceneEV=10.0;environment=0;layer=6;view='F4_Floor'},
+        @{id='f4-14';fixture=4;width=14;mode=1;ev=-4.0;sceneEV=10.0;environment=0;layer=6;view='F4_Floor'},
+        @{id='f4-30';fixture=4;width=30;mode=1;ev=-4.0;sceneEV=10.0;environment=0;layer=6;view='F4_Floor'},
+        @{id='black';fixture=19;width=6;mode=1;ev=0.0;sceneEV=10.0;environment=0;layer=2;view=''}
+    )
+    Write-VerificationJson "$output/irradiance-cases.json" $irradianceCases
+
     foreach ($backend in $Rhi) {
         $session = 'gi-probes-'+[Guid]::NewGuid().ToString('N').Substring(0,10)
         $start = $null
@@ -78,6 +95,8 @@ try {
                         @{id='view.taa.enabled';type='bool';value=$case.taa},
                         @{id='view.taa.resolution_preset';type='enum';value=0},
                         @{id='view.gi_probes.enabled';type='bool';value=$case.enabled},
+                        @{id='view.gi_probes.mode';type='enum';value=0},
+                        @{id='view.gi_probes.preview_ev';type='float';value=0.0},
                         @{id='view.gi_probes.bounds';type='bool';value=$case.bounds},
                         @{id='view.gi_probes.radius';type='float';value=0.2},
                         @{id='view.gi_probes.budget';type='uint';value=$case.budget},
@@ -99,6 +118,42 @@ try {
                     Write-VerificationJson "$directory/receipt.json" $result
                     if ($result.status -ne 'completed' -or $result.publication -ne 'Published') { throw 'Probe display capture did not publish.' }
                 }
+            }
+            foreach ($case in $irradianceCases) {
+                $directory = "$output/$backend/irradiance/$($case.id)"
+                Set-Values $session $run @(
+                    @{id='gi_reference.fixture';type='enum';value=$case.fixture},
+                    @{id='gi_reference.field_irradiance_width';type='enum';value=$case.width},
+                    @{id='gi_reference.environment';type='enum';value=$case.environment},
+                    @{id='gi_reference.field_readiness';type='bool';value=$true},
+                    @{id='view.exposure.ev100';type='float';value=$case.sceneEV},
+                    @{id='view.gi_probes.enabled';type='bool';value=$true},
+                    @{id='view.gi_probes.mode';type='enum';value=$case.mode},
+                    @{id='view.gi_probes.preview_ev';type='float';value=$case.ev},
+                    @{id='view.gi_probes.bounds';type='bool';value=$false},
+                    @{id='view.gi_probes.radius';type='float';value=0.45},
+                    @{id='view.gi_probes.budget';type='uint';value=8},
+                    @{id='view.gi_probes.slice_axis';type='uint';value=2},
+                    @{id='view.gi_probes.layer_minimum';type='uint';value=$case.layer},
+                    @{id='view.gi_probes.layer_maximum';type='uint';value=$case.layer},
+                    @{id='view.gi_probes.classification_mask';type='uint';value=2},
+                    @{id='view.gi_probes.maximum_distance';type='float';value=0.0})
+                $null = Wait-VerificationCondition -Poll {
+                    Invoke-VerificationSession status $session @{ExpectedRunIdentity=$run}
+                } -Until {
+                    param($r) $r.frame -and $r.frame.giField -and
+                        $r.frame.giField.summary.initialized -and $r.frame.giField.summary.inspectionAvailable
+                } -TimeoutSeconds $TimeoutSeconds
+                $products = @(@{kind='image';source='scene'},@{kind='image';source='composited'},@{kind='graph'},
+                    @{kind='resource';targets=@(@{resource='GI.Probes.Counts'},@{resource='GI.Probes.RenderedIDs'},
+                        @{resource='GI.Field.Classification'},@{resource='GI.Field.Irradiance'})})
+                $options = @{ExpectedRunIdentity=$run;Timing='next-frame';SettleFrames=32;
+                    Products=(ConvertTo-Json -InputObject $products -Depth 8 -Compress);
+                    OutputDirectory=$directory;TimeoutSeconds=$TimeoutSeconds}
+                if ($case.view) { $options.View=$case.view }
+                $result = Invoke-VerificationSession capture $session $options
+                Write-VerificationJson "$directory/receipt.json" $result
+                if ($result.status -ne 'completed' -or $result.publication -ne 'Published') { throw 'Irradiance sphere capture did not publish.' }
             }
         } catch {
             $primaryFailure = $_

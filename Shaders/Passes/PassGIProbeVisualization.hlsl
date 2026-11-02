@@ -19,6 +19,9 @@ cbuffer Parameters : register(b2)
 	uint ReversedDepth;
 	uint2 Extent;
 	uint4 ObservationStamp;
+	uint DisplayMode;
+	float PreviewExposureScale;
+	uint2 Padding;
 };
 
 uint3 Coordinate(uint id)
@@ -124,6 +127,8 @@ struct VertexOutput
 	float3 Normal : TEXCOORD0;
 	float2 UV : TEXCOORD1;
 	nointerpolation uint Category : TEXCOORD2;
+	nointerpolation uint ProbeID : TEXCOORD3;
+	float3 WorldPosition : TEXCOORD4;
 };
 
 VertexOutput VSMain(uint vertex : SV_VertexID, uint instance : SV_InstanceID)
@@ -173,7 +178,9 @@ VertexOutput VSMain(uint vertex : SV_VertexID, uint instance : SV_InstanceID)
 	const float latitude = uv.y * 3.14159265359;
 	const float3 normal = float3(sin(latitude) * cos(longitude), cos(latitude), sin(latitude) * sin(longitude));
 	const float3 center = Field.Minimum + (float3)(Coordinate(record.x)) * Field.Spacing;
-	output.Position = mul(float4(center + normal * Radius, 1), ViewProjection);
+	output.WorldPosition = center + normal * Radius;
+	output.Position = mul(float4(output.WorldPosition, 1), ViewProjection);
+	output.ProbeID = record.x;
 	output.Normal = normal;
 	output.UV = uv;
 	output.Category = record.y;
@@ -203,6 +210,25 @@ float4 PSMain(VertexOutput input) : SV_Target
 	if (input.Category == 0 && grid.y > 0.3)
 	{
 		discard;
+	}
+	if (DisplayMode == 1 && input.Category == 1)
+	{
+		const float3 normal = normalize(input.Normal);
+		Texture2DArray<float4> atlas = ResourceDescriptorHeap[NonUniformResourceIndex(Field.Irradiance)];
+		const float3 response = GIFieldIrradiance(atlas, Coordinate(input.ProbeID), normal, Field.IrradianceInteriorWidth);
+		if (!all(isfinite(NonFiniteObserveValue(NF_SITE_GI_PROBE_VISUALIZATION_PSMAIN_ISFINITE, response))) || any(response < 0))
+		{
+			return float4(1, 0, 1, 1);
+		}
+		// Atlas M = E/pi is already the unit-albedo Lambertian response. It has
+		// no camera exposure or pre-exposure. Keep a neutral silhouette for valid black.
+		const float facing = abs(dot(normal, normalize(Camera - input.WorldPosition)));
+		if (facing <= max(fwidth(facing), 0.025))
+		{
+			return float4(0.35, 0.35, 0.35, 1);
+		}
+		return float4(LinearToSRGB(ACESFitted(response * PreviewExposureScale,
+			NF_SITE_GI_PROBE_VISUALIZATION_PSMAIN_ACESFITTED)), 1);
 	}
 	const float light = 0.45 + 0.55 * saturate(dot(normalize(input.Normal), normalize(float3(-1, 2, -3))));
 	const float3 color = input.Category == 1 ? float3(0.08, 0.8, 0.5) * light :

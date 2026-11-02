@@ -128,7 +128,11 @@ def validate(root):
                 if fixture == "coastal":
                     require(counts[0] == 12870, "Coastal field no longer exercises the full production probe count")
                 results.append(dict(backend=backend, fixture=fixture, case=case["id"], counts=counts, changedPixels=changed))
-    return dict(ok=True, cases=results)
+    irradiance = []
+    if (root / "irradiance-cases.json").is_file():
+        from ValidateGIProbeIrradiance import validate as validate_irradiance
+        irradiance = validate_irradiance(root)
+    return dict(ok=True, cases=results, irradiance=irradiance)
 
 
 if __name__ == "__main__":

@@ -1688,6 +1688,42 @@
         "fp16Maximum": "report"
       },
       "rationale": "Tag non-finite receiver query or view-direction data as InvalidNumerics and suppress its markers while retaining the raw inspection records. This diagnostic validity check does not replace values or repair production field history."
+    },
+    {
+      "id": "gi-probe-visualization.psmain.isfinite",
+      "source": "Passes/PassGIProbeVisualization.hlsl",
+      "function": "PSMain",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "0f4e20fb550b31233e09a4da1a5a8be14c5ae0fa004805d693c3cf94b1daa6f6",
+      "programs": [
+        "gglab.shader.gi-field"
+      ],
+      "kind": "validity",
+      "evidence": "report-only",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Irradiance sphere display rejects invalid raw atlas samples as magenta, then applies its independent preview scale and the shared ACES display mapping."
+    },
+    {
+      "id": "gi-probe-visualization.psmain.acesfitted",
+      "source": "Passes/PassGIProbeVisualization.hlsl",
+      "function": "PSMain",
+      "operation": "ACESFitted",
+      "count": 1,
+      "bodySha256": "0f4e20fb550b31233e09a4da1a5a8be14c5ae0fa004805d693c3cf94b1daa6f6",
+      "programs": [
+        "gglab.shader.gi-field"
+      ],
+      "kind": "sanitization",
+      "evidence": "counter",
+      "policy": {
+        "negative": "report",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Irradiance sphere display rejects invalid raw atlas samples as magenta, then applies its independent preview scale and the shared ACES display mapping."
     }
   ],
   "injectionPoints": [

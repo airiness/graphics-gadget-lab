@@ -31,6 +31,13 @@ namespace gglab
 		settings.m_ClassificationMask &= 15;
 		settings.m_MaximumDistance = std::isfinite(settings.m_MaximumDistance) ?
 			std::clamp(settings.m_MaximumDistance, 0.0f, 1000000.0f) : 0;
+		if (settings.m_Mode != GIProbeVisualizationMode::Irradiance)
+		{
+			settings.m_Mode = GIProbeVisualizationMode::Classification;
+		}
+		settings.m_PreviewExposureEV = std::isfinite(settings.m_PreviewExposureEV) ?
+			std::clamp(settings.m_PreviewExposureEV, GIProbeVisualizationMinimumExposureEV,
+				GIProbeVisualizationMaximumExposureEV) : 0;
 		return settings;
 	}
 
@@ -40,7 +47,7 @@ namespace gglab
 			.m_DisplayName = "Stable probe display selection", .m_CategoryName = "Global Illumination",
 			.m_Category = RenderPassCategory::Debug, .m_Type = RenderPassType::Compute };
 		const RenderPassInfo DrawInfo{ .m_TypeName = "GI.Probes.Draw",
-			.m_DisplayName = "Classification probe spheres", .m_CategoryName = "Global Illumination",
+			.m_DisplayName = "GI probe spheres", .m_CategoryName = "Global Illumination",
 			.m_Category = RenderPassCategory::Debug, .m_Type = RenderPassType::Graphics };
 		constexpr auto StatsFootprint = ComputeRHITextureCopyFootprint(RHIFormat::R32Uint, 16, 1);
 		struct Parameters
@@ -61,10 +68,14 @@ namespace gglab
 			uint32_t m_ReversedDepth = 0;
 			std::array<uint32_t, 2> m_Extent{};
 			std::array<uint32_t, 4> m_Stamp{};
+			uint32_t m_DisplayMode = 0;
+			float m_PreviewExposureScale = 1;
+			std::array<uint32_t, 2> m_Padding{};
 		};
-		static_assert(sizeof(Parameters) == 192 && offsetof(Parameters, m_ViewProjection) == 48 &&
+		static_assert(sizeof(Parameters) == 208 && offsetof(Parameters, m_ViewProjection) == 48 &&
 			offsetof(Parameters, m_Camera) == 112 && offsetof(Parameters, m_Stats) == 152 &&
-			offsetof(Parameters, m_Mode) == 160);
+			offsetof(Parameters, m_Mode) == 160 && offsetof(Parameters, m_DisplayMode) == 192 &&
+			offsetof(Parameters, m_PreviewExposureScale) == 196);
 		struct Slot
 		{
 			RHIFencePoint m_Fence;
@@ -245,7 +256,9 @@ namespace gglab
 			.m_MaximumDistance = settings.m_MaximumDistance, .m_ClassificationMask = settings.m_ClassificationMask,
 			.m_ReversedDepth = view.m_ReversedDepth ? 1u : 0u, .m_Extent = view.m_DisplayExtent,
 			.m_Stamp = { uint32_t(observation.m_ProducingFrame), uint32_t(observation.m_ProducingFrame >> 32),
-				uint32_t(observation.m_FieldUpdate), uint32_t(observation.m_FieldUpdate >> 32) } };
+				uint32_t(observation.m_FieldUpdate), uint32_t(observation.m_FieldUpdate >> 32) },
+			.m_DisplayMode = static_cast<uint32_t>(settings.m_Mode),
+			.m_PreviewExposureScale = std::exp2(settings.m_PreviewExposureEV) };
 		RGTextureId stats;
 		RGTextureId ids;
 		struct SelectData
@@ -289,6 +302,7 @@ namespace gglab
 			});
 		struct DrawData
 		{
+			RGTextureViewId m_Irradiance;
 			RGTextureViewId m_Stats;
 			RGTextureViewId m_IDs;
 			RGTextureViewId m_Color;
@@ -301,6 +315,12 @@ namespace gglab
 					builder.Read(stats, RGTextureAccess::Sample, RHIStage::VertexShader));
 				data.m_IDs = builder.CreateView<RHITextureViewType::ShaderResource>(
 					builder.Read(ids, RGTextureAccess::Sample, RHIStage::VertexShader));
+				if (settings.m_Mode == GIProbeVisualizationMode::Irradiance)
+				{
+					data.m_Irradiance = builder.CreateView<RHITextureViewType::ShaderResource>(
+						builder.Read(field->m_Textures[0], RGTextureAccess::Sample, RHIStage::PixelShader),
+						MakeRHITexture2DArrayViewDesc(RHIFormat::R32G32B32A32Float, 0, 0, field->m_Parameters.m_Counts[1]));
+				}
 				auto& targets = builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName)
 					.GetViewTargets(frame.GetDisplayViewId());
 				builder.ReadWriteInPlace(targets.m_BackBuffer, RGTextureAccess::RenderTarget);
@@ -330,6 +350,10 @@ namespace gglab
 				commands->SetScissorRect({ 0, 0, int32_t(parameters.m_Extent[0]), int32_t(parameters.m_Extent[1]) });
 				commands->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 				auto values = parameters;
+				if (data.m_Irradiance.IsValid())
+				{
+					values.m_Field.m_Irradiance = execute.GetViewDescriptor(data.m_Irradiance).m_Index;
+				}
 				values.m_Stats = execute.GetViewDescriptor(data.m_Stats).m_Index;
 				values.m_IDs = execute.GetViewDescriptor(data.m_IDs).m_Index;
 				if (commands->SetConstantBufferData(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), values))

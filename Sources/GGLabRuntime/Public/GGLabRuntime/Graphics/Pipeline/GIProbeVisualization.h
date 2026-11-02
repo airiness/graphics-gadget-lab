@@ -1,12 +1,27 @@
 #pragma once
 #include <array>
 #include <cstdint>
+#include <string_view>
 
 namespace gglab
 {
 	inline constexpr uint32_t GIProbeVisualizationMaximumBudget = 16384;
 	inline constexpr uint32_t GIProbeVisualizationFilterVersion = 1;
 	inline constexpr uint32_t GIProbeVisualizationMagic = 0x47505631;
+
+	enum class GIProbeVisualizationMode : uint8_t
+	{
+		Classification,
+		Irradiance,
+	};
+
+	[[nodiscard]] constexpr std::string_view GetGIProbeVisualizationModeName(GIProbeVisualizationMode mode) noexcept
+	{
+		return mode == GIProbeVisualizationMode::Irradiance ? "irradiance" : "classification";
+	}
+
+	inline constexpr float GIProbeVisualizationMinimumExposureEV = -20.0f;
+	inline constexpr float GIProbeVisualizationMaximumExposureEV = 8.0f;
 
 	// Classification bits: Pending, Active, Inactive, Invalid. Slice axis 0 disables
 	// slicing; 1/2/3 select X/Y/Z. Distance zero disables the distance filter.
@@ -21,6 +36,8 @@ namespace gglab
 		uint32_t m_LayerMaximum = 65535;
 		uint32_t m_ClassificationMask = 15;
 		float m_MaximumDistance = 0;
+		GIProbeVisualizationMode m_Mode = GIProbeVisualizationMode::Classification;
+		float m_PreviewExposureEV = 0;
 		bool operator==(const GIProbeVisualizationSettings&) const = default;
 	};
 

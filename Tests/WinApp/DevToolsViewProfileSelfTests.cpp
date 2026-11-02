@@ -153,16 +153,20 @@ namespace gglab
 			DevToolsRuntime displayTools;
 			auto& displayOverrides = displayTools.GetViewRenderSettingsOverrides();
 			gui.m_ViewRenderSettingsOverrides = &displayOverrides;
-			ImGui::ActivateItemByID(ImHashStr("Probe array (Classification)", 0, ImHashStr("GIViewerFixture")));
+			ImGui::ActivateItemByID(ImHashStr("Probe array", 0, ImHashStr("GIViewerFixture")));
 			GGLAB_UNUSED(draw());
 			ImGui::ActivateItemByID(ImHashStr("Show probe spheres", 0, ImHashStr("GIViewerFixture")));
 			GGLAB_UNUSED(draw());
 			context.Check(displayOverrides.m_GIProbes.m_Enabled && displayOverrides.GetActiveCount() == 1,
 				"The real Viewer checkbox enables only its GUI probe display block");
 			Camera displayCamera(Camera::CreateInfo{});
+			displayOverrides.m_GIProbes.m_Mode = GIProbeVisualizationMode::Irradiance;
+			displayOverrides.m_GIProbes.m_PreviewExposureEV = 1.5f;
 			const auto displaySettings = displayTools.CaptureFrameSettings();
 			auto resolvedDisplay = ResolveApplicationViewSettings({}, displayCamera, displaySettings);
-			context.Check(resolvedDisplay.m_ToolingBlocks.m_GIProbes && resolvedDisplay.m_View.m_GIProbes.m_Enabled,
+			context.Check(resolvedDisplay.m_ToolingBlocks.m_GIProbes && resolvedDisplay.m_View.m_GIProbes.m_Enabled &&
+				resolvedDisplay.m_View.m_GIProbes.m_Mode == GIProbeVisualizationMode::Irradiance &&
+				resolvedDisplay.m_View.m_GIProbes.m_PreviewExposureEV == 1.5f,
 				"GUI probe settings reach Runtime frame settings with tooling attribution");
 			const std::array sessionDisplay{
 				LabParameterValue{ LabParameterId("view.gi_probes.enabled"), true },
@@ -171,7 +175,7 @@ namespace gglab
 			context.Check(resolvedDisplay.m_View.m_GIProbes.m_Budget == 17 &&
 				displayOverrides.m_GIProbes.m_Budget == 2048,
 				"Session display settings override GUI intent without modifying its owned request");
-			ImGui::ActivateItemByID(ImHashStr("Probe array (Classification)", 0, ImHashStr("GIViewerFixture")));
+			ImGui::ActivateItemByID(ImHashStr("Probe array", 0, ImHashStr("GIViewerFixture")));
 			GGLAB_UNUSED(draw());
 			GIFieldSummary fieldSummary{ .m_Field = { .m_Generation = 73, .m_RefreshEpoch = 2,
 				.m_EpochOriginUpdate = 80 }, .m_Counts = { 4, 4, 4 }, .m_InspectionAvailable = true,

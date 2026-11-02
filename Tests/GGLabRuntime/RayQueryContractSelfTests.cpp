@@ -843,6 +843,20 @@ namespace gglab
 				"Probe display defaults off and resolves finite, bounded diagnostic settings");
 			context.Check(display.m_LayerMinimum > display.m_LayerMaximum,
 				"An inverted inclusive slice remains empty instead of silently exchanging its endpoints");
+			display.m_Mode = static_cast<GIProbeVisualizationMode>(255);
+			display.m_PreviewExposureEV = std::numeric_limits<float>::infinity();
+			display = ResolveGIProbeVisualizationSettings(display);
+			context.Check(display.m_Mode == GIProbeVisualizationMode::Classification && display.m_PreviewExposureEV == 0,
+				"Unknown modes and nonfinite sphere exposure resolve without contaminating scene settings");
+			for (float ev : { -100.0f, 100.0f })
+			{
+				display.m_Mode = GIProbeVisualizationMode::Irradiance;
+				display.m_PreviewExposureEV = ev;
+				display = ResolveGIProbeVisualizationSettings(display);
+				context.Check(display.m_Mode == GIProbeVisualizationMode::Irradiance &&
+					display.m_PreviewExposureEV == (ev < 0 ? -20.0f : 8.0f),
+					"Irradiance sphere exposure uses the independent GI preview range");
+			}
 			GIReceiverViewSnapshot displayView{ .m_Revision = 1,
 				.m_RenderExtent = { 640, 400 }, .m_DisplayExtent = { 640, 400 } };
 			context.Check(IsGIProbeVisualizationViewSupported(displayView),

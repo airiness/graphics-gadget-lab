@@ -85,6 +85,8 @@ namespace gglab
 		ApplyOptional(patch.m_GIProbes.m_LayerMaximum, settings.m_GIProbes.m_LayerMaximum);
 		ApplyOptional(patch.m_GIProbes.m_ClassificationMask, settings.m_GIProbes.m_ClassificationMask);
 		ApplyOptional(patch.m_GIProbes.m_MaximumDistance, settings.m_GIProbes.m_MaximumDistance);
+		ApplyOptional(patch.m_GIProbes.m_Mode, settings.m_GIProbes.m_Mode);
+		ApplyOptional(patch.m_GIProbes.m_PreviewExposureEV, settings.m_GIProbes.m_PreviewExposureEV);
 		settings.m_GIProbes = ResolveGIProbeVisualizationSettings(settings.m_GIProbes);
 		settings.m_TemporalAA = ApplyTemporalAASettingsPatch(patch.m_TemporalAA, settings.m_TemporalAA);
 		settings.m_Lighting.m_GTAO =

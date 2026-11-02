@@ -47,6 +47,7 @@ namespace gglab
 	{
 		const LabParameterId FixtureId("gi_reference.fixture");
 		const LabParameterId FieldEnabledId("gi_reference.field_enabled");
+		const LabParameterId FieldIrradianceWidthId("gi_reference.field_irradiance_width");
 		const LabParameterId FieldSamplingId("gi_reference.field_sampling");
 		const LabParameterId FieldReadinessId("gi_reference.field_readiness");
 		const LabParameterId FieldRefreshNoiseId("gi_reference.field_refresh_noise");
@@ -312,6 +313,10 @@ namespace gglab
 		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldEnabledId, .m_Name = "Static field update owner",
 			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
 			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = false }));
+		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldIrradianceWidthId, .m_Name = "Field irradiance interior width",
+			.m_Group = "GI field", .m_Type = LabParameterType::Enum,
+			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = int32_t(0),
+			.m_EnumItems = { { 0, "Fixture default" }, { 6, "6" }, { 14, "14" }, { 30, "30" } } }));
 		for (const auto& [id, name] : std::array{
 			std::pair{ FieldRefreshNoiseId, "Measured refresh change noise" },
 			std::pair{ FieldSteadyNoiseId, "Measured steady change noise" } })
@@ -959,6 +964,11 @@ namespace gglab
 					{
 						info.m_Volume = { .m_Counts = { 7, 7, 7 }, .m_Minimum = { -3, -1, -3 } };
 					}
+				}
+				const auto width = GetParameters().Get(FieldIrradianceWidthId, int32_t(0));
+				if (width != 0)
+				{
+					info.m_IrradianceInteriorWidth = uint32_t(width);
 				}
 				m_Field = std::make_shared<GIField>(std::move(info));
 			}

@@ -18,7 +18,7 @@ namespace gglab
 	{
 		void DrawProbeArray(DevelopGuiContext& context) noexcept
 		{
-			if (!ImGui::CollapsingHeader("Probe array (Classification)"))
+			if (!ImGui::CollapsingHeader("Probe array"))
 			{
 				return;
 			}
@@ -32,6 +32,15 @@ namespace gglab
 			ImGui::Checkbox("Show probe spheres", &settings.m_Enabled);
 			ImGui::SameLine();
 			ImGui::Checkbox("Volume bounds", &settings.m_Bounds);
+			int mode = int(settings.m_Mode);
+			if (ImGui::Combo("Sphere display", &mode, "Classification\0Irradiance\0"))
+			{
+				settings.m_Mode = static_cast<GIProbeVisualizationMode>(mode);
+			}
+			ImGui::BeginDisabled(settings.m_Mode != GIProbeVisualizationMode::Irradiance);
+			ImGui::SliderFloat("Sphere Preview EV", &settings.m_PreviewExposureEV,
+				GIProbeVisualizationMinimumExposureEV, GIProbeVisualizationMaximumExposureEV, "%.2f");
+			ImGui::EndDisabled();
 			ImGui::SliderFloat("Radius / spacing", &settings.m_Radius, 0.01f, 0.5f, "%.3f");
 			int budget = int(settings.m_Budget);
 			if (ImGui::InputInt("Array budget", &budget))
@@ -65,9 +74,13 @@ namespace gglab
 			ImGui::InputFloat("Maximum center distance (0 = off)", &settings.m_MaximumDistance);
 			settings = ResolveGIProbeVisualizationSettings(settings);
 			ImGui::TextDisabled("X-ray | Native, TAA off | own depth resolves sphere overlaps");
-			ImGui::TextDisabled("Active: solid green | Inactive: dim wire | Pending: gold rings | Invalid: magenta");
-			ImGui::TextDisabled("Closing releases this GUI request. Host/session overrides keep precedence.");
 			const auto* summary = context.m_GIFieldSummary;
+			const auto effectiveMode = summary ? summary->m_Visualization.m_Settings.m_Mode : settings.m_Mode;
+			ImGui::TextDisabled(effectiveMode == GIProbeVisualizationMode::Irradiance ?
+				"Active: white Lambertian E(n)/pi | independent EV, ACES + sRGB | gray silhouette" :
+				"Active: solid green");
+			ImGui::TextDisabled("Inactive: dim wire | Pending: gold rings | Invalid: magenta");
+			ImGui::TextDisabled("Closing releases this GUI request. Host/session overrides keep precedence.");
 			if (!summary)
 			{
 				ImGui::TextDisabled("No probe field in the active pipeline.");
@@ -77,6 +90,8 @@ namespace gglab
 			ImGui::Text("Effective request: %s | budget %u | generation %llu",
 				display.m_Settings.m_Enabled ? "on" : "off", display.m_Settings.m_Budget,
 				static_cast<unsigned long long>(summary->m_Field.m_Generation));
+			ImGui::Text("Effective mode: %s | Preview EV %.2f",
+				GetGIProbeVisualizationModeName(display.m_Settings.m_Mode).data(), display.m_Settings.m_PreviewExposureEV);
 			if (display.m_Settings.m_Enabled && !display.m_Available)
 			{
 				ImGui::TextDisabled(!display.m_ViewSupported ? "Unsupported view: use Native with TAA off." :

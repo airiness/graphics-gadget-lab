@@ -582,7 +582,9 @@ namespace gglab
 				{ "layerMinimum", settings.m_LayerMinimum },
 				{ "layerMaximum", settings.m_LayerMaximum },
 				{ "classificationMask", settings.m_ClassificationMask },
-				{ "maximumDistance", settings.m_MaximumDistance } };
+				{ "maximumDistance", settings.m_MaximumDistance },
+				{ "mode", GetGIProbeVisualizationModeName(settings.m_Mode) },
+				{ "previewEV", settings.m_PreviewExposureEV } };
 		}
 		nlohmann::json GIProbeVisualizationJson(const GIProbeVisualizationSnapshot& snapshot)
 		{
@@ -590,7 +592,10 @@ namespace gglab
 			const auto& counts = snapshot.m_CompletedCounts;
 			return {
 				{ "schemaVersion", 1 },
-				{ "mode", "classification" },
+				{ "mode", GetGIProbeVisualizationModeName(snapshot.m_Settings.m_Mode) },
+				{ "irradianceQuantity", "white-Lambertian-E-over-pi" },
+				{ "irradianceMapping", "atlas-M=E/pi; exp2(previewEV); ACES-fitted; sRGB" },
+				{ "irradianceOutline", "neutral-gray-valid-probe-silhouette" },
 				{ "depthMode", "xray-private-strict-D32" },
 				{ "filterOrderVersion", GIProbeVisualizationFilterVersion },
 				{ "filterOrder", { "stable-id", "slice-inclusive", "classification", "center-distance-inclusive", "sphere-frustum", "first-N" } },

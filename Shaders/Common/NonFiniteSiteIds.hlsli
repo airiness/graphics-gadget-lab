@@ -83,7 +83,9 @@ static const uint NF_SITE_GI_SPECULAR_VISIBILITY_FINITE_ISFINITE = 78u;
 static const uint NF_SITE_GI_PROBE_UPDATE_TRACE_ISFINITE = 79u;
 static const uint NF_SITE_GI_PROBE_UPDATE_STORETEXEL_ISFINITE = 80u;
 static const uint NF_SITE_GI_RECEIVER_INSPECTION_CSMAIN_ISFINITE = 81u;
-static const uint NF_SITE_COUNT = 82u;
+static const uint NF_SITE_GI_PROBE_VISUALIZATION_PSMAIN_ISFINITE = 82u;
+static const uint NF_SITE_GI_PROBE_VISUALIZATION_PSMAIN_ACESFITTED = 83u;
+static const uint NF_SITE_COUNT = 84u;
 static const uint NF_PROGRAM_COUNT = 31u;
 
 static const uint NF_INJECT_PASS_RENDER_GRAPH_COMPUTE_SMOKE_CSNONFINITEPROBE_PROBE = 0u;
@@ -95,5 +97,5 @@ static const uint NF_INJECT_PASS_GI_PROBE_UPDATE_STORETEXEL_HISTORY = 5u;
 static const uint NF_INJECTION_POINT_COUNT = 6u;
 
 static const uint NF_ABI_VERSION = 2u;
-static const uint NF_INVENTORY_LOW = 0x4076687bu;
-static const uint NF_INVENTORY_HIGH = 0x4b36af20u;
+static const uint NF_INVENTORY_LOW = 0xc745cf74u;
+static const uint NF_INVENTORY_HIGH = 0x4a0b2f4eu;

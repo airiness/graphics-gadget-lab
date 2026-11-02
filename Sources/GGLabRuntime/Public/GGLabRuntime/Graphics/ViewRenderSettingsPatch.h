@@ -67,6 +67,8 @@ namespace gglab
 			std::optional<uint32_t> m_LayerMaximum;
 			std::optional<uint32_t> m_ClassificationMask;
 			std::optional<float> m_MaximumDistance;
+			std::optional<GIProbeVisualizationMode> m_Mode;
+			std::optional<float> m_PreviewExposureEV;
 		} m_GIProbes;
 		TemporalAASettingsPatch m_TemporalAA;
 		ExposureSettingsPatch m_Exposure;

@@ -188,6 +188,13 @@ namespace gglab
 					[](auto& s) -> auto& { return s.m_GIProbes.m_ClassificationMask; }, 0u, 15u),
 				MakeBinding("view.gi_probes.maximum_distance", Block::GIProbes,
 					[](auto& s) -> auto& { return s.m_GIProbes.m_MaximumDistance; }, 0.0f, 1000000.0f),
+				MakeBinding("view.gi_probes.mode", Block::GIProbes,
+					[](auto& s) -> auto& { return s.m_GIProbes.m_Mode; }, {}, {},
+					EnumItems({ GIProbeVisualizationMode::Classification, GIProbeVisualizationMode::Irradiance },
+						&GetGIProbeVisualizationModeName)),
+				MakeBinding("view.gi_probes.preview_ev", Block::GIProbes,
+					[](auto& s) -> auto& { return s.m_GIProbes.m_PreviewExposureEV; },
+					GIProbeVisualizationMinimumExposureEV, GIProbeVisualizationMaximumExposureEV),
 			};
 			return bindings;
 		}
