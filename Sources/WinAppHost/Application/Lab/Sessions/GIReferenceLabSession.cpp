@@ -672,6 +672,22 @@ namespace gglab
 				.m_ManualEV100 = camera.GetManualEV100(), .m_Keys = { key, last } } });
 			GGLAB_ASSERT(paths);
 		}
+		else if (fixture == GIReferenceFixture::IsolatedSphere)
+		{
+			// Cross the probe volume's z=-3 face, then turn inside it. Keep the
+			// authored reference view intact; only an explicit replay moves the camera.
+			const bool paths = GetCameraRig().SetCameraPaths({ CameraPath{
+				.m_Id = "GI_ProbeBoundsCrossing", .m_Name = "Probe bounds crossing",
+				.m_Purpose = "Near-plane clipping and visible volume-edge continuity",
+				.m_NearPlane = 0.1f, .m_FarPlane = 100.0f, .m_ManualEV100 = exposure,
+				.m_Keys = {
+					{ .m_Frame = 0, .m_Position = { 1.5f, 1.5f, -3.2f }, .m_Target = { 1.5f, 1.5f, -2.2f }, .m_VerticalFovDegrees = 100 },
+					{ .m_Frame = 4, .m_Position = { 1.5f, 1.5f, -3 }, .m_Target = { 1.5f, 1.5f, -2 }, .m_VerticalFovDegrees = 100 },
+					{ .m_Frame = 8, .m_Position = { 1.5f, 1.5f, -1 }, .m_Target = { 1.5f, 1.5f, 0 }, .m_VerticalFovDegrees = 100 },
+					{ .m_Frame = 10, .m_Position = { 1.5f, 1.5f, 0 }, .m_Target = { 0, 0, 0 }, .m_VerticalFovDegrees = 100 },
+					{ .m_Frame = 12, .m_Position = { 1.5f, 1.5f, 1 }, .m_Target = { 1.5f, 1.5f, 0 }, .m_VerticalFovDegrees = 100 } } } });
+			GGLAB_ASSERT(paths);
+		}
 		m_RayScene = std::make_shared<RayScene>(RaySceneCapacity{},
 			UsesGIPrimaryReceiverMaterials(fixture) ?
 				RaySceneMaterialInputs::PrimaryReceiver :

@@ -132,7 +132,9 @@ def validate(root):
     if (root / "irradiance-cases.json").is_file():
         from ValidateGIProbeIrradiance import validate as validate_irradiance
         irradiance = validate_irradiance(root)
-    return dict(ok=True, cases=results, irradiance=irradiance)
+    from ValidateGIProbeBounds import validate as validate_bounds
+    bounds = validate_bounds(root)
+    return dict(ok=True, cases=results, irradiance=irradiance, bounds=bounds)
 
 
 if __name__ == "__main__":

@@ -79,6 +79,38 @@ try {
             $run = $start.runIdentity
             $null = Wait-VerificationCondition -Poll { Invoke-VerificationSession status $session @{ExpectedRunIdentity=$run} } `
                 -Until { param($r) $r.frame -and $r.frame.ready } -TimeoutSeconds $TimeoutSeconds
+            # Select no ordinary spheres: every private-depth sample must belong to a
+            # bounds edge, including edges crossing the eye and near planes.
+            Set-Values $session $run @(
+                @{id='gi_reference.fixture';type='enum';value=0},
+                @{id='gi_reference.field_enabled';type='bool';value=$true},
+                @{id='gi_reference.field_sampling';type='bool';value=$true},
+                @{id='gi_reference.probe_enabled';type='bool';value=$true},
+                @{id='gi_reference.field_readiness';type='bool';value=$false},
+                @{id='view.taa.enabled';type='bool';value=$false},
+                @{id='view.gi_probes.enabled';type='bool';value=$true},
+                @{id='view.gi_probes.bounds';type='bool';value=$true},
+                @{id='view.gi_probes.classification_mask';type='uint';value=0},
+                @{id='view.gi_probes.budget';type='uint';value=1})
+            foreach ($mode in @(0,1)) {
+                foreach ($depth in @(0,1)) {
+                    Set-Values $session $run @(
+                        @{id='view.gi_probes.mode';type='enum';value=$mode},
+                        @{id='view.gi_probes.depth_mode';type='enum';value=$depth})
+                    $directory = "$output/$backend/bounds/mode$mode-depth$depth"
+                    $null = New-Item -ItemType Directory -Path $directory -Force
+                    $exports = @(0..12 | ForEach-Object {
+                        @{frame=$_;graph=$true;targets=@(@{resource='GI.Probes.Counts'},
+                            @{resource='GI.Probes.PrivateDepth'},@{resource='DisplayView.DepthBuffer'})}
+                    })
+                    $result = Invoke-VerificationSession sequence $session @{ExpectedRunIdentity=$run;
+                        CameraPath='GI_ProbeBoundsCrossing';Source='composited';CaptureFrames='0-12';
+                        Exports=(ConvertTo-Json -InputObject $exports -Depth 10 -Compress);
+                        OutputDirectory=$directory;Label='bounds';TimeoutSeconds=$TimeoutSeconds}
+                    Write-VerificationJson "$directory/receipt.json" $result
+                    if ($result.sequence.state -ne 'completed') { throw ('Probe bounds crossing sequence did not complete: '+($result | ConvertTo-Json -Depth 12 -Compress)) }
+                }
+            }
             foreach ($fixture in @(@{id='f4';value=4;view='F4_Floor'},@{id='coastal';value=15;view=''})) {
                 Set-Values $session $run @(
                     @{id='gi_reference.fixture';type='enum';value=$fixture.value},

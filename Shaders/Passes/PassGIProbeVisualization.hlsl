@@ -153,8 +153,29 @@ VertexOutput VSMain(uint vertex : SV_VertexID, uint instance : SV_InstanceID)
 		float3 b = a;
 		b[axis] = 1;
 		const float3 size = (float3)(Field.Counts - 1) * Field.Spacing;
-		const float4 ca = mul(float4(Field.Minimum + a * size, 1), ViewProjection);
-		const float4 cb = mul(float4(Field.Minimum + b * size, 1), ViewProjection);
+		float4 ca = mul(float4(Field.Minimum + a * size, 1), ViewProjection);
+		float4 cb = mul(float4(Field.Minimum + b * size, 1), ViewProjection);
+		// Clip the center line before dividing by w or expanding its screen width.
+		// A behind-eye endpoint must not discard the edge's visible portion.
+		const float da = ReversedDepth != 0 ? ca.w - ca.z : ca.z;
+		const float db = ReversedDepth != 0 ? cb.w - cb.z : cb.z;
+		if (da < 0 && db < 0)
+		{
+			return output;
+		}
+		if (da < 0 || db < 0)
+		{
+			float4 clipped = lerp(ca, cb, da / (da - db));
+			clipped.z = ReversedDepth != 0 ? clipped.w : 0;
+			if (da < 0)
+			{
+				ca = clipped;
+			}
+			else
+			{
+				cb = clipped;
+			}
+		}
 		if (ca.w <= 0 || cb.w <= 0)
 		{
 			return output;
