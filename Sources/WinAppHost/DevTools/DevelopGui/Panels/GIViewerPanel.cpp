@@ -253,19 +253,20 @@ namespace gglab
 			return found != SignalOptions.end() ? *found : SignalOptions.front();
 		}
 
-		void DrawProbeInspection(DevelopGuiContext& context, std::array<int, 3>& coordinate) noexcept
+		[[nodiscard]] bool DrawProbeInspection(DevelopGuiContext& context, std::array<int, 3>& coordinate) noexcept
 		{
 			if (!ImGui::CollapsingHeader("DDGI probe inspection", ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				return;
+				return false;
 			}
 			const auto* summary = context.m_GIFieldSummary;
 			auto* control = context.m_GIProbeInspection;
 			if (!summary || !control)
 			{
 				ImGui::TextDisabled("No DDGI field in the active pipeline.");
-				return;
+				return false;
 			}
+			bool selectionRequested = false;
 			ImGui::Text("Field %llu | epoch %llu (U0=%llu) | %u x %u x %u",
 				summary->m_Field.m_Generation, summary->m_Field.m_RefreshEpoch,
 				summary->m_Field.m_EpochOriginUpdate, summary->m_Counts[0], summary->m_Counts[1], summary->m_Counts[2]);
@@ -285,6 +286,7 @@ namespace gglab
 			}
 			if (ImGui::InputInt3("Probe coordinate (x,y,z)", coordinate.data()))
 			{
+				selectionRequested = true;
 				control->Cancel();
 				if (context.m_ViewRenderSettingsOverrides)
 				{
@@ -299,6 +301,7 @@ namespace gglab
 			ImGui::BeginDisabled(!validSelection || !context.m_ViewRenderSettingsOverrides);
 			if (ImGui::Button("Select / highlight probe"))
 			{
+				selectionRequested = true;
 				auto& display = context.m_ViewRenderSettingsOverrides->m_GIProbes;
 				display.m_Enabled = true;
 				display.m_Selection = GIProbeSelection{ request.m_Coordinate, request.m_ExpectedGeneration };
@@ -319,6 +322,7 @@ namespace gglab
 			{
 				if (control->Inspect(request) && context.m_ViewRenderSettingsOverrides)
 				{
+					selectionRequested = true;
 					auto& display = context.m_ViewRenderSettingsOverrides->m_GIProbes;
 					display.m_Enabled = true;
 					display.m_Selection = GIProbeSelection{ request.m_Coordinate, request.m_ExpectedGeneration };
@@ -328,6 +332,7 @@ namespace gglab
 			ImGui::SameLine();
 			if (ImGui::Button("Cancel / clear"))
 			{
+				selectionRequested = true;
 				control->Cancel();
 				if (context.m_ViewRenderSettingsOverrides)
 				{
@@ -338,7 +343,7 @@ namespace gglab
 			const auto result = control->GetResult();
 			if (!result)
 			{
-				return;
+				return selectionRequested;
 			}
 			const bool historical = result->m_Observation.m_Field != summary->m_Field ||
 				result->m_Request.m_Coordinate != request.m_Coordinate;
@@ -374,6 +379,7 @@ namespace gglab
 				ImGui::EndChild();
 				ImGui::TreePop();
 			}
+			return selectionRequested;
 		}
 		void DrawReceiverInspection(DevelopGuiContext& context, std::array<int, 2>& pixel,
 			bool& markers, int& selectedCorner) noexcept
@@ -679,7 +685,17 @@ namespace gglab
 		ImGui::EndDisabled();
 		ImGui::TextWrapped("%s", m_PickStatus.c_str());
 		ImGui::TextDisabled("Scene clicks | solid silhouette | async 1x1 | numeric inspection stays explicit");
-		DrawProbeInspection(context, m_ProbeCoordinate);
+		// Explicit selection intent supersedes an earlier click even if its value is unchanged.
+		if (DrawProbeInspection(context, m_ProbeCoordinate) && m_PendingPick)
+		{
+			if (context.m_GIProbePicking)
+			{
+				context.m_GIProbePicking->Cancel();
+			}
+			m_PendingPick.reset();
+			++m_PickToken;
+			m_PickStatus = "GUI pick superseded by manual selection.";
+		}
 		DrawReceiverInspection(context, m_ReceiverPixel, m_ReceiverMarkers, m_ReceiverCorner);
 		const auto* view = context.m_PostProcessPreview;
 		auto* control = context.m_PostProcessPreviewControl;

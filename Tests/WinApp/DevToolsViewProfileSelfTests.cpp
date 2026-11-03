@@ -27,7 +27,9 @@
 
 #include <array>
 #include <cstdint>
+#include <initializer_list>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -135,6 +137,8 @@ namespace gglab
 			io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 			auto source = std::make_shared<GIFieldSummary>();
 			source->m_Field = { .m_Generation = 7, .m_SceneRevision = 4 };
+			source->m_Counts = { 4, 4, 4 };
+			source->m_InspectionAvailable = true;
 			auto& display = source->m_Visualization;
 			display.m_SettingsRevision = 2;
 			display.m_Settings.m_Enabled = true;
@@ -208,6 +212,53 @@ namespace gglab
 				context.Check(overrides.m_GIProbes.m_Selection &&
 					overrides.m_GIProbes.m_Selection->m_Coordinate == *result->m_Coordinate && numeric.m_Cancellations == 0,
 					"A matching result applies while collapsed without cancelling independent numeric inspection");
+				const GIProbeSelection selected{ { 1, 2, 3 }, source->m_Field.m_Generation };
+				for (const char* action : { "Select / highlight probe", "Inspect probe", "Cancel / clear" })
+				{
+					for (bool completedBeforeAction : { false, true })
+					{
+						const bool clear = std::string_view(action) == "Cancel / clear";
+						const auto expected = clear ?
+							std::optional<GIProbeSelection>{} :
+							std::optional(selected);
+						overrides.m_GIProbes.m_Selection = expected;
+						display.m_Settings.m_Selection = expected;
+						current.m_Visualization.m_Settings.m_Selection = expected;
+						picking.m_Result.reset();
+						const auto requests = picking.m_Requests;
+						click();
+						context.Check(picking.m_Requests == requests + 1,
+							"Each explicit-selection regression starts with a new pending click");
+						auto late = std::make_shared<GIProbePickingResult>();
+						late->m_Request = *picking.m_Request;
+						late->m_Validity = GIProbePickingValidity::Hit;
+						late->m_Coordinate = std::array<uint32_t, 3>{ 3, 1, 0 };
+						if (completedBeforeAction)
+						{
+							picking.m_Result = late;
+						}
+						const auto cancellations = picking.m_Cancellations;
+						const auto numericCancellations = numeric.m_Cancellations;
+						draw(ImHashStr(action, 0, ImHashStr("PickingFixture")), true);
+						context.Check(picking.m_Cancellations == cancellations + 1 &&
+							overrides.m_GIProbes.m_Selection == expected &&
+							numeric.m_Cancellations == numericCancellations + (clear ? 1u : 0u),
+							"Same-value select/inspect and empty clear supersede picking "
+							"without extra numeric cancellation");
+						// Retain the old result even after Cancel to exercise the panel's token guard.
+						picking.m_Result = late;
+						draw(0, false, false);
+						context.Check(overrides.m_GIProbes.m_Selection == expected,
+							"A completed or late pick cannot overwrite "
+							"a newer same-value selection action");
+						picking.m_Result.reset();
+						draw(ImHashStr("Select / highlight probe", 0, ImHashStr("PickingFixture")), true);
+						context.Check(overrides.m_GIProbes.m_Selection == selected,
+							"A superseded pick cannot overwrite the manual coordinate editor");
+					}
+				}
+				display.m_Settings.m_Selection = overrides.m_GIProbes.m_Selection;
+				current.m_Visualization.m_Settings.m_Selection = overrides.m_GIProbes.m_Selection;
 				picking.m_Result.reset();
 				click();
 				const auto before = picking.m_Cancellations;
