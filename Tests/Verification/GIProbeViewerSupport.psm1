@@ -70,7 +70,7 @@ function Set-ProbeViewerCase($Session, $Run, $Case, $TimeoutSeconds = 600) {
 }
 
 function Invoke-ProbeViewerCapture($Session, $Run, $Directory, [bool]$Enabled, [int]$SettleFrames = 32,
-    [bool]$Images = $true, [int]$TimeoutSeconds = 600) {
+    [bool]$Images = $true, [int]$TimeoutSeconds = 600, [string]$View = '') {
     $null = New-Item -ItemType Directory -Path $Directory -Force
     $products = @(@{kind='graph'})
     if ($Images) { $products += @(@{kind='image';source='scene'},@{kind='image';source='composited'}) }
@@ -79,11 +79,87 @@ function Invoke-ProbeViewerCapture($Session, $Run, $Directory, [bool]$Enabled, [
             @{resource='GI.Probes.RenderedIDs'},@{resource='GI.Field.Classification'})}
     }
     $result = Invoke-VerificationSession capture $Session @{ExpectedRunIdentity=$Run;Timing='next-frame';
+        View=$View;
         SettleFrames=$SettleFrames;Products=(ConvertTo-Json -InputObject @($products) -Depth 8 -Compress);
         OutputDirectory=$Directory;TimeoutSeconds=$TimeoutSeconds}
     Write-VerificationJson "$Directory/receipt.json" $result
     if ($result.status -ne 'completed' -or $result.publication -ne 'Published') { throw 'Viewer evidence did not publish.' }
     return $result
+}
+
+function Get-ProbeViewerWarmupSample($Status, $Run) {
+    if (-not $Status.PSObject.Properties['frame']) {
+        throw 'Viewer warmup requires status submission evidence, not a capture receipt.'
+    }
+    if ($Status.environment.process.runIdentity -ne $Run) { throw 'Viewer warmup run identity changed.' }
+    $frame = $Status.frame
+    if (-not $frame -or -not $frame.ready -or $frame.outcome -ne 'submitted' -or
+        -not $frame.giField -or -not $frame.giField.summary.initialized) { return $null }
+    if (-not $Status.parameterControl.available) { throw 'Viewer warmup parameter revision is unavailable.' }
+    $summary = $frame.giField.summary
+    return [ordered]@{
+        runIdentity = $Status.environment.process.runIdentity
+        contentId = $(if ($frame.labId) { $frame.labId } else { $frame.demoId })
+        parameterRevision = [uint64]$Status.parameterControl.revision
+        controlState = $frame.controlState
+        field = $summary.field
+        viewRevision = [uint64]$summary.probeVisualization.view.revision
+        visualization = $summary.probeVisualization.settings
+        extent = @([int]$Status.session.width, [int]$Status.session.height)
+        backend = $frame.backend
+        frameSerial = [uint64]$frame.frameSerial
+        settledFrames = [uint64]$frame.settledFrames
+        outcome = $frame.outcome
+        ready = [bool]$frame.ready
+    }
+}
+
+function Wait-ProbeViewerWarmup {
+    [CmdletBinding()]
+    param([string]$Session, [string]$Run, [ValidateRange(1,3600)][int]$Frames,
+        [string]$Directory, [int]$TimeoutSeconds = 600)
+    $null = New-Item -ItemType Directory -Path $Directory -Force
+    $state = @{start=$null;previous=$null;binding=$null;samples=(New-Object 'Collections.Generic.List[object]')}
+    $end = Wait-VerificationCondition -TimeoutSeconds $TimeoutSeconds -Poll {
+        $sample = Get-ProbeViewerWarmupSample (Invoke-VerificationSession status $Session @{ExpectedRunIdentity=$Run}) $Run
+        if ($null -eq $sample) {
+            if ($null -ne $state.start) { throw 'Viewer warmup lost a submitted Ready frame.' }
+            return $null
+        }
+        $binding = [ordered]@{}
+        foreach ($key in @('runIdentity','contentId','parameterRevision','controlState','field',
+            'viewRevision','visualization','extent','backend')) { $binding[$key] = $sample[$key] }
+        $bindingJson = ConvertTo-Json -InputObject $binding -Depth 16 -Compress
+        if ($null -eq $state.start) {
+            if ($sample.settledFrames + $Frames -gt [uint32]::MaxValue) { throw 'Viewer warmup counter would overflow.' }
+            $state.start = $sample
+            $state.binding = $bindingJson
+        } else {
+            if ($bindingJson -cne $state.binding) { throw 'Viewer warmup arm or observation binding changed.' }
+            $serialDelta = [decimal]$sample.frameSerial - $state.previous.frameSerial
+            $submittedDelta = [decimal]$sample.settledFrames - $state.previous.settledFrames
+            if ($submittedDelta -lt 0 -or $serialDelta -lt $submittedDelta) {
+                throw 'Viewer warmup submitted counter reset or contradicted frame serials.'
+            }
+        }
+        $state.previous = $sample
+        $state.samples.Add($sample)
+        return $sample
+    } -Until { param($sample)
+        $null -ne $sample -and $sample.settledFrames - $state.start.settledFrames -ge $Frames
+    }
+    $evidence = [ordered]@{
+        schema = 'gglab.probe-viewer-warmup'
+        schemaVersion = 1
+        method = 'submitted-settle-counter'
+        requestedFrames = $Frames
+        submittedFrames = $end.settledFrames - $state.start.settledFrames
+        start = $state.start
+        end = $end
+        samples = @($state.samples.ToArray())
+    }
+    Write-VerificationJson "$Directory/submitted-frames.json" $evidence
+    return $evidence
 }
 
 function Stop-ProbeViewer($Session, $Start, $Directory) {
@@ -98,4 +174,4 @@ function Stop-ProbeViewer($Session, $Start, $Directory) {
 }
 
 Export-ModuleMember -Function Set-ProbeViewerValues,Initialize-ProbeViewer,Get-ProbeViewerCases,
-    Set-ProbeViewerCase,Invoke-ProbeViewerCapture,Stop-ProbeViewer
+    Set-ProbeViewerCase,Invoke-ProbeViewerCapture,Wait-ProbeViewerWarmup,Stop-ProbeViewer

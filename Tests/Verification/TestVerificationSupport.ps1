@@ -479,6 +479,7 @@ $pythonIdentity = if ($Python) { & $Python --version } else { '' }
         'gi-probe-temporal' = 'TestGIProbeTemporal.ps1'
         'gi-probe-selection' = 'TestGIProbeSelection.ps1'
         'gi-probe-change' = 'TestGIProbeChange.ps1'
+        'gi-probe-picking' = 'TestGIProbePicking.ps1'
         'gi-probe-viewer' = 'TestGIProbeViewer.ps1'
         'gi-field-readiness' = 'TestGIFieldReadiness.ps1'
         'gi-field-sampling' = 'TestGIFieldSampling.ps1'
@@ -515,11 +516,12 @@ $pythonIdentity = if ($Python) { & $Python --version } else { '' }
         'nonfinite-sites', 'render-graph-schema',
         'resource-export-schema', 'nonfinite-coverage-schema', 'capture-comparison', 'taa-comparison-workflow',
         'capture-bundle-schema', 'gpu-timing-schema', 'parameter-frames-schema', 'gi-reference-contracts',
-        'gi-specular-visibility-contracts', 'gi-probe-update-contracts', 'gi-field-sampling-contracts'
+        'gi-specular-visibility-contracts', 'gi-probe-update-contracts', 'gi-probe-viewer-contracts', 'gi-field-sampling-contracts'
     )
     foreach ($leaf in $gpuLeaves.Values) {
         [IO.File]::WriteAllText((Join-Path $runnerTests $leaf), $leafSource, (New-Object Text.UTF8Encoding($false)))
     }
+    [IO.File]::WriteAllText((Join-Path $runnerTests 'TestGIProbePickingDepth.ps1'), $leafSource, (New-Object Text.UTF8Encoding($false)))
     $execution = Invoke-VerificationScript (Join-Path $runnerTests 'RunVerification.ps1') @{
         Group='gpu'; Python=$runnerPython; OutputDirectory=(Join-Path $output 'runner-results') }
     $gpuResult = $execution.output | ConvertFrom-Json
@@ -527,9 +529,12 @@ $pythonIdentity = if ($Python) { & $Python --version } else { '' }
         $gpuResult.suites.Count -eq $gpuLeaves.Count -and
         @(Compare-Object @($gpuLeaves.Keys) @($gpuResult.suites.name)).Count -eq 0) 'runner-gpu-leaf-handoff'
     foreach ($suiteResult in $gpuResult.suites) {
-        $leafResult = $suiteResult.steps[0].receipt
-        Check ($leafResult.directory -eq (Join-Path $suiteResult.directory 'run') -and
-            $leafResult.configuration[0] -eq 'Develop' -and $leafResult.rhi.Count -eq 2) "runner-compact-$($suiteResult.name)"
+        for ($index = 0; $index -lt $suiteResult.steps.Count; ++$index) {
+            $leafResult = $suiteResult.steps[$index].receipt
+            $leafDirectory = if ($suiteResult.steps.Count -gt 1) { "run-$($index + 1)" } else { 'run' }
+            Check ($leafResult.directory -eq (Join-Path $suiteResult.directory $leafDirectory) -and
+                $leafResult.configuration[0] -eq 'Develop' -and $leafResult.rhi.Count -eq 2) "runner-compact-$($suiteResult.name)-$index"
+        }
     }
     Check (($gpuResult.suites | Where-Object name -eq 'taa-comparison').steps[0].receipt.python -eq
         $runnerPython) 'runner-forwards-selected-python-to-taa-workflow'

@@ -52,6 +52,9 @@ $catalog = @(
     @{ name = 'gi-specular-visibility-contracts'; group = 'contracts'; steps = @(
         @{ path = 'Tests/Verification/ValidateGISpecularVisibility.py'; arguments = @('--self-test') }) },
     @{ name = 'gi-probe-update-contracts'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/ValidateGIProbeUpdate.py'; arguments = @('--self-test') }) },
+    @{ name = 'gi-probe-viewer-contracts'; group = 'contracts'; steps = @(
+        @{ path = 'Tests/Verification/TestGIProbeViewerWarmup.ps1' },
+        @{ path = 'Tests/Verification/ValidateGIProbeViewer.py'; arguments = @('--self-test') }) },
     @{ name = 'gi-field'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIField.ps1' }) },
     @{ name = 'gi-probe-inspection'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIProbeInspection.ps1' }) },
     @{ name = 'gi-probe-visualization'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIProbeVisualization.ps1' }) },
@@ -146,7 +149,8 @@ try {
                 if ($path.EndsWith('.ps1')) {
                     $parameters = @{ OutputDirectory = $directory }
                     if ($item.group -eq 'gpu') {
-                        $parameters = @{ RunDirectory = (Join-Path $directory 'run'); Configuration = $config; Rhi = $Rhi }
+                        $leafDirectory = if ($item.steps.Count -gt 1) { "run-$($steps.Count + 1)" } else { 'run' }
+                        $parameters = @{ RunDirectory = (Join-Path $directory $leafDirectory); Configuration = $config; Rhi = $Rhi }
                         if ($item.name -in @('taa-comparison', 'session-lifecycle', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-probe-inspection', 'gi-receiver-inspection', 'gi-probe-visualization', 'gi-probe-depth', 'gi-probe-temporal', 'gi-probe-selection', 'gi-probe-change', 'gi-probe-viewer', 'gi-field-readiness', 'gi-field-sampling', 'gi-invalid-updates', 'gi-receiver-cache')) { $parameters.Python = $Python }
                     }
                     $execution = Invoke-VerificationScript $path $parameters

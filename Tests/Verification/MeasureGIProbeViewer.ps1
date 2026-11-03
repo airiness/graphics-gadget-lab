@@ -38,12 +38,13 @@ try {
         foreach ($fixture in @(@{id='f4';value=4},@{id='coastal';value=15})) {
             $directory = "$output/$backend/$($fixture.id)"
             $null = New-Item -ItemType Directory -Path $directory -Force
-            $session = 'viewer-cost-'+[Guid]::NewGuid().ToString('N').Substring(0,8)
+            $sessionId = [Guid]::NewGuid().ToString('N').Substring(0,8)
+            $session = 'viewer-cost-'+$sessionId
             $start = $null
             try {
                 $start = Invoke-VerificationSession start $session @{Configuration='Release';Rhi=$backend;
                     Lab='gglab.lab.gi_reference';WindowSize='1280x720';NoDevTools=$true;Validation='off';
-                    StateRoot="$directory/state";StartTimeoutSeconds=$TimeoutSeconds}
+                    StateRoot="$root/Build/PVC-$sessionId";StartTimeoutSeconds=$TimeoutSeconds}
                 Write-VerificationJson "$directory/start.json" $start
                 if ($start.ownership -ne 'created') { throw 'Viewer timing requires an owned quiet session.' }
                 $run = $start.runIdentity
@@ -51,6 +52,10 @@ try {
                     -Until {param($r) $r.frame -and $r.frame.ready} -TimeoutSeconds $TimeoutSeconds
                 Write-VerificationJson "$directory/inputs.json" (Initialize-ProbeViewer $session $run $fixture.value $TimeoutSeconds)
                 Write-VerificationJson "$directory/parameters.json" (Invoke-VerificationSession parameters $session @{ExpectedRunIdentity=$run})
+                $fixtureStatus = Invoke-VerificationSession status $session @{ExpectedRunIdentity=$run}
+                # GI_CostStatic is authored from the fixture's first reference view.
+                $warmupView = @($fixtureStatus.frame.referenceViews)[0]
+                if (-not $warmupView) { throw 'Viewer measurement requires the authored static reference view.' }
                 for ($repeat = 0; $repeat -lt $RepeatCount; ++$repeat) {
                     $cases = @(Get-ProbeViewerCases $Budgets)
                     if ($repeat % 2) {
@@ -64,11 +69,11 @@ try {
                         $null = New-Item -ItemType Directory -Path $path -Force
                         Set-ProbeViewerCase $session $run $case $TimeoutSeconds
                         # Allocation and completed-count evidence is deliberately outside the timed range.
-                        $null = Invoke-ProbeViewerCapture $session $run "$path/allocation" ($case.kind -ne 'off') 32 $false $TimeoutSeconds
-                        $warmup = Invoke-VerificationSession capture $session @{ExpectedRunIdentity=$run;Timing='next-frame';
-                            SettleFrames=$WarmupFrames;OutputDirectory="$path/warmup";TimeoutSeconds=$TimeoutSeconds}
-                        Write-VerificationJson "$path/warmup.json" $warmup
-                        if ($warmup.status -ne 'completed' -or $warmup.publication -ne 'Published') { throw 'Viewer warmup did not finish.' }
+                        # Reapply that view to start Ready temporal continuity after activation.
+                        # An earlier unready epoch can otherwise leave the capture settle counter at zero.
+                        $null = Invoke-ProbeViewerCapture $session $run "$path/allocation" ($case.kind -ne 'off') 32 $false $TimeoutSeconds $warmupView
+                        $null = Wait-ProbeViewerWarmup -Session $session -Run $run -Frames $WarmupFrames `
+                            -Directory "$path/warmup" -TimeoutSeconds $TimeoutSeconds
                         $sequence = Invoke-VerificationSession sequence $session @{ExpectedRunIdentity=$run;CameraPath='GI_CostStatic';
                             GpuTiming=$true;OutputDirectory="$path/samples";TimeoutSeconds=$TimeoutSeconds}
                         Write-VerificationJson "$path/sequence.json" $sequence

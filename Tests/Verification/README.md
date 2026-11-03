@@ -365,7 +365,13 @@ layers, a larger budget or X-ray when diagnosing an apparently empty display.
 viewer off, Classification, Irradiance and Classification plus one independent
 selected highlight at 1280x720, Native/TAA off, on F4 and the complete 12,870-probe
 Coastal volume. Defaults are budgets 256/2048/4096/16384, both depth modes, two repeats
-with reversed arm order and bracketing off baselines, and 120 warmup frames.
+with reversed arm order and bracketing off baselines, and at least 120 verified
+submitted warmup frames after each arm and its allocation capture. The runner
+records a Ready settle-counter baseline and waits for the configured additional
+submissions with unchanged run/content/parameter/view/field/viewer bindings.
+`warmup/submitted-frames.json` retains status observations and start/end serials;
+polling can overshoot the requested minimum. A completed next-frame capture does
+not establish warmup. `gi-probe-viewer-contracts` tests this without a GPU.
 Images and full graph/allocation captures finish outside each timed sequence.
 All 360 raw samples remain published; reporting explicitly excludes the first
 30 sequence frames to allow profiling and frame-local state to settle.
@@ -377,7 +383,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/MeasureGI
 
 Require the runner's final `result.json` as well as `validation.json` and
 `report.md`. Timed ranges reject validation/DevTools/PIX, images, graph/resource
-exports, non-finite watches, missing provenance, activation work and incomplete
+exports, non-finite watches, missing provenance, missing/insufficient submitted
+warmup or a timed range preceding that warmup, activation work and incomplete
 matrix coverage. Compare within one backend/device/configuration. GPU viewer
 totals join scope sample indices before aggregation; frame deltas are differences
 of pooled medians against viewer-off baselines. Small frame deltas require repeats.

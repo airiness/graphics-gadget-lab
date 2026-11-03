@@ -1,5 +1,6 @@
 """Audit probe viewer correctness separately from quiet Release CPU/GPU overhead."""
 import argparse
+import copy
 import json
 import math
 from pathlib import Path
@@ -69,6 +70,45 @@ def inspect_counts(display):
     return c
 
 
+def validate_warmup(proof, requested, record, run, frames):
+    require(proof.get("schema") == "gglab.probe-viewer-warmup" and proof.get("schemaVersion") == 1 and
+            proof.get("method") == "submitted-settle-counter", "Missing submitted-frame warmup evidence")
+    require(type(requested) is int and requested > 0 and proof["requestedFrames"] == requested,
+            "Warmup request differs from measurement settings")
+    samples = proof["samples"]
+    require(len(samples) >= 2 and samples[0] == proof["start"] and samples[-1] == proof["end"],
+            "Warmup endpoints do not match its observations")
+    binding_keys = ("runIdentity", "contentId", "parameterRevision", "controlState", "field",
+                    "viewRevision", "visualization", "extent", "backend")
+    start, end = samples[0], samples[-1]
+    binding = {k: start[k] for k in binding_keys}
+    case = record["case"]
+    viewer = start["visualization"]
+    require(start["runIdentity"] == run and start["contentId"] == "gglab.lab.gi_reference" and
+            start["backend"] == record["rhi"] and start["extent"] == [1280, 720], "Warmup session differs")
+    require(viewer["enabled"] == (case["kind"] != "off") and viewer["budget"] == case["budget"] and
+            viewer["mode"] == ("irradiance" if case["mode"] else "classification") and
+            viewer["depthMode"] == ("scene-depth" if case["depth"] else "xray") and
+            (viewer["selection"] is not None) == case["selected"], "Warmup viewer arm differs")
+    for i, sample in enumerate(samples):
+        require(sample["ready"] is True and sample["outcome"] == "submitted" and
+                {k: sample[k] for k in binding_keys} == binding, "Warmup readiness or binding changed")
+        require(all(type(sample[k]) is int and 0 <= sample[k] <= limit for k, limit in
+                    (("frameSerial", 2**64 - 1), ("settledFrames", 2**32 - 1))), "Invalid warmup counters")
+        if i:
+            serial_delta = sample["frameSerial"] - samples[i-1]["frameSerial"]
+            submitted_delta = sample["settledFrames"] - samples[i-1]["settledFrames"]
+            require(0 <= submitted_delta <= serial_delta, "Warmup counter reset or exceeds submitted serials")
+    submitted = end["settledFrames"] - start["settledFrames"]
+    require(submitted >= requested and proof["submittedFrames"] == submitted, "Insufficient actual warmup frames")
+    require(frames[0]["parameters"]["frameSerial"] > end["frameSerial"] and
+            all(f["parameters"]["revision"] == start["parameterRevision"] and
+                f["parameters"]["contentId"] == start["contentId"] for f in frames),
+            "Timed range precedes warmup or changes its parameter binding")
+    return dict(requestedFrames=requested, submittedFrames=submitted, startFrameSerial=start["frameSerial"],
+                endFrameSerial=end["frameSerial"], observations=len(samples))
+
+
 def inspect_cost(root, record, settings):
     path = root / record["directory"]
     case = record["case"]
@@ -88,6 +128,10 @@ def inspect_cost(root, record, settings):
     require(set(products) == {"gpu-timing", "parameter-frames"}, "Timed range contains image/export products")
     document = timing.validate(load(manifest_path.parent / products["gpu-timing"]["metadata"]))
     frames = parameters.validate(load(manifest_path.parent / products["parameter-frames"]["metadata"]))["frames"]
+    require(manifest["environment"]["process"]["runIdentity"] == env["process"]["runIdentity"],
+            "Timed range belongs to another session")
+    warmup = validate_warmup(load(path / "warmup" / "submitted-frames.json"), settings["warmupFrames"],
+                             record, env["process"]["runIdentity"], frames)
     require(document["schemaVersion"] == 2 and document["sequence"]["frameCount"] == 360 and
             document["stablePassSet"] and document["watch"] is None, "Incomplete or unstable viewer timing range")
     expected = {"gi_reference.fixture": record["fixtureValue"], "gi_reference.field_enabled": True,
@@ -143,7 +187,7 @@ def inspect_cost(root, record, settings):
     return dict(record=record, metrics={k: stats(v) for k, v in values.items()}, counts=counts,
                 allocation=allocation_facts(graph), graphTotals=graph["execution"]["totals"],
                 readbackLogicalBytes=display["readbackBufferBytes"], readbackAllocatedBytes=display["readbackAllocatedBytes"],
-                environment=env), values
+                environment=env, warmup=warmup), values
 
 
 def validate_matrix(settings, records):
@@ -175,8 +219,10 @@ def validate_cost(root):
                  for k in ("cpuBuildRecord", "gpuFrame")}
         aggregate.append(dict(rhi=backend, fixture=fixture, kind=kind, budget=budget, depth=depth, metrics=metrics, deltaMedianMs=delta))
     save(root / "validation.json", dict(ok=True, performanceAcceptance=False, settings=settings, cases=results, aggregate=aggregate))
+    submitted = [r["warmup"]["submittedFrames"] for r in results]
     lines = ["# Probe viewer overhead", "", "Quiet Release, 1280x720, Native/TAA off, validation/DevTools/PIX off.",
-             f"Each arm: {settings['repeats']} repetitions, {settings['warmupFrames']} warmup frames, 360 raw frames; first {settings['discardFrames']} sequence frames excluded explicitly.",
+             f"Each arm: {settings['repeats']} repetitions, at least {settings['warmupFrames']} verified submitted warmup frames (observed {min(submitted)}-{max(submitted)}), 360 raw frames; first {settings['discardFrames']} sequence frames excluded explicitly.",
+             "Warmup counts use the submitted Ready settle-counter delta after the arm/allocation capture; warmup/submitted-frames.json retains observations and endpoint serials. RPC elapsed frames and next-frame receipts are not warmup proof.",
              "CPU = owner-thread elapsed build/record after BeginFrame and before EndFrame; excludes frame-slot waits, submission/Present, content Update and readback tails.",
              "GPU viewer = sample-joined GI.Probes passes, including count copies, private depth clear and the selected marker. Delta = difference of pooled medians against bracketing viewer-off runs.",
              "Graph/allocation evidence is outside timing. Native resource allocation is not residency; allocator totals include retained pools and unrelated resources.",
@@ -265,6 +311,61 @@ def validate_images(root):
     print(f"Viewer correctness passed ({len(results)} image/count/allocation cases)")
 
 
+def warmup_self_test():
+    case = dict(kind="classification", budget=4096, mode=0, depth=0, selected=False)
+    record = dict(rhi="dx12", case=case)
+    start = dict(runIdentity="fixture-run", contentId="gglab.lab.gi_reference", parameterRevision=3,
+                 controlState={}, field=dict(generation=1), viewRevision=1, extent=[1280, 720], backend="dx12",
+                 visualization=dict(enabled=True, budget=4096, mode="classification", depthMode="xray", selection=None),
+                 frameSerial=1000, settledFrames=10, ready=True, outcome="submitted")
+    end = dict(start, frameSerial=1120, settledFrames=130)
+    proof = dict(schema="gglab.probe-viewer-warmup", schemaVersion=1, method="submitted-settle-counter",
+                 requestedFrames=120, submittedFrames=120, start=start, end=end, samples=[start, end])
+    frames = [dict(parameters=dict(frameSerial=1121, revision=3, contentId=start["contentId"]))]
+    def check(value, timed=frames):
+        return validate_warmup(value, 120, record, "fixture-run", timed)
+    require(check(proof)["submittedFrames"] == 120, "Valid warmup rejected")
+    malformed = [dict(status="completed", publication="Published",
+                      timing=dict(mode="next-frame", settleFrames=0, settledFrames=0))]
+    for key, value in (("settledFrames", 129), ("settledFrames", 9), ("frameSerial", 1119),
+                       ("parameterRevision", 4), ("ready", False), ("outcome", "aborted"),
+                       ("runIdentity", "replacement"), ("viewRevision", 2), ("field", dict(generation=2))):
+        bad = copy.deepcopy(proof)
+        bad["end"][key] = value
+        malformed.append(bad)
+    for key, value in (("submittedFrames", 121), ("requestedFrames", 60), ("schemaVersion", 2)):
+        bad = copy.deepcopy(proof)
+        bad[key] = value
+        malformed.append(bad)
+    bad = copy.deepcopy(proof)
+    bad["start"]["visualization"]["budget"] = 256
+    malformed.append(bad)
+    bad = copy.deepcopy(proof)
+    bad["start"]["runIdentity"] = bad["end"]["runIdentity"] = "another-run"
+    malformed.append(bad)
+    for bad in malformed:
+        try:
+            check(bad)
+        except (ValueError, KeyError):
+            continue
+        raise AssertionError("Invalid warmup accepted")
+    for key, value in (("frameSerial", 1120), ("revision", 4), ("contentId", "replacement")):
+        timed = copy.deepcopy(frames)
+        timed[0]["parameters"][key] = value
+        try:
+            check(proof, timed)
+        except ValueError:
+            continue
+        raise AssertionError("Unbound timed range accepted")
+    overshoot = copy.deepcopy(proof)
+    overshoot["end"].update(frameSerial=1125, settledFrames=135)
+    overshoot["submittedFrames"] = 125
+    timed = copy.deepcopy(frames)
+    timed[0]["parameters"]["frameSerial"] = 1126
+    require(check(overshoot, timed)["submittedFrames"] == 125, "Verified minimum overshoot rejected")
+    return len(malformed) + 5
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     group = parser.add_mutually_exclusive_group(required=True)
@@ -289,7 +390,8 @@ def main():
                 continue
             raise AssertionError("Incomplete/duplicated matrix was accepted")
         require(stats([1, 9, 2, 3])["medianMs"] == 2, "Nearest-rank statistics changed")
-        print("Viewer evidence self-test passed (missing/duplicated arms and nearest-rank statistics)")
+        checks = warmup_self_test()
+        print(f"Viewer evidence self-test passed (matrix/statistics and {checks} warmup checks)")
     elif args.cost:
         if args.case_index is None:
             validate_cost(args.cost)
