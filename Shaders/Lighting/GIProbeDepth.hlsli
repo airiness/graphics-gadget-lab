@@ -1,6 +1,15 @@
 #pragma once
 #include <Common/NonFiniteCounters.hlsli>
 
+float4 GIProbeCropDisplayPixel(float4 clip, uint2 extent, uint2 pixel)
+{
+	// Preserve original clip Z/W while mapping one display-pixel footprint to 1x1.
+	clip.xy = clip.xy * (float2)(extent) + clip.w *
+		float2((float)(extent.x) - 2 * (float)(pixel.x) - 1,
+			2 * (float)(pixel.y) + 1 - (float)(extent.y));
+	return clip;
+}
+
 uint GIProbeComparableDepthBits(float depth)
 {
 	if (!isfinite(NonFiniteObserveValue(NF_SITE_GI_PROBE_DEPTH_GIPROBECOMPARABLEDEPTHBITS_ISFINITE, depth)))

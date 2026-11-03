@@ -17,6 +17,7 @@
 #include "Capture/FrameCaptureCoordinator.h"
 #include "Capture/GIProbeInspectionControl.h"
 #include "Capture/GIReceiverInspectionControl.h"
+#include "Capture/GIProbePickingControl.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderingSettingsDiagnosticsSnapshot.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
@@ -99,6 +100,130 @@ namespace gglab
 			const std::string& GetStatus() const noexcept override { return m_Status; }
 			const std::string& GetImagePath() const noexcept override { return m_ImagePath; }
 		};
+
+		class GIPickingProbe final : public GIProbePickingControlBase
+		{
+		public:
+			GIProbePickingDisplay m_Display;
+			std::optional<GIProbePickingRequest> m_Request;
+			std::shared_ptr<const GIProbePickingResult> m_Result;
+			std::string m_Status = "Fixture picking";
+			uint32_t m_Requests = 0;
+			uint32_t m_Cancellations = 0;
+			const GIProbePickingDisplay& GetDisplay() const noexcept override { return m_Display; }
+			bool Pick(GIProbePickingRequest request) noexcept override
+			{
+				m_Request = std::move(request);
+				++m_Requests;
+				return true;
+			}
+			void Cancel() noexcept override { ++m_Cancellations; }
+			std::shared_ptr<const GIProbePickingResult> GetResult() const noexcept override { return m_Result; }
+			const std::string& GetStatus() const noexcept override { return m_Status; }
+		};
+
+		void RunGIProbePickingGuiChecks(SelfTestContext& context) noexcept
+		{
+			auto* previous = ImGui::GetCurrentContext();
+			ImGui::CreateContext();
+			auto& io = ImGui::GetIO();
+			io.IniFilename = io.LogFilename = nullptr;
+			io.DisplaySize = ImVec2(1600, 1000);
+			io.ConfigInputTrickleEventQueue = false;
+			unsigned char* pixels = nullptr;
+			int width = 0, height = 0;
+			io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+			auto source = std::make_shared<GIFieldSummary>();
+			source->m_Field = { .m_Generation = 7, .m_SceneRevision = 4 };
+			auto& display = source->m_Visualization;
+			display.m_SettingsRevision = 2;
+			display.m_Settings.m_Enabled = true;
+			display.m_Available = display.m_PickingAvailable = true;
+			display.m_Observation = GIObservationStamp{ .m_ProducingFrame = 100 };
+			display.m_View = { .m_Revision = 3, .m_RenderExtent = { 1600, 1000 },
+				.m_DisplayExtent = { 1600, 1000 }, .m_TemporalAA = true,
+				.m_ProjectionSupported = true, .m_Valid = true };
+			auto current = *source;
+			current.m_Visualization.m_View.m_TemporalFrameIndex = 23;
+			current.m_Visualization.m_View.m_JitterPixels = { .25f, -.25f };
+			DevToolsRuntime tools;
+			auto& overrides = tools.GetViewRenderSettingsOverrides();
+			overrides.m_GIProbes = display.m_Settings;
+			GIPickingProbe picking;
+			picking.m_Display = { source, 1, "gglab.lab.test" };
+			GIInspectionProbe numeric;
+			DevelopGuiContext gui{ .m_ViewRenderSettingsOverrides = &overrides, .m_GIFieldSummary = &current,
+				.m_GIProbeInspection = &numeric, .m_GIProbePicking = &picking,
+				.m_AbsolutePointer = true, .m_ContentId = "gglab.lab.test" };
+			GIViewerPanel panel;
+			const auto draw = [&](ImGuiID activation = 0, bool captured = false, bool contents = true)
+				{
+					if (activation)
+					{
+						ImGui::ActivateItemByID(activation);
+					}
+					ImGui::NewFrame();
+					if (contents)
+					{
+						ImGui::Begin("PickingFixture");
+						panel.Draw(gui);
+						ImGui::End();
+					}
+					io.WantCaptureMouse = captured;
+					panel.OnFrame(gui);
+					ImGui::EndFrame();
+				};
+			draw();
+			draw(ImHashStr("Pick probes with left click", 0, ImHashStr("PickingFixture")));
+			const auto click = [&](bool captured = false)
+				{
+					io.AddMousePosEvent(100, 800);
+					io.AddMouseButtonEvent(0, false);
+					draw();
+					io.AddMouseButtonEvent(0, true);
+					draw(0, captured);
+				};
+			click(true);
+			gui.m_AbsolutePointer = false;
+			click();
+			context.Check(picking.m_Requests == 0, "GUI picking ignores captured and relative-pointer clicks");
+			gui.m_AbsolutePointer = true;
+			click();
+			context.Check(picking.m_Request && picking.m_Request->m_SourceFrame == 100 &&
+				picking.m_Request->m_View == display.m_View && picking.m_Request->m_Pixel == std::array<uint32_t, 2>{ 100, 800 },
+				"Mouse clicks freeze the previous submitted display rather than the planned jitter phase");
+			if (picking.m_Request)
+			{
+				const auto earlier = *picking.m_Request;
+				click();
+				auto result = std::make_shared<GIProbePickingResult>();
+				result->m_Request = earlier;
+				result->m_Validity = GIProbePickingValidity::Hit;
+				result->m_Coordinate = std::array<uint32_t, 3>{ 1, 2, 3 };
+				picking.m_Result = result;
+				draw(0, false, false);
+				context.Check(!overrides.m_GIProbes.m_Selection, "A late earlier token cannot overwrite the latest GUI selection");
+				result->m_Request = *picking.m_Request;
+				draw(0, false, false);
+				context.Check(overrides.m_GIProbes.m_Selection &&
+					overrides.m_GIProbes.m_Selection->m_Coordinate == *result->m_Coordinate && numeric.m_Cancellations == 0,
+					"A matching result applies while collapsed without cancelling independent numeric inspection");
+				picking.m_Result.reset();
+				click();
+				const auto before = picking.m_Cancellations;
+				gui.m_DisplayDpiScale = 1.25f;
+				draw(0, false, false);
+				context.Check(picking.m_Cancellations == before + 1, "DPI changes invalidate an in-flight GUI token");
+				gui.m_DisplayDpiScale = 1;
+				click();
+				const auto closing = picking.m_Cancellations;
+				panel.OnClosed(gui);
+				context.Check(picking.m_Cancellations == closing + 1 && !overrides.m_GIProbes.m_Selection,
+					"Closing the panel invalidates its picking token and releases its GUI selection");
+			}
+			ImGui::DestroyContext();
+			ImGui::SetCurrentContext(previous);
+		}
 
 		void RunGIViewerPanelChecks(SelfTestContext& context) noexcept
 		{
@@ -1004,5 +1129,6 @@ namespace gglab
 		RunRenderingSettingsPanelChecks(context);
 		RunViewControlPanelChecks(context);
 		RunGIViewerPanelChecks(context);
+		RunGIProbePickingGuiChecks(context);
 	}
 }

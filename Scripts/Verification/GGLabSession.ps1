@@ -158,6 +158,8 @@ param(
     [string]$GIProbeInspectionFile,
     [string]$GIReceiverInspection,
     [string]$GIReceiverInspectionFile,
+    [string]$GIProbePicking,
+    [string]$GIProbePickingFile,
     # capture/graph/export: the typed frame predicate, directly or from a UTF-8 file.
     [string]$RequiredFrameState,
     [string]$RequiredFrameStateFile,
@@ -369,6 +371,10 @@ function New-CaptureRequest([string]$ViewId) {
     }
     if ($GIReceiverInspection -or $GIReceiverInspectionFile) {
         $request['giReceiverInspection'] = Read-JsonObject $GIReceiverInspection $GIReceiverInspectionFile 'GIReceiverInspection'
+        if (-not $script:PSBoundParameters.ContainsKey('Source')) { $request['source'] = 'composited' }
+    }
+    if ($GIProbePicking -or $GIProbePickingFile) {
+        $request['giProbePicking'] = Read-JsonObject $GIProbePicking $GIProbePickingFile 'GIProbePicking'
         if (-not $script:PSBoundParameters.ContainsKey('Source')) { $request['source'] = 'composited' }
     }
     if ($RequiredFrameState -or $RequiredFrameStateFile) {

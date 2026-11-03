@@ -6,6 +6,7 @@
 #include "Application/Platform/Windows/Win32NamedPipeServer.h"
 #include "Capture/CaptureBundle.h"
 #include "Capture/CaptureEnvironment.h"
+#include "Capture/FrameCaptureMetadata.h"
 #include "Parameters/HostViewParameters.h"
 #include "Parameters/ParameterEffectReceipt.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
@@ -1285,8 +1286,100 @@ namespace gglab
 		}
 	}
 
+	namespace
+	{
+		void RunGIProbePickingProtocolTests(SelfTestContext& context) noexcept
+		{
+			using Json = nlohmann::json;
+			GIFieldSummary summary{ .m_Field = { .m_Generation = 73, .m_SceneRevision = 4 } };
+			auto& display = summary.m_Visualization;
+			display.m_SettingsRevision = 2;
+			display.m_Settings.m_Enabled = true;
+			display.m_View = { .m_Revision = 3, .m_RenderExtent = { 64, 32 },
+				.m_DisplayExtent = { 64, 32 }, .m_ProjectionSupported = true, .m_Valid = true };
+			display.m_Observation = GIObservationStamp{ .m_ProducingFrame = 16 };
+			const auto source = Json::parse(SerializeGIProbePickingSource(summary, 1.25f, "gglab.lab.test"));
+			Json document{
+				{ "protocol", 4 },
+				{ "id", 99 },
+				{ "command", "capture" },
+				{ "expectedRunIdentity", "0123456789abcdef0123456789abcdef" },
+				{ "giProbePicking", {
+					{ "token", 8 },
+					{ "pixel", { 32, 16 } },
+					{ "source", source } } } };
+			const auto parsed = ParseApplicationControlRequest(document.dump());
+			context.Check(parsed.m_Request && parsed.m_Request->m_Capture.m_GIProbePicking &&
+				parsed.m_Request->m_Capture.m_GIProbePicking->m_SourceFrame == 16 &&
+				parsed.m_Request->m_Capture.m_GIProbePicking->m_Mapping.m_DpiScale == 1.25f &&
+				parsed.m_Request->m_Capture.m_RequiredContentId == "gglab.lab.test" &&
+				parsed.m_Request->m_Capture.m_RequiredProducts.size() == 2 &&
+				std::get<ResourceCaptureProduct>(parsed.m_Request->m_Capture.m_RequiredProducts[1]).m_Targets.size() == 2,
+				"Picking protocol preserves the frozen source and automatically pairs both compact resources");
+			for (uint32_t change = 0; change < 12; ++change)
+			{
+				auto invalid = document;
+				auto& pick = invalid["giProbePicking"];
+				if (change == 0)
+				{
+					invalid.erase("expectedRunIdentity");
+				}
+				if (change == 1)
+				{
+					pick["token"] = 0;
+				}
+				if (change == 2)
+				{
+					pick["pixel"] = { 64, 16 };
+				}
+				if (change == 3)
+				{
+					pick["pixel"] = { -1, 16 };
+				}
+				if (change == 4)
+				{
+					pick["source"]["view"]["cameraPosition"][0] = nullptr;
+				}
+				if (change == 5)
+				{
+					pick["source"]["view"]["extra"] = 1;
+				}
+				if (change == 6)
+				{
+					pick["source"]["settings"]["budget"] = uint64_t(UINT32_MAX) + 1;
+				}
+				if (change == 7)
+				{
+					pick["source"]["mapping"]["dpiScale"] = 0;
+				}
+				if (change == 8)
+				{
+					pick["source"]["view"]["matrixConvention"] = "column-major";
+				}
+				if (change == 9)
+				{
+					invalid["requiredContentId"] = "gglab.lab.other";
+				}
+				if (change == 10)
+				{
+					pick["source"]["settings"]["mode"] = "unknown";
+				}
+				if (change == 11)
+				{
+					pick["source"]["view"]["resolutionPreset"] = "unknown";
+				}
+				context.Check(!ParseApplicationControlRequest(invalid.dump()).m_Request,
+					"Malformed, unbound and contradictory picking requests reject at the control boundary");
+			}
+			const auto capability = Json::parse(SerializeApplicationControlStatus(1, {}))["capabilities"]["giProbePicking"];
+			context.Check(capability["schemaVersion"] == 1 && capability["attachmentExtent"] == Json::array({ 1, 1 }) &&
+				capability["attachmentLogicalBytes"] == 8, "Capabilities distinguish actual tiny attachments from logical scissoring");
+		}
+	}
+
 	void RunApplicationControlSelfTests(SelfTestContext& context) noexcept
 	{
+		RunGIProbePickingProtocolTests(context);
 		RunParameterControlTests(context);
 		RunDeferredParameterSerializationTests(context);
 		RunParseTests(context);

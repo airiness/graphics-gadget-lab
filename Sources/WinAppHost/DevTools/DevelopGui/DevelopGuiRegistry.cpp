@@ -235,6 +235,10 @@ namespace gglab
 			}
 			ImGui::End();
 			notifyClosed(panel);
+			if (panel.m_Open && panel.m_Panel)
+			{
+				panel.m_Panel->OnFrame(context);
+			}
 		}
 
 		context.m_CurrentPanelKey = prevKey;

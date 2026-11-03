@@ -195,6 +195,8 @@ namespace gglab::shader_programs
 		"gglab.shader.gi-field", "vertex.probe-visualization", ShaderStage::Vertex };
 	inline const ShaderProgramRef GIProbeVisualizationPixel{
 		"gglab.shader.gi-field", "pixel.probe-visualization", ShaderStage::Pixel };
+	inline const ShaderProgramRef GIProbePickingPixel{
+		"gglab.shader.gi-field", "pixel.probe-picking", ShaderStage::Pixel };
 	inline const ShaderProgramRef GIProbeDepthConformanceVertex{
 		"gglab.shader.gi-probe-depth-conformance", "vertex.probe", ShaderStage::Vertex };
 	inline const ShaderProgramRef GIProbeDepthConformancePixel{

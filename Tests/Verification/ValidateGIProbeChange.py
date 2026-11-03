@@ -98,7 +98,7 @@ def validate(root):
         graph = load(next(directory.glob('*.graph.json')))
         summary = graph['frame']['readiness']['giField']['summary']
         display = summary['probeVisualization']
-        require(display['schemaVersion'] == 6 and display['mode'] == 'change', 'Change capability is not implemented')
+        require(display['schemaVersion'] in (6, 7) and display['mode'] == 'change', 'Change capability is not implemented')
         images, metadata = {}, {}
         for path in directory.glob('*.json'):
             value = load(path)

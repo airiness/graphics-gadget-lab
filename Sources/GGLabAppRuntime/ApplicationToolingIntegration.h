@@ -6,6 +6,7 @@
 #include <optional>
 #include <cstdint>
 #include <span>
+#include <string_view>
 
 namespace gglab
 {
@@ -43,6 +44,7 @@ namespace gglab
 	class ViewControlActionsBase;
 	class GIProbeInspectionControlBase;
 	class GIReceiverInspectionControlBase;
+	class GIProbePickingControlBase;
 	struct GIFieldSummary;
 
 	struct ApplicationToolingInputCapture
@@ -121,6 +123,10 @@ namespace gglab
 		const GIFieldSummary* m_GIFieldSummary = nullptr;
 		GIProbeInspectionControlBase* m_GIProbeInspection = nullptr;
 		GIReceiverInspectionControlBase* m_GIReceiverInspection = nullptr;
+		GIProbePickingControlBase* m_GIProbePicking = nullptr;
+		float m_DisplayDpiScale = 1;
+		bool m_AbsolutePointer = true;
+		std::string_view m_ContentId;
 	};
 
 	enum class ApplicationToolingFrameEndReason : uint8_t

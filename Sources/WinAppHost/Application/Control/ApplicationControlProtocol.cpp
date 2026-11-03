@@ -19,8 +19,10 @@
 #include <limits>
 #include <optional>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 
 namespace gglab
@@ -32,6 +34,154 @@ namespace gglab
 		constexpr uint32_t MaxSettleFrames = 10000;
 		constexpr size_t MaxSequenceCaptureFrames = 10000;
 		constexpr double MaxReferenceTextureLodBias = 8.0;
+
+		[[nodiscard]] std::string ParseGIProbePicking(const Json& value, CapturePlan& plan)
+		{
+			// Compare the reconstructed versioned DTO to reject unknown fields, missing
+			// conventions and narrowing. The source remains a binding, not trusted state.
+			try
+			{
+				const auto unsignedValue = [](const Json& object, const char* name)
+					{
+						const auto& item = object.at(name);
+						if (!item.is_number_unsigned())
+						{
+							throw std::runtime_error("Expected unsigned integer.");
+						}
+						return item.get<uint64_t>();
+					};
+				const auto unsigned32 = [&unsignedValue](const Json& object, const char* name)
+					{
+						const uint64_t result = unsignedValue(object, name);
+						if (result > UINT32_MAX)
+						{
+							throw std::runtime_error("Integer exceeds uint32.");
+						}
+						return uint32_t(result);
+					};
+				const auto number = [](const Json& object, const char* name)
+					{
+						const auto& item = object.at(name);
+						const float result = item.is_number() ? item.get<float>() : NAN;
+						if (!std::isfinite(result))
+						{
+							throw std::runtime_error("Expected finite number.");
+						}
+						return result;
+					};
+				const auto array = [&number, &unsigned32]<typename T, size_t N>(
+					const Json& object, const char* name, std::array<T, N>& output)
+					{
+						const auto& items = object.at(name);
+						if (!items.is_array() || items.size() != N)
+						{
+							throw std::runtime_error("Invalid array extent.");
+						}
+						for (size_t index = 0; index < N; ++index)
+						{
+							const Json item{ { "value", items[index] } };
+							if constexpr (std::is_same_v<T, uint32_t>)
+							{
+								output[index] = unsigned32(item, "value");
+							}
+							else
+							{
+								output[index] = number(item, "value");
+							}
+						}
+					};
+				if (!value.is_object() || value.size() != 3 || !value.contains("source"))
+				{
+					return "giProbePicking requires token, pixel and source.";
+				}
+				GIProbePickingRequest request;
+				request.m_Token = unsignedValue(value, "token");
+				array(value, "pixel", request.m_Pixel);
+				const auto& source = value.at("source");
+				if (unsignedValue(source, "schemaVersion") != 1)
+				{
+					return "Unsupported probe picking source schema.";
+				}
+				request.m_SourceFrame = unsignedValue(source, "sourceFrame");
+				request.m_SettingsRevision = unsignedValue(source, "settingsRevision");
+				const auto content = source.at("contentId").get<std::string>();
+				const auto& identity = source.at("field");
+				request.m_Field = {
+					.m_Generation = unsignedValue(identity, "generation"),
+					.m_SceneRevision = unsignedValue(identity, "sceneRevision"),
+					.m_LightingGeneration = unsignedValue(identity, "lightingGeneration"),
+					.m_EnvironmentGeneration = unsignedValue(identity, "environmentGeneration"),
+					.m_RefreshEpoch = unsignedValue(identity, "refreshEpoch"),
+					.m_EpochOriginUpdate = unsignedValue(identity, "epochOriginUpdate") };
+				const auto& view = source.at("view");
+				auto& target = request.m_View;
+				target.m_Revision = unsignedValue(view, "revision");
+				target.m_ViewId = unsigned32(view, "viewId");
+				array(view, "renderExtent", target.m_RenderExtent);
+				array(view, "displayExtent", target.m_DisplayExtent);
+				array(view, "cameraPosition", target.m_CameraPosition);
+				array(view, "view", target.m_View);
+				array(view, "projection", target.m_Projection);
+				array(view, "viewProjection", target.m_ViewProjection);
+				array(view, "unjitteredProjection", target.m_UnjitteredProjection);
+				array(view, "unjitteredViewProjection", target.m_UnjitteredViewProjection);
+				array(view, "jitterPixels", target.m_JitterPixels);
+				array(view, "nearFar", target.m_NearFar);
+				target.m_TemporalFrameIndex = unsigned32(view, "temporalFrameIndex");
+				target.m_ReversedDepth = view.at("reversedDepth").get<bool>();
+				target.m_TemporalAA = view.at("temporalAA").get<bool>();
+				target.m_ResolutionPreset = view.at("resolutionPreset") == "quality" ?
+					TemporalAAResolutionPreset::Quality : TemporalAAResolutionPreset::Native;
+				target.m_PostTemporalJittered = view.at("postTemporalProjection") == "jittered";
+				target.m_ProjectionSupported = view.at("supported").get<bool>();
+				target.m_Valid = true;
+				const auto& settings = source.at("settings");
+				auto& effective = request.m_Settings;
+				effective.m_Enabled = settings.at("enabled").get<bool>();
+				effective.m_Bounds = settings.at("bounds").get<bool>();
+				effective.m_Radius = number(settings, "radiusInSpacings");
+				effective.m_Budget = unsigned32(settings, "budget");
+				effective.m_SliceAxis = unsigned32(settings, "sliceAxis");
+				effective.m_LayerMinimum = unsigned32(settings, "layerMinimum");
+				effective.m_LayerMaximum = unsigned32(settings, "layerMaximum");
+				effective.m_ClassificationMask = unsigned32(settings, "classificationMask");
+				effective.m_MaximumDistance = number(settings, "maximumDistance");
+				effective.m_Mode = settings.at("mode") == "change" ? GIProbeVisualizationMode::Change :
+					settings.at("mode") == "irradiance" ? GIProbeVisualizationMode::Irradiance : GIProbeVisualizationMode::Classification;
+				effective.m_PreviewExposureEV = number(settings, "previewEV");
+				effective.m_ChangeNormalized = settings.at("changeNormalized").get<bool>();
+				effective.m_ChangeRange = number(settings, "changeRange");
+				effective.m_ChangeBlocks = settings.at("changeBlocks").get<bool>();
+				effective.m_DepthMode = settings.at("depthMode") == "scene-depth" ?
+					GIProbeDepthMode::SceneDepth : GIProbeDepthMode::XRay;
+				const auto& mapping = source.at("mapping");
+				array(mapping, "guiOrigin", request.m_Mapping.m_GuiOrigin);
+				array(mapping, "guiExtent", request.m_Mapping.m_GuiExtent);
+				array(mapping, "framebufferScale", request.m_Mapping.m_FramebufferScale);
+				request.m_Mapping.m_DpiScale = number(mapping, "dpiScale");
+				GIFieldSummary summary{ .m_Field = request.m_Field };
+				summary.m_Visualization.m_View = target;
+				summary.m_Visualization.m_Settings = effective;
+				summary.m_Visualization.m_SettingsRevision = request.m_SettingsRevision;
+				summary.m_Visualization.m_Observation = GIObservationStamp{ .m_ProducingFrame = request.m_SourceFrame };
+				auto canonical = Json::parse(SerializeGIProbePickingSource(summary, request.m_Mapping.m_DpiScale, content));
+				canonical["mapping"] = Json{
+					{ "guiOrigin", request.m_Mapping.m_GuiOrigin },
+					{ "guiExtent", request.m_Mapping.m_GuiExtent },
+					{ "framebufferScale", request.m_Mapping.m_FramebufferScale },
+					{ "dpiScale", request.m_Mapping.m_DpiScale } };
+				if (content.empty() || canonical != source || !IsGIProbePickingRequestValid(request))
+				{
+					return "Malformed or unsupported probe picking source.";
+				}
+				plan.m_GIProbePicking = std::move(request);
+				return {};
+			}
+			catch (const std::exception& error)
+			{
+				return std::format("Malformed probe picking source fields: {}", error.what());
+			}
+		}
 
 		[[nodiscard]] std::string ToUtf8(const std::filesystem::path& path)
 		{
@@ -1103,6 +1253,17 @@ namespace gglab
 					}
 					capture.m_FrameSelectionTimeout = std::chrono::milliseconds(value.get<uint32_t>());
 				}
+				else if (key == "giProbePicking" && !graph && !resources)
+				{
+					if (!request.m_ExpectedRunIdentity)
+					{
+						return "giProbePicking requires expectedRunIdentity.";
+					}
+					if (const auto error = ParseGIProbePicking(value, capture); !error.empty())
+					{
+						return error;
+					}
+				}
 				else if (key == "giProbeInspection" && !graph && !resources)
 				{
 					if (!value.is_object() || !value.contains("coordinate") ||
@@ -1190,9 +1351,22 @@ namespace gglab
 					return std::format("Unknown field '{}' for command '{}'.", key, graph ? "graph" : resources ? "export" : "capture");
 				}
 			}
+			if (capture.m_GIProbePicking)
+			{
+				const auto content = document.at("giProbePicking").at("source").at("contentId").get<std::string>();
+				if (!capture.m_RequiredContentId.empty() && capture.m_RequiredContentId != content)
+				{
+					return "Probe picking content conflicts with requiredContentId.";
+				}
+				capture.m_RequiredContentId = content;
+			}
 			const auto addInspectionTarget = [&capture]()
 				{
 					std::vector<std::string> names;
+					if (capture.m_GIProbePicking)
+					{
+						names.insert(names.end(), { "GI.Probes.PickID", "GI.Probes.PickDepth" });
+					}
 					if (capture.m_GIProbeInspection)
 					{
 						names.push_back("GI.Field.ProbeInspection");
@@ -1964,7 +2138,7 @@ namespace gglab
 				{ "resultConsumption", "explicit" } } },
 			{ "captureJobs", true },
 			{ "giProbeVisualization", {
-				{ "schemaVersion", 6 },
+				{ "schemaVersion", 7 },
 				{ "parameters", "Host view.gi_probes.*" },
 				{ "summary", "frame.giField.summary.probeVisualization" },
 				{ "modes", { "classification", "irradiance", "change" } },
@@ -1984,6 +2158,16 @@ namespace gglab
 				{ "selectionCommand", "select-gi-probe" },
 				{ "maximumHighlights", GIProbeVisualizationMaximumHighlights },
 				{ "highlightPolicy", "generation-bound diagnostic overlay; independent ordinary filters/budget/depth winners" } } },
+			{ "giProbePicking", {
+				{ "schemaVersion", 1 },
+				{ "source", "frame.probePickingSource; last successfully submitted display" },
+				{ "request", "capture.giProbePicking; token,pixel,source; expectedRunIdentity required" },
+				{ "result", "products[].metadata.giProbePicking" },
+				{ "resources", { "GI.Probes.PickID", "GI.Probes.PickDepth" } },
+				{ "attachmentExtent", { 1, 1 } },
+				{ "attachmentLogicalBytes", 8 },
+				{ "idEncoding", "0=NoHit; stable-id+1=Hit" },
+				{ "policy", "shared filtered instances; solid silhouette; strict nearest-depth then stable-ID" } } },
 			{ "giReceiverInspection", {
 				{ "version", 1 },
 				{ "summary", "frame.giField.summary.receiverView" },
@@ -2228,6 +2412,8 @@ namespace gglab
 			{ "settledFrames", status.m_SettledFrames },
 			{ "gates", SerializeGates(frame.m_Readiness) },
 			{ "giField", std::move(giField) },
+			{ "probePickingSource", status.m_GIProbePickingSource.empty() ? Json(nullptr) :
+				Json::parse(status.m_GIProbePickingSource) },
 			{ "camera",{
 				{ "name", camera.m_Name },
 				{ "position", camera.m_Position },

@@ -128,7 +128,7 @@ def inspect_cost(root, record, settings):
     _, _, graph, _ = read_capture(path / "allocation")
     summary = graph["frame"]["readiness"]["giField"]["summary"]
     display = summary["probeVisualization"]
-    require(display["schemaVersion"] in (5, 6) and display["settings"]["enabled"] == enabled, "Allocation arm differs")
+    require(display["schemaVersion"] in (5, 6, 7) and display["settings"]["enabled"] == enabled, "Allocation arm differs")
     if record["fixture"] == "coastal":
         require(math.prod(summary["counts"]) == 12870, "Coastal volume was reduced")
     counts = inspect_counts(display) if enabled else None

@@ -36,6 +36,8 @@ cbuffer Parameters : register(b2)
 	float ChangeRange;
 	uint ChangeBlockCount;
 	uint3 ChangePadding;
+	uint2 PickPixel;
+	uint2 PickPadding;
 };
 
 uint3 Coordinate(uint id)
@@ -259,11 +261,33 @@ VertexOutput VSMain(uint vertex : SV_VertexID, uint instance : SV_InstanceID)
 	const float3 center = Field.Minimum + (float3)(Coordinate(record.x)) * Field.Spacing;
 	output.WorldPosition = center + normal * Radius * (Mode == 2 ? 1.12 : 1);
 	output.Position = mul(float4(output.WorldPosition, 1), ViewProjection);
+	if (Mode == 5)
+	{
+		output.Position = GIProbeCropDisplayPixel(output.Position, Extent, PickPixel);
+	}
 	output.ProbeID = record.x;
 	output.Normal = normal;
 	output.UV = uv;
 	output.Category = record.y;
 	return output;
+}
+
+uint PSPick(VertexOutput input) : SV_Target
+{
+	if (!GIProbeDepthAdmitted(input.Position.z, ReversedDepth != 0))
+	{
+		discard;
+	}
+	if (DepthMode == 1)
+	{
+		Texture2D<float> scene = ResourceDescriptorHeap[NonUniformResourceIndex(SceneDepthIndex)];
+		if (!GIProbeSceneDepthVisible(input.Position.z, scene.Load(int3(PickPixel, 0)), ReversedDepth != 0))
+		{
+			discard;
+		}
+	}
+	// Inactive wireframes retain a solid picking silhouette.
+	return input.ProbeID + 1;
 }
 
 float4 PSMain(VertexOutput input) : SV_Target

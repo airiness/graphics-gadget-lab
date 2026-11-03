@@ -32,6 +32,7 @@ namespace gglab
 		ProbeAtlas,
 		ReceiverContribution,
 		ProbeVisualization,
+		ProbePicking,
 	};
 
 	struct GIObservationStamp
@@ -214,6 +215,8 @@ namespace gglab
 	// Published together on the Runtime owner thread. Copies retain CPU values only.
 	struct GIProbeVisualizationSnapshot
 	{
+		uint64_t m_SettingsRevision = 0;
+		bool m_PickingAvailable = false;
 		std::shared_ptr<const GIFieldChangeObservation> m_ChangeObservation;
 		uint64_t m_ChangeUploadBytes = 0;
 		GIProbeVisualizationSettings m_Settings;

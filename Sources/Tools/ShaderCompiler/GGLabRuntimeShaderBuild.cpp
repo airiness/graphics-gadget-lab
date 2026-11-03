@@ -186,6 +186,7 @@ namespace gglab
 			ShaderProgramBuildRecord{ &GIProbeVisualizationCompute, L"Passes/PassGIProbeVisualization.hlsl", L"CSMain" },
 			ShaderProgramBuildRecord{ &GIProbeVisualizationVertex, L"Passes/PassGIProbeVisualization.hlsl", L"VSMain" },
 			ShaderProgramBuildRecord{ &GIProbeVisualizationPixel, L"Passes/PassGIProbeVisualization.hlsl", L"PSMain" },
+			ShaderProgramBuildRecord{ &GIProbePickingPixel, L"Passes/PassGIProbeVisualization.hlsl", L"PSPick" },
 			ShaderProgramBuildRecord{ &GIProbeDepthConformanceVertex, L"Passes/PassGIProbeDepthConformance.hlsl", L"VSMain" },
 			ShaderProgramBuildRecord{ &GIProbeDepthConformancePixel, L"Passes/PassGIProbeDepthConformance.hlsl", L"PSProbe" },
 			ShaderProgramBuildRecord{ &GIProbeDepthConformanceScene, L"Passes/PassGIProbeDepthConformance.hlsl", L"PSScene" },

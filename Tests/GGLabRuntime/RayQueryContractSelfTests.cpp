@@ -10,6 +10,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIField.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIProbePicking.h"
 #include "Graphics/Pipeline/GIFieldState.h"
 #include "GGLabRuntime/Graphics/RayScene.h"
 #include "GGLabRuntime/Graphics/Pipeline/RaySceneSunVisibility.h"
@@ -2818,8 +2819,160 @@ namespace gglab
 		}
 	}
 
+	namespace
+	{
+		void RunGIProbePickingTests(SelfTestContext& context) noexcept
+		{
+			const GIProbePickMapping scaled{ .m_GuiOrigin = { 100, 40 }, .m_GuiExtent = { 128, 80 },
+				.m_FramebufferScale = { 1.25f, 1.25f }, .m_DpiScale = 1.25f };
+			context.Check(MapGIProbePickPixel(scaled, { 160, 100 }, { 100, 40 }) == std::array<uint32_t, 2>{ 0, 0 } &&
+				MapGIProbePickPixel(scaled, { 160, 100 }, { 227.9f, 119.9f }) == std::array<uint32_t, 2>{ 159, 99 },
+				"Picking maps viewport origin and fractional scale to integer display pixels");
+			for (const std::array<float, 2> point : { std::array<float, 2>{ 99.99f, 40 }, { 228, 40 },
+				{ 100, 39.99f }, { 100, 120 }, { NAN, 40 }, { 100, INFINITY } })
+			{
+				context.Check(!MapGIProbePickPixel(scaled, { 160, 100 }, point),
+					"Picking rejects non-finite and outside-edge positions without clamping");
+			}
+			GIFieldSummary summary{ .m_Field = { .m_Generation = 7, .m_SceneRevision = 3 } };
+			auto& visualization = summary.m_Visualization;
+			visualization.m_Settings.m_Enabled = true;
+			visualization.m_SettingsRevision = 2;
+			visualization.m_Available = visualization.m_PickingAvailable = true;
+			visualization.m_View = { .m_Revision = 4, .m_RenderExtent = { 160, 100 },
+				.m_DisplayExtent = { 160, 100 }, .m_ProjectionSupported = true, .m_Valid = true };
+			GIProbePickingRequest request{ .m_Token = 8, .m_SourceFrame = 100, .m_SettingsRevision = 2,
+				.m_Field = summary.m_Field, .m_View = visualization.m_View,
+				.m_Settings = visualization.m_Settings, .m_Mapping = scaled, .m_Pixel = { 80, 50 } };
+			context.Check(IsGIProbePickingRequestValid(request) &&
+				CheckGIProbePickingBinding(request, summary, scaled) == GIProbePickingBinding::Matching,
+				"A complete immutable picking source binds to the same logical display");
+			for (uint32_t change = 0; change < 10; ++change)
+			{
+				auto current = summary;
+				auto mapping = scaled;
+				auto expected = GIProbePickingBinding::Matching;
+				if (change == 0)
+				{
+					++current.m_Field.m_Generation;
+					expected = GIProbePickingBinding::FieldMismatch;
+				}
+				if (change == 1)
+				{
+					++current.m_Field.m_SceneRevision;
+					expected = GIProbePickingBinding::FieldMismatch;
+				}
+				if (change == 2)
+				{
+					++current.m_Visualization.m_View.m_Revision;
+					expected = GIProbePickingBinding::ViewMismatch;
+				}
+				if (change == 3)
+				{
+					current.m_Visualization.m_View.m_CameraPosition[0] = 1;
+					expected = GIProbePickingBinding::ViewMismatch;
+				}
+				if (change == 4)
+				{
+					++current.m_Visualization.m_SettingsRevision;
+					expected = GIProbePickingBinding::SettingsMismatch;
+				}
+				if (change == 5)
+				{
+					++current.m_Visualization.m_Settings.m_Budget;
+					expected = GIProbePickingBinding::SettingsMismatch;
+				}
+				if (change == 6)
+				{
+					mapping.m_DpiScale = 1.5f;
+					expected = GIProbePickingBinding::MappingMismatch;
+				}
+				if (change == 7)
+				{
+					mapping.m_GuiOrigin[0] = 0;
+					expected = GIProbePickingBinding::MappingMismatch;
+				}
+				if (change == 8)
+				{
+					current.m_Invalid = true;
+					expected = GIProbePickingBinding::Unavailable;
+				}
+				if (change == 9)
+				{
+					++current.m_Field.m_LightingGeneration;
+					++current.m_Field.m_RefreshEpoch;
+				}
+				context.Check(CheckGIProbePickingBinding(request, current, mapping) == expected,
+					"Picking rejects changed logical bindings while allowing newer lighting observations");
+			}
+			request.m_View.m_TemporalAA = visualization.m_View.m_TemporalAA = true;
+			visualization.m_View.m_JitterPixels = { .25f, -.25f };
+			visualization.m_View.m_TemporalFrameIndex = 23;
+			visualization.m_View.m_Projection[0] = 123;
+			visualization.m_View.m_ViewProjection[0] = 456;
+			context.Check(CheckGIProbePickingBinding(request, summary, scaled) == GIProbePickingBinding::Matching,
+				"Execution jitter and raster matrices may advance without relabelling the clicked source");
+			GIObservationStamp stamp{ .m_Field = summary.m_Field, .m_Kind = GIObservationKind::ProbePicking,
+				.m_ProducingFrame = 120, .m_FieldUpdate = 30, .m_ReadinessUpdate = 30 };
+			uint32_t encoded = 26;
+			float depth = .4f;
+			const auto decode = [&]()
+				{
+					return DecodeGIProbePicking(request, stamp, visualization.m_View, { 4, 3, 5 },
+						std::as_bytes(std::span(&encoded, 1)), std::as_bytes(std::span(&depth, 1)));
+				};
+			const auto hit = decode();
+			context.Check(hit->m_Validity == GIProbePickingValidity::Hit && hit->m_ProbeId == 25 &&
+				hit->m_Coordinate == std::array<uint32_t, 3>{ 1, 1, 1 } && hit->m_Depth == depth &&
+				hit->m_Request.m_SourceFrame == 100 && hit->m_Observation.m_ProducingFrame == 120,
+				"Compact picking decoding preserves separate source/execution stamps and x-z-y stable IDs");
+			for (const bool reversed : { false, true })
+			{
+				request.m_View.m_ReversedDepth = visualization.m_View.m_ReversedDepth = reversed;
+				encoded = 0;
+				depth = reversed ? 0.0f : 1.0f;
+				const auto noHit = decode();
+				context.Check(noHit->m_Validity == GIProbePickingValidity::NoHit && !noHit->m_ProbeId &&
+					!noHit->m_Coordinate && !noHit->m_Depth, "NoHit has null optional values and the correct clear endpoint");
+				encoded = 1;
+				context.Check(decode()->m_Validity == GIProbePickingValidity::MalformedPayload,
+					"A purported hit at clear depth cannot fabricate a probe");
+				depth = .5f;
+				context.Check(decode()->m_ProbeId == 0, "Probe zero is distinct from the NoHit sentinel");
+			}
+			for (uint32_t change = 0; change < 5; ++change)
+			{
+				auto invalid = stamp;
+				if (change == 0)
+				{
+					invalid.m_Kind = GIObservationKind::ProbeAtlas;
+				}
+				if (change == 1)
+				{
+					++invalid.m_Field.m_SceneRevision;
+				}
+				if (change == 2)
+				{
+					invalid.m_ProducingFrame = request.m_SourceFrame;
+				}
+				if (change == 3)
+				{
+					++invalid.m_ReadinessUpdate;
+				}
+				if (change == 4)
+				{
+					invalid.m_Field.m_EpochOriginUpdate = 31;
+				}
+				context.Check(DecodeGIProbePicking(request, invalid, visualization.m_View, { 4, 3, 5 },
+					std::as_bytes(std::span(&encoded, 1)), std::as_bytes(std::span(&depth, 1)))->m_Validity ==
+					GIProbePickingValidity::MalformedPayload, "Decoder rejects wrong-kind, epoch and stale execution provenance");
+			}
+		}
+	}
+
 	void RunRayQueryContractSelfTests(SelfTestContext& context) noexcept
 	{
+		RunGIProbePickingTests(context);
 		RunDX12PipelineIdentityTests(context);
 		RHIAccelerationStructureStore store;
 		auto bottom = std::make_shared<RHIAccelerationStructureBackingBase>();

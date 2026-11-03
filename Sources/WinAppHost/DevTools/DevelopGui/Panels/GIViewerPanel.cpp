@@ -6,6 +6,7 @@
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
 #include "Capture/GIProbeInspectionControl.h"
 #include "Capture/GIReceiverInspectionControl.h"
+#include "Capture/GIProbePickingControl.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 
 #include <algorithm>
@@ -549,6 +550,13 @@ namespace gglab
 
 	void GIViewerPanel::OnClosed(DevelopGuiContext& context) noexcept
 	{
+		m_PickingEnabled = false;
+		m_PendingPick.reset();
+		++m_PickToken;
+		if (context.m_GIProbePicking)
+		{
+			context.m_GIProbePicking->Cancel();
+		}
 		if (context.m_ViewRenderSettingsOverrides)
 		{
 			context.m_ViewRenderSettingsOverrides->m_GIProbes.m_Enabled = false;
@@ -564,11 +572,113 @@ namespace gglab
 		}
 	}
 
+	void GIViewerPanel::OnFrame(DevelopGuiContext& context) noexcept
+	{
+		auto* control = context.m_GIProbePicking;
+		auto* overrides = context.m_ViewRenderSettingsOverrides;
+		if (!control || !overrides)
+		{
+			return;
+		}
+		const auto& io = ImGui::GetIO();
+		const auto* viewport = ImGui::GetMainViewport();
+		const GIProbePickMapping mapping{
+			.m_GuiOrigin = { viewport->Pos.x, viewport->Pos.y },
+			.m_GuiExtent = { io.DisplaySize.x, io.DisplaySize.y },
+			.m_FramebufferScale = { io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y },
+			.m_DpiScale = context.m_DisplayDpiScale };
+		if (m_PendingPick)
+		{
+			const auto binding = context.m_GIFieldSummary ?
+				CheckGIProbePickingBinding(*m_PendingPick, *context.m_GIFieldSummary, mapping) :
+				GIProbePickingBinding::Unavailable;
+			if (!m_PickingEnabled || context.m_ContentId != m_PickContent ||
+				overrides->m_GIProbes != m_PickGuiSettings || binding != GIProbePickingBinding::Matching ||
+				context.m_GIFieldSummary->m_Visualization.m_Settings.m_Selection != m_PickEffectiveSelection)
+			{
+				control->Cancel();
+				m_PendingPick.reset();
+				++m_PickToken;
+				m_PickStatus = "GUI pick invalidated: " + std::string(GetGIProbePickingBindingName(binding));
+			}
+		}
+		// Clicks bind to the last submitted display, never this planned GUI frame.
+		if (m_PickingEnabled && context.m_AbsolutePointer && !io.WantCaptureMouse &&
+			!ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow) && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+		{
+			const auto& display = control->GetDisplay();
+			const auto* summary = display.m_Summary.get();
+			const auto pixel = summary ? MapGIProbePickPixel(mapping, summary->m_Visualization.m_View.m_DisplayExtent,
+				{ io.MousePos.x, io.MousePos.y }) : std::nullopt;
+			if (pixel && summary->m_Visualization.m_Observation && display.m_DpiScale == mapping.m_DpiScale)
+			{
+				const auto& source = summary->m_Visualization;
+				GIProbePickingRequest request{
+					.m_Token = ++m_PickToken,
+					.m_SourceFrame = source.m_Observation->m_ProducingFrame,
+					.m_SettingsRevision = source.m_SettingsRevision,
+					.m_Field = summary->m_Field,
+					.m_View = source.m_View,
+					.m_Settings = GIProbePickSettings(source.m_Settings),
+					.m_Mapping = mapping,
+					.m_Pixel = *pixel };
+				m_PendingPick.reset();
+				if (control->Pick(request))
+				{
+					m_PendingPick = request;
+					m_PickContent = display.m_ContentId;
+					m_PickGuiSettings = overrides->m_GIProbes;
+					m_PickEffectiveSelection = source.m_Settings.m_Selection;
+				}
+				else
+				{
+					control->Cancel();
+				}
+				m_PickStatus = control->GetStatus();
+			}
+			else
+			{
+				control->Cancel();
+				m_PendingPick.reset();
+				++m_PickToken;
+				m_PickStatus = "Click has no matching displayed view / pixel mapping.";
+			}
+		}
+		if (const auto result = control->GetResult(); m_PendingPick && result &&
+			result->m_Request.m_Token == m_PickToken && result->m_Request == *m_PendingPick)
+		{
+			if (result->m_Validity == GIProbePickingValidity::Hit)
+			{
+				overrides->m_GIProbes.m_Selection = GIProbeSelection{
+					.m_Coordinate = *result->m_Coordinate, .m_ExpectedGeneration = result->m_Request.m_Field.m_Generation };
+				for (size_t axis = 0; axis < 3; ++axis)
+				{
+					m_ProbeCoordinate[axis] = int((*result->m_Coordinate)[axis]);
+				}
+			}
+			else if (result->m_Validity == GIProbePickingValidity::NoHit)
+			{
+				overrides->m_GIProbes.m_Selection.reset();
+			}
+			m_PickStatus = control->GetStatus();
+			m_PendingPick.reset();
+		}
+		else if (m_PendingPick)
+		{
+			m_PickStatus = control->GetStatus();
+		}
+	}
+
 	void GIViewerPanel::Draw(DevelopGuiContext& context) noexcept
 	{
 		ImGui::SetWindowPos(ImVec2(460, 45), ImGuiCond_FirstUseEver);
 		ImGui::SetWindowSize(ImVec2(760, 660), ImGuiCond_FirstUseEver);
 		DrawProbeArray(context);
+		ImGui::BeginDisabled(!context.m_GIProbePicking);
+		ImGui::Checkbox("Pick probes with left click", &m_PickingEnabled);
+		ImGui::EndDisabled();
+		ImGui::TextWrapped("%s", m_PickStatus.c_str());
+		ImGui::TextDisabled("Scene clicks | solid silhouette | async 1x1 | numeric inspection stays explicit");
 		DrawProbeInspection(context, m_ProbeCoordinate);
 		DrawReceiverInspection(context, m_ReceiverPixel, m_ReceiverMarkers, m_ReceiverCorner);
 		const auto* view = context.m_PostProcessPreview;

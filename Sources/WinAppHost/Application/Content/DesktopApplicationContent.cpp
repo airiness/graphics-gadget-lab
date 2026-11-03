@@ -99,6 +99,7 @@ namespace gglab
 					shader_programs::GIReceiverMarkersPixel,
 					shader_programs::GIProbeVisualizationCompute, shader_programs::GIProbeVisualizationVertex,
 					shader_programs::GIProbeVisualizationPixel,
+					shader_programs::GIProbePickingPixel,
 					shader_programs::GIFieldReadinessFloorCompute,
 					shader_programs::GISpecularVisibilityCompute,
 					shader_programs::RaySceneHitMaterialCompute } },

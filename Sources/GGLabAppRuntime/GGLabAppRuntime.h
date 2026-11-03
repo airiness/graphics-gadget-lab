@@ -13,6 +13,7 @@
 #include "Parameters/ViewControlActions.h"
 #include "Capture/GIProbeInspectionControl.h"
 #include "Capture/GIReceiverInspectionControl.h"
+#include "Capture/GIProbePickingControl.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
 #include "GGLabRuntime/Graphics/RenderServicesView.h"
@@ -146,6 +147,7 @@ namespace gglab
 
 	struct AppRuntimeTickInfo
 	{
+		float m_WindowDpiScale = 1;
 		ApplicationToolingIntegrationBase* m_ApplicationTooling = nullptr;
 		// Optional current-content adapter borrowed only for this frame's Lab snapshot.
 		const LabRuntimeLocatorBase* m_LabRuntimeLocator = nullptr;
@@ -188,6 +190,7 @@ namespace gglab
 		[[nodiscard]] AppRuntimeServiceInitializeResult InitializeServices(
 			AppRuntimeServiceCreateInfo createInfo) noexcept;
 		[[nodiscard]] AppRuntimeTickResult Tick(AppRuntimeTickInfo tickInfo = {}) noexcept;
+		[[nodiscard]] std::string GetGIProbePickingSourceJson() const noexcept;
 		void HandleHostEvent(const AppHostEvent& event) noexcept;
 		void Shutdown(AppRuntimeShutdownInfo shutdownInfo = {}) noexcept;
 
@@ -353,6 +356,7 @@ namespace gglab
 		ToolingViewControl m_ToolingViewControl;
 		ToolingGIProbeInspection m_ToolingGIProbeInspection;
 		ToolingGIReceiverInspection m_ToolingGIReceiverInspection;
+		ToolingGIProbePicking m_ToolingGIProbePicking;
 		// Frozen after content update; shared by parameters and this frame's planning.
 		uint64_t m_ActiveContentIdentity = 0;
 		// Results already routed to the sequence, awaiting host publication.

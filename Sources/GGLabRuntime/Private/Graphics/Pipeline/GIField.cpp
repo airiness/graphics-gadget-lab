@@ -682,6 +682,11 @@ namespace gglab
 			.m_ReadinessUpdate = update - summary.m_Field.m_EpochOriginUpdate });
 	}
 
+	void GIField::SetProbePicking(std::optional<GIProbePickingRequest> request) noexcept
+	{
+		m_State->m_Visualization.SetPicking(std::move(request));
+	}
+
 	void GIField::ExportResources(RenderGraph& graph) noexcept
 	{
 		m_State->m_Workload.ExportFieldResources(graph);

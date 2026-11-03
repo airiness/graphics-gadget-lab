@@ -539,6 +539,7 @@ namespace gglab
 				{ "field", GIIdentityJson(stamp.m_Field) },
 				{ "kind", stamp.m_Kind == GIObservationKind::ReceiverContribution ? "receiver-contribution" :
 					stamp.m_Kind == GIObservationKind::ProbeAtlas ? "probe-atlas" :
+					stamp.m_Kind == GIObservationKind::ProbePicking ? "probe-picking" :
 					stamp.m_Kind == GIObservationKind::ProbeVisualization ? "probe-visualization" : "completed-readiness" },
 				{ "producingFrame", stamp.m_ProducingFrame },
 				{ "fieldUpdate", stamp.m_FieldUpdate },
@@ -677,7 +678,9 @@ namespace gglab
 			using Json = nlohmann::json;
 			const auto& counts = snapshot.m_CompletedCounts;
 			return {
-				{ "schemaVersion", 6 },
+				{ "schemaVersion", 7 },
+				{ "settingsRevision", snapshot.m_SettingsRevision },
+				{ "pickingAvailable", snapshot.m_PickingAvailable },
 				{ "changeObservation", GIChangeObservationJson(snapshot.m_ChangeObservation) },
 				{ "changeResource", "GI.Probes.Change" },
 				{ "changeUploadLogicalBytes", snapshot.m_ChangeUploadBytes },
@@ -735,6 +738,56 @@ namespace gglab
 						{ "budgetDropped", counts.m_BudgetDropped },
 						{ "highlights", counts.m_Highlights } } } } : Json(nullptr) } };
 		}
+	}
+
+	std::string SerializeGIProbePickingSource(const GIFieldSummary& summary, float dpiScale,
+		std::string_view contentId) noexcept
+	{
+		const auto& display = summary.m_Visualization;
+		return nlohmann::json{
+			{ "schemaVersion", 1 },
+			{ "sourceFrame", display.m_Observation ? display.m_Observation->m_ProducingFrame : 0 },
+			{ "contentId", contentId },
+			{ "field", GIIdentityJson(summary.m_Field) },
+			{ "view", GIProbeVisualizationViewJson(display.m_View) },
+			{ "settings", GIProbeVisualizationSettingsJson(GIProbePickSettings(display.m_Settings)) },
+			{ "settingsRevision", display.m_SettingsRevision },
+			{ "mapping", {
+				{ "guiOrigin", { 0, 0 } },
+				{ "guiExtent", display.m_View.m_DisplayExtent },
+				{ "framebufferScale", { 1, 1 } },
+				{ "dpiScale", dpiScale } } } }.dump();
+	}
+
+	std::string SerializeGIProbePicking(const GIProbePickingResult& result) noexcept
+	{
+		using Json = nlohmann::json;
+		const auto& request = result.m_Request;
+		return Json{
+			{ "schemaVersion", 1 },
+			{ "token", request.m_Token },
+			{ "pixel", request.m_Pixel },
+			{ "sourceFrame", request.m_SourceFrame },
+			{ "sourceField", GIIdentityJson(request.m_Field) },
+			{ "sourceView", GIProbeVisualizationViewJson(request.m_View) },
+			{ "settingsRevision", request.m_SettingsRevision },
+			{ "settings", GIProbeVisualizationSettingsJson(request.m_Settings) },
+			{ "mapping", {
+				{ "guiOrigin", request.m_Mapping.m_GuiOrigin },
+				{ "guiExtent", request.m_Mapping.m_GuiExtent },
+				{ "framebufferScale", request.m_Mapping.m_FramebufferScale },
+				{ "dpiScale", request.m_Mapping.m_DpiScale } } },
+			{ "observation", GIStampJson(result.m_Observation) },
+			{ "executionView", GIProbeVisualizationViewJson(result.m_ExecutionView) },
+			{ "validity", result.m_Validity == GIProbePickingValidity::Hit ? "Hit" :
+				result.m_Validity == GIProbePickingValidity::NoHit ? "NoHit" : "MalformedPayload" },
+			{ "probeId", result.m_ProbeId ? Json(*result.m_ProbeId) : Json(nullptr) },
+			{ "coordinate", result.m_Coordinate ? Json(*result.m_Coordinate) : Json(nullptr) },
+			{ "depth", result.m_Depth ? Json(*result.m_Depth) : Json(nullptr) },
+			{ "idEncoding", "0=NoHit; stable-id+1=Hit" },
+			{ "attachmentExtent", { 1, 1 } },
+			{ "attachmentLogicalBytes", 8 },
+			{ "maximumSubmittedVertices", uint64_t(request.m_Settings.m_Budget) * 768 } }.dump();
 	}
 
 	std::string SerializeGIFieldSummary(const GIFieldSummary& summary) noexcept
@@ -868,6 +921,23 @@ namespace gglab
 		JsonWriter writer;
 		writer.BeginObject();
 		writer.Unsigned("schemaVersion", FrameCaptureMetadataSchemaVersion);
+		if (metadata.m_GIProbePickingRequest && metadata.m_GIProbePickingObservation && metadata.m_GIProbePickingView)
+		{
+			GIProbePickingResult observation{ .m_Request = *metadata.m_GIProbePickingRequest,
+				.m_Observation = *metadata.m_GIProbePickingObservation,
+				.m_ExecutionView = *metadata.m_GIProbePickingView };
+			auto document = nlohmann::json::parse(SerializeGIProbePicking(observation));
+			document.erase("validity");
+			document.erase("probeId");
+			document.erase("coordinate");
+			document.erase("depth");
+			document["executionDpiScale"] = metadata.m_GIProbePickingDpiScale;
+			writer.Json("giProbePickingObservation", document.dump());
+		}
+		if (metadata.m_GIProbePicking)
+		{
+			writer.Json("giProbePicking", SerializeGIProbePicking(*metadata.m_GIProbePicking));
+		}
 		if (metadata.m_GIReceiverObservation && metadata.m_GIReceiverView)
 		{
 			writer.Json("giReceiverObservation", nlohmann::json{

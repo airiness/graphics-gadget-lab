@@ -79,6 +79,10 @@ publishes its [CPU observation values](../../Sources/GGLabRuntime/Public/GGLabRu
 The [GUI adapter](../../Sources/GGLabAppRuntime/Capture/GIProbeInspectionControl.h)
 owns its capture job and result independently of session jobs.
 
+Probe picking uses [`GIProbePickingRequest`](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GIProbePicking.h) through `RenderPipelineBase::SetGIProbePicking`.
+AppRuntime binds requests to the last submitted display snapshot and validates them before issue;
+Runtime executes the matching GPU query.
+
 `RenderPresentationAccess` exposes immutable progress and transient-pool snapshots;
 [`RayScene::GetMemorySnapshot`](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RayScene.h)
 reports scene memory without retaining the observed resources. See the

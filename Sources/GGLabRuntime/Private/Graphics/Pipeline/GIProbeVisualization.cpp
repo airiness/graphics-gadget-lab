@@ -62,6 +62,9 @@ namespace gglab
 		const RenderPassInfo DrawInfo{ .m_TypeName = "GI.Probes.Draw",
 			.m_DisplayName = "GI probe spheres", .m_CategoryName = "Global Illumination",
 			.m_Category = RenderPassCategory::Debug, .m_Type = RenderPassType::Graphics };
+		const RenderPassInfo PickInfo{ .m_TypeName = "GI.Probes.Pick",
+			.m_DisplayName = "One-pixel probe picking", .m_CategoryName = "Global Illumination",
+			.m_Category = RenderPassCategory::Debug, .m_Type = RenderPassType::Graphics };
 		constexpr auto StatsFootprint = ComputeRHITextureCopyFootprint(RHIFormat::R32Uint, 16, 1);
 		constexpr LayoutBindingKey ChangeInputKey{ 0x710 };
 		struct ChangeUpload
@@ -138,8 +141,11 @@ namespace gglab
 			float m_ChangeRange = 3;
 			uint32_t m_ChangeBlockCount = 0;
 			std::array<uint32_t, 3> m_ChangePadding{};
+			std::array<uint32_t, 2> m_PickPixel{};
+			std::array<uint32_t, 2> m_PickPadding{};
 		};
-		static_assert(sizeof(Parameters) == 320 && offsetof(Parameters, m_ChangeWords) == 288 &&
+		static_assert(sizeof(Parameters) == 336 && offsetof(Parameters, m_PickPixel) == 320 &&
+			offsetof(Parameters, m_ChangeWords) == 288 &&
 			offsetof(Parameters, m_ChangeRange) == 300 && offsetof(Parameters, m_ViewProjection) == 48 &&
 			offsetof(Parameters, m_Camera) == 112 && offsetof(Parameters, m_Stats) == 152 &&
 			offsetof(Parameters, m_Mode) == 160 && offsetof(Parameters, m_DisplayMode) == 192 &&
@@ -178,9 +184,12 @@ namespace gglab
 		ComputePipelineSlot m_SelectSlot;
 		GraphicsPipelineSlot m_DrawSlot;
 		GraphicsPipelineSlot m_HighlightSlot;
+		GraphicsPipelineSlot m_PickSlot;
 		ResolvedRenderPipeline m_Select;
 		ResolvedRenderPipeline m_Draw;
 		ResolvedRenderPipeline m_Highlight;
+		ResolvedRenderPipeline m_Pick;
+		std::optional<GIProbePickingRequest> m_Picking;
 		uint32_t m_SelectedID = 0;
 		GIProbeVisualizationViewSnapshot m_View;
 		std::shared_ptr<Progress> m_Progress = std::make_shared<Progress>();
@@ -243,6 +252,11 @@ namespace gglab
 		return m_State->m_Progress->m_Snapshot;
 	}
 
+	void GIProbeVisualization::SetPicking(std::optional<GIProbePickingRequest> request) noexcept
+	{
+		m_State->m_Picking = std::move(request);
+	}
+
 	void GIProbeVisualization::Prepare(const RenderFrameContext& frame, const RenderServices& services,
 		GIProbeVisualizationSettings settings, uint64_t generation,
 		const std::array<uint32_t, 3>& counts, std::shared_ptr<const GIFieldChangeObservation> change) noexcept
@@ -250,7 +264,12 @@ namespace gglab
 		auto& state = *m_State;
 		state.Poll();
 		auto& snapshot = state.m_Progress->m_Snapshot;
-		snapshot.m_Settings = ResolveGIProbeVisualizationSettings(settings);
+		const auto resolvedSettings = ResolveGIProbeVisualizationSettings(settings);
+		if (GIProbePickSettings(snapshot.m_Settings) != GIProbePickSettings(resolvedSettings))
+		{
+			++snapshot.m_SettingsRevision;
+		}
+		snapshot.m_Settings = resolvedSettings;
 		snapshot.m_ChangeObservation = change;
 		snapshot.m_ChangeUploadBytes = 0;
 		const auto& raster = frame.GetDisplayRenderView();
@@ -283,6 +302,7 @@ namespace gglab
 		snapshot.m_View = view;
 		snapshot.m_ViewSupported = IsGIProbeVisualizationViewSupported(view);
 		snapshot.m_Available = false;
+		snapshot.m_PickingAvailable = false;
 		snapshot.m_HighlightAvailable = false;
 		snapshot.m_HighlightCount = 0;
 		snapshot.m_HighlightState = ResolveGIProbeHighlightState(
@@ -364,6 +384,12 @@ namespace gglab
 		recipe.m_RasterizerPreset = RasterizerPreset::TwoSided;
 		recipe.m_DepthPreset = GetGIProbeDepthPreset(view.m_ReversedDepth);
 		state.m_Draw = state.m_Layout.Resolve(*services.m_PipelineResolver, state.m_DrawSlot, recipe, DrawInfo);
+		recipe.m_Formats.m_RenderTargetFormats[0] = RHIFormat::R32Uint;
+		recipe.m_PSId = services.m_ShaderPrograms->LoadProgram(shader_programs::GIProbePickingPixel);
+		state.m_Pick = state.m_Layout.Resolve(*services.m_PipelineResolver, state.m_PickSlot, recipe, PickInfo);
+		snapshot.m_PickingAvailable = state.m_Pick.IsValid();
+		recipe.m_Formats.m_RenderTargetFormats[0] = services.m_Presentation->GetSwapChain()->GetFormat();
+		recipe.m_PSId = services.m_ShaderPrograms->LoadProgram(shader_programs::GIProbeVisualizationPixel);
 		recipe.m_DepthPreset = DepthPreset::DepthDisabled;
 		state.m_Highlight = state.m_Layout.Resolve(*services.m_PipelineResolver,
 			state.m_HighlightSlot, recipe, DrawInfo);
@@ -649,6 +675,85 @@ namespace gglab
 				}
 			});
 		const auto slot = frame.m_FrameSlotIndex;
+		const GIFieldSummary pickingSummary{ .m_Field = observation.m_Field, .m_Visualization = snapshot };
+		if (state.m_Picking && state.m_Picking->m_SourceFrame < observation.m_ProducingFrame &&
+			CheckGIProbePickingBinding(*state.m_Picking, pickingSummary, state.m_Picking->m_Mapping) ==
+				GIProbePickingBinding::Matching)
+		{
+			const auto request = *state.m_Picking;
+			struct PickData
+			{
+				RGBufferId m_Change;
+				RGTextureViewId m_Stats;
+				RGTextureViewId m_IDs;
+				RGTextureViewId m_SceneDepth;
+				RGTextureViewId m_Color;
+				RGTextureViewId m_Depth;
+			};
+			graph.AddPass<PickData>(PickInfo.m_TypeName.c_str(),
+				[&](RenderGraph::RGBuilder& builder, PickData& data)
+				{
+					data.m_Change = builder.Read(changeBuffer, RGBufferAccess::StructuredRead, RHIStage::VertexShader);
+					data.m_Stats = builder.CreateView<RHITextureViewType::ShaderResource>(
+						builder.Read(stats, RGTextureAccess::Sample, RHIStage::VertexShader));
+					data.m_IDs = builder.CreateView<RHITextureViewType::ShaderResource>(
+						builder.Read(ids, RGTextureAccess::Sample, RHIStage::VertexShader));
+					if (settings.m_DepthMode == GIProbeDepthMode::SceneDepth)
+					{
+						const auto& depth = builder.GetBlackboard().Get<RGDisplayDepthResources>(DisplayDepthResourcesName);
+						data.m_SceneDepth = builder.CreateView<RHITextureViewType::ShaderResource>(
+							builder.Read(depth.m_Texture, RGTextureAccess::Sample, RHIStage::PixelShader), depth.m_SrvDesc);
+					}
+					auto color = builder.CreateTexture("GI.Probes.PickID", {
+						.m_Format = RHIFormat::R32Uint, .m_Extent = { 1, 1, 1 },
+						.m_ClearValue = RHIClearValue{ .m_Format = RHIFormat::R32Uint,
+							.m_Color = { 0, 0, 0, 0 } } });
+					auto depth = builder.CreateTexture("GI.Probes.PickDepth", {
+						.m_Format = RHIFormat::D32Float, .m_Extent = { 1, 1, 1 },
+						.m_ClearValue = RHIClearValue{ .m_Format = RHIFormat::D32Float,
+							.m_Depth = view.m_ReversedDepth ? 0.0f : 1.0f, .m_IsDepthStencil = true } });
+					builder.WriteInPlace(color, RGTextureAccess::RenderTarget);
+					builder.WriteInPlace(depth, RGTextureAccess::DepthStencilWrite);
+					data.m_Color = builder.CreateView<RHITextureViewType::RenderTarget>(color);
+					data.m_Depth = builder.CreateView<RHITextureViewType::DepthStencil>(depth);
+					builder.SideEffect();
+				},
+				[this, &frame, upload, parameters, request](RGExecuteContext& execute, PickData& data)
+				{
+					auto& state = *m_State;
+					auto* commands = execute.GetGraphicsCommandContext();
+					ScopedConstantBindings<RHIGraphicsCommandContext> constants(*commands, state.m_Layout, state.m_Scene);
+					if (!commands->RetainForSubmission(upload) || !constants.SetPipeline(state.m_Pick) ||
+						!constants.Bind(state.m_Scene, frame.m_FrameConstants.m_SceneSnapshot))
+					{
+						return;
+					}
+					commands->SetReadOnlyBuffer(state.m_ChangeInput, execute.GetBufferHandle(data.m_Change));
+					const RHIRenderingAttachment color{ .m_View = execute.GetViewHandle(data.m_Color), .m_LoadOp = RHIContentLoadOp::DontCare };
+					commands->BeginRendering({ .m_ColorAttachments = std::span(&color, 1),
+						.m_DepthAttachment = RHIRenderingAttachment{ .m_View = execute.GetViewHandle(data.m_Depth),
+							.m_LoadOp = RHIContentLoadOp::DontCare } });
+					// Zero is the no-hit encoding; stable probe IDs are encoded as ID + 1.
+					commands->ClearColorAttachment(0, { 0, 0, 0, 0 });
+					commands->ClearDepthAttachment(parameters.m_ReversedDepth ? 0.0f : 1.0f);
+					commands->SetViewport({ 0, 0, 1, 1 });
+					commands->SetScissorRect({ 0, 0, 1, 1 });
+					commands->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+					auto values = parameters;
+					values.m_Mode = 5;
+					values.m_PickPixel = request.m_Pixel;
+					values.m_Stats = execute.GetViewDescriptor(data.m_Stats).m_Index;
+					values.m_IDs = execute.GetViewDescriptor(data.m_IDs).m_Index;
+					if (data.m_SceneDepth.IsValid())
+					{
+						values.m_SceneDepth = execute.GetViewDescriptor(data.m_SceneDepth).m_Index;
+					}
+					if (commands->SetConstantBufferData(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), values))
+					{
+						commands->Draw(16 * 8 * 6, request.m_Settings.m_Budget, 0);
+					}
+				});
+		}
 		const auto progress = state.m_Progress;
 		const auto resources = state.m_Resources;
 		// A pending slot is never overwritten, including when its last completion

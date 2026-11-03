@@ -41,6 +41,7 @@ namespace gglab
 	class ViewControlActionsBase;
 	class GIProbeInspectionControlBase;
 	class GIReceiverInspectionControlBase;
+	class GIProbePickingControlBase;
 	struct GIFieldSummary;
 
 	class DevelopGuiStateStore;
@@ -84,6 +85,10 @@ namespace gglab
 		const GIFieldSummary* m_GIFieldSummary = nullptr;
 		GIProbeInspectionControlBase* m_GIProbeInspection = nullptr;
 		GIReceiverInspectionControlBase* m_GIReceiverInspection = nullptr;
+		GIProbePickingControlBase* m_GIProbePicking = nullptr;
+		float m_DisplayDpiScale = 1;
+		bool m_AbsolutePointer = false;
+		std::string_view m_ContentId;
 		DevelopGuiSystem* m_DevelopGuiSystem = nullptr;
 		DevelopGuiRegistry* m_PanelRegistry = nullptr;
 		// Borrowed from the active authoring owner for this draw.

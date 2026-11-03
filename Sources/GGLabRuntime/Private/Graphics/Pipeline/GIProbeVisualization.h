@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Pipeline/GIFieldObservation.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIProbePicking.h"
 
 #include <array>
 #include <cstdint>
@@ -23,6 +24,7 @@ namespace gglab
 		void AddPasses(RenderGraph& graph, const RenderFrameContext& frame,
 			const GIObservationStamp& observation) noexcept;
 		[[nodiscard]] GIProbeVisualizationSnapshot GetSnapshot() const noexcept;
+		void SetPicking(std::optional<GIProbePickingRequest> request) noexcept;
 
 	private:
 		struct State;

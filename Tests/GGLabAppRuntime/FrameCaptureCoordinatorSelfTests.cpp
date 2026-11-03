@@ -2020,6 +2020,113 @@ namespace gglab
 			}
 		}
 
+		void RunGIProbePickingTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("probe-picking");
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(), .m_WriteOnCallingThread = true });
+			CaptureTestJobs jobs(coordinator, context);
+			auto summary = std::make_shared<GIFieldSummary>();
+			summary->m_Field = { .m_Generation = 73, .m_SceneRevision = 9 };
+			summary->m_Counts = { 4, 4, 4 };
+			auto& display = summary->m_Visualization;
+			display.m_SettingsRevision = 2;
+			display.m_Settings.m_Enabled = true;
+			display.m_Available = display.m_PickingAvailable = true;
+			display.m_View = { .m_Revision = 3, .m_RenderExtent = { 64, 32 },
+				.m_DisplayExtent = { 64, 32 }, .m_ProjectionSupported = true, .m_Valid = true };
+			GIProbePickingRequest request{ .m_Token = 1, .m_SourceFrame = 16, .m_SettingsRevision = 2,
+				.m_Field = summary->m_Field, .m_View = display.m_View, .m_Settings = display.m_Settings,
+				.m_Mapping = { .m_GuiExtent = { 64, 32 } }, .m_Pixel = { 32, 16 } };
+			const auto plan = [&request]()
+				{
+					CapturePlan result;
+					result.m_RequiredContentId = "gglab.lab.test";
+					result.m_GIProbePicking = request;
+					result.m_RequiredProducts = { ResourceCaptureProduct{ {
+						{ .m_Resource = "GI.Probes.PickID" }, { .m_Resource = "GI.Probes.PickDepth" } } } };
+					return result;
+				};
+			for (uint32_t change = 0; change < 4; ++change)
+			{
+				auto invalid = plan();
+				if (change == 0)
+				{
+					invalid.m_RequiredContentId.clear();
+				}
+				if (change == 1)
+				{
+					invalid.m_GIProbePicking->m_Token = 0;
+				}
+				if (change == 2)
+				{
+					std::get<ResourceCaptureProduct>(invalid.m_RequiredProducts[0]).m_Targets.pop_back();
+				}
+				if (change == 3)
+				{
+					invalid.m_GIProbePicking->m_Pixel[0] = 64;
+				}
+				context.Check(coordinator.CheckJobAdmission(invalid).m_Reason == CaptureAdmissionReason::InvalidPlan,
+					"Malformed or incomplete picking plans reject without issuing Runtime work");
+			}
+			auto state = MakeFrameState(false);
+			state.m_Readiness.m_GIField = GIFieldCaptureState{ .m_Generation = 73, .m_Summary = summary };
+			const auto first = jobs.Admit(plan());
+			++request.m_Token;
+			const auto deferred = jobs.Admit(plan());
+			coordinator.BeginFrame(state);
+			context.Check(control.m_Issued.size() == 1 && coordinator.GetFrameGIProbePicking()->m_Token == 1 &&
+				coordinator.GetJobSnapshot(deferred)->m_Stage == CaptureJobStage::Waiting,
+				"Only one distinct pick issues per frame; conflicting clicks wait in bounded existing jobs");
+			coordinator.OnFrameSubmitted();
+			control.Complete(control.m_Issued[0].m_Id);
+			coordinator.Update();
+			const auto completed = jobs.TakeResults();
+			context.Check(completed.size() == 1 && completed[0].m_JobId == first &&
+				completed[0].m_Products[0].m_Metadata->m_GIProbePicking->m_Validity == GIProbePickingValidity::MalformedPayload,
+				"Malformed completed transport remains explicit evidence instead of becoming NoHit");
+			++display.m_SettingsRevision;
+			++state.m_FrameSerial;
+			coordinator.BeginFrame(state);
+			const auto stale = jobs.TakeResults();
+			context.Check(stale.size() == 1 && stale[0].m_JobId == deferred &&
+				stale[0].m_FailureCode == "GIProbePickingSettingsMismatch" && control.m_Issued.size() == 1 &&
+				!coordinator.GetFrameGIProbePicking(), "Deferred picks revalidate bindings before any GPU request");
+			--display.m_SettingsRevision;
+			for (uint32_t change = 0; change < 4; ++change)
+			{
+				auto current = state;
+				if (change == 0)
+				{
+					current.m_LabId = "gglab.lab.other";
+				}
+				if (change == 1)
+				{
+					current.m_DisplayDpiScale = 1.25f;
+				}
+				if (change == 2)
+				{
+					++summary->m_Field.m_SceneRevision;
+				}
+				if (change == 3)
+				{
+					current.m_FrameSerial = request.m_SourceFrame;
+				}
+				const auto id = jobs.Admit(plan());
+				coordinator.BeginFrame(current);
+				const auto failed = jobs.TakeResults();
+				context.Check(failed.size() == 1 && failed[0].m_JobId == id &&
+					failed[0].m_Status == CaptureJobStatus::Failed && !failed[0].m_FailureCode.empty() &&
+					control.m_Issued.size() == 1, "Content, DPI, scene and future-frame mismatches issue no GPU work");
+				if (change == 2)
+				{
+					--summary->m_Field.m_SceneRevision;
+				}
+			}
+			coordinator.FinalizeAfterRenderHost();
+		}
+
 		void RunGIProbeInspectionTests(SelfTestContext& context) noexcept
 		{
 			TemporaryDirectory directory("probe-inspection");
@@ -2308,7 +2415,7 @@ namespace gglab
 				changeJson["changeObservation"]["blocks"][0]["excluded"] == true &&
 				changeJson["changeObservation"]["observation"]["readinessUpdate"] == 5 &&
 				changeJson["probeVisualization"]["mode"] == "change" &&
-				changeJson["probeVisualization"]["schemaVersion"] == 6,
+				changeJson["probeVisualization"]["schemaVersion"] == 7,
 				"Change metadata shares the completed observation and preserves Excluded/null semantics");
 
 			const std::string json = SerializeFrameCaptureMetadata(metadata);
@@ -5862,6 +5969,7 @@ namespace gglab
 		RunPublicationShutdownTests(context);
 		RunMetadataSerializationTests(context);
 		RunGIProbeInspectionTests(context);
+		RunGIProbePickingTests(context);
 		RunGIReceiverInspectionTests(context);
 		RunGIInspectionCancellationTests(context);
 		RunFrameSequenceTests(context);

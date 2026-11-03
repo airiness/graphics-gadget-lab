@@ -106,6 +106,7 @@ namespace gglab
 		uint32_t m_SettledFrames = 0;
 		// Absent before the first rendered frame.
 		const FrameCaptureFrameState* m_Frame = nullptr;
+		std::string m_GIProbePickingSource;
 		// The active or most recent sequence; absent before the first one.
 		const FrameSequenceStatus* m_Sequence = nullptr;
 		bool m_NonFiniteInstrumentation = false;

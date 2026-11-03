@@ -5,6 +5,7 @@ import copy
 import json
 import ValidateGIProbeInspection as probes
 import ValidateGIReceiverInspection as receivers
+import ValidateGIProbePicking as picking
 import struct
 import tempfile
 import zlib
@@ -128,6 +129,7 @@ def validate(path, bundle_validator=None):
 		product_frames.append((source, frame))
 		probes.validate(frame, validator("GIProbeInspection.schema.json"))
 		receivers.validate(frame, validator("GIReceiverInspection.schema.json"))
+		picking.validate(frame)
 		if source in ("graph", "resource-export"):
 			if product["diagnosticTap"] is not None:
 				raise ValueError("Numerical/graph products cannot name an image tap")
@@ -145,6 +147,7 @@ def validate(path, bundle_validator=None):
 		if frame.get("control") != document["provenance"].get("control"):
 			raise ValueError("Required products disagree on Host view control evidence")
 	receivers.validate_pairing(product_frames)
+	picking.validate_pairing(product_frames)
 	if document["provenance"].get("control") is not None:
 		validate_control(document["provenance"], document["runIdentity"])
 	return document

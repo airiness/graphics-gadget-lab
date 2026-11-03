@@ -59,6 +59,7 @@ $catalog = @(
     @{ name = 'gi-probe-temporal'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIProbeTemporal.ps1' }) },
     @{ name = 'gi-probe-selection'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIProbeSelection.ps1' }) },
     @{ name = 'gi-probe-change'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIProbeChange.ps1' }) },
+    @{ name = 'gi-probe-picking'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIProbePicking.ps1' }, @{ path = 'Tests/Verification/TestGIProbePickingDepth.ps1' }) },
     @{ name = 'gi-probe-viewer'; group = 'gpu'; configurations = @('Develop'); steps = @(@{ path = 'Tests/Verification/TestGIProbeViewer.ps1' }) },
     @{ name = 'gi-receiver-inspection'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIReceiverInspection.ps1' }) },
     @{ name = 'gi-field-readiness'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIFieldReadiness.ps1' }) },

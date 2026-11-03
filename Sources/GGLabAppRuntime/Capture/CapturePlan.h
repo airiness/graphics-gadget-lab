@@ -5,6 +5,7 @@
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIFieldObservation.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIReceiverObservation.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIProbePicking.h"
 
 #include <chrono>
 #include <cstdint>
@@ -97,5 +98,6 @@ namespace gglab
 		// coordinate per frame through the ordinary capture admission/attempt path.
 		std::optional<GIProbeInspectionRequest> m_GIProbeInspection;
 		std::optional<GIReceiverInspectionRequest> m_GIReceiverInspection;
+		std::optional<GIProbePickingRequest> m_GIProbePicking;
 	};
 }

@@ -11,7 +11,10 @@ cbuffer Parameters : register(b2)
 	uint CaseIndex;
 	uint SceneTextureIndex;
 	uint Batches;
-	uint2 Padding;
+	uint2 PickPixel;
+	uint2 PickExtent;
+	uint RasterDepth;
+	uint Padding;
 };
 
 struct VertexOutput
@@ -28,6 +31,15 @@ VertexOutput VSMain(uint vertex : SV_VertexID, uint instance : SV_InstanceID)
 	VertexOutput output;
 	output.Position = float4(corners[vertex], 0.5, 1);
 	output.ProbeID = BaseID + instance;
+	if (RasterDepth != 0)
+	{
+		// A plane crossing both clip-depth endpoints qualifies near/far clipping.
+		output.Position.z = 0.5 + 0.7 * output.Position.x;
+	}
+	if (PickExtent.x != 0)
+	{
+		output.Position = GIProbeCropDisplayPixel(output.Position, PickExtent, PickPixel);
+	}
 	return output;
 }
 
@@ -55,7 +67,7 @@ struct ProbeOutput
 
 ProbeOutput PSProbe(VertexOutput input)
 {
-	const float depth = asfloat(CandidateBits[input.ProbeID]);
+	const float depth = RasterDepth != 0 ? input.Position.z : asfloat(CandidateBits[input.ProbeID]);
 	if (AdmissionEnabled != 0 && !GIProbeDepthAdmitted(depth, Reversed != 0))
 	{
 		discard;
@@ -63,7 +75,8 @@ ProbeOutput PSProbe(VertexOutput input)
 	if (SceneEnabled != 0)
 	{
 		Texture2D<float> scene = ResourceDescriptorHeap[NonUniformResourceIndex(SceneTextureIndex)];
-		if (!GIProbeSceneDepthVisible(depth, scene.Load(int3((uint2)(input.Position.xy), 0)), Reversed != 0))
+		const uint2 pixel = PickExtent.x != 0 ? PickPixel : (uint2)(input.Position.xy);
+		if (!GIProbeSceneDepthVisible(depth, scene.Load(int3(pixel, 0)), Reversed != 0))
 		{
 			discard;
 		}

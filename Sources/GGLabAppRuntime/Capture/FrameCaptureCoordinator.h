@@ -78,6 +78,7 @@ namespace gglab
 		std::optional<double> m_FixedDeltaTime;
 		double m_TotalTime = 0.0;
 		bool m_DevelopmentTools = false;
+		float m_DisplayDpiScale = 1;
 		FrameCaptureTemporalState m_Temporal{};
 		HostViewControlStamp m_HostViewControl{};
 		// Final display-view values, attributed through this frame's sequence/reference patches.
@@ -154,6 +155,7 @@ namespace gglab
 		[[nodiscard]] bool HasFrameResourceExports() const noexcept;
 		[[nodiscard]] std::optional<GIProbeInspectionRequest> GetFrameGIProbeInspection() const noexcept;
 		[[nodiscard]] std::optional<GIReceiverInspectionRequest> GetFrameGIReceiverInspection() const noexcept;
+		[[nodiscard]] std::optional<GIProbePickingRequest> GetFrameGIProbePicking() const noexcept;
 		// Issued deliveries from earlier frames may still be awaiting readback.
 		[[nodiscard]] bool HasFrameGraphExports(uint64_t frameSerial) const noexcept;
 		[[nodiscard]] bool HasNonFiniteInstrumentation() const noexcept { return m_Capture && m_Capture->HasNonFiniteInstrumentation(); }
@@ -279,6 +281,7 @@ namespace gglab
 			const FrameCaptureFrameState& state) noexcept;
 		[[nodiscard]] bool SelectGIReceiverInspection(CaptureJob& job,
 			const FrameCaptureFrameState& state) noexcept;
+		[[nodiscard]] bool SelectGIProbePicking(CaptureJob& job, const FrameCaptureFrameState& state) noexcept;
 		void Issue(ProductDelivery& entry, const FrameCaptureFrameState& state,
 			bool preAdmitted = false) noexcept;
 		void FailPlan(CaptureJob& job, std::string failure, std::string_view failureCode = {}) noexcept;
@@ -331,6 +334,7 @@ namespace gglab
 		std::optional<FrameCaptureFrameState> m_LastFrameState;
 		std::optional<GIProbeInspectionRequest> m_FrameGIProbeInspection;
 		std::optional<GIReceiverInspectionRequest> m_FrameGIReceiverInspection;
+		std::optional<GIProbePickingRequest> m_FrameGIProbePicking;
 		uint32_t m_SettledFrames = 0;
 		// Every frame of the current settle key so far had every gate ready.
 		bool m_HistoryReady = false;

@@ -15,6 +15,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <format>
+#include <string>
 
 namespace gglab
 {
@@ -27,6 +29,7 @@ namespace gglab
 			.m_DisplayName = "Probe D32 comparison", .m_CategoryName = "Debug",
 			.m_Category = RenderPassCategory::Debug, .m_Type = RenderPassType::Graphics };
 		constexpr uint32_t Tile = 16;
+		constexpr std::array<uint32_t, 3> ClipPixels{ 0, 8, 15 };
 		struct Parameters
 		{
 			std::array<uint32_t, 2> m_Candidates{};
@@ -38,10 +41,13 @@ namespace gglab
 			uint32_t m_Case = 0;
 			uint32_t m_SceneTexture = 0;
 			uint32_t m_Batches = 0;
-			std::array<uint32_t, 2> m_Padding{};
+			std::array<uint32_t, 2> m_PickPixel{};
+			std::array<uint32_t, 2> m_PickExtent{};
+			uint32_t m_RasterDepth = 0;
+			uint32_t m_Padding = 0;
 		};
-		static_assert(sizeof(Parameters) == 48 && offsetof(Parameters, m_Case) == 28 &&
-			offsetof(Parameters, m_SceneTexture) == 32);
+		static_assert(sizeof(Parameters) == 64 && offsetof(Parameters, m_Case) == 28 &&
+			offsetof(Parameters, m_SceneTexture) == 32 && offsetof(Parameters, m_PickExtent) == 48);
 		struct Case
 		{
 			uint32_t m_A;
@@ -281,6 +287,78 @@ namespace gglab
 					}
 					commands->EndRendering();
 				});
+			for (uint32_t index = 0; index < CaseCount + 4; ++index)
+			{
+				const bool reference = index == CaseCount + 3;
+				const uint32_t extent = reference ? Tile : 1;
+				const std::string prefix = reference ?
+					std::format("GI.Pick.{}.ClipReference", reversed ? "Reversed" : "Standard") :
+					std::format("GI.Pick.{}.{}", reversed ? "Reversed" : "Standard", index);
+				graph.AddPass<ProbeData>(prefix.c_str(),
+					[=](RenderGraph::RGBuilder& builder, ProbeData& data)
+					{
+						data.m_Scene = builder.CreateView<RHITextureViewType::ShaderResource>(
+							builder.Read(sceneTexture, RGTextureAccess::Sample, RHIStage::PixelShader));
+						auto winners = builder.CreateTexture((prefix + ".ID").c_str(), {
+							.m_Format = RHIFormat::R32Uint, .m_Extent = { extent, extent, 1 },
+							.m_ClearValue = RHIClearValue{ .m_Format = RHIFormat::R32Uint,
+								.m_Color = { 0, 0, 0, 0 } } });
+						auto depth = builder.CreateTexture((prefix + ".D32").c_str(), {
+							.m_Format = RHIFormat::D32Float, .m_Extent = { extent, extent, 1 },
+							.m_ClearValue = RHIClearValue{ .m_Format = RHIFormat::D32Float,
+								.m_Depth = reversed ? 0.0f : 1.0f, .m_IsDepthStencil = true } });
+						builder.WriteInPlace(winners, RGTextureAccess::RenderTarget);
+						builder.WriteInPlace(depth, RGTextureAccess::DepthStencilWrite);
+						data.m_Winners = builder.CreateView<RHITextureViewType::RenderTarget>(winners);
+						data.m_Depth = builder.CreateView<RHITextureViewType::DepthStencil>(depth);
+						builder.SideEffect();
+					},
+					[this, &frame, cases, convention, index, ready, reference, extent](RGExecuteContext& execute, ProbeData& data)
+					{
+						auto* commands = execute.GetGraphicsCommandContext();
+						if (!ready)
+						{
+							commands->RejectRecording();
+							return;
+						}
+						ScopedConstantBindings<RHIGraphicsCommandContext> constants(*commands, m_State->m_Layout, m_State->m_Scene);
+						if (!constants.SetPipeline(m_State->m_ProbePipelines[convention]) ||
+							!constants.Bind(m_State->m_Scene, frame.m_FrameConstants.m_SceneSnapshot))
+						{
+							return;
+						}
+						const RHIRenderingAttachment color{ .m_View = execute.GetViewHandle(data.m_Winners),
+							.m_LoadOp = RHIContentLoadOp::DontCare };
+						commands->BeginRendering({ .m_ColorAttachments = std::span(&color, 1),
+							.m_DepthAttachment = RHIRenderingAttachment{ .m_View = execute.GetViewHandle(data.m_Depth),
+								.m_LoadOp = RHIContentLoadOp::DontCare } });
+						commands->ClearColorAttachment(0, { 0, 0, 0, 0 });
+						commands->ClearDepthAttachment(convention ? 0.0f : 1.0f);
+						commands->SetViewport({ 0, 0, float(extent), float(extent) });
+						commands->SetScissorRect({ 0, 0, int32_t(extent), int32_t(extent) });
+						commands->SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+						const bool raster = index >= CaseCount;
+						const auto& c = cases[raster ? 0 : index];
+						const uint32_t pixel = reference ? 8 : raster ? ClipPixels[index - CaseCount] : 8;
+						Parameters parameters{ .m_Candidates = { c.m_A, c.m_B }, .m_Scene = c.m_Scene,
+							.m_Reversed = convention, .m_SceneEnabled = raster ? 0u : uint32_t(c.m_SceneEnabled),
+							.m_AdmissionEnabled = uint32_t(c.m_Admission), .m_Case = index,
+							.m_SceneTexture = execute.GetViewDescriptor(data.m_Scene).m_Index,
+							.m_PickPixel = { raster ? pixel : index * Tile + pixel, pixel },
+							.m_PickExtent = reference ? std::array<uint32_t, 2>{} :
+								std::array<uint32_t, 2>{ raster ? Tile : uint32_t(CaseCount) * Tile, Tile },
+							.m_RasterDepth = uint32_t(raster) };
+						for (uint32_t batch = 0; batch < (c.m_Batches ? 2u : 1u); ++batch)
+						{
+							parameters.m_BaseID = batch;
+							if (commands->SetConstantBufferData(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+							{
+								commands->Draw(6, c.m_Batches ? 1u : 2u);
+							}
+						}
+						commands->EndRendering();
+					});
+			}
 		}
 	}
 }

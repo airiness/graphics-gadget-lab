@@ -372,6 +372,7 @@ namespace gglab
 			m_CaptureOnReadyJob->TryAdmit();
 		}
 		const AppRuntimeTickResult tickResult = m_AppRuntime->Tick({
+			.m_WindowDpiScale = m_PlatformHost->GetMainWindow().GetDpiScale(),
 			.m_ApplicationTooling = m_ApplicationTooling.get(),
 			.m_LabRuntimeLocator = m_LabRuntimeLocator.get(),
 			});
@@ -615,6 +616,7 @@ namespace gglab
 				.m_CaptureIntake = m_AppRuntime ? m_AppRuntime->GetCaptureIntakeSnapshot() : CaptureIntakeSnapshot{},
 				.m_SettledFrames = m_FrameCapture ? m_FrameCapture->GetSettledFrameCount() : 0,
 				.m_Frame = m_FrameCapture ? m_FrameCapture->GetLastFrameState() : nullptr,
+				.m_GIProbePickingSource = m_AppRuntime ? m_AppRuntime->GetGIProbePickingSourceJson() : std::string{},
 				.m_Sequence = frameSequence ? frameSequence->GetStatus() : nullptr,
 				.m_NonFiniteInstrumentation = frameCapture && frameCapture->HasNonFiniteInstrumentation(),
 				.m_NonFiniteProduction = frameCapture ? frameCapture->GetLatestNonFiniteProductionFrame() : nullptr,

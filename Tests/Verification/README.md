@@ -313,6 +313,39 @@ ordinary Classification/Irradiance uses a 16-byte fallback binding. Change also
 creates a padded export texture and optional bounded block outlines. These costs
 and diagnostic correctness do not establish GI quality or performance acceptance.
 
+### Probe mouse picking
+
+Run `RunVerification.ps1 -Suite gi-probe-picking -Configuration Develop -Rhi dx12,vulkan`.
+`TestGIProbePicking.ps1` compares real 1x1 ID/depth exports with an independent
+FP64 sphere point rasterizer, including Native/TAA/Quality execution views,
+Inactive solid pick silhouettes, display filters and stale-source failures.
+Its bundle seal checks source/execution provenance, paired products and injected
+contradictions. `TestGIProbePickingDepth.ps1` separately checks exact D32/tie rules,
+cropped near/far clipping and full-view GPU controls in bounded capture groups.
+The controlled sloped-plane oracle quantizes clipped screen vertices to
+`-RasterSubpixelBits` (default 8); qualify that input against the selected adapter.
+Both cropped and full-view interpolation must agree with the independent model
+within 2e-7. Constant-depth ownership and adjacent D32 values remain exact checks.
+
+Enable probe display, then read `status.frame.probePickingSource` from the last
+submitted display. Pass `-GIProbePicking` / `-GIProbePickingFile` with
+`{token, pixel:[x,y], source:<copied object>}` and `-ExpectedRunIdentity` to `capture`.
+The adapter adds `GI.Probes.PickID` and `GI.Probes.PickDepth` to the same resource
+group. NoHit encodes ID zero and clear depth; hits encode stable ID plus one.
+Capture metadata exposes the frozen observation on every product and a decoded
+Hit/NoHit/MalformedPayload on the resource product. View/settings/field/content/
+mapping changes reject before issue. Later jitter/field updates may execute with
+matching logical bindings; this observes the execution frame.
+
+The GUI checkbox enables scene clicks with an absolute pointer outside UI windows.
+Only the latest matching GUI token applies a completed selection; panel closure
+invalidates it, while submitted storage drains through capture. Numeric inspection
+keeps its separate explicit job. Picking creates two four-byte logical attachments;
+graph execution allocations and resource-export readbacks report native alignment
+costs. The ordinary full-view probe depth and optional verification exports are
+separate costs. The draw submits the display budget's instance capacity, with
+768 vertices per instance; ordered IDs/counts identify the actual retained probes.
+
 ### Probe viewer overhead and usability
 
 Run `TestGIProbeViewer.ps1` through the `gi-probe-viewer` catalog suite in Develop.

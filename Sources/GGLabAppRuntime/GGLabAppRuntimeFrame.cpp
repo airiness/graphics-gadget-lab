@@ -704,6 +704,7 @@ namespace gglab
 			.m_DevelopmentTools = applicationTooling != nullptr,
 		});
 		captureFrameState.m_ParameterRevision = m_ParameterControl->GetParameterRevision();
+		captureFrameState.m_DisplayDpiScale = tickInfo.m_WindowDpiScale;
 		captureFrameState.m_HostViewControl = GetHostViewControlStamp();
 		captureFrameState.m_HostViewProjection = DescribeHostViewProjection(displayViewSettings,
 			inheritedView.m_ToolingBlocks, m_ParameterControl->GetHostViewOverrides(), {
@@ -823,9 +824,12 @@ namespace gglab
 			std::optional(BuildViewControlSnapshot(inheritedView, m_ParameterControl->GetHostViewOverrides(),
 				captureFrameState, m_FrameCapture->GetLastFrameState())) :
 			std::nullopt;
+		const std::string toolingContentId = captureFrameState.m_LabId.empty() ?
+			captureFrameState.m_DemoId : captureFrameState.m_LabId;
 		m_FrameCapture->BeginFrame(std::move(captureFrameState));
 		renderPipeline.SetGIProbeInspection(m_FrameCapture->GetFrameGIProbeInspection());
 		renderPipeline.SetGIReceiverInspection(m_FrameCapture->GetFrameGIReceiverInspection());
+		renderPipeline.SetGIProbePicking(m_FrameCapture->GetFrameGIProbePicking());
 		m_FrameCapture->SetFrameSceneInputs(frame.m_FrameSerial, {
 			.m_Exposure = capturedView.m_Exposure,
 			.m_PostProcess = capturedView.m_PostProcess,
@@ -947,6 +951,10 @@ namespace gglab
 				.m_GIFieldSummary = field.m_Summary.get(),
 				.m_GIProbeInspection = &m_ToolingGIProbeInspection,
 				.m_GIReceiverInspection = &m_ToolingGIReceiverInspection,
+				.m_GIProbePicking = &m_ToolingGIProbePicking,
+				.m_DisplayDpiScale = tickInfo.m_WindowDpiScale,
+				.m_AbsolutePointer = m_Input && m_Input->GetPointerMode() == AppPointerMode::Absolute,
+				.m_ContentId = toolingContentId,
 			};
 			toolingFrame.Draw(toolingContext);
 		}
@@ -971,6 +979,11 @@ namespace gglab
 		}
 		m_NonFiniteWatch->OnFrameSubmitted(frame.m_FrameSerial);
 		m_FrameCapture->OnFrameSubmitted();
+		if (const auto* presented = m_FrameCapture->GetLastFrameState())
+		{
+			m_ToolingGIProbePicking.OnPresented(field.m_Summary, tickInfo.m_WindowDpiScale,
+				presented->m_LabId.empty() ? presented->m_DemoId : presented->m_LabId);
+		}
 		const FrameSequenceObservation sequenceObservation = m_FrameSequence->WantsGpuTiming() ?
 			FrameSequenceObservation{ m_FrameCapture->HasFrameGraphExports(frame.m_FrameSerial),
 				renderGraph.GetObservationActivity(), cpuBuildRecordMilliseconds } :

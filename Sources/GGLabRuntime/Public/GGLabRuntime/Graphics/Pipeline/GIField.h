@@ -6,6 +6,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/GIFieldReadiness.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIFieldObservation.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIReceiverObservation.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIProbePicking.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBase.h"
 #include "GGLabRuntime/Graphics/RHI/RHIResource.h"
 
@@ -95,6 +96,7 @@ namespace gglab
 		void SetProbeInspection(std::optional<GIProbeInspectionRequest> request) noexcept;
 		void AddProbeInspection(RenderGraph& graph, const RenderFrameContext& frame) noexcept;
 		void SetReceiverInspection(std::optional<GIReceiverInspectionRequest> request) noexcept;
+		void SetProbePicking(std::optional<GIProbePickingRequest> request) noexcept;
 		void AddReceiverInspection(RenderGraph& graph, const RenderFrameContext& frame) noexcept;
 		void AddReceiverMarkers(RenderGraph& graph, const RenderFrameContext& frame) noexcept;
 		void AddProbeVisualization(RenderGraph& graph, const RenderFrameContext& frame) noexcept;
