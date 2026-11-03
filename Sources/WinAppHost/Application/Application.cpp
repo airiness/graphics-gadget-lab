@@ -649,6 +649,18 @@ namespace gglab
 			pipeRequest->Respond(SubmitApplicationControlHostViewOverrides(request.m_Id,
 				request.m_ExpectedHostView, request.m_HostViewOverrides, m_AppRuntime.get()));
 			return;
+		case ApplicationControlCommand::SelectGIProbe:
+		{
+			std::string error;
+			if (!m_AppRuntime || !m_AppRuntime->SelectGIProbe(request.m_GIProbeSelection, error))
+			{
+				pipeRequest->Respond(SerializeApplicationControlError(request.m_Id,
+					m_AppRuntime ? error : "GIProbeSelectionUnavailable"));
+				return;
+			}
+			pipeRequest->Respond(SerializeApplicationControlGIProbeSelection(request.m_Id, request.m_GIProbeSelection));
+			return;
+		}
 		case ApplicationControlCommand::Watch:
 		{
 			auto* watch = m_AppRuntime ? m_AppRuntime->GetNonFiniteWatchCoordinator() : nullptr;

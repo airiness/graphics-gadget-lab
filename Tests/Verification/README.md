@@ -179,6 +179,13 @@ fixtures through `gi_reference.field_enabled`. Field mode uses full updates, Sha
 blending and rotating directions. Runtime `ray-query-contracts` covers field
 descriptors and CPU settlement.
 
+### Selected-probe visualization
+
+`RunVerification.ps1 -Suite gi-probe-selection -Rhi dx12,vulkan -Python $python`
+runs [TestGIProbeSelection.ps1](TestGIProbeSelection.ps1). It checks generation-bound
+selection, ordinary-budget isolation and independent numeric inspection. Inspect
+`validation.json`, artifact audits and native logs.
+
 ### Field readiness
 
 `RunVerification.ps1 -Suite gi-field-readiness` runs F1 plane, F2, F4, an excluded-block

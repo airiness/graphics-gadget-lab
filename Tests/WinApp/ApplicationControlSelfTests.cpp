@@ -175,6 +175,50 @@ namespace gglab
 
 		void RunParseTests(SelfTestContext& context) noexcept
 		{
+			const Json selectedRequest{
+				{ "protocol", ApplicationControlProtocolVersion },
+				{ "id", 99u },
+				{ "command", "select-gi-probe" },
+				{ "expectedRunIdentity", "0123456789abcdef0123456789abcdef" },
+				{ "selection", {
+					{ "coordinate", { 2u, 3u, 4u } },
+					{ "expectedGeneration", uint64_t(UINT32_MAX) + 10 } } } };
+			const auto selected = ParseApplicationControlRequest(selectedRequest.dump());
+			context.Check(selected.m_Request && selected.m_Request->m_GIProbeSelection &&
+				selected.m_Request->m_GIProbeSelection->m_ExpectedGeneration == uint64_t(UINT32_MAX) + 10,
+				"Probe selection preserves a generation above uint32 without narrowing Lab parameter types");
+			for (const Json& selection : { Json(nullptr), Json{ { "coordinate", { 0u, 0u, 0u } }, { "expectedGeneration", 1u } } })
+			{
+				auto wire = selectedRequest;
+				wire["selection"] = selection;
+				context.Check(ParseApplicationControlRequest(wire.dump()).m_Request.has_value(),
+					"Probe selection accepts explicit selection and explicit clear");
+			}
+			for (const char* invalid : { "missing-run", "generation-zero", "coordinate-negative",
+				"coordinate-overflow", "coordinate-fraction", "extra-field" })
+			{
+				auto wire = selectedRequest;
+				const std::string_view kind(invalid);
+				if (kind == "missing-run")
+				{
+					wire.erase("expectedRunIdentity");
+				}
+				else if (kind == "generation-zero")
+				{
+					wire["selection"]["expectedGeneration"] = 0;
+				}
+				else if (kind == "extra-field")
+				{
+					wire["selection"]["epoch"] = 1;
+				}
+				else
+				{
+					wire["selection"]["coordinate"][0] = kind == "coordinate-negative" ?
+						Json(-1) :
+						kind == "coordinate-overflow" ? Json(uint64_t(UINT32_MAX) + 1) : Json(1.5);
+				}
+				context.Check(!ParseApplicationControlRequest(wire.dump()).m_Request, "Invalid probe selection rejects atomically");
+			}
 			const auto status = ParseApplicationControlRequest(R"({"protocol":4,"id":7,"command":"status"})");
 			context.Check(status.m_Request && status.m_Request->m_Id == 7 &&
 				status.m_Request->m_Command == ApplicationControlCommand::Status,
@@ -978,7 +1022,9 @@ namespace gglab
 
 			const auto status = Json::parse(SerializeApplicationControlStatus(40, {}));
 			const auto& commands = status["capabilities"]["runIdentityChecks"]["commands"];
-			context.Check(status["capabilities"]["runIdentityChecks"]["version"] == 1 && commands.size() == 11 &&
+			context.Check(status["capabilities"]["runIdentityChecks"]["version"] == 1 && commands.size() == 12 &&
+				std::ranges::find(commands, Json("select-gi-probe")) != commands.end() &&
+				AcceptsApplicationControlExpectedRun(ApplicationControlCommand::SelectGIProbe) &&
 				!AcceptsApplicationControlExpectedRun(ApplicationControlCommand::Status) &&
 				!AcceptsApplicationControlExpectedRun(ApplicationControlCommand::Parameters) &&
 				AcceptsApplicationControlExpectedRun(ApplicationControlCommand::Sequence),

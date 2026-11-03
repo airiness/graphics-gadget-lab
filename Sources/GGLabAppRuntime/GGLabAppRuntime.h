@@ -263,6 +263,9 @@ namespace gglab
 		// do not reserve execution. Cancellation and result consumption survive Shutdown.
 		[[nodiscard]] uint64_t StartFrameSequence(FrameSequenceRequest request, std::string& error) noexcept;
 		[[nodiscard]] FrameSequenceCancelVerdict CancelFrameSequence() noexcept;
+		// One session-owned selection overrides the GUI selection until explicitly cleared.
+		// Values are validated again by Runtime against the field used to build the frame.
+		[[nodiscard]] bool SelectGIProbe(std::optional<GIProbeSelection> selection, std::string& error) noexcept;
 		void EnableParameterControl() noexcept;
 		// Read-only preflight before a transport enables descriptors for type checks.
 		// Submission repeats admission and then validates the complete typed batch.
@@ -320,6 +323,7 @@ namespace gglab
 		void CheckOwnerThread() const noexcept;
 
 		ApplicationToolingFrameSettings m_ToolingFrameSettings;
+		std::optional<GIProbeSelection> m_SessionGIProbeSelection;
 		AppRuntimeConfig m_Config{};
 		RuntimePaths m_Paths{};
 		AppRuntimeHostServices m_HostServices{};

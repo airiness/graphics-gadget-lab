@@ -571,6 +571,15 @@ namespace gglab
 
 	namespace
 	{
+		nlohmann::json GIProbeSelectionJson(const std::optional<GIProbeSelection>& selection)
+		{
+			return selection ?
+				nlohmann::json{
+					{ "coordinate", selection->m_Coordinate },
+					{ "expectedGeneration", selection->m_ExpectedGeneration } } :
+				nlohmann::json(nullptr);
+		}
+
 		nlohmann::json GIProbeVisualizationSettingsJson(const GIProbeVisualizationSettings& settings)
 		{
 			return {
@@ -585,7 +594,8 @@ namespace gglab
 				{ "maximumDistance", settings.m_MaximumDistance },
 				{ "mode", GetGIProbeVisualizationModeName(settings.m_Mode) },
 				{ "previewEV", settings.m_PreviewExposureEV },
-				{ "depthMode", GetGIProbeDepthModeName(settings.m_DepthMode) } };
+				{ "depthMode", GetGIProbeDepthModeName(settings.m_DepthMode) },
+				{ "selection", GIProbeSelectionJson(settings.m_Selection) } };
 		}
 		nlohmann::json GIProbeVisualizationViewJson(const GIProbeVisualizationViewSnapshot& view)
 		{
@@ -621,7 +631,7 @@ namespace gglab
 			using Json = nlohmann::json;
 			const auto& counts = snapshot.m_CompletedCounts;
 			return {
-				{ "schemaVersion", 3 },
+				{ "schemaVersion", 4 },
 				{ "mode", GetGIProbeVisualizationModeName(snapshot.m_Settings.m_Mode) },
 				{ "irradianceQuantity", "white-Lambertian-E-over-pi" },
 				{ "irradianceMapping", "atlas-M=E/pi; exp2(previewEV); ACES-fitted; sRGB" },
@@ -647,7 +657,14 @@ namespace gglab
 				{ "countsResource", "GI.Probes.Counts" },
 				{ "orderedIDsResource", "GI.Probes.RenderedIDs" },
 				{ "idLayout", "R32Uint[2,budget]: row0=stable-id, row1=classification; unused=(UINT32_MAX,0)" },
-				{ "highlightCount", 0 },
+				{ "highlightCount", snapshot.m_HighlightCount },
+				{ "highlight", {
+					{ "state", GetGIProbeHighlightStateName(snapshot.m_HighlightState) },
+					{ "pipelineAvailable", snapshot.m_HighlightAvailable },
+					{ "maximumCount", GIProbeVisualizationMaximumHighlights },
+					{ "countMeaning", "submitted-diagnostic-probes; not visible-pixels" },
+					{ "appearance", "yellow-great-circles; radius-scale=1.12" },
+					{ "depth", "scene-depth-mode applies; ordinary private depth neither tested nor written" } } },
 				{ "completed", snapshot.m_CompletedObservation ? Json{
 					{ "observation", GIStampJson(*snapshot.m_CompletedObservation) },
 					{ "view", GIProbeVisualizationViewJson(snapshot.m_CompletedView) },
@@ -659,7 +676,8 @@ namespace gglab
 						{ "afterDistance", counts.m_AfterDistance },
 						{ "afterFrustum", counts.m_AfterFrustum },
 						{ "rendered", counts.m_Rendered },
-						{ "budgetDropped", counts.m_BudgetDropped } } } } : Json(nullptr) } };
+						{ "budgetDropped", counts.m_BudgetDropped },
+						{ "highlights", counts.m_Highlights } } } } : Json(nullptr) } };
 		}
 	}
 

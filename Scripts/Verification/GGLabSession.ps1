@@ -26,6 +26,10 @@ Commands:
            -Validation off|standard|gpu overrides validation (gpu: DX12 only).
   attach   Inspect an existing session and return its run identity with attached ownership.
   status   Report lifetime, runtime state, readiness, camera and pending captures.
+  select-gi-probe
+           Set -GIProbeSelection '{"coordinate":[x,y,z],"expectedGeneration":n}'
+           or -ClearSelection. Requires -ExpectedRunIdentity; the session selection
+           overrides GUI selection until cleared. Inspect the next frame summary.
   parameters
            List Host and active Lab descriptors, current/default values and revision.
   set      Submit -Changes/-ChangesFile as [{"id":"gtao.radius","type":"float","value":2.0}].
@@ -96,7 +100,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File Scripts/Verification/GGLabSe
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true, Position = 0)]
-    [ValidateSet('start', 'attach', 'status', 'parameters', 'set', 'assign', 'parameter-result', 'host-view-overrides', 'capture', 'graph', 'export', 'watch', 'batch', 'result', 'capture-cancel', 'sequence', 'sequence-cancel', 'stop', 'list')]
+    [ValidateSet('start', 'attach', 'status', 'parameters', 'set', 'assign', 'parameter-result', 'host-view-overrides', 'capture', 'graph', 'export', 'watch', 'batch', 'result', 'capture-cancel', 'sequence', 'sequence-cancel', 'select-gi-probe', 'stop', 'list')]
     [string]$Command,
 
     [ValidatePattern('^[A-Za-z0-9_-]{1,64}$')]
@@ -148,6 +152,8 @@ param(
     [switch]$KeepResult,
     [string]$Products,
     [string]$ProductsFile,
+    [string]$GIProbeSelection,
+    [switch]$ClearSelection,
     [string]$GIProbeInspection,
     [string]$GIProbeInspectionFile,
     [string]$GIReceiverInspection,
@@ -214,7 +220,7 @@ Set-StrictMode -Version 3.0
 $ProtocolVersion = 4
 # Commands the session checks against expectedRunIdentity; status and parameters report the run.
 $RunCheckedCommands = @('set', 'parameter-result', 'capture', 'graph', 'export', 'watch', 'result',
-    'capture-cancel', 'sequence', 'sequence-cancel', 'stop')
+    'capture-cancel', 'sequence', 'sequence-cancel', 'select-gi-probe', 'stop')
 $RepositoryRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 if (-not $SessionRoot) {
     $SessionRoot = Join-Path $RepositoryRoot 'Build\Sessions'
@@ -642,6 +648,18 @@ switch ($Command) {
     'status' {
         Require-Session
         $response = Invoke-SessionCommand $Session @{ command = 'status' } 30
+        Complete-SessionResponse $response $Session
+    }
+    'select-gi-probe' {
+        Require-Session
+        if (-not $ExpectedRunIdentity) { Fail 'select-gi-probe requires -ExpectedRunIdentity.' }
+        if ([bool]$GIProbeSelection -eq [bool]$ClearSelection) { Fail 'Use -GIProbeSelection or -ClearSelection.' }
+        $selection = $null
+        if ($GIProbeSelection) {
+            try { $selection = Read-JsonObject $GIProbeSelection '' 'GIProbeSelection' }
+            catch { Fail $_.Exception.Message @{ session = $Session } }
+        }
+        $response = Invoke-SessionCommand $Session @{ command = 'select-gi-probe'; selection = $selection } 30
         Complete-SessionResponse $response $Session
     }
     'parameters' {

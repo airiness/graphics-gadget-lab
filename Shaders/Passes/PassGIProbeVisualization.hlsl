@@ -25,6 +25,9 @@ cbuffer Parameters : register(b2)
 	uint DepthMode;
 	uint SceneDepthIndex;
 	row_major float4x4 UnjitteredViewProjection;
+	uint SelectedID;
+	uint HighlightCount;
+	uint2 HighlightPadding;
 };
 
 uint3 Coordinate(uint id)
@@ -115,7 +118,7 @@ void CSMain()
 	stats[uint2(6, 0)] = afterFrustum;
 	stats[uint2(7, 0)] = rendered;
 	stats[uint2(8, 0)] = afterFrustum - rendered;
-	stats[uint2(9, 0)] = 0;
+	stats[uint2(9, 0)] = HighlightCount;
 	stats[uint2(10, 0)] = Budget;
 	stats[uint2(11, 0)] = 0;
 	stats[uint2(12, 0)] = ObservationStamp.x;
@@ -191,18 +194,20 @@ VertexOutput VSMain(uint vertex : SV_VertexID, uint instance : SV_InstanceID)
 	}
 	Texture2D<uint> stats = ResourceDescriptorHeap[NonUniformResourceIndex(StatsIndex)];
 	Texture2D<uint> ids = ResourceDescriptorHeap[NonUniformResourceIndex(IDsIndex)];
-	if (instance >= stats.Load(int3(7, 0, 0)))
+	if (Mode != 2 && instance >= stats.Load(int3(7, 0, 0)))
 	{
 		return output;
 	}
-	const uint2 record = uint2(ids.Load(int3(instance, 0, 0)), ids.Load(int3(instance, 1, 0)));
+	const uint2 record = Mode == 2 ?
+		uint2(SelectedID, 5) :
+		uint2(ids.Load(int3(instance, 0, 0)), ids.Load(int3(instance, 1, 0)));
 	const uint cell = vertex / 6;
 	const float2 uv = (float2(cell % 16, cell / 16) + corners[vertex % 6]) / float2(16, 8);
 	const float longitude = uv.x * 6.28318530718;
 	const float latitude = uv.y * 3.14159265359;
 	const float3 normal = float3(sin(latitude) * cos(longitude), cos(latitude), sin(latitude) * sin(longitude));
 	const float3 center = Field.Minimum + (float3)(Coordinate(record.x)) * Field.Spacing;
-	output.WorldPosition = center + normal * Radius;
+	output.WorldPosition = center + normal * Radius * (Mode == 2 ? 1.12 : 1);
 	output.Position = mul(float4(output.WorldPosition, 1), ViewProjection);
 	output.ProbeID = record.x;
 	output.Normal = normal;
@@ -230,6 +235,16 @@ float4 PSMain(VertexOutput input) : SV_Target
 	if (input.Category == 4)
 	{
 		return float4(0.55, 0.8, 1.0, 1);
+	}
+	if (input.Category == 5)
+	{
+		// Three diagnostic great circles; the overlay never changes ordinary depth winners.
+		const float3 normal = normalize(input.Normal);
+		if (all(abs(normal) > max(fwidth(normal) * 1.25, 0.015)))
+		{
+			discard;
+		}
+		return float4(1, 0.9, 0.1, 1);
 	}
 	const float2 grid = abs(sin(input.UV * float2(8, 4) * 3.14159265359));
 	// Cap the angular line width: derivative expansion must not fill a small

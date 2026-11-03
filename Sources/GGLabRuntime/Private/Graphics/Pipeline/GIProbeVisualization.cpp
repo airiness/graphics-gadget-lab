@@ -78,19 +78,24 @@ namespace gglab
 			uint32_t m_DepthMode = 0;
 			uint32_t m_SceneDepth = 0;
 			std::array<float, 16> m_UnjitteredViewProjection{};
+			uint32_t m_SelectedID = 0;
+			uint32_t m_HighlightCount = 0;
+			std::array<uint32_t, 2> m_Padding{};
 		};
-		static_assert(sizeof(Parameters) == 272 && offsetof(Parameters, m_ViewProjection) == 48 &&
+		static_assert(sizeof(Parameters) == 288 && offsetof(Parameters, m_ViewProjection) == 48 &&
 			offsetof(Parameters, m_Camera) == 112 && offsetof(Parameters, m_Stats) == 152 &&
 			offsetof(Parameters, m_Mode) == 160 && offsetof(Parameters, m_DisplayMode) == 192 &&
 			offsetof(Parameters, m_PreviewExposureScale) == 196 &&
 			offsetof(Parameters, m_DepthMode) == 200 && offsetof(Parameters, m_SceneDepth) == 204 &&
-			offsetof(Parameters, m_UnjitteredViewProjection) == 208);
+			offsetof(Parameters, m_UnjitteredViewProjection) == 208 &&
+			offsetof(Parameters, m_SelectedID) == 272 && offsetof(Parameters, m_HighlightCount) == 276);
 		struct Slot
 		{
 			RHIFencePoint m_Fence;
 			GIObservationStamp m_Observation;
 			GIProbeVisualizationViewSnapshot m_View;
 			GIProbeVisualizationSettings m_Settings;
+			uint32_t m_HighlightCount = 0;
 		};
 		// Deferred commits retain CPU values only. Native buffers are retained by
 		// the recorded submission, including failures after work was submitted.
@@ -112,8 +117,11 @@ namespace gglab
 		ResolvedBindingRef<SceneGPU> m_Scene;
 		ComputePipelineSlot m_SelectSlot;
 		GraphicsPipelineSlot m_DrawSlot;
+		GraphicsPipelineSlot m_HighlightSlot;
 		ResolvedRenderPipeline m_Select;
 		ResolvedRenderPipeline m_Draw;
+		ResolvedRenderPipeline m_Highlight;
+		uint32_t m_SelectedID = 0;
 		GIProbeVisualizationViewSnapshot m_View;
 		std::shared_ptr<Progress> m_Progress = std::make_shared<Progress>();
 		std::shared_ptr<Resources> m_Resources = std::make_shared<Resources>();
@@ -149,6 +157,7 @@ namespace gglab
 				m_Resources->m_Device->UnmapBuffer(m_Resources->m_Readbacks[index].Get(), {});
 				if (words[0] != GIProbeVisualizationMagic || words[1] != GIProbeVisualizationFilterVersion ||
 					words[7] > slot.m_Settings.m_Budget || words[6] < words[7] || words[8] != words[6] - words[7] ||
+					words[9] != slot.m_HighlightCount ||
 					(uint64_t(words[12]) | (uint64_t(words[13]) << 32)) != slot.m_Observation.m_ProducingFrame ||
 					(uint64_t(words[14]) | (uint64_t(words[15]) << 32)) != slot.m_Observation.m_FieldUpdate)
 				{
@@ -160,7 +169,7 @@ namespace gglab
 					snapshot.m_CompletedObservation = slot.m_Observation;
 					snapshot.m_CompletedView = slot.m_View;
 					snapshot.m_CompletedSettings = slot.m_Settings;
-					snapshot.m_CompletedCounts = { words[2], words[3], words[4], words[5], words[6], words[7], words[8] };
+					snapshot.m_CompletedCounts = { words[2], words[3], words[4], words[5], words[6], words[7], words[8], words[9] };
 				}
 				slot.m_Fence = {};
 			}
@@ -175,7 +184,8 @@ namespace gglab
 	}
 
 	void GIProbeVisualization::Prepare(const RenderFrameContext& frame, const RenderServices& services,
-		GIProbeVisualizationSettings settings) noexcept
+		GIProbeVisualizationSettings settings, uint64_t generation,
+		const std::array<uint32_t, 3>& counts) noexcept
 	{
 		auto& state = *m_State;
 		state.Poll();
@@ -211,6 +221,10 @@ namespace gglab
 		snapshot.m_View = view;
 		snapshot.m_ViewSupported = IsGIProbeVisualizationViewSupported(view);
 		snapshot.m_Available = false;
+		snapshot.m_HighlightAvailable = false;
+		snapshot.m_HighlightCount = 0;
+		snapshot.m_HighlightState = ResolveGIProbeHighlightState(
+			snapshot.m_Settings, generation, counts, false, false);
 		snapshot.m_PrivateDepthLogicalBytes = 0;
 		snapshot.m_SelectionLogicalBytes = 0;
 		if (!snapshot.m_Settings.m_Enabled || !snapshot.m_ViewSupported || snapshot.m_ReadbackFailed)
@@ -244,6 +258,10 @@ namespace gglab
 		recipe.m_RasterizerPreset = RasterizerPreset::TwoSided;
 		recipe.m_DepthPreset = GetGIProbeDepthPreset(view.m_ReversedDepth);
 		state.m_Draw = state.m_Layout.Resolve(*services.m_PipelineResolver, state.m_DrawSlot, recipe, DrawInfo);
+		recipe.m_DepthPreset = DepthPreset::DepthDisabled;
+		state.m_Highlight = state.m_Layout.Resolve(*services.m_PipelineResolver,
+			state.m_HighlightSlot, recipe, DrawInfo);
+		snapshot.m_HighlightAvailable = state.m_Highlight.IsValid();
 		if (!state.m_Select.IsValid() || !state.m_Draw.IsValid())
 		{
 			return;
@@ -271,6 +289,14 @@ namespace gglab
 		snapshot.m_PrivateDepthLogicalBytes = uint64_t(view.m_DisplayExtent[0]) * view.m_DisplayExtent[1] * 4;
 		snapshot.m_SelectionLogicalBytes = 64 + uint64_t(snapshot.m_Settings.m_Budget) * 8;
 		snapshot.m_Available = !snapshot.m_ReadbackFailed && frame.m_FrameSlotIndex < state.m_Progress->m_Slots.size();
+		snapshot.m_HighlightState = ResolveGIProbeHighlightState(snapshot.m_Settings, generation, counts,
+			snapshot.m_Available, snapshot.m_HighlightAvailable);
+		if (snapshot.m_HighlightState == GIProbeHighlightState::Ready)
+		{
+			const auto coordinate = snapshot.m_Settings.m_Selection->m_Coordinate;
+			state.m_SelectedID = coordinate[0] + counts[0] * (coordinate[2] + counts[2] * coordinate[1]);
+			snapshot.m_HighlightCount = 1;
+		}
 	}
 
 	void GIProbeVisualization::AddPasses(RenderGraph& graph, const RenderFrameContext& frame,
@@ -296,7 +322,8 @@ namespace gglab
 			.m_DisplayMode = static_cast<uint32_t>(settings.m_Mode),
 			.m_PreviewExposureScale = std::exp2(settings.m_PreviewExposureEV),
 			.m_DepthMode = static_cast<uint32_t>(settings.m_DepthMode),
-			.m_UnjitteredViewProjection = view.m_UnjitteredViewProjection };
+			.m_UnjitteredViewProjection = view.m_UnjitteredViewProjection,
+			.m_SelectedID = state.m_SelectedID, .m_HighlightCount = snapshot.m_HighlightCount };
 		RGTextureId stats;
 		RGTextureId ids;
 		struct SelectData
@@ -417,6 +444,15 @@ namespace gglab
 						commands->Draw(12 * 6, 1, 0);
 					}
 				}
+				if (parameters.m_HighlightCount != 0 && constants.SetPipeline(state.m_Highlight) &&
+					constants.Bind(state.m_Scene, frame.m_FrameConstants.m_SceneSnapshot))
+				{
+					values.m_Mode = 2;
+					if (commands->SetConstantBufferData(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), values))
+					{
+						commands->Draw(16 * 8 * 6, 1, 0);
+					}
+				}
 			});
 		const auto slot = frame.m_FrameSlotIndex;
 		const auto progress = state.m_Progress;
@@ -451,9 +487,9 @@ namespace gglab
 				}
 				commands->CopyTextureToBuffer({ .m_Source = execute.GetTextureHandle(data.m_Source),
 					.m_Destination = execute.GetBufferHandle(data.m_Destination), .m_Footprint = StatsFootprint });
-				execute.DeferCommit([progress, slot, observation, settings, view](const RGCommitContext& commit) noexcept
+				execute.DeferCommit([progress, slot, observation, settings, view, parameters](const RGCommitContext& commit) noexcept
 				{
-					progress->m_Slots[slot] = { commit.m_Fence, observation, view, settings };
+					progress->m_Slots[slot] = { commit.m_Fence, observation, view, settings, parameters.m_HighlightCount };
 				});
 			});
 	}

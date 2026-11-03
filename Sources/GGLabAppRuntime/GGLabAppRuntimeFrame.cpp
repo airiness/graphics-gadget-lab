@@ -607,6 +607,10 @@ namespace gglab
 		ResolvedViewRenderSettings displayViewSettings = inheritedView.m_View;
 		m_ParameterControl->ApplyViewSettings(displayViewSettings,
 			effectiveViewRenderProfile.m_EnableScenePreExposure);
+		if (m_SessionGIProbeSelection)
+		{
+			displayViewSettings.m_GIProbes.m_Selection = m_SessionGIProbeSelection;
+		}
 		// Records which fields the frame-local layer below writes, for value attribution.
 		ViewRenderSettingsPatch framePatch;
 		if (referenceSample)

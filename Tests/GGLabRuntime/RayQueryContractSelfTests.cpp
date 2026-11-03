@@ -859,6 +859,29 @@ namespace gglab
 					display.m_PreviewExposureEV == (ev < 0 ? -20.0f : 8.0f),
 					"Irradiance sphere exposure uses the independent GI preview range");
 			}
+			display.m_Selection = GIProbeSelection{ { 2, 3, 4 }, uint64_t(UINT32_MAX) + 10 };
+			display.m_Enabled = true;
+			display.m_ClassificationMask = 0;
+			display.m_LayerMinimum = 10;
+			display.m_LayerMaximum = 0;
+			display.m_MaximumDistance = 0.01f;
+			const auto generation = display.m_Selection->m_ExpectedGeneration;
+			context.Check(ResolveGIProbeHighlightState(display, generation, { 5, 5, 5 }, true, true) ==
+				GIProbeHighlightState::Ready && MatchesGIProbeSelection(*display.m_Selection, generation, { 5, 5, 5 }),
+				"A 64-bit field-bound highlight ignores ordinary class, slice, distance and budget filters");
+			context.Check(ResolveGIProbeHighlightState(display, generation + 1, { 5, 5, 5 }, true, true) ==
+				GIProbeHighlightState::FieldMismatch &&
+				ResolveGIProbeHighlightState(display, generation, { 2, 5, 5 }, true, true) == GIProbeHighlightState::OutOfRange,
+				"Field replacement and invalid coordinates cannot silently rebind a selected highlight");
+			context.Check(ResolveGIProbeHighlightState(display, generation, { 5, 5, 5 }, true, false) ==
+				GIProbeHighlightState::Unavailable,
+				"An unavailable highlight pipeline does not claim a submitted diagnostic probe");
+			display.m_Enabled = false;
+			context.Check(ResolveGIProbeHighlightState(display, generation, { 5, 5, 5 }, true, true) ==
+				GIProbeHighlightState::Disabled, "Disabling the viewer suppresses its independent highlight");
+			display.m_Selection.reset();
+			context.Check(ResolveGIProbeHighlightState(display, generation, { 5, 5, 5 }, true, true) ==
+				GIProbeHighlightState::None, "Cleared selection contains no latent default coordinate");
 			GIProbeVisualizationViewSnapshot displayView{ .m_Revision = 1,
 				.m_RenderExtent = { 640, 400 }, .m_DisplayExtent = { 640, 400 },
 				.m_ProjectionSupported = true, .m_Valid = true };
@@ -906,6 +929,12 @@ namespace gglab
 			countsDisplay.m_View.m_JitterPixels = { 0.25f, -0.125f };
 			context.Check(MatchesGIProbeVisualizationCounts(countsSummary),
 				"Completed visualization counts match across jitter phases independently of the receiver clock");
+			countsDisplay.m_HighlightCount = 1;
+			context.Check(!MatchesGIProbeVisualizationCounts(countsSummary),
+				"A highlight availability change makes previous completed counts historical");
+			countsDisplay.m_CompletedCounts.m_Highlights = 1;
+			context.Check(MatchesGIProbeVisualizationCounts(countsSummary),
+				"Completed highlight counts match only the current diagnostic submission count");
 			++countsDisplay.m_View.m_Revision;
 			context.Check(!MatchesGIProbeVisualizationCounts(countsSummary),
 				"A new logical visualization view makes older completed counts historical");

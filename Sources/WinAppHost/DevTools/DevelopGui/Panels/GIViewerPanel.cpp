@@ -127,6 +127,8 @@ namespace gglab
 			{
 				ImGui::TextDisabled("No completed display counts yet.");
 			}
+			ImGui::Text("Diagnostic highlights: %u | %s", display.m_HighlightCount,
+				GetGIProbeHighlightStateName(display.m_HighlightState).data());
 			ImGui::Text("Logical depth %llu B | selection %llu B | count buffers %llu B",
 				static_cast<unsigned long long>(display.m_PrivateDepthLogicalBytes),
 				static_cast<unsigned long long>(display.m_SelectionLogicalBytes),
@@ -187,22 +189,53 @@ namespace gglab
 			if (ImGui::InputInt3("Probe coordinate (x,y,z)", coordinate.data()))
 			{
 				control->Cancel();
+				if (context.m_ViewRenderSettingsOverrides)
+				{
+					context.m_ViewRenderSettingsOverrides->m_GIProbes.m_Selection.reset();
+				}
 			}
 			GIProbeInspectionRequest request{
 				.m_Coordinate = { uint32_t(coordinate[0]), uint32_t(coordinate[1]), uint32_t(coordinate[2]) },
 				.m_ExpectedGeneration = summary->m_Field.m_Generation,
 				.m_ExpectedRefreshEpoch = summary->m_Field.m_RefreshEpoch };
+			const bool validSelection = MatchesGIProbeInspection(request, *summary);
+			ImGui::BeginDisabled(!validSelection || !context.m_ViewRenderSettingsOverrides);
+			if (ImGui::Button("Select / highlight probe"))
+			{
+				auto& display = context.m_ViewRenderSettingsOverrides->m_GIProbes;
+				display.m_Enabled = true;
+				display.m_Selection = GIProbeSelection{ request.m_Coordinate, request.m_ExpectedGeneration };
+			}
+			ImGui::EndDisabled();
+			ImGui::TextDisabled("Effective highlight: %s | %u / %u diagnostic probes",
+				GetGIProbeHighlightStateName(summary->m_Visualization.m_HighlightState).data(),
+				summary->m_Visualization.m_HighlightCount, GIProbeVisualizationMaximumHighlights);
+			if (summary->m_Visualization.m_Settings.m_Selection)
+			{
+				const auto& effective = *summary->m_Visualization.m_Settings.m_Selection;
+				ImGui::Text("Effective selection: [%u,%u,%u] | generation %llu", effective.m_Coordinate[0],
+					effective.m_Coordinate[1], effective.m_Coordinate[2], effective.m_ExpectedGeneration);
+			}
 			ImGui::BeginDisabled(control->IsPending() || !summary->m_InspectionAvailable ||
 				!MatchesGIProbeInspection(request, *summary));
 			if (ImGui::Button("Inspect probe"))
 			{
-				GGLAB_UNUSED(control->Inspect(request));
+				if (control->Inspect(request) && context.m_ViewRenderSettingsOverrides)
+				{
+					auto& display = context.m_ViewRenderSettingsOverrides->m_GIProbes;
+					display.m_Enabled = true;
+					display.m_Selection = GIProbeSelection{ request.m_Coordinate, request.m_ExpectedGeneration };
+				}
 			}
 			ImGui::EndDisabled();
 			ImGui::SameLine();
 			if (ImGui::Button("Cancel / clear"))
 			{
 				control->Cancel();
+				if (context.m_ViewRenderSettingsOverrides)
+				{
+					context.m_ViewRenderSettingsOverrides->m_GIProbes.m_Selection.reset();
+				}
 			}
 			ImGui::TextWrapped("%s", control->GetStatus().c_str());
 			const auto result = control->GetResult();
@@ -423,6 +456,7 @@ namespace gglab
 		if (context.m_ViewRenderSettingsOverrides)
 		{
 			context.m_ViewRenderSettingsOverrides->m_GIProbes.m_Enabled = false;
+			context.m_ViewRenderSettingsOverrides->m_GIProbes.m_Selection.reset();
 		}
 		if (context.m_GIProbeInspection)
 		{

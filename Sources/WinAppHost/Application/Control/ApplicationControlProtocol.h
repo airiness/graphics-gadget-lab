@@ -43,6 +43,7 @@ namespace gglab
 		// Sets exact Host view override states, guarded by the expected control state.
 		HostViewOverrides,
 		Assign,
+		SelectGIProbe,
 	};
 
 	struct ApplicationControlRequest
@@ -51,6 +52,8 @@ namespace gglab
 		ApplicationControlCommand m_Command = ApplicationControlCommand::Status;
 		// Capture/Graph/Export always answer admission immediately.
 		CapturePlan m_Capture;
+		// SelectGIProbe: null clears only the session-owned selection.
+		std::optional<GIProbeSelection> m_GIProbeSelection;
 		// Result/CaptureCancel: process-local job identity, never a legacy output id.
 		uint64_t m_JobId = 0;
 		// Result: only terminal receipt consumption releases its reservation.
@@ -137,6 +140,8 @@ namespace gglab
 		uint64_t id, const CaptureJobResult& result, bool consumed) noexcept;
 	[[nodiscard]] std::string SerializeApplicationControlCaptureCancellation(
 		uint64_t id, uint64_t jobId, CaptureCancelResult cancellation) noexcept;
+	[[nodiscard]] std::string SerializeApplicationControlGIProbeSelection(
+		uint64_t id, const std::optional<GIProbeSelection>& selection) noexcept;
 	[[nodiscard]] std::string SerializeApplicationControlStopping(uint64_t id) noexcept;
 	[[nodiscard]] std::string SerializeApplicationControlWatch(uint64_t id,
 		const NonFiniteWatchStatus& status, bool instrumentation) noexcept;

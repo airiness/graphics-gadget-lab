@@ -36,6 +36,10 @@ try {
         $missingStop.error -match 'not running') 'real-session-client-reports-missing-session-as-json'
     $missingAttach = Invoke-VerificationSession attach $missingSession -AllowFailure
     Check (-not $missingAttach.ok -and $missingAttach.error -match 'not running') 'attach-transport-failure-remains-json'
+    $missingSelection = Invoke-VerificationSession select-gi-probe $missingSession @{
+        ExpectedRunIdentity=('a'*32); ClearSelection=$true } -AllowFailure
+    Check (-not $missingSelection.ok -and $missingSelection.session -eq $missingSession -and
+        $missingSelection.error -match 'not running') 'selection-transport-failure-remains-json'
     $conflict = Invoke-VerificationScript (Join-Path $root 'Scripts/Verification/GGLabSession.ps1') @{
         Command='start';Session=$missingSession;SessionLifetime='developer';IdleTimeout=1 }
     $conflictResult = $conflict.output | ConvertFrom-Json
@@ -307,15 +311,17 @@ try {
         . ([scriptblock]::Create($commands.Extent.Text))
         $ExpectedRunIdentity = '0123456789abcdef0123456789abcdef'
         $set = @{ command='set' }; Add-ExpectedRunIdentity $set
+        $selection = @{ command='select-gi-probe'; selection=$null }; Add-ExpectedRunIdentity $selection
         $status = @{ command='status' }; Add-ExpectedRunIdentity $status
         # The guarded override operation names its run in the expected control state.
         $guarded = @{ command='host-view-overrides' }; Add-ExpectedRunIdentity $guarded
         $ExpectedRunIdentity = ''
         $unchecked = @{ command='stop' }; Add-ExpectedRunIdentity $unchecked
         Check ($set.expectedRunIdentity -eq '0123456789abcdef0123456789abcdef' -and
+            $selection.expectedRunIdentity -eq '0123456789abcdef0123456789abcdef' -and
             -not $status.ContainsKey('expectedRunIdentity') -and -not $guarded.ContainsKey('expectedRunIdentity') -and
             -not $unchecked.ContainsKey('expectedRunIdentity') -and
-            $RunCheckedCommands.Count -eq 11) 'client-expected-run-identity-only-on-protected-commands'
+            $RunCheckedCommands.Count -eq 12) 'client-expected-run-identity-only-on-protected-commands'
     }
     $invalidParameter = Invoke-VerificationScript (Join-Path $root 'Scripts/Verification/GGLabSession.ps1') @{
         Command='set';Session='parameter-invalid';Changes='[]';NoWait=$true;WaitConsumed=$true }
@@ -471,6 +477,7 @@ $pythonIdentity = if ($Python) { & $Python --version } else { '' }
         'gi-probe-visualization' = 'TestGIProbeVisualization.ps1'
         'gi-probe-depth' = 'TestGIProbeDepth.ps1'
         'gi-probe-temporal' = 'TestGIProbeTemporal.ps1'
+        'gi-probe-selection' = 'TestGIProbeSelection.ps1'
         'gi-field-readiness' = 'TestGIFieldReadiness.ps1'
         'gi-field-sampling' = 'TestGIFieldSampling.ps1'
         'gi-invalid-updates' = 'TestGIInvalidUpdates.ps1'
@@ -524,7 +531,7 @@ $pythonIdentity = if ($Python) { & $Python --version } else { '' }
     }
     Check (($gpuResult.suites | Where-Object name -eq 'taa-comparison').steps[0].receipt.python -eq
         $runnerPython) 'runner-forwards-selected-python-to-taa-workflow'
-    foreach ($suite in @('session-lifecycle', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-probe-inspection', 'gi-receiver-inspection', 'gi-probe-visualization', 'gi-probe-depth', 'gi-probe-temporal', 'gi-field-readiness', 'gi-field-sampling', 'gi-invalid-updates', 'gi-receiver-cache')) {
+    foreach ($suite in @('session-lifecycle', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-probe-inspection', 'gi-receiver-inspection', 'gi-probe-visualization', 'gi-probe-depth', 'gi-probe-temporal', 'gi-probe-selection', 'gi-field-readiness', 'gi-field-sampling', 'gi-invalid-updates', 'gi-receiver-cache')) {
         $leafResult = ($gpuResult.suites | Where-Object name -eq $suite).steps[0].receipt
         Check ($leafResult.python -eq $runnerPython -and $leafResult.pythonIdentity -eq
             'inspection-test-python') "runner-forwards-selected-python-to-$suite"

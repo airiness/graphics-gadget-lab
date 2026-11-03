@@ -160,6 +160,51 @@ namespace gglab
 		return next;
 	}
 
+	enum class GIProbeHighlightState : uint8_t
+	{
+		None,
+		Disabled,
+		Unavailable,
+		FieldMismatch,
+		OutOfRange,
+		Ready,
+	};
+
+	[[nodiscard]] inline std::string_view GetGIProbeHighlightStateName(GIProbeHighlightState state) noexcept
+	{
+		constexpr std::array<std::string_view, 6> names
+		{
+			"none", "disabled", "unavailable", "field-mismatch", "out-of-range", "ready"
+		};
+		const auto index = static_cast<size_t>(state);
+		return index < names.size() ? names[index] : "unknown";
+	}
+
+	[[nodiscard]] inline GIProbeHighlightState ResolveGIProbeHighlightState(
+		const GIProbeVisualizationSettings& settings, uint64_t generation,
+		const std::array<uint32_t, 3>& counts, bool available, bool highlightAvailable) noexcept
+	{
+		if (!settings.m_Selection)
+		{
+			return GIProbeHighlightState::None;
+		}
+		const auto& selection = *settings.m_Selection;
+		if (selection.m_ExpectedGeneration == 0 || selection.m_ExpectedGeneration != generation)
+		{
+			return GIProbeHighlightState::FieldMismatch;
+		}
+		for (size_t axis = 0; axis < counts.size(); ++axis)
+		{
+			if (selection.m_Coordinate[axis] >= counts[axis])
+			{
+				return GIProbeHighlightState::OutOfRange;
+			}
+		}
+		return !settings.m_Enabled ?
+			GIProbeHighlightState::Disabled :
+			available && highlightAvailable ? GIProbeHighlightState::Ready : GIProbeHighlightState::Unavailable;
+	}
+
 	// Published together on the Runtime owner thread. Copies retain CPU values only.
 	struct GIProbeVisualizationSnapshot
 	{
@@ -167,6 +212,9 @@ namespace gglab
 		bool m_Available = false;
 		bool m_ViewSupported = false;
 		bool m_ReadbackFailed = false;
+		bool m_HighlightAvailable = false;
+		uint32_t m_HighlightCount = 0;
+		GIProbeHighlightState m_HighlightState = GIProbeHighlightState::None;
 		uint64_t m_PrivateDepthLogicalBytes = 0;
 		uint64_t m_SelectionLogicalBytes = 0;
 		uint64_t m_ReadbackBufferBytes = 0;
@@ -197,13 +245,22 @@ namespace gglab
 		GIProbeVisualizationSnapshot m_Visualization;
 	};
 
+	[[nodiscard]] inline bool MatchesGIProbeSelection(const GIProbeSelection& selection,
+		uint64_t generation, const std::array<uint32_t, 3>& counts) noexcept
+	{
+		return selection.m_ExpectedGeneration != 0 && selection.m_ExpectedGeneration == generation &&
+			selection.m_Coordinate[0] < counts[0] && selection.m_Coordinate[1] < counts[1] &&
+			selection.m_Coordinate[2] < counts[2];
+	}
+
 	// A completed execution can match the current logical view at a different jitter phase.
 	[[nodiscard]] inline bool MatchesGIProbeVisualizationCounts(const GIFieldSummary& summary) noexcept
 	{
 		const auto& display = summary.m_Visualization;
 		return display.m_CompletedObservation && display.m_CompletedObservation->m_Field == summary.m_Field &&
 			display.m_CompletedSettings == display.m_Settings &&
-			display.m_CompletedView.m_Revision == display.m_View.m_Revision;
+			display.m_CompletedView.m_Revision == display.m_View.m_Revision &&
+			display.m_CompletedCounts.m_Highlights == display.m_HighlightCount;
 	}
 
 	struct GIProbeInspectionRequest

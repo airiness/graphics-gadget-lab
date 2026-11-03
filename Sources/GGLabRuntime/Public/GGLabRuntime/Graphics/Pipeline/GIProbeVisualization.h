@@ -3,6 +3,7 @@
 
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <string_view>
 
 namespace gglab
@@ -41,6 +42,15 @@ namespace gglab
 	inline constexpr float GIProbeVisualizationMinimumExposureEV = -20.0f;
 	inline constexpr float GIProbeVisualizationMaximumExposureEV = 8.0f;
 
+	struct GIProbeSelection
+	{
+		std::array<uint32_t, 3> m_Coordinate{};
+		uint64_t m_ExpectedGeneration = 0;
+		bool operator==(const GIProbeSelection&) const = default;
+	};
+
+	inline constexpr uint32_t GIProbeVisualizationMaximumHighlights = 1;
+
 	// Classification bits: Pending, Active, Inactive, Invalid. Slice axis 0 disables
 	// slicing; 1/2/3 select X/Y/Z. Distance zero disables the distance filter.
 	struct GIProbeVisualizationSettings
@@ -57,6 +67,8 @@ namespace gglab
 		GIProbeVisualizationMode m_Mode = GIProbeVisualizationMode::Classification;
 		float m_PreviewExposureEV = 0;
 		GIProbeDepthMode m_DepthMode = GIProbeDepthMode::XRay;
+		// A diagnostic overlay, independent of ordinary filters, IDs and private depth winners.
+		std::optional<GIProbeSelection> m_Selection;
 		bool operator==(const GIProbeVisualizationSettings&) const = default;
 	};
 
@@ -69,6 +81,7 @@ namespace gglab
 		uint32_t m_AfterFrustum = 0;
 		uint32_t m_Rendered = 0;
 		uint32_t m_BudgetDropped = 0;
+		uint32_t m_Highlights = 0;
 	};
 
 	[[nodiscard]] GIProbeVisualizationSettings ResolveGIProbeVisualizationSettings(

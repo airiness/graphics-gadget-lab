@@ -192,6 +192,15 @@ namespace gglab
 				inspection.m_Request->m_ExpectedRefreshEpoch == 2 &&
 				inspectionText.find("No completed readiness measurement") != std::string::npos,
 				"GUI inspection binds the displayed field identity and keeps pending measurement absence explicit");
+			context.Check(displayOverrides.m_GIProbes.m_Selection &&
+				displayOverrides.m_GIProbes.m_Selection->m_ExpectedGeneration == 73,
+				"Inspecting a coordinate selects the same field-bound diagnostic highlight");
+			fieldSummary.m_Field.m_Generation = 74;
+			GGLAB_UNUSED(draw());
+			context.Check(displayOverrides.m_GIProbes.m_Selection &&
+				displayOverrides.m_GIProbes.m_Selection->m_ExpectedGeneration == 73,
+				"A field replacement cannot silently rebind the GUI selection to a new generation");
+			fieldSummary.m_Field.m_Generation = 73;
 			auto historical = std::make_shared<GIProbeInspectionResult>();
 			historical->m_Observation.m_Field.m_Generation = 72;
 			historical->m_Observation.m_ProducingFrame = 913;
@@ -283,7 +292,7 @@ namespace gglab
 					receiver.m_Cancellations == receiverCancellations + 1 &&
 					!inspection.m_Result && !receiver.m_Result,
 					"The GI Viewer close button cancels both owned inspections in the closing frame");
-				context.Check(!displayOverrides.m_GIProbes.m_Enabled,
+				context.Check(!displayOverrides.m_GIProbes.m_Enabled && !displayOverrides.m_GIProbes.m_Selection,
 					"Closing the Viewer releases its GUI probe display request");
 				resolvedDisplay = ResolveApplicationViewSettings({}, displayCamera, displayTools.CaptureFrameSettings());
 				ApplyHostViewParameters(sessionDisplay, resolvedDisplay.m_View, true);

@@ -247,6 +247,14 @@ namespace gglab
 				summary->m_ReceiverView = state.m_ReceiverView;
 				summary->m_Visualization = state.m_Visualization.GetSnapshot();
 				summary->m_Visualization.m_Available &= state.m_UpdatePrepared;
+				if (!summary->m_Visualization.m_Available)
+				{
+					summary->m_Visualization.m_HighlightCount = 0;
+					if (summary->m_Visualization.m_HighlightState == GIProbeHighlightState::Ready)
+					{
+						summary->m_Visualization.m_HighlightState = GIProbeHighlightState::Unavailable;
+					}
+				}
 				if (summary->m_Visualization.m_Available)
 				{
 					const uint64_t update = summary->m_SubmittedUpdates + (summary->m_Invalid ? 0 : 1);
@@ -298,7 +306,7 @@ namespace gglab
 			state.m_ReceiverView = AdvanceGIReceiverView(state.m_ReceiverView, next);
 		}
 		state.m_Visualization.Prepare(frame, services,
-			frame.GetDisplayViewRenderSettings().m_GIProbes);
+			frame.GetDisplayViewRenderSettings().m_GIProbes, state.m_Generation, state.m_Info.m_Volume.m_Counts);
 		if (!state.m_Info.m_ConstantEnvironment)
 		{
 			const auto bake = services.m_Environment->GetBakingStatus();

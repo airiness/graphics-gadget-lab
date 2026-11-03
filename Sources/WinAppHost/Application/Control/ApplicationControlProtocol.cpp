@@ -113,6 +113,10 @@ namespace gglab
 			{
 				return ApplicationControlCommand::SequenceCancel;
 			}
+			if (command == "select-gi-probe")
+			{
+				return ApplicationControlCommand::SelectGIProbe;
+			}
 			if (command == "host-view-overrides")
 			{
 				return ApplicationControlCommand::HostViewOverrides;
@@ -1731,7 +1735,7 @@ namespace gglab
 		{
 			result.m_Error = "Field 'command' must be 'status', 'capture', 'graph', 'export', 'result', 'stop', "
 				"'capture-cancel', 'watch', 'sequence', 'sequence-cancel', 'parameters', 'set', 'parameter-result' "
-				"'host-view-overrides' or 'assign'.";
+				"'host-view-overrides', 'assign' or 'select-gi-probe'.";
 			return result;
 		}
 
@@ -1813,6 +1817,40 @@ namespace gglab
 		case ApplicationControlCommand::Sequence:
 			error = ParseSequenceFields(fields, request);
 			break;
+		case ApplicationControlCommand::SelectGIProbe:
+		{
+			if (!request.m_ExpectedRunIdentity || fields.size() != 4 || !fields.contains("selection"))
+			{
+				error = "Command 'select-gi-probe' requires expectedRunIdentity and selection (object or null).";
+				break;
+			}
+			const auto& value = fields["selection"];
+			if (value.is_null())
+			{
+				break;
+			}
+			if (!value.is_object() || value.size() != 2 || !value.contains("coordinate") ||
+				!value.contains("expectedGeneration") || !value["expectedGeneration"].is_number_unsigned() ||
+				value["expectedGeneration"].get<uint64_t>() == 0 || !value["coordinate"].is_array() ||
+				value["coordinate"].size() != 3)
+			{
+				error = "Selection requires coordinate (three uint32 values) and nonzero uint64 expectedGeneration.";
+				break;
+			}
+			GIProbeSelection selection{ .m_ExpectedGeneration = value["expectedGeneration"].get<uint64_t>() };
+			for (size_t axis = 0; axis < 3; ++axis)
+			{
+				const auto& coordinate = value["coordinate"][axis];
+				if (!coordinate.is_number_unsigned() || coordinate.get<uint64_t>() > UINT32_MAX)
+				{
+					error = "Selection coordinate components must be uint32 integers.";
+					break;
+				}
+				selection.m_Coordinate[axis] = coordinate.get<uint32_t>();
+			}
+			request.m_GIProbeSelection = selection;
+			break;
+		}
 		case ApplicationControlCommand::HostViewOverrides:
 			error = ParseHostViewOverrideFields(fields, request);
 			break;
@@ -1926,7 +1964,7 @@ namespace gglab
 				{ "resultConsumption", "explicit" } } },
 			{ "captureJobs", true },
 			{ "giProbeVisualization", {
-				{ "schemaVersion", 3 },
+				{ "schemaVersion", 4 },
 				{ "parameters", "Host view.gi_probes.*" },
 				{ "summary", "frame.giField.summary.probeVisualization" },
 				{ "modes", { "classification", "irradiance" } },
@@ -1940,7 +1978,10 @@ namespace gglab
 				{ "orderedIDsLayout", "R32Uint[2,budget]: row0=stable-id,row1=classification; unused=(UINT32_MAX,0)" },
 				{ "classification", { "Pending=0", "Active=1", "Inactive=2", "Invalid=3" } },
 				{ "filterOrderVersion", GIProbeVisualizationFilterVersion },
-				{ "maximumBudget", GIProbeVisualizationMaximumBudget } } },
+				{ "maximumBudget", GIProbeVisualizationMaximumBudget },
+				{ "selectionCommand", "select-gi-probe" },
+				{ "maximumHighlights", GIProbeVisualizationMaximumHighlights },
+				{ "highlightPolicy", "generation-bound diagnostic overlay; independent ordinary filters/budget/depth winners" } } },
 			{ "giReceiverInspection", {
 				{ "version", 1 },
 				{ "summary", "frame.giField.summary.receiverView" },
@@ -2004,7 +2045,7 @@ namespace gglab
 				{ "version", 1 },
 				{ "field", "expectedRunIdentity" },
 				{ "commands", { "set", "parameter-result", "capture", "graph", "export", "watch", "result",
-					"capture-cancel", "sequence", "sequence-cancel", "stop" } },
+					"capture-cancel", "sequence", "sequence-cancel", "select-gi-probe", "stop" } },
 				{ "errorCodes", { "ExpectedRunChanged", "RunIdentityUnavailable" } } } },
 			{ "hostViewOverrides", {
 				{ "version", 1 },
@@ -2412,6 +2453,19 @@ namespace gglab
 		response["watch"] = {
 			{ "instrumentation", instrumentation ? "available" : "unavailable" },
 			{ "report", SerializeWatchReport(status) } };
+		return Dump(response);
+	}
+
+	std::string SerializeApplicationControlGIProbeSelection(uint64_t id,
+		const std::optional<GIProbeSelection>& selection) noexcept
+	{
+		auto response = MakeResponse(id, true);
+		response["selection"] = selection ?
+			Json{
+				{ "coordinate", selection->m_Coordinate },
+				{ "expectedGeneration", selection->m_ExpectedGeneration } } :
+			Json(nullptr);
+		response["effect"] = "accepted-for-next-frame; inspect frame.giField.summary.probeVisualization";
 		return Dump(response);
 	}
 

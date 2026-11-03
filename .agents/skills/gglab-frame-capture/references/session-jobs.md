@@ -57,6 +57,18 @@ equals field-lifetime update U minus `epochOriginUpdate`; producing frame is sep
 Native probe payload is at most 20,496 bytes. One distinct coordinate issues per
 frame; conflicting jobs wait for a later frame.
 
+### Probe visualization selection
+
+`select-gi-probe -GIProbeSelection '{"coordinate":[x,y,z],"expectedGeneration":n}'`
+requires `-ExpectedRunIdentity` and the current nonzero field generation.
+It overrides GUI selection until `-ClearSelection` releases the session override.
+Enable `view.gi_probes.enabled` separately; numeric inspection remains independent.
+
+Admission does not confirm rendering. Check `frame.giField.summary.probeVisualization`
+for `settings.selection`, `highlight.state` and `highlightCount`. Rejected requests
+preserve the accepted selection; field replacement reports `field-mismatch`
+instead of rebinding it.
+
 ## Admit, query and consume
 
 Accepted admission returns `reason: None` and a nonzero `jobId`. Busy/Rejected
