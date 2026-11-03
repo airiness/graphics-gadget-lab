@@ -1,5 +1,8 @@
 #pragma once
 #include <memory>
+#include <array>
+#include <optional>
+#include <vector>
 #include <cstdint>
 #include <string_view>
 
@@ -58,6 +61,47 @@ namespace gglab
 		float m_Threshold = 0.01f;
 		float m_IrradianceFloor = 0.001f;
 		float m_Hysteresis = 0.5f;
+	};
+
+	// Multiple reasons may apply. Excluded blocks carry no statistics or blockers.
+	enum class GIFieldReadinessBlocker : uint32_t
+	{
+		Warming = 1,
+		Percentile = 2,
+		Maximum = 4,
+		QuietHold = 8,
+	};
+
+	struct GIFieldProbeMeasurement
+	{
+		float m_Change = 0;
+		bool m_Active = false;
+	};
+
+	struct GIFieldBlockMeasurement
+	{
+		uint32_t m_ActiveProbes = 0;
+		std::optional<float> m_Percentile95;
+		std::optional<float> m_Maximum;
+		uint32_t m_QuietUpdates = 0;
+		uint32_t m_Blockers = 0;
+		bool m_WarmingMet = false;
+		// Threshold quietness is independent of warming and the accumulated hold.
+		bool m_CurrentQuiet = false;
+	};
+
+	// Owned CPU values from one successful estimator observation. No GPU owners.
+	struct GIFieldReadinessMeasurement
+	{
+		std::array<uint32_t, 3> m_Counts{};
+		uint32_t m_BlockWidth = 0;
+		uint32_t m_WarmingUpdates = 0;
+		uint32_t m_RequiredQuietUpdates = 0;
+		bool m_RefreshMode = false;
+		bool m_IncludesDistance = false;
+		GIFieldReadinessSnapshot m_Readiness;
+		std::vector<GIFieldProbeMeasurement> m_Probes;
+		std::vector<GIFieldBlockMeasurement> m_Blocks;
 	};
 
 	// Frozen before graph construction, from fence-completed measurement records.

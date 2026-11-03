@@ -226,6 +226,8 @@ namespace gglab
 		struct PublishSummary
 		{
 			State& m_State;
+			const RenderFrameContext& m_Frame;
+			const RenderServices& m_Services;
 			uint64_t m_FrameSerial = 0;
 			~PublishSummary()
 			{
@@ -242,6 +244,19 @@ namespace gglab
 				summary->m_SubmittedUpdates = diagnostics.m_SubmittedUpdates;
 				summary->m_Readiness = state.m_Workload.GetReadiness();
 				summary->m_Invalid = diagnostics.m_Failed || state.m_Update->IsInvalid();
+				auto change = state.m_Workload.GetChangeObservation();
+				if (change && change->m_Observation.m_Field == summary->m_Field && !summary->m_Invalid)
+				{
+					summary->m_ChangeObservation = std::move(change);
+				}
+				const auto displayIndex = static_cast<size_t>(m_Frame.GetDisplayViewId());
+				if (state.m_UpdatePrepared && displayIndex < m_Frame.m_RenderViews.size() &&
+					displayIndex < m_Frame.m_ViewRenderSettings.size())
+				{
+					state.m_Visualization.Prepare(m_Frame, m_Services,
+						m_Frame.GetDisplayViewRenderSettings().m_GIProbes, state.m_Generation,
+						state.m_Info.m_Volume.m_Counts, summary->m_ChangeObservation);
+				}
 				summary->m_Initialized = diagnostics.m_Initialized;
 				summary->m_InspectionAvailable = state.m_UpdatePrepared;
 				summary->m_ReceiverView = state.m_ReceiverView;
@@ -274,7 +289,7 @@ namespace gglab
 				}
 				state.m_Summary = std::move(summary);
 			}
-		} publication{ state, frame.m_FrameSerial };
+		} publication{ state, frame, services, frame.m_FrameSerial };
 		if (!ValidateGIFieldCreateInfo(state.m_Info) || !services.m_GIFieldFrameState)
 		{
 			return RenderFrameValidationResult::ContractFailure("Invalid GI field descriptor or settlement service");
@@ -305,8 +320,6 @@ namespace gglab
 				!next.m_TemporalAA && next.m_JitterPixels == std::array<float, 2>{};
 			state.m_ReceiverView = AdvanceGIReceiverView(state.m_ReceiverView, next);
 		}
-		state.m_Visualization.Prepare(frame, services,
-			frame.GetDisplayViewRenderSettings().m_GIProbes, state.m_Generation, state.m_Info.m_Volume.m_Counts);
 		if (!state.m_Info.m_ConstantEnvironment)
 		{
 			const auto bake = services.m_Environment->GetBakingStatus();

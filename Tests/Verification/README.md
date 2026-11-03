@@ -259,6 +259,60 @@ measurements cover an experimental update chain, not production field or complet
 GI performance acceptance. Keep hardware-specific numbers and run history in
 experiment reports, not this guide.
 
+### Completed probe change and readiness explanations
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/RunVerification.ps1 -Suite gi-probe-change -Configuration Develop -Rhi dx12,vulkan -Python $python
+```
+
+The GI Viewer and Host `view.gi_probes.mode=2` select Change. The same frame settings
+provide `change_normalized` (default true), `change_range` (default 3) and
+`change_blocks` (default false). These controls affect diagnostic presentation.
+The heatmap uses completed estimator values and their completed classification,
+with a separate current display observation. The block table retains p95/maximum,
+warming, quiet hold and all applicable blocker bits. Excluded blocks have no p95
+or maximum and never block readiness. Black irradiance can still have nonzero
+distance change; `includesDistance` identifies that measurement signal.
+
+`frame.giField.summary.changeState` distinguishes completed, pending, disabled and
+failed/unknown completion. `changeObservation` carries immutable CPU values and
+the original field/lighting/environment/epoch/update/frame identity. Refresh or
+replacement clears current measurement availability. Reading summaries does not
+poll fences or advance readiness. Visualization metadata is nested schema v6;
+existing observation/counter/ordered-ID layouts retain their versions.
+
+Request `GI.Probes.Change` with a composited image in one capture attempt for a
+paired image/data observation. Its v1 ABI is an R32Uint texture, width 256, rows
+rounded up to hold packed uint4 records, with zero padding. Header records 0-7:
+
+| Record | Four words |
+| --- | --- |
+| 0 | magic `0x47494331`, version 1, probe count, block count |
+| 1 | field generation low/high, refresh epoch low/high |
+| 2 | producing frame low/high, field-lifetime update low/high |
+| 3 | epoch-relative update low/high, epoch origin low/high |
+| 4 | float bits: tau, 3 tau, irradiance floor, adopted noise |
+| 5 | hysteresis float bits, phase bits (1 refresh, 2 includes distance), warming updates, required quiet updates |
+| 6 | grid X/Y/Z counts, block width |
+| 7 | readiness state ordinal, Active blocks, held-quiet blocks, Excluded blocks |
+
+One record per stable probe ID follows: change float bits, classification (1 Active,
+2 Inactive), zero, zero. Then two records per block in `x + Bx*(z + Bz*y)` order:
+Active count/p95 bits/maximum bits/quiet count, then blocker bits/warming-met/current-
+quiet/zero. Blocker bits are 1 warming, 2 p95, 4 maximum and 8 incomplete hold.
+Excluded statistics encode zero in the binary payload and null in JSON, qualified
+by Active count zero. Image palette is diagnostic RGB at `t=clamp(value/range,0,1)`:
+`clamp((2t, 2-2*abs(2t-1), 2-2t),0,1)`; over-range values saturate.
+
+The suite independently reduces exported probe values, validates block decisions,
+identity/pairing, deterministic selection and heatmap pixels on F2/F4/F10 and an
+all-Excluded fixture. Off and readiness-disabled controls schedule no Change work.
+The immutable upload is replaced only when its completed observation changes and
+retained by each reading submission. Its logical bytes are reported separately;
+ordinary Classification/Irradiance uses a 16-byte fallback binding. Change also
+creates a padded export texture and optional bounded block outlines. These costs
+and diagnostic correctness do not establish GI quality or performance acceptance.
+
 ### Probe viewer overhead and usability
 
 Run `TestGIProbeViewer.ps1` through the `gi-probe-viewer` catalog suite in Develop.

@@ -78,7 +78,7 @@ def choose(directory, category):
 def validate_case(directory, choice, name):
     resource, summary, arrays, images = read(directory)
     display = summary['probeVisualization']
-    require(display['schemaVersion'] in (4, 5) and not resource['frame']['developmentTools'], 'Selection is not a headless selection diagnostic')
+    require(display['schemaVersion'] in (4, 5, 6) and not resource['frame']['developmentTools'], 'Selection is not a headless selection diagnostic')
     expected, counts = oracle(summary, arrays['GI.Field.Classification'])
     stats = arrays['GI.Probes.Counts'].reshape(-1)
     ids = arrays['GI.Probes.RenderedIDs'].reshape(2, -1).T

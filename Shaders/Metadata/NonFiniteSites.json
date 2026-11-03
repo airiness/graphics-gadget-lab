@@ -1695,7 +1695,7 @@
       "function": "PSMain",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "8188a817df2048921ec2cb8e37b145e9ca85ef6eaf0b34cf7449f64718f0c500",
+      "bodySha256": "cde42d037689dc1c538fc036c5d173008182a658013c166d0cce0f3bd5a374f5",
       "programs": [
         "gglab.shader.gi-field"
       ],
@@ -1713,7 +1713,7 @@
       "function": "PSMain",
       "operation": "ACESFitted",
       "count": 1,
-      "bodySha256": "8188a817df2048921ec2cb8e37b145e9ca85ef6eaf0b34cf7449f64718f0c500",
+      "bodySha256": "cde42d037689dc1c538fc036c5d173008182a658013c166d0cce0f3bd5a374f5",
       "programs": [
         "gglab.shader.gi-field"
       ],

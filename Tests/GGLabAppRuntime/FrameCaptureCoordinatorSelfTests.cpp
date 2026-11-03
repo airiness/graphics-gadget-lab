@@ -2290,6 +2290,26 @@ namespace gglab
 				fieldJson["readiness"]["giField"]["completedUpdates"] == 84 &&
 				fieldJson["readiness"]["giField"]["state"] == "Ready",
 				"Field readiness and generation are serialized from the frozen frame snapshot");
+			auto measurement = std::make_shared<GIFieldReadinessMeasurement>();
+			measurement->m_Counts = { 4, 4, 4 };
+			measurement->m_BlockWidth = 4;
+			measurement->m_RequiredQuietUpdates = 30;
+			measurement->m_Blocks.push_back({});
+			auto change = std::make_shared<GIFieldChangeObservation>();
+			change->m_Observation = { .m_Field = { .m_Generation = 73, .m_RefreshEpoch = 2,
+				.m_EpochOriginUpdate = 80 }, .m_ProducingFrame = 113, .m_FieldUpdate = 85, .m_ReadinessUpdate = 5 };
+			change->m_Measurement = measurement;
+			GIFieldSummary summary{ .m_ChangeObservation = change };
+			summary.m_Visualization.m_ChangeObservation = change;
+			summary.m_Visualization.m_Settings.m_Mode = GIProbeVisualizationMode::Change;
+			const auto changeJson = nlohmann::json::parse(SerializeGIFieldSummary(summary));
+			context.Check(changeJson["changeObservation"] == changeJson["probeVisualization"]["changeObservation"] &&
+				changeJson["changeObservation"]["blocks"][0]["p95"].is_null() &&
+				changeJson["changeObservation"]["blocks"][0]["excluded"] == true &&
+				changeJson["changeObservation"]["observation"]["readinessUpdate"] == 5 &&
+				changeJson["probeVisualization"]["mode"] == "change" &&
+				changeJson["probeVisualization"]["schemaVersion"] == 6,
+				"Change metadata shares the completed observation and preserves Excluded/null semantics");
 
 			const std::string json = SerializeFrameCaptureMetadata(metadata);
 			context.Check(

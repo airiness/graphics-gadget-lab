@@ -25,6 +25,7 @@ namespace gglab
 		[[nodiscard]] RenderFrameValidationResult Prepare(const RenderFrameContext& frame,
 			const RenderServices& services) noexcept;
 		[[nodiscard]] GIFieldReadinessSnapshot GetReadiness() const noexcept;
+		[[nodiscard]] std::shared_ptr<const GIFieldChangeObservation> GetChangeObservation() const noexcept;
 		[[nodiscard]] std::optional<GIObservationStamp> GetCompletedObservation() const noexcept;
 		[[nodiscard]] uint64_t GetRefreshEpoch() const noexcept;
 		[[nodiscard]] uint64_t GetEpochOriginUpdate() const noexcept;

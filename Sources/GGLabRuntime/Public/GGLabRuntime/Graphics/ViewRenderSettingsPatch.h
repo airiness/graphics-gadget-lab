@@ -69,6 +69,9 @@ namespace gglab
 			std::optional<float> m_MaximumDistance;
 			std::optional<GIProbeVisualizationMode> m_Mode;
 			std::optional<float> m_PreviewExposureEV;
+			std::optional<bool> m_ChangeNormalized;
+			std::optional<float> m_ChangeRange;
+			std::optional<bool> m_ChangeBlocks;
 			std::optional<GIProbeDepthMode> m_DepthMode;
 		} m_GIProbes;
 		TemporalAASettingsPatch m_TemporalAA;

@@ -33,13 +33,18 @@ namespace gglab
 			ImGui::SameLine();
 			ImGui::Checkbox("Volume bounds", &settings.m_Bounds);
 			int mode = int(settings.m_Mode);
-			if (ImGui::Combo("Sphere display", &mode, "Classification\0Irradiance\0"))
+			if (ImGui::Combo("Sphere display", &mode, "Classification\0Irradiance\0Change\0"))
 			{
 				settings.m_Mode = static_cast<GIProbeVisualizationMode>(mode);
 			}
 			ImGui::BeginDisabled(settings.m_Mode != GIProbeVisualizationMode::Irradiance);
 			ImGui::SliderFloat("Sphere Preview EV", &settings.m_PreviewExposureEV,
 				GIProbeVisualizationMinimumExposureEV, GIProbeVisualizationMaximumExposureEV, "%.2f");
+			ImGui::EndDisabled();
+			ImGui::BeginDisabled(settings.m_Mode != GIProbeVisualizationMode::Change);
+			ImGui::Checkbox("Change / threshold", &settings.m_ChangeNormalized);
+			ImGui::InputFloat("Change display maximum", &settings.m_ChangeRange);
+			ImGui::Checkbox("Readiness block outlines", &settings.m_ChangeBlocks);
 			ImGui::EndDisabled();
 			int depthMode = int(settings.m_DepthMode);
 			if (ImGui::Combo("Probe depth", &depthMode, "X-ray\0Scene depth\0"))
@@ -92,6 +97,92 @@ namespace gglab
 				return;
 			}
 			const auto& display = summary->m_Visualization;
+			if (display.m_Settings.m_Mode == GIProbeVisualizationMode::Change)
+			{
+				ImGui::TextWrapped("Completed relative change%s: blue through white to red; values above %.4g saturate. "
+					"A low change can still be warming or waiting for the quiet hold.",
+					display.m_Settings.m_ChangeNormalized ? " / tau" : "", display.m_Settings.m_ChangeRange);
+				const auto& observation = display.m_ChangeObservation;
+				if (!observation)
+				{
+					ImGui::TextDisabled(summary->m_Invalid ? "Change unavailable: field failed or completion unknown." :
+						!summary->m_Readiness.m_Enabled ? "Change unavailable: readiness measurements disabled." :
+						"Change pending: no completed measurement for this field/refresh epoch.");
+				}
+				else
+				{
+					const auto& data = *observation->m_Measurement;
+					const auto& stamp = observation->m_Observation;
+					ImGui::TextDisabled(data.m_IncludesDistance ?
+						"Change includes irradiance and distance statistics; a black probe can still change." :
+						"Lighting refresh: irradiance change only.");
+					ImGui::TextDisabled("Block outlines: gray Excluded | gold warming | red p95/max | blue hold | green ready");
+					ImGui::Text("Completed frame %llu | field update %llu | epoch %llu update %llu",
+						static_cast<unsigned long long>(stamp.m_ProducingFrame), static_cast<unsigned long long>(stamp.m_FieldUpdate),
+						static_cast<unsigned long long>(stamp.m_Field.m_RefreshEpoch), static_cast<unsigned long long>(stamp.m_ReadinessUpdate));
+					ImGui::Text("%s | %s | alpha %.4g | noise %.4g | floor %.4g | tau %.4g / max %.4g",
+						GetGIFieldReadinessName(data.m_Readiness.m_State).data(), data.m_RefreshMode ? "refresh" : "steady",
+						data.m_Readiness.m_Hysteresis, data.m_Readiness.m_NoiseSigma, data.m_Readiness.m_IrradianceFloor,
+						data.m_Readiness.m_Threshold, 3 * data.m_Readiness.m_Threshold);
+					if (display.m_Settings.m_Selection &&
+						MatchesGIProbeSelection(*display.m_Settings.m_Selection, stamp.m_Field.m_Generation, data.m_Counts))
+					{
+						const auto coordinate = display.m_Settings.m_Selection->m_Coordinate;
+						const auto& probe = data.m_Probes[coordinate[0] + data.m_Counts[0] * (coordinate[2] + data.m_Counts[2] * coordinate[1])];
+						ImGui::Text("Selected completed probe: %s | raw change %.6g | change/tau %.6g",
+							probe.m_Active ? "Active" : "Inactive", probe.m_Change, probe.m_Change / data.m_Readiness.m_Threshold);
+					}
+					if (ImGui::BeginTable("Readiness blocks", 6, ImGuiTableFlags_Borders | ImGuiTableFlags_ScrollY, ImVec2(0, 180)))
+					{
+						for (const char* name : { "Block", "Active", "p95 / max", "Quiet hold", "Warming", "Blockers" })
+						{
+							ImGui::TableSetupColumn(name);
+						}
+						ImGui::TableHeadersRow();
+						ImGuiListClipper clipper;
+						clipper.Begin(int(data.m_Blocks.size()));
+						while (clipper.Step())
+						{
+							for (int index = clipper.DisplayStart; index < clipper.DisplayEnd; ++index)
+							{
+								const auto& block = data.m_Blocks[index];
+								ImGui::TableNextRow();
+								ImGui::TableNextColumn();
+								ImGui::Text("%d", index);
+								ImGui::TableNextColumn();
+								ImGui::Text("%u", block.m_ActiveProbes);
+								ImGui::TableNextColumn();
+								if (block.m_Percentile95)
+								{
+									ImGui::Text("%.4g / %.4g", *block.m_Percentile95, *block.m_Maximum);
+								}
+								else
+								{
+									ImGui::TextDisabled("Excluded");
+								}
+								ImGui::TableNextColumn();
+								if (block.m_ActiveProbes != 0)
+								{
+									ImGui::Text("%u / %u", block.m_QuietUpdates, data.m_RequiredQuietUpdates);
+									ImGui::TableNextColumn();
+									ImGui::Text("%s (%u)", block.m_WarmingMet ? "met" : "pending", data.m_WarmingUpdates);
+								}
+								else
+								{
+									ImGui::TextDisabled("N/A");
+									ImGui::TableNextColumn();
+									ImGui::TextDisabled("Excluded");
+								}
+								ImGui::TableNextColumn();
+								ImGui::Text("%s%s%s%s", (block.m_Blockers & 1) ? "warming " : "",
+									(block.m_Blockers & 2) ? "p95 " : "", (block.m_Blockers & 4) ? "maximum " : "",
+									(block.m_Blockers & 8) ? "hold" : "");
+							}
+						}
+						ImGui::EndTable();
+					}
+				}
+			}
 			ImGui::Text("Effective request: %s | budget %u | generation %llu",
 				display.m_Settings.m_Enabled ? "on" : "off", display.m_Settings.m_Budget,
 				static_cast<unsigned long long>(summary->m_Field.m_Generation));

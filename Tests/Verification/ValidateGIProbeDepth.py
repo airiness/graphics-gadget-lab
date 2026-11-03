@@ -103,7 +103,7 @@ def validate(root):
                     resource, data = arrays(directory)
                     summary = resource["frame"]["readiness"]["giField"]["summary"]
                     display = summary["probeVisualization"]
-                    require(display["schemaVersion"] in (4, 5) and display["available"] and display["viewSupported"] and
+                    require(display["schemaVersion"] in (4, 5, 6) and display["available"] and display["viewSupported"] and
                             display["depthSubnormalConversion"] == "positive-subnormal-to-zero",
                             "Native display schema/availability is incorrect")
                     require(display["depthMode"] == ("scene-depth" if depth_mode else "xray") and
@@ -118,8 +118,14 @@ def validate(root):
                         a["dependencyAccess"] == "Read" and a["access"] == "Sample" and a["stages"] == "PixelShader"
                         for a in scene_reads), "Probe display writes scene depth or declares the wrong pixel-read dependency")
                     resources = [r for r in graph["compile"]["resources"] if r["name"].startswith("GI.Probes.")]
-                    require({r["name"] for r in resources} == {
-                        "GI.Probes.Counts", "GI.Probes.RenderedIDs", "GI.Probes.PrivateDepth", "GI.Probes.Counts.Readback"},
+                    expected_resources = {"GI.Probes.Counts", "GI.Probes.RenderedIDs", "GI.Probes.PrivateDepth", "GI.Probes.Counts.Readback"}
+                    if display["schemaVersion"] >= 6:
+                        expected_resources.add("GI.Probes.CompletedChange.Upload")
+                        upload = next(r for r in resources if r["name"] == "GI.Probes.CompletedChange.Upload")
+                        require(upload["type"] == "Buffer" and upload["imported"] and upload["logicalBytes"] == 16 and
+                                upload["buffer"] == {"sizeBytes": 16, "strideBytes": 16},
+                                "Ordinary depth display has an unbounded Change fallback binding")
+                    require({r["name"] for r in resources} == expected_resources,
                         "Depth mode introduced an undeclared diagnostic attachment")
                     selected, counts = oracle(summary, data["GI.Field.Classification"])
                     ids = data["GI.Probes.RenderedIDs"].reshape(2, -1).T

@@ -177,6 +177,7 @@ namespace gglab
 			uint64_t m_ReadinessEpoch = 0;
 			uint64_t m_RefreshEpoch = 1;
 			std::optional<GIObservationStamp> m_CompletedObservation;
+			std::shared_ptr<const GIFieldChangeObservation> m_ChangeObservation;
 			uint64_t m_ReadbackBytes = sizeof(GIUpdateStatus);
 			bool m_RefreshDistance = true;
 			bool m_CompletionFailed = false;
@@ -221,6 +222,16 @@ namespace gglab
 					}
 					GIUpdateStatus status;
 					std::memcpy(&status, mapped, sizeof(status));
+					// Validate the complete status before publishing any measurement from it.
+					if (!IsGIUpdateStatusValid(status, m_Diagnostics.m_ProbeCount, m_RaysPerProbe,
+						slot.m_Update, m_IrradianceInteriorWidth))
+					{
+						m_Device->UnmapBuffer(slot.m_Buffer, {});
+						m_CompletionFailed = true;
+						m_Diagnostics.m_Failed = true;
+						m_Diagnostics.m_Reason = "Probe update status readback contains an invalid record";
+						return;
+					}
 
 					if (status.m_Error == GIUpdateError::None && m_ReadinessSettings.m_Enabled &&
 						slot.m_Update > m_ReadinessEpoch &&
@@ -241,17 +252,11 @@ namespace gglab
 						else
 						{
 							m_CompletedObservation = slot.m_Observation;
+							m_ChangeObservation = std::make_shared<GIFieldChangeObservation>(
+								GIFieldChangeObservation{ slot.m_Observation, m_Readiness.GetMeasurement() });
 						}
 					}
 					m_Device->UnmapBuffer(slot.m_Buffer, {});
-					if (!IsGIUpdateStatusValid(status, m_Diagnostics.m_ProbeCount, m_RaysPerProbe,
-						slot.m_Update, m_IrradianceInteriorWidth))
-					{
-						m_CompletionFailed = true;
-						m_Diagnostics.m_Failed = true;
-						m_Diagnostics.m_Reason = "Probe update status readback contains an invalid record";
-						return;
-					}
 					if (status.m_Error != GIUpdateError::None)
 					{
 						if (m_Diagnostics.m_UpdateStatus.m_Error == GIUpdateError::None)
@@ -388,6 +393,12 @@ namespace gglab
 		return snapshot;
 	}
 
+	std::shared_ptr<const GIFieldChangeObservation> GIProbeUpdateWorkload::GetChangeObservation() const noexcept
+	{
+		const auto& progress = *m_State->m_Progress;
+		return progress.m_Diagnostics.m_Failed || progress.m_CompletionFailed ? nullptr : progress.m_ChangeObservation;
+	}
+
 	std::optional<GIObservationStamp> GIProbeUpdateWorkload::GetCompletedObservation() const noexcept
 	{
 		return m_State->m_Progress->m_CompletedObservation;
@@ -409,6 +420,7 @@ namespace gglab
 		progress.m_ReadinessEpoch = progress.m_Diagnostics.m_SubmittedUpdates;
 		++progress.m_RefreshEpoch;
 		progress.m_CompletedObservation.reset();
+		progress.m_ChangeObservation.reset();
 		progress.m_RefreshDistance = false;
 		progress.m_Readiness.Reset(m_State->m_Profile.m_Counts, progress.m_ReadinessSettings, true);
 	}

@@ -16,11 +16,13 @@ namespace gglab
 	{
 		Classification,
 		Irradiance,
+		Change,
 	};
 
 	[[nodiscard]] constexpr std::string_view GetGIProbeVisualizationModeName(GIProbeVisualizationMode mode) noexcept
 	{
-		return mode == GIProbeVisualizationMode::Irradiance ? "irradiance" : "classification";
+		return mode == GIProbeVisualizationMode::Change ? "change" :
+			mode == GIProbeVisualizationMode::Irradiance ? "irradiance" : "classification";
 	}
 
 	enum class GIProbeDepthMode : uint8_t
@@ -66,6 +68,9 @@ namespace gglab
 		float m_MaximumDistance = 0;
 		GIProbeVisualizationMode m_Mode = GIProbeVisualizationMode::Classification;
 		float m_PreviewExposureEV = 0;
+		bool m_ChangeNormalized = true;
+		float m_ChangeRange = 3;
+		bool m_ChangeBlocks = false;
 		GIProbeDepthMode m_DepthMode = GIProbeDepthMode::XRay;
 		// A diagnostic overlay, independent of ordinary filters, IDs and private depth winners.
 		std::optional<GIProbeSelection> m_Selection;

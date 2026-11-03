@@ -594,6 +594,9 @@ namespace gglab
 				{ "maximumDistance", settings.m_MaximumDistance },
 				{ "mode", GetGIProbeVisualizationModeName(settings.m_Mode) },
 				{ "previewEV", settings.m_PreviewExposureEV },
+				{ "changeNormalized", settings.m_ChangeNormalized },
+				{ "changeRange", settings.m_ChangeRange },
+				{ "changeBlocks", settings.m_ChangeBlocks },
 				{ "depthMode", GetGIProbeDepthModeName(settings.m_DepthMode) },
 				{ "selection", GIProbeSelectionJson(settings.m_Selection) } };
 		}
@@ -626,12 +629,63 @@ namespace gglab
 				{ "depthAlignment", GetGIProbeVisualizationDepthAlignmentName(view) },
 				{ "supported", IsGIProbeVisualizationViewSupported(view) } };
 		}
+		nlohmann::json GIChangeObservationJson(const std::shared_ptr<const GIFieldChangeObservation>& observation)
+		{
+			using Json = nlohmann::json;
+			if (!observation)
+			{
+				return nullptr;
+			}
+			const auto& data = *observation->m_Measurement;
+			const auto& readiness = data.m_Readiness;
+			Json blocks = Json::array();
+			for (const auto& block : data.m_Blocks)
+			{
+				blocks.push_back({
+					{ "activeProbes", block.m_ActiveProbes },
+					{ "excluded", block.m_ActiveProbes == 0 },
+					{ "p95", block.m_Percentile95 ? Json(*block.m_Percentile95) : Json(nullptr) },
+					{ "maximum", block.m_Maximum ? Json(*block.m_Maximum) : Json(nullptr) },
+					{ "quietUpdates", block.m_QuietUpdates },
+					{ "blockers", block.m_Blockers },
+					{ "warmingMet", block.m_WarmingMet },
+					{ "currentQuiet", block.m_CurrentQuiet } });
+			}
+			return {
+				{ "schemaVersion", 1 },
+				{ "observation", GIStampJson(observation->m_Observation) },
+				{ "counts", data.m_Counts },
+				{ "probeCount", data.m_Probes.size() },
+				{ "blockWidth", data.m_BlockWidth },
+				{ "blockOrder", "x + Bx * (z + Bz * y)" },
+				{ "state", GetGIFieldReadinessName(readiness.m_State) },
+				{ "phase", data.m_RefreshMode ? "refresh" : "steady" },
+				{ "includesDistance", data.m_IncludesDistance },
+				{ "hysteresis", readiness.m_Hysteresis },
+				{ "noiseSigma", readiness.m_NoiseSigma },
+				{ "irradianceFloor", readiness.m_IrradianceFloor },
+				{ "threshold", readiness.m_Threshold },
+				{ "maximumThreshold", 3 * readiness.m_Threshold },
+				{ "warmingUpdates", data.m_WarmingUpdates },
+				{ "requiredQuietUpdates", data.m_RequiredQuietUpdates },
+				{ "blockerBits", { { "warming", 1 }, { "p95", 2 }, { "maximum", 4 }, { "quietHold", 8 } } },
+				{ "blocks", std::move(blocks) } };
+		}
+
 		nlohmann::json GIProbeVisualizationJson(const GIProbeVisualizationSnapshot& snapshot)
 		{
 			using Json = nlohmann::json;
 			const auto& counts = snapshot.m_CompletedCounts;
 			return {
-				{ "schemaVersion", 5 },
+				{ "schemaVersion", 6 },
+				{ "changeObservation", GIChangeObservationJson(snapshot.m_ChangeObservation) },
+				{ "changeResource", "GI.Probes.Change" },
+				{ "changeUploadLogicalBytes", snapshot.m_ChangeUploadBytes },
+				{ "changeBlockOutlineCount", snapshot.m_Available && snapshot.m_HighlightAvailable &&
+					snapshot.m_Settings.m_Mode == GIProbeVisualizationMode::Change && snapshot.m_Settings.m_ChangeBlocks &&
+					snapshot.m_ChangeObservation ? snapshot.m_ChangeObservation->m_Measurement->m_Blocks.size() : 0 },
+				{ "changeMeaning", "fence-completed-estimator; raw-relative-change or change/tau; independent of live atlas" },
+				{ "changePalette", "saturate((2t,2-2*abs(2t-1),2-2t)); t=clamp(value/range,0,1); over-range saturated" },
 				{ "mode", GetGIProbeVisualizationModeName(snapshot.m_Settings.m_Mode) },
 				{ "irradianceQuantity", "white-Lambertian-E-over-pi" },
 				{ "irradianceMapping", "atlas-M=E/pi; exp2(previewEV); ACES-fitted; sRGB" },
@@ -700,6 +754,9 @@ namespace gglab
 			{ "receiverInspectionAvailable", summary.m_ReceiverInspectionAvailable },
 			{ "receiverMarkersAvailable", summary.m_ReceiverMarkersAvailable },
 			{ "classificationCounts", nullptr },
+			{ "changeObservation", GIChangeObservationJson(summary.m_ChangeObservation) },
+			{ "changeState", summary.m_Invalid ? "failed-or-unknown-completion" :
+				!summary.m_Readiness.m_Enabled ? "disabled" : summary.m_ChangeObservation ? "completed" : "pending" },
 			{ "probeVisualization", GIProbeVisualizationJson(summary.m_Visualization) },
 			{ "receiverView", GIReceiverViewJson(summary.m_ReceiverView) },
 			{ "completedMeasurement", summary.m_CompletedMeasurement ?

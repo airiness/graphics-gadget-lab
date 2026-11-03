@@ -170,6 +170,16 @@ namespace gglab
 				resolvedDisplay.m_View.m_GIProbes.m_PreviewExposureEV == 1.5f &&
 				resolvedDisplay.m_View.m_GIProbes.m_DepthMode == GIProbeDepthMode::SceneDepth,
 				"GUI probe settings reach Runtime frame settings with tooling attribution");
+			const std::array changeDisplay{
+				LabParameterValue{ LabParameterId("view.gi_probes.mode"), int32_t(2) },
+				LabParameterValue{ LabParameterId("view.gi_probes.change_normalized"), false },
+				LabParameterValue{ LabParameterId("view.gi_probes.change_range"), 0.25f },
+				LabParameterValue{ LabParameterId("view.gi_probes.change_blocks"), true } };
+			ApplyHostViewParameters(changeDisplay, resolvedDisplay.m_View, true);
+			context.Check(resolvedDisplay.m_View.m_GIProbes.m_Mode == GIProbeVisualizationMode::Change &&
+				!resolvedDisplay.m_View.m_GIProbes.m_ChangeNormalized &&
+				resolvedDisplay.m_View.m_GIProbes.m_ChangeRange == 0.25f && resolvedDisplay.m_View.m_GIProbes.m_ChangeBlocks,
+				"Host Change controls reach the same Runtime settings as the GUI");
 			const std::array sessionDisplay{
 				LabParameterValue{ LabParameterId("view.gi_probes.enabled"), true },
 				LabParameterValue{ LabParameterId("view.gi_probes.budget"), uint32_t(17) } };
@@ -206,6 +216,37 @@ namespace gglab
 				displayOverrides.m_GIProbes.m_Budget == 2048,
 				"Resizing the Viewer retains its budget and truncation explanation");
 			ImGui::SetWindowSize("GIViewerFixture", ImVec2(760, 660));
+			auto completedChange = std::make_shared<GIFieldChangeObservation>();
+			auto changeMeasurement = std::make_shared<GIFieldReadinessMeasurement>();
+			changeMeasurement->m_Counts = { 4, 4, 4 };
+			changeMeasurement->m_WarmingUpdates = 4;
+			changeMeasurement->m_RequiredQuietUpdates = 30;
+			changeMeasurement->m_Readiness.m_State = GIFieldReadinessState::Settling;
+			changeMeasurement->m_Readiness.m_Threshold = 0.3f;
+			changeMeasurement->m_Probes.resize(64, { 0.2f, true });
+			changeMeasurement->m_Blocks.push_back({ .m_ActiveProbes = 64,
+				.m_Percentile95 = 0.2f, .m_Maximum = 0.4f, .m_QuietUpdates = 17,
+				.m_Blockers = 8, .m_WarmingMet = true, .m_CurrentQuiet = true });
+			completedChange->m_Observation = { .m_Field = fieldSummary.m_Field,
+				.m_ProducingFrame = 113, .m_FieldUpdate = 100, .m_ReadinessUpdate = 20 };
+			completedChange->m_Measurement = changeMeasurement;
+			fieldSummary.m_Visualization.m_ChangeObservation = completedChange;
+			fieldSummary.m_Visualization.m_Settings.m_Mode = GIProbeVisualizationMode::Change;
+			const auto changeText = draw();
+			context.Check(changeText.find("Completed frame 113") != std::string::npos &&
+				changeText.find("17 / 30") != std::string::npos && changeText.find("hold") != std::string::npos &&
+				changeText.find("irradiance change only") != std::string::npos &&
+				changeMeasurement->m_Blocks[0].m_QuietUpdates == 17,
+				"The real Change panel displays the completed source and incomplete hold without advancing readiness");
+			fieldSummary.m_Visualization.m_ChangeObservation.reset();
+			fieldSummary.m_Readiness.m_Enabled = true;
+			const auto pendingChange = draw();
+			context.Check(pendingChange.find("no completed measurement for this field/refresh epoch") != std::string::npos,
+				"A missing completed observation is displayed as pending rather than zero change");
+			fieldSummary.m_Readiness.m_Enabled = false;
+			context.Check(draw().find("readiness measurements disabled") != std::string::npos,
+				"The real Change panel distinguishes an explicitly disabled measurement owner");
+			fieldSummary.m_Visualization.m_Settings.m_Mode = GIProbeVisualizationMode::Irradiance;
 			ImGui::ActivateItemByID(ImHashStr("Probe array", 0, ImHashStr("GIViewerFixture")));
 			GGLAB_UNUSED(draw());
 			fieldSummary.m_Counts = { 4, 4, 4 };

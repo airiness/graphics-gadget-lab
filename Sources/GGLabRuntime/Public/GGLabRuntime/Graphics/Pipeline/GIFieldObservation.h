@@ -43,6 +43,12 @@ namespace gglab
 		uint64_t m_ReadinessUpdate = 0;
 	};
 
+	struct GIFieldChangeObservation
+	{
+		GIObservationStamp m_Observation;
+		std::shared_ptr<const GIFieldReadinessMeasurement> m_Measurement;
+	};
+
 	struct GIReceiverViewSnapshot
 	{
 		uint64_t m_Revision = 0;
@@ -208,6 +214,8 @@ namespace gglab
 	// Published together on the Runtime owner thread. Copies retain CPU values only.
 	struct GIProbeVisualizationSnapshot
 	{
+		std::shared_ptr<const GIFieldChangeObservation> m_ChangeObservation;
+		uint64_t m_ChangeUploadBytes = 0;
 		GIProbeVisualizationSettings m_Settings;
 		bool m_Available = false;
 		bool m_ViewSupported = false;
@@ -230,6 +238,7 @@ namespace gglab
 
 	struct GIFieldSummary
 	{
+		std::shared_ptr<const GIFieldChangeObservation> m_ChangeObservation;
 		GIFieldIdentity m_Field;
 		std::array<uint32_t, 3> m_Counts{};
 		std::array<float, 3> m_Minimum{};

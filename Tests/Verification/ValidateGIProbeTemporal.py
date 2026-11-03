@@ -16,7 +16,7 @@ def validate_frame(directory, resource_path, image_metadata, arm, fixture, scene
     resource = load(resource_path)
     summary = resource["frame"]["readiness"]["giField"]["summary"]
     display, view = summary["probeVisualization"], summary["probeVisualization"]["view"]
-    require(display["schemaVersion"] in (4, 5) and display["available"] and display["viewSupported"] and
+    require(display["schemaVersion"] in (4, 5, 6) and display["available"] and display["viewSupported"] and
             not resource["frame"]["developmentTools"], "Temporal display unavailable or requires DevTools")
     require(image_metadata["readiness"]["giField"]["summary"]["probeVisualization"]["view"] == view,
             "Image and resource execution views are not frozen together")
@@ -81,6 +81,12 @@ def validate_frame(directory, resource_path, image_metadata, arm, fixture, scene
     if arm["quality"]:
         require(passes["PostProcess.TemporalAA.DisplayDepth"] < passes["GI.Probes.Draw"], "Probe overlay precedes display-depth publication")
     expected_resources = {"GI.Probes.Counts", "GI.Probes.RenderedIDs", "GI.Probes.PrivateDepth", "GI.Probes.Counts.Readback"}
+    if display["schemaVersion"] >= 6:
+        expected_resources.add("GI.Probes.CompletedChange.Upload")
+        upload = next(r for r in graph["compile"]["resources"] if r["name"] == "GI.Probes.CompletedChange.Upload")
+        require(upload["type"] == "Buffer" and upload["imported"] and upload["logicalBytes"] == 16 and
+                upload["buffer"] == {"sizeBytes": 16, "strideBytes": 16},
+                "Ordinary temporal display has an unbounded Change fallback binding")
     require({r["name"] for r in graph["compile"]["resources"] if r["name"].startswith("GI.Probes.")} == expected_resources,
             "Temporal probe display adds an undeclared attachment")
     mask, winners, normals, depth = raster(summary, selected, full=True, edge_guard=1/16)

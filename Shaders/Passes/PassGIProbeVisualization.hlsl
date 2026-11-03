@@ -2,6 +2,8 @@
 #include <Lighting/GIFieldSampling.hlsli>
 #include <Lighting/GIProbeDepth.hlsli>
 
+StructuredBuffer<uint4> CompletedChange : register(t11);
+
 cbuffer Parameters : register(b2)
 {
 	GIFieldSamplingParameters Field;
@@ -28,6 +30,12 @@ cbuffer Parameters : register(b2)
 	uint SelectedID;
 	uint HighlightCount;
 	uint2 HighlightPadding;
+	uint ChangeWords;
+	uint ChangeTextureIndex;
+	uint ChangeNormalized;
+	float ChangeRange;
+	uint ChangeBlockCount;
+	uint3 ChangePadding;
 };
 
 uint3 Coordinate(uint id)
@@ -56,9 +64,30 @@ bool IntersectsFrustum(float3 center)
 
 // A serial scan is bounded by the field's probe limit, and makes first-N order
 // independent of subgroup size or atomic arrival order. No CPU readback feeds drawing.
-[numthreads(1, 1, 1)]
-void CSMain()
+[numthreads(64, 1, 1)]
+void CSMain(uint3 thread : SV_DispatchThreadID)
 {
+	if (Mode == 4)
+	{
+		RWTexture2D<uint> change = ResourceDescriptorHeap[NonUniformResourceIndex(ChangeTextureIndex)];
+		const uint word = thread.x;
+		const uint paddedWords = ((ChangeWords + 255) / 256) * 256;
+		if (word < paddedWords)
+		{
+			uint value = 0;
+			[branch]
+			if (word < ChangeWords)
+			{
+				value = CompletedChange[word / 4][word % 4];
+			}
+			change[uint2(word % 256, word / 256)] = value;
+		}
+		return;
+	}
+	if (thread.x != 0)
+	{
+		return;
+	}
 	RWTexture2D<uint> stats = ResourceDescriptorHeap[NonUniformResourceIndex(StatsIndex)];
 	RWTexture2D<uint> ids = ResourceDescriptorHeap[NonUniformResourceIndex(IDsIndex)];
 	Texture2DArray<uint> classification = ResourceDescriptorHeap[NonUniformResourceIndex(Field.Classification)];
@@ -84,8 +113,17 @@ void CSMain()
 		}
 		++afterSlice;
 		const uint raw = classification.Load(int4(coordinate.xzy, 0));
-		const uint category = (classification.Load(int4(0, 0, 0, 0)) & GIProbeFieldInvalidBit) != 0 ?
-			3 : raw <= 2 ? raw : 3;
+		uint category = 0;
+		[branch]
+		if (DisplayMode == 2)
+		{
+			category = CompletedChange[8 + id].y;
+		}
+		else
+		{
+			category = (classification.Load(int4(0, 0, 0, 0)) & GIProbeFieldInvalidBit) != 0 ?
+				3 : raw <= 2 ? raw : 3;
+		}
 		if ((ClassificationMask & (1u << category)) == 0)
 		{
 			continue;
@@ -135,6 +173,7 @@ struct VertexOutput
 	nointerpolation uint Category : TEXCOORD2;
 	nointerpolation uint ProbeID : TEXCOORD3;
 	float3 WorldPosition : TEXCOORD4;
+	nointerpolation uint Block : TEXCOORD5;
 };
 
 VertexOutput VSMain(uint vertex : SV_VertexID, uint instance : SV_InstanceID)
@@ -144,7 +183,7 @@ VertexOutput VSMain(uint vertex : SV_VertexID, uint instance : SV_InstanceID)
 	const float2 corners[6] = {
 		float2(0, 0), float2(0, 1), float2(1, 1),
 		float2(0, 0), float2(1, 1), float2(1, 0) };
-	if (Mode == 1)
+	if (Mode == 1 || Mode == 3)
 	{
 		// Twelve screen-width edges around the probe-center volume bounds.
 		const uint edge = vertex / 6;
@@ -155,9 +194,20 @@ VertexOutput VSMain(uint vertex : SV_VertexID, uint instance : SV_InstanceID)
 		a[(axis + 2) % 3] = (float)(side >> 1);
 		float3 b = a;
 		b[axis] = 1;
-		const float3 size = (float3)(Field.Counts - 1) * Field.Spacing;
-		float4 ca = mul(float4(Field.Minimum + a * size, 1), ViewProjection);
-		float4 cb = mul(float4(Field.Minimum + b * size, 1), ViewProjection);
+		float3 minimum = Field.Minimum;
+		float3 size = (float3)(Field.Counts - 1) * Field.Spacing;
+		if (Mode == 3)
+		{
+			const uint width = CompletedChange[6].w;
+			const uint3 counts = (Field.Counts + width - 1) / width;
+			const uint3 block = uint3(instance % counts.x, instance / (counts.x * counts.z), (instance / counts.x) % counts.z);
+			const uint3 first = block * width;
+			minimum += (float3)(first) * Field.Spacing;
+			size = (float3)(min(first + width - 1, Field.Counts - 1) - first) * Field.Spacing;
+			output.Block = instance;
+		}
+		float4 ca = mul(float4(minimum + a * size, 1), ViewProjection);
+		float4 cb = mul(float4(minimum + b * size, 1), ViewProjection);
 		// Clip the center line before dividing by w or expanding its screen width.
 		// A behind-eye endpoint must not discard the edge's visible portion.
 		const float da = ReversedDepth != 0 ? ca.w - ca.z : ca.z;
@@ -189,7 +239,7 @@ VertexOutput VSMain(uint vertex : SV_VertexID, uint instance : SV_InstanceID)
 		const float4 clip = lerp(ca, cb, local.x);
 		output.Position = clip;
 		output.Position.xy += perpendicular * (local.y * 2 - 1) / (float2)(Extent) * clip.w;
-		output.Category = 4;
+		output.Category = Mode == 3 ? 6 : 4;
 		return output;
 	}
 	Texture2D<uint> stats = ResourceDescriptorHeap[NonUniformResourceIndex(StatsIndex)];
@@ -236,6 +286,17 @@ float4 PSMain(VertexOutput input) : SV_Target
 	{
 		return float4(0.55, 0.8, 1.0, 1);
 	}
+	if (input.Category == 6)
+	{
+		const uint base = 8 + CompletedChange[0].z + 2 * input.Block;
+		const uint active = CompletedChange[base].x;
+		const uint reasons = CompletedChange[base + 1].x;
+		const float3 color = active == 0 ? float3(0.25, 0.25, 0.25) :
+			(reasons & 6) != 0 ? float3(1, 0.15, 0.1) :
+				(reasons & 1) != 0 ? float3(1, 0.65, 0.05) :
+					(reasons & 8) != 0 ? float3(0.2, 0.6, 1) : float3(0.1, 1, 0.5);
+		return float4(color, 1);
+	}
 	if (input.Category == 5)
 	{
 		// Three diagnostic great circles; the overlay never changes ordinary depth winners.
@@ -276,6 +337,14 @@ float4 PSMain(VertexOutput input) : SV_Target
 		}
 		return float4(LinearToSRGB(ACESFitted(response * PreviewExposureScale,
 			NF_SITE_GI_PROBE_VISUALIZATION_PSMAIN_ACESFITTED)), 1);
+	}
+	if (DisplayMode == 2 && input.Category == 1)
+	{
+		const float raw = asfloat(CompletedChange[8 + input.ProbeID].x);
+		const float value = ChangeNormalized != 0 ? raw / asfloat(CompletedChange[4].x) : raw;
+		const float t = saturate(value / ChangeRange);
+		// Display-linear diagnostic colours; no exposure or readiness feedback.
+		return float4(saturate(float3(2 * t, 2 - 2 * abs(2 * t - 1), 2 - 2 * t)), 1);
 	}
 	const float light = 0.45 + 0.55 * saturate(dot(normalize(input.Normal), normalize(float3(-1, 2, -3))));
 	const float3 color = input.Category == 1 ? float3(0.08, 0.8, 0.5) * light :

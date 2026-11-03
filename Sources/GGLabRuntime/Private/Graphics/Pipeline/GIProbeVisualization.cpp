@@ -14,9 +14,14 @@
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
 #include <algorithm>
+#include <array>
+#include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstring>
+#include <memory>
+#include <span>
+#include <utility>
 #include <vector>
 
 namespace gglab
@@ -33,13 +38,15 @@ namespace gglab
 		settings.m_ClassificationMask &= 15;
 		settings.m_MaximumDistance = std::isfinite(settings.m_MaximumDistance) ?
 			std::clamp(settings.m_MaximumDistance, 0.0f, 1000000.0f) : 0;
-		if (settings.m_Mode != GIProbeVisualizationMode::Irradiance)
+		if (settings.m_Mode != GIProbeVisualizationMode::Irradiance && settings.m_Mode != GIProbeVisualizationMode::Change)
 		{
 			settings.m_Mode = GIProbeVisualizationMode::Classification;
 		}
 		settings.m_PreviewExposureEV = std::isfinite(settings.m_PreviewExposureEV) ?
 			std::clamp(settings.m_PreviewExposureEV, GIProbeVisualizationMinimumExposureEV,
 				GIProbeVisualizationMaximumExposureEV) : 0;
+		settings.m_ChangeRange = std::isfinite(settings.m_ChangeRange) ?
+			std::clamp(settings.m_ChangeRange, 0.001f, 1000000.0f) : 3;
 		if (settings.m_DepthMode != GIProbeDepthMode::SceneDepth)
 		{
 			settings.m_DepthMode = GIProbeDepthMode::XRay;
@@ -56,6 +63,49 @@ namespace gglab
 			.m_DisplayName = "GI probe spheres", .m_CategoryName = "Global Illumination",
 			.m_Category = RenderPassCategory::Debug, .m_Type = RenderPassType::Graphics };
 		constexpr auto StatsFootprint = ComputeRHITextureCopyFootprint(RHIFormat::R32Uint, 16, 1);
+		constexpr LayoutBindingKey ChangeInputKey{ 0x710 };
+		struct ChangeUpload
+		{
+			RHIBufferOwner m_Buffer;
+			RHIBufferDesc m_Desc;
+			std::shared_ptr<const GIFieldChangeObservation> m_Observation;
+		};
+
+		std::vector<std::array<uint32_t, 4>> PackChange(const GIFieldChangeObservation& observation)
+		{
+			const auto& stamp = observation.m_Observation;
+			const auto& data = *observation.m_Measurement;
+			const auto& readiness = data.m_Readiness;
+			const auto bits = [](float value) { return std::bit_cast<uint32_t>(value); };
+			std::vector<std::array<uint32_t, 4>> words(8 + data.m_Probes.size() + 2 * data.m_Blocks.size());
+			words[0] = { 0x47494331, 1, uint32_t(data.m_Probes.size()), uint32_t(data.m_Blocks.size()) };
+			words[1] = { uint32_t(stamp.m_Field.m_Generation), uint32_t(stamp.m_Field.m_Generation >> 32),
+				uint32_t(stamp.m_Field.m_RefreshEpoch), uint32_t(stamp.m_Field.m_RefreshEpoch >> 32) };
+			words[2] = { uint32_t(stamp.m_ProducingFrame), uint32_t(stamp.m_ProducingFrame >> 32),
+				uint32_t(stamp.m_FieldUpdate), uint32_t(stamp.m_FieldUpdate >> 32) };
+			words[3] = { uint32_t(stamp.m_ReadinessUpdate), uint32_t(stamp.m_ReadinessUpdate >> 32),
+				uint32_t(stamp.m_Field.m_EpochOriginUpdate), uint32_t(stamp.m_Field.m_EpochOriginUpdate >> 32) };
+			words[4] = { bits(readiness.m_Threshold), bits(3 * readiness.m_Threshold),
+				bits(readiness.m_IrradianceFloor), bits(readiness.m_NoiseSigma) };
+			words[5] = { bits(readiness.m_Hysteresis), (data.m_RefreshMode ? 1u : 0u) | (data.m_IncludesDistance ? 2u : 0u),
+				data.m_WarmingUpdates, data.m_RequiredQuietUpdates };
+			words[6] = { data.m_Counts[0], data.m_Counts[1], data.m_Counts[2], data.m_BlockWidth };
+			words[7] = { uint32_t(readiness.m_State), readiness.m_ActiveBlocks, readiness.m_QuietBlocks, readiness.m_ExcludedBlocks };
+			for (size_t index = 0; index < data.m_Probes.size(); ++index)
+			{
+				const auto& probe = data.m_Probes[index];
+				words[8 + index] = { bits(probe.m_Change), probe.m_Active ? 1u : 2u, 0, 0 };
+			}
+			for (size_t index = 0; index < data.m_Blocks.size(); ++index)
+			{
+				const auto& block = data.m_Blocks[index];
+				words[8 + data.m_Probes.size() + 2 * index] = { block.m_ActiveProbes,
+					bits(block.m_Percentile95.value_or(0)), bits(block.m_Maximum.value_or(0)), block.m_QuietUpdates };
+				words[9 + data.m_Probes.size() + 2 * index] = { block.m_Blockers,
+					block.m_WarmingMet ? 1u : 0u, block.m_CurrentQuiet ? 1u : 0u, 0 };
+			}
+			return words;
+		}
 		struct Parameters
 		{
 			GIFieldSamplingParameters m_Field;
@@ -82,8 +132,15 @@ namespace gglab
 			uint32_t m_SelectedID = 0;
 			uint32_t m_HighlightCount = 0;
 			std::array<uint32_t, 2> m_Padding{};
+			uint32_t m_ChangeWords = 0;
+			uint32_t m_ChangeTexture = 0;
+			uint32_t m_ChangeNormalized = 0;
+			float m_ChangeRange = 3;
+			uint32_t m_ChangeBlockCount = 0;
+			std::array<uint32_t, 3> m_ChangePadding{};
 		};
-		static_assert(sizeof(Parameters) == 288 && offsetof(Parameters, m_ViewProjection) == 48 &&
+		static_assert(sizeof(Parameters) == 320 && offsetof(Parameters, m_ChangeWords) == 288 &&
+			offsetof(Parameters, m_ChangeRange) == 300 && offsetof(Parameters, m_ViewProjection) == 48 &&
 			offsetof(Parameters, m_Camera) == 112 && offsetof(Parameters, m_Stats) == 152 &&
 			offsetof(Parameters, m_Mode) == 160 && offsetof(Parameters, m_DisplayMode) == 192 &&
 			offsetof(Parameters, m_PreviewExposureScale) == 196 &&
@@ -116,6 +173,8 @@ namespace gglab
 	{
 		ResolvedRenderLayout m_Layout;
 		ResolvedBindingRef<SceneGPU> m_Scene;
+		uint32_t m_ChangeInput = 0;
+		std::shared_ptr<ChangeUpload> m_ChangeUpload;
 		ComputePipelineSlot m_SelectSlot;
 		GraphicsPipelineSlot m_DrawSlot;
 		GraphicsPipelineSlot m_HighlightSlot;
@@ -186,12 +245,14 @@ namespace gglab
 
 	void GIProbeVisualization::Prepare(const RenderFrameContext& frame, const RenderServices& services,
 		GIProbeVisualizationSettings settings, uint64_t generation,
-		const std::array<uint32_t, 3>& counts) noexcept
+		const std::array<uint32_t, 3>& counts, std::shared_ptr<const GIFieldChangeObservation> change) noexcept
 	{
 		auto& state = *m_State;
 		state.Poll();
 		auto& snapshot = state.m_Progress->m_Snapshot;
 		snapshot.m_Settings = ResolveGIProbeVisualizationSettings(settings);
+		snapshot.m_ChangeObservation = change;
+		snapshot.m_ChangeUploadBytes = 0;
 		const auto& raster = frame.GetDisplayRenderView();
 		const auto& plan = frame.GetTemporalFramePlan();
 		const auto& temporal = frame.GetDisplayViewRenderSettings().m_TemporalAA;
@@ -230,8 +291,36 @@ namespace gglab
 		snapshot.m_SelectionLogicalBytes = 0;
 		if (!snapshot.m_Settings.m_Enabled || !snapshot.m_ViewSupported || snapshot.m_ReadbackFailed)
 		{
+			state.m_ChangeUpload.reset();
 			return;
 		}
+		if (snapshot.m_Settings.m_Mode == GIProbeVisualizationMode::Change && !change)
+		{
+			state.m_ChangeUpload.reset();
+			return;
+		}
+		const auto uploadObservation = snapshot.m_Settings.m_Mode == GIProbeVisualizationMode::Change ? change : nullptr;
+		if (!state.m_ChangeUpload || state.m_ChangeUpload->m_Observation != uploadObservation)
+		{
+			auto* device = services.m_Presentation->GetDevice();
+			auto upload = std::make_shared<ChangeUpload>();
+			upload->m_Observation = uploadObservation;
+			const auto words = uploadObservation ? PackChange(*uploadObservation) : std::vector<std::array<uint32_t, 4>>(1);
+			upload->m_Desc = { .m_SizeInBytes = words.size() * 16, .m_StrideInBytes = 16,
+				.m_Usage = RHIBufferUsage::Structured, .m_MemoryUsage = RHIMemoryUsage::CpuToGpu,
+				.m_DebugName = "GI.Probes.CompletedChange" };
+			upload->m_Buffer = RHIBufferOwner(device, device->CreateBuffer(upload->m_Desc));
+			void* mapped = upload->m_Buffer ? device->MapBuffer(upload->m_Buffer.Get(), {}) : nullptr;
+			if (!mapped)
+			{
+				state.m_ChangeUpload.reset();
+				return;
+			}
+			std::memcpy(mapped, words.data(), upload->m_Desc.m_SizeInBytes);
+			device->UnmapBuffer(upload->m_Buffer.Get(), { 0, upload->m_Desc.m_SizeInBytes });
+			state.m_ChangeUpload = std::move(upload);
+		}
+		snapshot.m_ChangeUploadBytes = state.m_ChangeUpload->m_Desc.m_SizeInBytes;
 		if (!state.m_Layout.IsValid())
 		{
 			const auto* common = services.m_BindingLayout->GetCommonLayoutContract();
@@ -239,8 +328,24 @@ namespace gglab
 			{
 				return;
 			}
+			std::vector<LayoutBindingRequirement> bindings(common->GetBindings().begin(), common->GetBindings().end());
+			uint32_t order = 0;
+			for (const auto& binding : bindings)
+			{
+				order = std::max(order, binding.m_ParameterOrder + 1);
+			}
+			bindings.push_back({ .m_Key = ChangeInputKey,
+				.m_Slot = { .m_Type = RHIBindingType::ReadOnlyStorageBuffer,
+					.m_Visibility = RHIShaderStage::All, .m_Binding = 11, .m_Count = 1 }, .m_ParameterOrder = order });
+			const std::array fragments{ LayoutFragment{ "GIProbeVisualization", bindings } };
+			const auto composed = ComposeLayoutFragments(fragments);
+			if (!composed.IsSuccess())
+			{
+				return;
+			}
+			state.m_ChangeInput = *composed.m_Layout->FindParameterIndex(ChangeInputKey);
 			state.m_Layout = ResolvedRenderLayout::Create(
-				services.m_Presentation->GetRHIContext()->GetPipelineSystem(), *common, "GI.Probes");
+				services.m_Presentation->GetRHIContext()->GetPipelineSystem(), *composed.m_Layout, "GI.Probes");
 			state.m_Scene = ResolvedBindingRef<SceneGPU>::Resolve(state.m_Layout, scene_bindings::SceneConstants);
 		}
 		state.m_Select = state.m_Layout.Resolve(*services.m_PipelineResolver, state.m_SelectSlot,
@@ -342,11 +447,65 @@ namespace gglab
 			.m_PreviewExposureScale = std::exp2(settings.m_PreviewExposureEV),
 			.m_DepthMode = static_cast<uint32_t>(settings.m_DepthMode),
 			.m_UnjitteredViewProjection = view.m_UnjitteredViewProjection,
-			.m_SelectedID = state.m_SelectedID, .m_HighlightCount = snapshot.m_HighlightCount };
+			.m_SelectedID = state.m_SelectedID, .m_HighlightCount = snapshot.m_HighlightCount,
+			.m_ChangeWords = uint32_t(state.m_ChangeUpload->m_Desc.m_SizeInBytes / 4),
+			.m_ChangeNormalized = settings.m_ChangeNormalized ? 1u : 0u, .m_ChangeRange = settings.m_ChangeRange,
+			.m_ChangeBlockCount = settings.m_Mode == GIProbeVisualizationMode::Change && settings.m_ChangeBlocks ?
+				uint32_t(snapshot.m_ChangeObservation->m_Measurement->m_Blocks.size()) : 0u };
+		const auto upload = state.m_ChangeUpload;
+		RGBufferId changeBuffer;
 		RGTextureId stats;
 		RGTextureId ids;
+		// Each immutable upload is retained by every submission that reads it. A later
+		// completion allocates a new buffer rather than overwriting in-flight storage.
+		struct ChangeData
+		{
+			RGBufferId m_Input;
+			RGTextureViewId m_Output;
+		};
+		graph.AddPass<ChangeData>("GI.Probes.CompletedChange", RGPassEncoderType::Compute,
+			[&](RenderGraph::RGBuilder& builder, ChangeData& data)
+			{
+				changeBuffer = builder.ImportBuffer("GI.Probes.CompletedChange.Upload", upload->m_Buffer.Get(),
+					upload->m_Desc, RGBufferAccess::StructuredRead, RGContentValidity::Defined);
+				data.m_Input = builder.Read(changeBuffer, RGBufferAccess::StructuredRead, RHIStage::ComputeShader);
+				if (settings.m_Mode == GIProbeVisualizationMode::Change)
+				{
+					auto output = builder.CreateTexture("GI.Probes.Change", { .m_Format = RHIFormat::R32Uint,
+						.m_Extent = { 256, (parameters.m_ChangeWords + 255) / 256, 1 } });
+					builder.WriteInPlace(output, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+					data.m_Output = builder.CreateView<RHITextureViewType::UnorderedAccess>(output);
+					// Keep the named completed-observation product available to late capture
+					// extraction even when the heatmap reads the immutable upload directly.
+					builder.SideEffect();
+				}
+			},
+			[this, &frame, upload, parameters](RGExecuteContext& execute, ChangeData& data)
+			{
+				if (!data.m_Output.IsValid())
+				{
+					return;
+				}
+				auto& state = *m_State;
+				auto* commands = execute.GetDirectComputeCommandContext();
+				ScopedConstantBindings<RHIComputeCommandContext> constants(*commands, state.m_Layout, state.m_Scene);
+				if (!commands->RetainForSubmission(upload) || !constants.SetPipeline(state.m_Select) ||
+					!constants.Bind(state.m_Scene, frame.m_FrameConstants.m_SceneSnapshot))
+				{
+					return;
+				}
+				commands->SetReadOnlyBuffer(state.m_ChangeInput, execute.GetBufferHandle(data.m_Input));
+				auto values = parameters;
+				values.m_Mode = 4;
+				values.m_ChangeTexture = execute.GetViewDescriptor(data.m_Output).m_Index;
+				if (commands->SetConstantBufferData(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), values))
+				{
+					commands->Dispatch(((parameters.m_ChangeWords + 255) / 256) * 4, 1, 1);
+				}
+			});
 		struct SelectData
 		{
+			RGBufferId m_Change;
 			RGTextureViewId m_Classification;
 			RGTextureViewId m_Stats;
 			RGTextureViewId m_IDs;
@@ -354,6 +513,7 @@ namespace gglab
 		graph.AddPass<SelectData>(SelectInfo.m_TypeName.c_str(), RGPassEncoderType::Compute,
 			[&](RenderGraph::RGBuilder& builder, SelectData& data)
 			{
+				data.m_Change = builder.Read(changeBuffer, RGBufferAccess::StructuredRead, RHIStage::ComputeShader);
 				data.m_Classification = builder.CreateView<RHITextureViewType::ShaderResource>(
 					builder.Read(field->m_Textures[2], RGTextureAccess::Sample, RHIStage::ComputeShader),
 					MakeRHITexture2DArrayViewDesc(RHIFormat::R32Uint, 0, 0, field->m_Parameters.m_Counts[1]));
@@ -366,16 +526,17 @@ namespace gglab
 				data.m_Stats = builder.CreateView<RHITextureViewType::UnorderedAccess>(stats);
 				data.m_IDs = builder.CreateView<RHITextureViewType::UnorderedAccess>(ids);
 			},
-			[this, &frame, parameters](RGExecuteContext& execute, SelectData& data)
+			[this, &frame, parameters, upload](RGExecuteContext& execute, SelectData& data)
 			{
 				auto& state = *m_State;
 				auto* commands = execute.GetDirectComputeCommandContext();
 				ScopedConstantBindings<RHIComputeCommandContext> constants(*commands, state.m_Layout, state.m_Scene);
-				if (!constants.SetPipeline(state.m_Select) || !constants.Bind(state.m_Scene, frame.m_FrameConstants.m_SceneSnapshot))
+				if (!commands->RetainForSubmission(upload) || !constants.SetPipeline(state.m_Select) || !constants.Bind(state.m_Scene, frame.m_FrameConstants.m_SceneSnapshot))
 				{
 					return;
 				}
 				auto values = parameters;
+				commands->SetReadOnlyBuffer(state.m_ChangeInput, execute.GetBufferHandle(data.m_Change));
 				values.m_Field.m_Classification = execute.GetViewDescriptor(data.m_Classification).m_Index;
 				values.m_Stats = execute.GetViewDescriptor(data.m_Stats).m_Index;
 				values.m_IDs = execute.GetViewDescriptor(data.m_IDs).m_Index;
@@ -386,6 +547,7 @@ namespace gglab
 			});
 		struct DrawData
 		{
+			RGBufferId m_Change;
 			RGTextureViewId m_Irradiance;
 			RGTextureViewId m_SceneDepth;
 			RGTextureViewId m_Stats;
@@ -396,6 +558,7 @@ namespace gglab
 		graph.AddPass<DrawData>(DrawInfo.m_TypeName.c_str(),
 			[&](RenderGraph::RGBuilder& builder, DrawData& data)
 			{
+				data.m_Change = builder.Read(changeBuffer, RGBufferAccess::StructuredRead, RHIStage::VertexShader | RHIStage::PixelShader);
 				data.m_Stats = builder.CreateView<RHITextureViewType::ShaderResource>(
 					builder.Read(stats, RGTextureAccess::Sample, RHIStage::VertexShader));
 				data.m_IDs = builder.CreateView<RHITextureViewType::ShaderResource>(
@@ -423,16 +586,17 @@ namespace gglab
 				builder.WriteInPlace(depth, RGTextureAccess::DepthStencilWrite);
 				data.m_Depth = builder.CreateView<RHITextureViewType::DepthStencil>(depth);
 			},
-			[this, &frame, parameters, settings](RGExecuteContext& execute, DrawData& data)
+			[this, &frame, parameters, settings, upload](RGExecuteContext& execute, DrawData& data)
 			{
 				auto& state = *m_State;
 				auto* commands = execute.GetGraphicsCommandContext();
 				ScopedConstantBindings<RHIGraphicsCommandContext> constants(*commands, state.m_Layout, state.m_Scene);
-				if (!constants.SetPipeline(state.m_Draw) || !constants.Bind(state.m_Scene, frame.m_FrameConstants.m_SceneSnapshot))
+				if (!commands->RetainForSubmission(upload) || !constants.SetPipeline(state.m_Draw) || !constants.Bind(state.m_Scene, frame.m_FrameConstants.m_SceneSnapshot))
 				{
 					return;
 				}
 				const RHIRenderingAttachment color{ .m_View = execute.GetViewHandle(data.m_Color) };
+				commands->SetReadOnlyBuffer(state.m_ChangeInput, execute.GetBufferHandle(data.m_Change));
 				commands->BeginRendering({ .m_ColorAttachments = std::span<const RHIRenderingAttachment>(&color, 1),
 					.m_DepthAttachment = RHIRenderingAttachment{ .m_View = execute.GetViewHandle(data.m_Depth),
 						.m_LoadOp = RHIContentLoadOp::DontCare } });
@@ -467,9 +631,20 @@ namespace gglab
 					constants.Bind(state.m_Scene, frame.m_FrameConstants.m_SceneSnapshot))
 				{
 					values.m_Mode = 2;
+					commands->SetReadOnlyBuffer(state.m_ChangeInput, execute.GetBufferHandle(data.m_Change));
 					if (commands->SetConstantBufferData(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), values))
 					{
 						commands->Draw(16 * 8 * 6, 1, 0);
+					}
+				}
+				if (parameters.m_ChangeBlockCount != 0 && constants.SetPipeline(state.m_Highlight) &&
+					constants.Bind(state.m_Scene, frame.m_FrameConstants.m_SceneSnapshot))
+				{
+					commands->SetReadOnlyBuffer(state.m_ChangeInput, execute.GetBufferHandle(data.m_Change));
+					values.m_Mode = 3;
+					if (commands->SetConstantBufferData(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), values))
+					{
+						commands->Draw(12 * 6, parameters.m_ChangeBlockCount, 0);
 					}
 				}
 			});

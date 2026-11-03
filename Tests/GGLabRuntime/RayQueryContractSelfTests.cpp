@@ -660,21 +660,46 @@ namespace gglab
 					return estimator.Observe(update, 0.001f, changes);
 				};
 			estimator.Reset(readinessCounts, readinessSettings);
+			context.Check(!estimator.GetMeasurement(), "A reset has no completed change measurement");
 			context.Check(estimator.GetSnapshot().m_State == GIFieldReadinessState::Initializing,
 				"A replacement field starts without a readiness certificate");
 			for (uint32_t update = 1; update <= 62; ++update)
 			{
 				context.Check(observe(update, 0), "Finite black-field measurements advance in order");
+				if (update == 1)
+				{
+					const auto warming = estimator.GetMeasurement();
+					context.Check(warming->m_Blocks[0].m_CurrentQuiet && !warming->m_Blocks[0].m_WarmingMet &&
+						warming->m_Blocks[0].m_QuietUpdates == 0 && warming->m_Blocks[0].m_Blockers == 9,
+						"Low measured change remains distinct from warming and the full quiet hold");
+				}
+				if (update == 50)
+				{
+					const auto partialHold = estimator.GetMeasurement();
+					context.Check(partialHold->m_Blocks[0].m_CurrentQuiet &&
+						partialHold->m_Blocks[0].m_QuietUpdates == 17 && partialHold->m_Blocks[0].m_Blockers == 8,
+						"A currently quiet block explicitly reports its incomplete 17/30 hold");
+				}
 			}
 			context.Check(estimator.GetSnapshot().m_State != GIFieldReadinessState::Ready,
 				"Warm-up and thirty quiet updates cannot be replaced by elapsed submissions");
 			context.Check(observe(63, 0) && estimator.GetSnapshot().m_State == GIFieldReadinessState::Ready &&
 				estimator.GetSnapshot().m_QuietBlocks == 8 && estimator.GetSnapshot().m_ReadyUpdate == 63,
 				"The exact-black field becomes Ready with a positive scene-referred denominator");
+			const auto retained = estimator.GetMeasurement();
+			context.Check(retained && retained->m_Probes.size() == 125 && retained->m_Blocks.size() == 8 &&
+				retained->m_Blocks[0].m_ActiveProbes == 64 && retained->m_Blocks[7].m_ActiveProbes == 1 &&
+				retained->m_Blocks[0].m_CurrentQuiet && retained->m_Blocks[0].m_QuietUpdates == 30 &&
+				retained->m_IncludesDistance &&
+				retained->m_Blocks[0].m_Blockers == 0 && retained->m_Readiness.m_CompletedUpdates == 63,
+				"Completed blocks retain estimator decisions, edge-block counts and the full quiet hold");
 			context.Check(!observe(63, 0) && estimator.GetSnapshot().m_ReadyUpdate == 63,
 				"Repeated polls cannot advance quiet-update counts");
 			context.Check(observe(64, 0.2f) && estimator.GetSnapshot().m_State == GIFieldReadinessState::Settling,
 				"Observed changes revoke Ready without changing shading");
+			context.Check(retained->m_Probes[0].m_Change == 0 && retained->m_Blocks[0].m_Blockers == 0 &&
+				estimator.GetMeasurement()->m_Blocks[0].m_Blockers == 14,
+				"New changes publish new immutable values with percentile, maximum and quiet-hold blockers");
 			for (uint32_t update = 65; update <= 240; ++update)
 			{
 				context.Check(observe(update, 0.2f), "Nonquiet measurements remain valid diagnostic data");
@@ -696,6 +721,10 @@ namespace gglab
 			context.Check(estimator.GetSnapshot().m_ExcludedBlocks == 8 &&
 				estimator.GetSnapshot().m_State == GIFieldReadinessState::Ready,
 				"Blocks without Active probes are reported and do not block readiness");
+			context.Check(!estimator.GetMeasurement()->m_Blocks[0].m_Percentile95 &&
+				!estimator.GetMeasurement()->m_Blocks[0].m_Maximum &&
+				estimator.GetMeasurement()->m_Blocks[0].m_Blockers == 0,
+				"Excluded blocks have unavailable statistics and never acquire readiness blockers");
 			estimator.Reset(readinessCounts, readinessSettings);
 			context.Check(!observe(2, 0) && estimator.GetSnapshot().m_Failed,
 				"Missing completed measurements cannot silently accumulate quiet time");
@@ -731,6 +760,49 @@ namespace gglab
 				estimator.GetSnapshot().m_Threshold == 0.01f &&
 				estimator.GetSnapshot().m_State == GIFieldReadinessState::Settling,
 				"Changing alpha selects its own noise input and restarts the quiet hold");
+			context.Check(!estimator.GetMeasurement()->m_RefreshMode &&
+				estimator.GetMeasurement()->m_Blocks[0].m_QuietUpdates == 0 &&
+				estimator.GetMeasurement()->m_Readiness.m_Hysteresis == 0.97f,
+				"Change explanations retain the measurement phase and its adopted hysteresis");
+
+			GIFieldReadinessEstimator outliers;
+			std::vector<GIFieldProbeChange> blockProbes(64);
+			outliers.Reset({ 4, 4, 4 }, readinessSettings);
+			for (uint32_t update = 1; update <= 34; ++update)
+			{
+				for (auto& probe : blockProbes)
+				{
+					probe = { .m_Change = 0, .m_Active = 1, .m_Updates = update };
+				}
+				blockProbes.back().m_Change = 0.04f;
+				context.Check(outliers.Observe(update, 0.001f, blockProbes), "A finite outlier remains an admitted observation");
+			}
+			const auto singleOutlier = outliers.GetMeasurement();
+			context.Check(singleOutlier->m_Blocks[0].m_Percentile95 == 0 &&
+				singleOutlier->m_Blocks[0].m_Maximum == 0.04f && singleOutlier->m_Blocks[0].m_Blockers == 12,
+				"One high outlier blocks maximum independently of the p95 condition");
+			for (auto& probe : blockProbes)
+			{
+				probe.m_Updates = 35;
+			}
+			for (size_t index = 60; index < 64; ++index)
+			{
+				blockProbes[index].m_Change = 0.02f;
+			}
+			context.Check(outliers.Observe(35, 0.001f, blockProbes) &&
+				outliers.GetMeasurement()->m_Blocks[0].m_Blockers == 10,
+				"The p95 blocker remains distinct when the maximum is below three tau");
+			const auto beforeReset = outliers.GetMeasurement();
+			outliers.Reset({ 4, 4, 4 }, readinessSettings, true);
+			context.Check(!outliers.GetMeasurement() && beforeReset->m_Blocks[0].m_Blockers == 10,
+				"Refresh clears current change data while retained CPU observations keep their values");
+			for (auto& probe : blockProbes)
+			{
+				probe.m_Updates = 1;
+			}
+			context.Check(outliers.Observe(1, 0.001f, blockProbes) &&
+				!outliers.GetMeasurement()->m_IncludesDistance && outliers.GetMeasurement()->m_WarmingUpdates == 4,
+				"Lighting-refresh explanations retain irradiance-only measurements and their own warming span");
 
 			estimator.Reset(readinessCounts, noisySettings);
 			for (auto& probe : changes)
@@ -1005,6 +1077,16 @@ namespace gglab
 			RenderScene scene;
 			RenderFrameContext frame{ .m_RenderScene = scene };
 			context.Check(!first.Prepare(frame, {}).IsReady(), "A field requires the Runtime settlement service");
+			std::array<RenderView, 1> displayViews;
+			displayViews[0].m_IsValid = true;
+			displayViews[0].m_Width = displayViews[0].m_DisplayWidth = 16;
+			displayViews[0].m_Height = displayViews[0].m_DisplayHeight = 16;
+			ResolvedViewRenderSettings displaySettings;
+			displaySettings.m_GIProbes.m_Enabled = true;
+			frame.m_RenderViews = displayViews;
+			frame.m_ViewRenderSettings = std::span(&displaySettings, 1);
+			context.Check(!first.Prepare(frame, {}).IsReady(),
+				"A rejected field never prepares viewer GPU resources even when a valid display requests them");
 
 			const RHIFencePoint fence{ RHIFenceHandle(0, 1), 1 };
 			GIFieldFrameState participant;

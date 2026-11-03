@@ -18,7 +18,8 @@ namespace gglab
 		~GIProbeVisualization();
 		void Prepare(const RenderFrameContext& frame, const RenderServices& services,
 			GIProbeVisualizationSettings settings, uint64_t generation,
-			const std::array<uint32_t, 3>& counts) noexcept;
+			const std::array<uint32_t, 3>& counts,
+			std::shared_ptr<const GIFieldChangeObservation> change) noexcept;
 		void AddPasses(RenderGraph& graph, const RenderFrameContext& frame,
 			const GIObservationStamp& observation) noexcept;
 		[[nodiscard]] GIProbeVisualizationSnapshot GetSnapshot() const noexcept;
