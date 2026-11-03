@@ -66,6 +66,12 @@ and owning tests. Use
 orientation and cross-module changes; its task table selects the relevant map,
 Public interface and implementation path.
 
+Update the Atlas only to correct or complete necessary architecture navigation or
+durable contracts. Feature completion or a review trigger alone does not require
+an Atlas edit. Keep feature-level implementation details, construction/completion
+records and verification results in the owning feature/test documentation or
+change report, not in the Atlas.
+
 ## GPU, shader and Lab invariants
 
 For GPU changes, follow ownership through submission, fences, frames in flight,
