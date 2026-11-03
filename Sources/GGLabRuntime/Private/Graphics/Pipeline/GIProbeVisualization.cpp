@@ -1,5 +1,6 @@
 #include "Graphics/Pipeline/GIProbeVisualization.h"
 #include "Graphics/RenderPass/GIFieldGraphResources.h"
+#include "GGLabRuntime/Graphics/RenderPass/SceneDepthGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
 #include "GGLabRuntime/Graphics/RenderContexts.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
@@ -38,6 +39,10 @@ namespace gglab
 		settings.m_PreviewExposureEV = std::isfinite(settings.m_PreviewExposureEV) ?
 			std::clamp(settings.m_PreviewExposureEV, GIProbeVisualizationMinimumExposureEV,
 				GIProbeVisualizationMaximumExposureEV) : 0;
+		if (settings.m_DepthMode != GIProbeDepthMode::SceneDepth)
+		{
+			settings.m_DepthMode = GIProbeDepthMode::XRay;
+		}
 		return settings;
 	}
 
@@ -70,12 +75,14 @@ namespace gglab
 			std::array<uint32_t, 4> m_Stamp{};
 			uint32_t m_DisplayMode = 0;
 			float m_PreviewExposureScale = 1;
-			std::array<uint32_t, 2> m_Padding{};
+			uint32_t m_DepthMode = 0;
+			uint32_t m_SceneDepth = 0;
 		};
 		static_assert(sizeof(Parameters) == 208 && offsetof(Parameters, m_ViewProjection) == 48 &&
 			offsetof(Parameters, m_Camera) == 112 && offsetof(Parameters, m_Stats) == 152 &&
 			offsetof(Parameters, m_Mode) == 160 && offsetof(Parameters, m_DisplayMode) == 192 &&
-			offsetof(Parameters, m_PreviewExposureScale) == 196);
+			offsetof(Parameters, m_PreviewExposureScale) == 196 &&
+			offsetof(Parameters, m_DepthMode) == 200 && offsetof(Parameters, m_SceneDepth) == 204);
 		struct Slot
 		{
 			RHIFencePoint m_Fence;
@@ -206,7 +213,7 @@ namespace gglab
 		recipe.m_Formats.m_RenderTargetCount = 1;
 		recipe.m_Formats.m_DepthStencilFormat = RHIFormat::D32Float;
 		recipe.m_RasterizerPreset = RasterizerPreset::TwoSided;
-		recipe.m_DepthPreset = view.m_ReversedDepth ? DepthPreset::ReversedZStrictWrite : DepthPreset::StandardZWrite;
+		recipe.m_DepthPreset = GetGIProbeDepthPreset(view.m_ReversedDepth);
 		state.m_Draw = state.m_Layout.Resolve(*services.m_PipelineResolver, state.m_DrawSlot, recipe, DrawInfo);
 		if (!state.m_Select.IsValid() || !state.m_Draw.IsValid())
 		{
@@ -258,7 +265,8 @@ namespace gglab
 			.m_Stamp = { uint32_t(observation.m_ProducingFrame), uint32_t(observation.m_ProducingFrame >> 32),
 				uint32_t(observation.m_FieldUpdate), uint32_t(observation.m_FieldUpdate >> 32) },
 			.m_DisplayMode = static_cast<uint32_t>(settings.m_Mode),
-			.m_PreviewExposureScale = std::exp2(settings.m_PreviewExposureEV) };
+			.m_PreviewExposureScale = std::exp2(settings.m_PreviewExposureEV),
+			.m_DepthMode = static_cast<uint32_t>(settings.m_DepthMode) };
 		RGTextureId stats;
 		RGTextureId ids;
 		struct SelectData
@@ -303,6 +311,7 @@ namespace gglab
 		struct DrawData
 		{
 			RGTextureViewId m_Irradiance;
+			RGTextureViewId m_SceneDepth;
 			RGTextureViewId m_Stats;
 			RGTextureViewId m_IDs;
 			RGTextureViewId m_Color;
@@ -320,6 +329,12 @@ namespace gglab
 					data.m_Irradiance = builder.CreateView<RHITextureViewType::ShaderResource>(
 						builder.Read(field->m_Textures[0], RGTextureAccess::Sample, RHIStage::PixelShader),
 						MakeRHITexture2DArrayViewDesc(RHIFormat::R32G32B32A32Float, 0, 0, field->m_Parameters.m_Counts[1]));
+				}
+				if (settings.m_DepthMode == GIProbeDepthMode::SceneDepth)
+				{
+					const auto& depth = builder.GetBlackboard().Get<RGDisplayDepthResources>(DisplayDepthResourcesName);
+					data.m_SceneDepth = builder.CreateView<RHITextureViewType::ShaderResource>(
+						builder.Read(depth.m_Texture, RGTextureAccess::Sample, RHIStage::PixelShader), depth.m_SrvDesc);
 				}
 				auto& targets = builder.GetBlackboard().Get<RGViewTargetsTable>(ViewTargetsTableName)
 					.GetViewTargets(frame.GetDisplayViewId());
@@ -353,6 +368,10 @@ namespace gglab
 				if (data.m_Irradiance.IsValid())
 				{
 					values.m_Field.m_Irradiance = execute.GetViewDescriptor(data.m_Irradiance).m_Index;
+				}
+				if (data.m_SceneDepth.IsValid())
+				{
+					values.m_SceneDepth = execute.GetViewDescriptor(data.m_SceneDepth).m_Index;
 				}
 				values.m_Stats = execute.GetViewDescriptor(data.m_Stats).m_Index;
 				values.m_IDs = execute.GetViewDescriptor(data.m_IDs).m_Index;

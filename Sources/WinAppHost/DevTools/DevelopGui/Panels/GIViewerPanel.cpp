@@ -41,6 +41,11 @@ namespace gglab
 			ImGui::SliderFloat("Sphere Preview EV", &settings.m_PreviewExposureEV,
 				GIProbeVisualizationMinimumExposureEV, GIProbeVisualizationMaximumExposureEV, "%.2f");
 			ImGui::EndDisabled();
+			int depthMode = int(settings.m_DepthMode);
+			if (ImGui::Combo("Probe depth", &depthMode, "X-ray\0Scene depth\0"))
+			{
+				settings.m_DepthMode = static_cast<GIProbeDepthMode>(depthMode);
+			}
 			ImGui::SliderFloat("Radius / spacing", &settings.m_Radius, 0.01f, 0.5f, "%.3f");
 			int budget = int(settings.m_Budget);
 			if (ImGui::InputInt("Array budget", &budget))
@@ -73,7 +78,7 @@ namespace gglab
 			}
 			ImGui::InputFloat("Maximum center distance (0 = off)", &settings.m_MaximumDistance);
 			settings = ResolveGIProbeVisualizationSettings(settings);
-			ImGui::TextDisabled("X-ray | Native, TAA off | own depth resolves sphere overlaps");
+			ImGui::TextDisabled("Native, TAA off | scene depth is read-only | own depth resolves sphere overlaps");
 			const auto* summary = context.m_GIFieldSummary;
 			const auto effectiveMode = summary ? summary->m_Visualization.m_Settings.m_Mode : settings.m_Mode;
 			ImGui::TextDisabled(effectiveMode == GIProbeVisualizationMode::Irradiance ?
@@ -92,6 +97,7 @@ namespace gglab
 				static_cast<unsigned long long>(summary->m_Field.m_Generation));
 			ImGui::Text("Effective mode: %s | Preview EV %.2f",
 				GetGIProbeVisualizationModeName(display.m_Settings.m_Mode).data(), display.m_Settings.m_PreviewExposureEV);
+			ImGui::Text("Effective depth: %s", GetGIProbeDepthModeName(display.m_Settings.m_DepthMode).data());
 			if (display.m_Settings.m_Enabled && !display.m_Available)
 			{
 				ImGui::TextDisabled(!display.m_ViewSupported ? "Unsupported view: use Native with TAA off." :

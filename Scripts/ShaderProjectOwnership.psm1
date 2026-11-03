@@ -5,6 +5,7 @@ $shaderItemCondition = "'`$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'"
 $shaderOwnerOverrides = @{
     # These pipelines/queries are authored by Labs, not Runtime recipes.
     'Passes/PassCoordinateConformance.hlsl' = 'WinAppHost'
+    'Passes/PassGIProbeDepthConformance.hlsl' = 'WinAppHost'
     'Passes/PassNapaVoxel.hlsl' = 'WinAppHost'
     'Passes/PassRayQuery.hlsl' = 'WinAppHost'
     'Passes/PassRaySceneProbe.hlsl' = 'WinAppHost'

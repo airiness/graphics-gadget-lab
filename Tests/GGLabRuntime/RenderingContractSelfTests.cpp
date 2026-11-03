@@ -2,6 +2,7 @@
 #include "GGLabRuntime/Graphics/IBLPreviewViewBase.h"
 #include "GGLabRuntime/Graphics/IBLPreviewControlBase.h"
 #include "RenderingContractSelfTests.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIProbeVisualization.h"
 #include "RGObjectArenaSelfTests.h"
 #include "RenderServicesViewSelfTests.h"
 #include "AssetTestServices.h"
@@ -5500,13 +5501,13 @@ namespace gglab
 			reversedEqualRecipe.m_DepthPreset = DepthPreset::ReversedZEqualReadOnly;
 			const auto reversedEqual = BuildRHIGraphicsPipelineDesc(reversedEqualRecipe).m_DepthStencil;
 			GraphicsPhysicalPipelineKey probeDepthRecipe{};
-			probeDepthRecipe.m_DepthPreset = DepthPreset::ReversedZStrictWrite;
+			probeDepthRecipe.m_DepthPreset = GetGIProbeDepthPreset(true);
 			const auto probeDepth = BuildRHIGraphicsPipelineDesc(probeDepthRecipe).m_DepthStencil;
 			context.Check(probeDepth.m_DepthTestEnable && probeDepth.m_DepthWriteEnable &&
 				probeDepth.m_DepthCompareOp == RHICompareOp::Greater,
 				"Probe depth keeps the earliest stable ID at equal D32 depth without changing production coverage");
 			GraphicsPhysicalPipelineKey standardWriteRecipe{};
-			standardWriteRecipe.m_DepthPreset = DepthPreset::StandardZWrite;
+			standardWriteRecipe.m_DepthPreset = GetGIProbeDepthPreset(false);
 			const auto standardWrite = BuildRHIGraphicsPipelineDesc(standardWriteRecipe).m_DepthStencil;
 			context.Check(reversedWrite.m_DepthTestEnable && reversedWrite.m_DepthWriteEnable &&
 				reversedWrite.m_DepthCompareOp == RHICompareOp::GreaterEqual &&

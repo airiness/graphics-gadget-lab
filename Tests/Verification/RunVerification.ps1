@@ -55,6 +55,7 @@ $catalog = @(
     @{ name = 'gi-field'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIField.ps1' }) },
     @{ name = 'gi-probe-inspection'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIProbeInspection.ps1' }) },
     @{ name = 'gi-probe-visualization'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIProbeVisualization.ps1' }) },
+    @{ name = 'gi-probe-depth'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIProbeDepth.ps1' }) },
     @{ name = 'gi-receiver-inspection'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIReceiverInspection.ps1' }) },
     @{ name = 'gi-field-readiness'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIFieldReadiness.ps1' }) },
     @{ name = 'gi-field-sampling'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIFieldSampling.ps1' }) },
@@ -141,7 +142,7 @@ try {
                     $parameters = @{ OutputDirectory = $directory }
                     if ($item.group -eq 'gpu') {
                         $parameters = @{ RunDirectory = (Join-Path $directory 'run'); Configuration = $config; Rhi = $Rhi }
-                        if ($item.name -in @('taa-comparison', 'session-lifecycle', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-probe-inspection', 'gi-receiver-inspection', 'gi-probe-visualization', 'gi-field-readiness', 'gi-field-sampling', 'gi-invalid-updates', 'gi-receiver-cache')) { $parameters.Python = $Python }
+                        if ($item.name -in @('taa-comparison', 'session-lifecycle', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-probe-inspection', 'gi-receiver-inspection', 'gi-probe-visualization', 'gi-probe-depth', 'gi-field-readiness', 'gi-field-sampling', 'gi-invalid-updates', 'gi-receiver-cache')) { $parameters.Python = $Python }
                     }
                     $execution = Invoke-VerificationScript $path $parameters
                     $text = $execution.output + $execution.error

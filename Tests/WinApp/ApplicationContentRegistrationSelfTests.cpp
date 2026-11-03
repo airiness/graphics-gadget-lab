@@ -1738,11 +1738,11 @@ namespace gglab
 		checkSelectedDemand("gglab.lab.render_graph_compute", 54,
 			"Render-graph compute selection contributes four stable shader demands");
 #endif
-		checkSelectedDemand("gglab.lab.coordinate_conformance", 54,
-			"Coordinate conformance selection contributes four stable shader demands");
+		checkSelectedDemand("gglab.lab.coordinate_conformance", 57,
+			"Coordinate conformance selection contributes seven stable shader demands");
 		checkSelectedDemand("gglab.lab.ray_query", 54,
 			"Ray-query selection contributes query, preview and pipeline-identity artifacts without changing raster startup demand");
-		checkSelectedDemand("gglab.lab.gi_reference", 63,
+		checkSelectedDemand("gglab.lab.gi_reference", 70,
 			"GI diagnostics opt into receiver/reference/visibility/material shaders without changing ordinary raster startup demand");
 		for (const auto& lab : desktop.m_Labs)
 		{

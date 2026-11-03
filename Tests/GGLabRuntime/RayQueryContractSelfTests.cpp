@@ -843,10 +843,12 @@ namespace gglab
 				"Probe display defaults off and resolves finite, bounded diagnostic settings");
 			context.Check(display.m_LayerMinimum > display.m_LayerMaximum,
 				"An inverted inclusive slice remains empty instead of silently exchanging its endpoints");
+			display.m_DepthMode = static_cast<GIProbeDepthMode>(255);
 			display.m_Mode = static_cast<GIProbeVisualizationMode>(255);
 			display.m_PreviewExposureEV = std::numeric_limits<float>::infinity();
 			display = ResolveGIProbeVisualizationSettings(display);
-			context.Check(display.m_Mode == GIProbeVisualizationMode::Classification && display.m_PreviewExposureEV == 0,
+			context.Check(display.m_Mode == GIProbeVisualizationMode::Classification && display.m_PreviewExposureEV == 0 &&
+				display.m_DepthMode == GIProbeDepthMode::XRay,
 				"Unknown modes and nonfinite sphere exposure resolve without contaminating scene settings");
 			for (float ev : { -100.0f, 100.0f })
 			{

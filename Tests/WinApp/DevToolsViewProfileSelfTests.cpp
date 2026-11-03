@@ -162,11 +162,13 @@ namespace gglab
 			Camera displayCamera(Camera::CreateInfo{});
 			displayOverrides.m_GIProbes.m_Mode = GIProbeVisualizationMode::Irradiance;
 			displayOverrides.m_GIProbes.m_PreviewExposureEV = 1.5f;
+			displayOverrides.m_GIProbes.m_DepthMode = GIProbeDepthMode::SceneDepth;
 			const auto displaySettings = displayTools.CaptureFrameSettings();
 			auto resolvedDisplay = ResolveApplicationViewSettings({}, displayCamera, displaySettings);
 			context.Check(resolvedDisplay.m_ToolingBlocks.m_GIProbes && resolvedDisplay.m_View.m_GIProbes.m_Enabled &&
 				resolvedDisplay.m_View.m_GIProbes.m_Mode == GIProbeVisualizationMode::Irradiance &&
-				resolvedDisplay.m_View.m_GIProbes.m_PreviewExposureEV == 1.5f,
+				resolvedDisplay.m_View.m_GIProbes.m_PreviewExposureEV == 1.5f &&
+				resolvedDisplay.m_View.m_GIProbes.m_DepthMode == GIProbeDepthMode::SceneDepth,
 				"GUI probe settings reach Runtime frame settings with tooling attribution");
 			const std::array sessionDisplay{
 				LabParameterValue{ LabParameterId("view.gi_probes.enabled"), true },

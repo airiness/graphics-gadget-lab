@@ -13,11 +13,11 @@ namespace gglab::nonfinite
 	inline constexpr uint32_t CounterMagic = 0x4e464354;
 	inline constexpr uint32_t HeaderBytes = 32;
 	inline constexpr uint32_t RecordBytes = 32;
-	inline constexpr uint32_t InventoryLow = 0xc745cf74;
-	inline constexpr uint32_t InventoryHigh = 0x4a0b2f4e;
-	inline constexpr std::string_view VariantSuffix = ".nonfinite-counters.c745cf744a0b2f4e63d12d8109d4dbbd3b11964da8406d37a1f9116d1c5faceb";
-	inline constexpr uint32_t SiteCount = 84;
-	inline constexpr uint32_t ProgramCount = 31;
+	inline constexpr uint32_t InventoryLow = 0x99ff88ed;
+	inline constexpr uint32_t InventoryHigh = 0xa67780ba;
+	inline constexpr std::string_view VariantSuffix = ".nonfinite-counters.99ff88eda67780ba1a82f146634fb41d0a031db24d2b4085e20e77cfb94c7bdc";
+	inline constexpr uint32_t SiteCount = 85;
+	inline constexpr uint32_t ProgramCount = 32;
 	// The frame injection block follows the site records: point + 1 (zero is none),
 	// IEEE bits, x, y, component, applied count and two reserved words.
 	inline constexpr uint32_t InjectionBytes = 32;
@@ -109,6 +109,7 @@ namespace gglab::nonfinite
 		Site{ "gi-receiver-inspection.csmain.isfinite", "expected", "report" },
 		Site{ "gi-probe-visualization.psmain.isfinite", "report", "report" },
 		Site{ "gi-probe-visualization.psmain.acesfitted", "report", "report" },
+		Site{ "gi-probe-depth.giprobecomparabledepthbits.isfinite", "expected", "report" },
 	};
 	struct InjectionPoint { std::string_view m_Id; std::string_view m_Claim; };
 	inline constexpr std::array<InjectionPoint, 6> InjectionPoints{
@@ -132,6 +133,7 @@ namespace gglab::nonfinite
 		"gglab.shader.forward-plus-cull",
 		"gglab.shader.forward-plus-validation",
 		"gglab.shader.gi-field",
+		"gglab.shader.gi-probe-depth-conformance",
 		"gglab.shader.gi-probe-update",
 		"gglab.shader.gi-receiver",
 		"gglab.shader.gtao",

@@ -195,6 +195,12 @@ namespace gglab::shader_programs
 		"gglab.shader.gi-field", "vertex.probe-visualization", ShaderStage::Vertex };
 	inline const ShaderProgramRef GIProbeVisualizationPixel{
 		"gglab.shader.gi-field", "pixel.probe-visualization", ShaderStage::Pixel };
+	inline const ShaderProgramRef GIProbeDepthConformanceVertex{
+		"gglab.shader.gi-probe-depth-conformance", "vertex.probe", ShaderStage::Vertex };
+	inline const ShaderProgramRef GIProbeDepthConformancePixel{
+		"gglab.shader.gi-probe-depth-conformance", "pixel.probe", ShaderStage::Pixel };
+	inline const ShaderProgramRef GIProbeDepthConformanceScene{
+		"gglab.shader.gi-probe-depth-conformance", "pixel.scene", ShaderStage::Pixel };
 	inline const ShaderProgramRef GIReceiverPixel{
 		"gglab.shader.gi-receiver", "pixel.receiver", ShaderStage::Pixel };
 	inline const ShaderProgramRef GIReceiverPositionPixel{

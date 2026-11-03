@@ -1695,7 +1695,7 @@
       "function": "PSMain",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "0f4e20fb550b31233e09a4da1a5a8be14c5ae0fa004805d693c3cf94b1daa6f6",
+      "bodySha256": "74eef8b3aa8319440b48f83523c20203cdde0c0cf86455ef1d4b62ba963373a5",
       "programs": [
         "gglab.shader.gi-field"
       ],
@@ -1713,7 +1713,7 @@
       "function": "PSMain",
       "operation": "ACESFitted",
       "count": 1,
-      "bodySha256": "0f4e20fb550b31233e09a4da1a5a8be14c5ae0fa004805d693c3cf94b1daa6f6",
+      "bodySha256": "74eef8b3aa8319440b48f83523c20203cdde0c0cf86455ef1d4b62ba963373a5",
       "programs": [
         "gglab.shader.gi-field"
       ],
@@ -1724,6 +1724,25 @@
         "fp16Maximum": "report"
       },
       "rationale": "Irradiance sphere display rejects invalid raw atlas samples as magenta, then applies its independent preview scale and the shared ACES display mapping."
+    },
+    {
+      "id": "gi-probe-depth.giprobecomparabledepthbits.isfinite",
+      "source": "Lighting/GIProbeDepth.hlsli",
+      "function": "GIProbeComparableDepthBits",
+      "operation": "isfinite",
+      "count": 1,
+      "bodySha256": "44012f304ef1e5e41a71515c3b7e4ffb1a77bc7085c5734b4c75de72ce0102d7",
+      "programs": [
+        "gglab.shader.gi-field",
+        "gglab.shader.gi-probe-depth-conformance"
+      ],
+      "kind": "validity",
+      "evidence": "report-only",
+      "policy": {
+        "negative": "expected",
+        "fp16Maximum": "report"
+      },
+      "rationale": "Reject non-finite values before D32 ordering; canonicalize signed zero and qualified native positive-subnormal conversion before both scene rejection and admission. Adjacent normal depths remain distinct without an epsilon."
     }
   ],
   "injectionPoints": [

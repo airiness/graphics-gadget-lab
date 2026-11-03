@@ -1,4 +1,6 @@
 #pragma once
+#include "GGLabRuntime/Graphics/Pipeline/PipelinePresets.h"
+
 #include <array>
 #include <cstdint>
 #include <string_view>
@@ -20,6 +22,22 @@ namespace gglab
 		return mode == GIProbeVisualizationMode::Irradiance ? "irradiance" : "classification";
 	}
 
+	enum class GIProbeDepthMode : uint8_t
+	{
+		XRay,
+		SceneDepth,
+	};
+
+	[[nodiscard]] constexpr std::string_view GetGIProbeDepthModeName(GIProbeDepthMode mode) noexcept
+	{
+		return mode == GIProbeDepthMode::SceneDepth ? "scene-depth" : "xray";
+	}
+
+	[[nodiscard]] constexpr DepthPreset GetGIProbeDepthPreset(bool reversed) noexcept
+	{
+		return reversed ? DepthPreset::ReversedZStrictWrite : DepthPreset::StandardZWrite;
+	}
+
 	inline constexpr float GIProbeVisualizationMinimumExposureEV = -20.0f;
 	inline constexpr float GIProbeVisualizationMaximumExposureEV = 8.0f;
 
@@ -38,6 +56,7 @@ namespace gglab
 		float m_MaximumDistance = 0;
 		GIProbeVisualizationMode m_Mode = GIProbeVisualizationMode::Classification;
 		float m_PreviewExposureEV = 0;
+		GIProbeDepthMode m_DepthMode = GIProbeDepthMode::XRay;
 		bool operator==(const GIProbeVisualizationSettings&) const = default;
 	};
 

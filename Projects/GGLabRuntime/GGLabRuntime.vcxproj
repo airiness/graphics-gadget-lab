@@ -958,6 +958,7 @@
     <None Include="..\..\Shaders\Lighting\GIFieldSampling.hlsli" />
     <None Include="..\..\Shaders\Lighting\GIHitLighting.hlsli" />
     <None Include="..\..\Shaders\Lighting\GIHitMaterial.hlsli" />
+    <None Include="..\..\Shaders\Lighting\GIProbeDepth.hlsli" />
     <None Include="..\..\Shaders\Lighting\GIRayScene.hlsli" />
     <None Include="..\..\Shaders\Lighting\GIReceiverCache.hlsli" />
     <None Include="..\..\Shaders\Lighting\GISampling.hlsli" />

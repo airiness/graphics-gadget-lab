@@ -2844,6 +2844,9 @@
     <None Include="..\..\Shaders\Lighting\GIHitMaterial.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>
+    <None Include="..\..\Shaders\Lighting\GIProbeDepth.hlsli">
+      <Filter>Shaders\Lighting</Filter>
+    </None>
     <None Include="..\..\Shaders\Lighting\GIRayScene.hlsli">
       <Filter>Shaders\Lighting</Filter>
     </None>

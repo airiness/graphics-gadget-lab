@@ -1411,7 +1411,7 @@ namespace gglab
 			const std::filesystem::path& sourceRoot,
 			const std::filesystem::path& tempRoot) noexcept
 		{
-			constexpr size_t ExpectedRuntimeProgramCount = 172;
+			constexpr size_t ExpectedRuntimeProgramCount = 177;
 			const std::string expectedProgramCountField = std::format("\"programCount\":{}", ExpectedRuntimeProgramCount);
 			const CliRunResult missingRequiredOption = RunCli({ L"build-runtime", L"--result-format", L"json", });
 			const CliRunResult unknownOption = RunCli({ L"build-runtime", L"--bogus", L"--result-format", L"json", });
@@ -1519,6 +1519,11 @@ namespace gglab
 				shader_programs::GIProbeVisualizationCompute,
 				shader_programs::GIProbeVisualizationVertex,
 				shader_programs::GIProbeVisualizationPixel,
+				shader_programs::GIProbeDepthConformanceVertex,
+				shader_programs::GIProbeDepthConformancePixel,
+				shader_programs::GIProbeDepthConformanceScene,
+				nonfinite::CounterVariant(shader_programs::GIProbeDepthConformancePixel),
+				nonfinite::CounterVariant(shader_programs::GIProbeDepthConformanceScene),
 				nonfinite::CounterVariant(shader_programs::GIProbeVisualizationCompute),
 				nonfinite::CounterVariant(shader_programs::GIProbeVisualizationPixel),
 				nonfinite::CounterVariant(shader_programs::RaySceneProbeCompute),

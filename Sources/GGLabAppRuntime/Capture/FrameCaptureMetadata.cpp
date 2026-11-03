@@ -584,19 +584,26 @@ namespace gglab
 				{ "classificationMask", settings.m_ClassificationMask },
 				{ "maximumDistance", settings.m_MaximumDistance },
 				{ "mode", GetGIProbeVisualizationModeName(settings.m_Mode) },
-				{ "previewEV", settings.m_PreviewExposureEV } };
+				{ "previewEV", settings.m_PreviewExposureEV },
+				{ "depthMode", GetGIProbeDepthModeName(settings.m_DepthMode) } };
 		}
 		nlohmann::json GIProbeVisualizationJson(const GIProbeVisualizationSnapshot& snapshot)
 		{
 			using Json = nlohmann::json;
 			const auto& counts = snapshot.m_CompletedCounts;
 			return {
-				{ "schemaVersion", 1 },
+				{ "schemaVersion", 2 },
 				{ "mode", GetGIProbeVisualizationModeName(snapshot.m_Settings.m_Mode) },
 				{ "irradianceQuantity", "white-Lambertian-E-over-pi" },
 				{ "irradianceMapping", "atlas-M=E/pi; exp2(previewEV); ACES-fitted; sRGB" },
 				{ "irradianceOutline", "neutral-gray-valid-probe-silhouette" },
-				{ "depthMode", "xray-private-strict-D32" },
+				{ "depthMode", GetGIProbeDepthModeName(snapshot.m_Settings.m_DepthMode) },
+				{ "probeDepth", "private-strict-D32; nearest-then-lowest-stable-ID" },
+				{ "depthSubnormalConversion", "positive-subnormal-to-zero" },
+				{ "sceneDepthSource", snapshot.m_Available && snapshot.m_Settings.m_DepthMode == GIProbeDepthMode::SceneDepth ?
+					Json("DisplayView.DepthBuffer") : Json(nullptr) },
+				{ "sceneDepthSampling", "native-integer-pixel-load; equal-visible; no-bias; invalid-rejected" },
+				{ "sceneDepthAdditionalLogicalBytes", 0 },
 				{ "filterOrderVersion", GIProbeVisualizationFilterVersion },
 				{ "filterOrder", { "stable-id", "slice-inclusive", "classification", "center-distance-inclusive", "sphere-frustum", "first-N" } },
 				{ "settings", GIProbeVisualizationSettingsJson(snapshot.m_Settings) },

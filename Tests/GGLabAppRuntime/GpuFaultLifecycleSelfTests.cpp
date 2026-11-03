@@ -2766,7 +2766,7 @@ namespace gglab
 			checks.Check(revisionBeforeDiscovery != 0,
 				"Production frames already carry a valid parameter identity before observer activation");
 			runtime.EnableParameterControl();
-			checks.Check(parameters.IsAvailable() && parameters.GetHostParameters().GetParameters().size() == 36 &&
+			checks.Check(parameters.IsAvailable() && parameters.GetHostParameters().GetParameters().size() == 37 &&
 				(parameters.GetLabParameters() != nullptr) == withLab,
 				"Host descriptors are available with Demo content and alongside the active Lab source");
 			std::string error;
@@ -3062,7 +3062,7 @@ namespace gglab
 			checks.Check(!control.IsEnabled() && frame && frame->m_Outcome == FrameCaptureFrameOutcome::Submitted &&
 				frame->m_HostViewControl.m_RunIdentity == runtime.GetRunIdentity() &&
 				frame->m_HostViewControl.m_ContentIdentity == control.GetContentIdentity() &&
-				frame->m_HostViewControl.m_HostViewRevision == initial && frame->m_HostViewProjection.size() == 36 &&
+				frame->m_HostViewControl.m_HostViewRevision == initial && frame->m_HostViewProjection.size() == 37 &&
 				find(frame->m_HostViewProjection, "view.taa.enabled").m_Source == HostViewValueSource::Tooling &&
 				find(frame->m_HostViewProjection, "view.gtao.radius").m_Source == HostViewValueSource::Content &&
 				find(frame->m_HostViewProjection, "view.exposure.ev100").m_Source == HostViewValueSource::Camera,
@@ -3085,7 +3085,7 @@ namespace gglab
 
 			runtime.EnableParameterControl();
 			const auto discovered = control.DescribeHostView();
-			checks.Check(control.GetHostViewRevision() == initial && discovered.size() == 36 &&
+			checks.Check(control.GetHostViewRevision() == initial && discovered.size() == 37 &&
 				find(discovered, "view.taa.enabled").m_InheritedSource == HostViewValueSource::Tooling &&
 				!find(discovered, "view.gtao.radius").m_Override,
 				"Discovery describes the next frame without advancing the Host view revision");

@@ -240,6 +240,9 @@
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Validation\CoastalRaySceneOracle.cpp">
       <Filter>Application\Lab\Validation</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\WinAppHost\Application\Lab\Validation\GIProbeDepthConformance.cpp">
+      <Filter>Application\Lab\Validation</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\WinAppHost\Application\Platform\Windows\Input\InputBase.cpp">
       <Filter>Application\Platform\Windows\Input</Filter>
     </ClCompile>
@@ -590,6 +593,9 @@
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Validation\CoastalRaySceneOracle.h">
       <Filter>Application\Lab\Validation</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Validation\GIProbeDepthConformance.h">
+      <Filter>Application\Lab\Validation</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Platform\PlatformHost.h">
       <Filter>Application\Platform</Filter>
     </ClInclude>
@@ -824,6 +830,9 @@
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\..\Shaders\Passes\PassCoordinateConformance.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassGIProbeDepthConformance.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassNapaVoxel.hlsl">

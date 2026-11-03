@@ -195,6 +195,9 @@ namespace gglab
 				MakeBinding("view.gi_probes.preview_ev", Block::GIProbes,
 					[](auto& s) -> auto& { return s.m_GIProbes.m_PreviewExposureEV; },
 					GIProbeVisualizationMinimumExposureEV, GIProbeVisualizationMaximumExposureEV),
+				MakeBinding("view.gi_probes.depth_mode", Block::GIProbes,
+					[](auto& s) -> auto& { return s.m_GIProbes.m_DepthMode; }, {}, {},
+					EnumItems({ GIProbeDepthMode::XRay, GIProbeDepthMode::SceneDepth }, &GetGIProbeDepthModeName)),
 			};
 			return bindings;
 		}

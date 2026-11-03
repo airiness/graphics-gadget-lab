@@ -9,7 +9,7 @@ from ValidateGIFieldSampling import bilinear
 from ValidateGIProbeVisualization import load, oracle, require
 
 
-def raster(summary, selected):
+def raster(summary, selected, full=False):
     """Independent FP64 triangle rasterization, perspective interpolation and D32 ownership."""
     view = summary["receiverView"]
     width, height = view["displayExtent"]
@@ -77,6 +77,8 @@ def raster(summary, selected):
     facing = np.abs(np.sum(normals * toward_camera, axis=-1))
     # Stay away from the deliberately neutral silhouette and triangle raster edges.
     mask = (winners >= 0) & interior & (facing > .45)
+    if full:
+        return mask, winners, normals, depth
     return mask, winners[mask], normals[mask]
 
 

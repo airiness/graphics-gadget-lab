@@ -1,5 +1,6 @@
 #include <Common/Common.hlsli>
 #include <Lighting/GIFieldSampling.hlsli>
+#include <Lighting/GIProbeDepth.hlsli>
 
 cbuffer Parameters : register(b2)
 {
@@ -21,7 +22,8 @@ cbuffer Parameters : register(b2)
 	uint4 ObservationStamp;
 	uint DisplayMode;
 	float PreviewExposureScale;
-	uint2 Padding;
+	uint DepthMode;
+	uint SceneDepthIndex;
 };
 
 uint3 Coordinate(uint id)
@@ -191,9 +193,17 @@ float4 PSMain(VertexOutput input) : SV_Target
 {
 	// Exclude clear-depth endpoints; strict D32 testing resolves nearest, then
 	// ascending stable ID for exactly equal comparable depths.
-	if ((ReversedDepth != 0 && input.Position.z <= 0) || (ReversedDepth == 0 && input.Position.z >= 1))
+	if (!GIProbeDepthAdmitted(input.Position.z, ReversedDepth != 0))
 	{
 		discard;
+	}
+	if (DepthMode == 1)
+	{
+		Texture2D<float> scene = ResourceDescriptorHeap[NonUniformResourceIndex(SceneDepthIndex)];
+		if (!GIProbeSceneDepthVisible(input.Position.z, scene.Load(int3((uint2)(input.Position.xy), 0)), ReversedDepth != 0))
+		{
+			discard;
+		}
 	}
 	if (input.Category == 4)
 	{
