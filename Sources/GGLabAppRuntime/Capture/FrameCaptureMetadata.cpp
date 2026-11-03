@@ -587,12 +587,41 @@ namespace gglab
 				{ "previewEV", settings.m_PreviewExposureEV },
 				{ "depthMode", GetGIProbeDepthModeName(settings.m_DepthMode) } };
 		}
+		nlohmann::json GIProbeVisualizationViewJson(const GIProbeVisualizationViewSnapshot& view)
+		{
+			const uint32_t phases = view.m_TemporalAA ? GetTemporalAAJitterSequenceLength(view.m_ResolutionPreset) : 1u;
+			return {
+				{ "revision", view.m_Revision },
+				{ "viewId", view.m_ViewId },
+				{ "renderExtent", view.m_RenderExtent },
+				{ "displayExtent", view.m_DisplayExtent },
+				{ "cameraPosition", view.m_CameraPosition },
+				{ "view", view.m_View },
+				{ "projection", view.m_Projection },
+				{ "viewProjection", view.m_ViewProjection },
+				{ "unjitteredProjection", view.m_UnjitteredProjection },
+				{ "unjitteredViewProjection", view.m_UnjitteredViewProjection },
+				{ "matrixConvention", "row-major-row-vector" },
+				{ "clipDepthRange", { 0, 1 } },
+				{ "pixelConvention", "top-left-integer-center" },
+				{ "jitterPixels", view.m_JitterPixels },
+				{ "nearFar", view.m_NearFar },
+				{ "reversedDepth", view.m_ReversedDepth },
+				{ "temporalAA", view.m_TemporalAA },
+				{ "resolutionPreset", GetTemporalAAResolutionPresetName(view.m_ResolutionPreset) },
+				{ "postTemporalProjection", view.m_PostTemporalJittered ? "jittered" : "unjittered" },
+				{ "temporalFrameIndex", view.m_TemporalFrameIndex },
+				{ "jitterPhase", view.m_TemporalFrameIndex % phases },
+				{ "jitterSequenceLength", phases },
+				{ "depthAlignment", GetGIProbeVisualizationDepthAlignmentName(view) },
+				{ "supported", IsGIProbeVisualizationViewSupported(view) } };
+		}
 		nlohmann::json GIProbeVisualizationJson(const GIProbeVisualizationSnapshot& snapshot)
 		{
 			using Json = nlohmann::json;
 			const auto& counts = snapshot.m_CompletedCounts;
 			return {
-				{ "schemaVersion", 2 },
+				{ "schemaVersion", 3 },
 				{ "mode", GetGIProbeVisualizationModeName(snapshot.m_Settings.m_Mode) },
 				{ "irradianceQuantity", "white-Lambertian-E-over-pi" },
 				{ "irradianceMapping", "atlas-M=E/pi; exp2(previewEV); ACES-fitted; sRGB" },
@@ -601,9 +630,10 @@ namespace gglab
 				{ "probeDepth", "private-strict-D32; nearest-then-lowest-stable-ID" },
 				{ "depthSubnormalConversion", "positive-subnormal-to-zero" },
 				{ "sceneDepthSource", snapshot.m_Available && snapshot.m_Settings.m_DepthMode == GIProbeDepthMode::SceneDepth ?
-					Json("DisplayView.DepthBuffer") : Json(nullptr) },
-				{ "sceneDepthSampling", "native-integer-pixel-load; equal-visible; no-bias; invalid-rejected" },
+					Json(GetGIProbeVisualizationDepthSourceName(snapshot.m_View)) : Json(nullptr) },
+				{ "sceneDepthSampling", "display-integer-pixel-load; equal-visible; no-bias; invalid-rejected" },
 				{ "sceneDepthAdditionalLogicalBytes", 0 },
+				{ "view", GIProbeVisualizationViewJson(snapshot.m_View) },
 				{ "filterOrderVersion", GIProbeVisualizationFilterVersion },
 				{ "filterOrder", { "stable-id", "slice-inclusive", "classification", "center-distance-inclusive", "sphere-frustum", "first-N" } },
 				{ "settings", GIProbeVisualizationSettingsJson(snapshot.m_Settings) },
@@ -620,7 +650,7 @@ namespace gglab
 				{ "highlightCount", 0 },
 				{ "completed", snapshot.m_CompletedObservation ? Json{
 					{ "observation", GIStampJson(*snapshot.m_CompletedObservation) },
-					{ "view", GIReceiverViewJson(snapshot.m_CompletedView) },
+					{ "view", GIProbeVisualizationViewJson(snapshot.m_CompletedView) },
 					{ "settings", GIProbeVisualizationSettingsJson(snapshot.m_CompletedSettings) },
 					{ "counts", {
 						{ "enumerated", counts.m_Enumerated },

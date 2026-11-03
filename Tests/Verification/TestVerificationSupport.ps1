@@ -470,6 +470,7 @@ $pythonIdentity = if ($Python) { & $Python --version } else { '' }
         'gi-receiver-inspection' = 'TestGIReceiverInspection.ps1'
         'gi-probe-visualization' = 'TestGIProbeVisualization.ps1'
         'gi-probe-depth' = 'TestGIProbeDepth.ps1'
+        'gi-probe-temporal' = 'TestGIProbeTemporal.ps1'
         'gi-field-readiness' = 'TestGIFieldReadiness.ps1'
         'gi-field-sampling' = 'TestGIFieldSampling.ps1'
         'gi-invalid-updates' = 'TestGIInvalidUpdates.ps1'
@@ -523,7 +524,7 @@ $pythonIdentity = if ($Python) { & $Python --version } else { '' }
     }
     Check (($gpuResult.suites | Where-Object name -eq 'taa-comparison').steps[0].receipt.python -eq
         $runnerPython) 'runner-forwards-selected-python-to-taa-workflow'
-    foreach ($suite in @('session-lifecycle', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-probe-inspection', 'gi-receiver-inspection', 'gi-probe-visualization', 'gi-probe-depth', 'gi-field-readiness', 'gi-field-sampling', 'gi-invalid-updates', 'gi-receiver-cache')) {
+    foreach ($suite in @('session-lifecycle', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-probe-inspection', 'gi-receiver-inspection', 'gi-probe-visualization', 'gi-probe-depth', 'gi-probe-temporal', 'gi-field-readiness', 'gi-field-sampling', 'gi-invalid-updates', 'gi-receiver-cache')) {
         $leafResult = ($gpuResult.suites | Where-Object name -eq $suite).steps[0].receipt
         Check ($leafResult.python -eq $runnerPython -and $leafResult.pythonIdentity -eq
             'inspection-test-python') "runner-forwards-selected-python-to-$suite"

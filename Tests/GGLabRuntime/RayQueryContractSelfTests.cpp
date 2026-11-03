@@ -859,18 +859,60 @@ namespace gglab
 					display.m_PreviewExposureEV == (ev < 0 ? -20.0f : 8.0f),
 					"Irradiance sphere exposure uses the independent GI preview range");
 			}
-			GIReceiverViewSnapshot displayView{ .m_Revision = 1,
-				.m_RenderExtent = { 640, 400 }, .m_DisplayExtent = { 640, 400 } };
+			GIProbeVisualizationViewSnapshot displayView{ .m_Revision = 1,
+				.m_RenderExtent = { 640, 400 }, .m_DisplayExtent = { 640, 400 },
+				.m_ProjectionSupported = true, .m_Valid = true };
 			context.Check(IsGIProbeVisualizationViewSupported(displayView),
 				"Classification display does not require receiver diagnostic attachments");
+			const auto logical = displayView;
 			displayView.m_TemporalAA = true;
-			context.Check(!IsGIProbeVisualizationViewSupported(displayView), "TAA display is explicitly unsupported");
+			displayView = AdvanceGIProbeVisualizationView(logical, displayView);
+			context.Check(IsGIProbeVisualizationViewSupported(displayView) && displayView.m_Revision == 2,
+				"Temporal enable changes logical view while supporting the display");
+			auto nextPhase = displayView;
+			nextPhase.m_TemporalFrameIndex = 5;
+			nextPhase.m_JitterPixels = { 0.25f, -0.125f };
+			nextPhase.m_Projection[8] = 0.25f;
+			nextPhase.m_ViewProjection[8] = 0.25f;
+			nextPhase = AdvanceGIProbeVisualizationView(displayView, nextPhase);
+			context.Check(nextPhase.m_Revision == displayView.m_Revision &&
+				nextPhase.m_TemporalFrameIndex == 5 && nextPhase.m_JitterPixels[0] == 0.25f,
+				"Jitter phase retains logical revision and its own execution matrices and jitter");
+			nextPhase.m_UnjitteredProjection[0] = 2;
+			nextPhase = AdvanceGIProbeVisualizationView(displayView, nextPhase);
+			context.Check(nextPhase.m_Revision == 3, "A camera projection change advances visualization revision");
+			displayView.m_ResolutionPreset = TemporalAAResolutionPreset::Quality;
+			displayView.m_RenderExtent = { 427, 267 };
+			context.Check(IsGIProbeVisualizationViewSupported(displayView) &&
+				GetGIProbeVisualizationDepthSourceName(displayView) == "DisplayView.DisplayDepth",
+				"Quality uses the existing display-domain temporal depth");
+			displayView.m_ProjectionSupported = false;
+			context.Check(!IsGIProbeVisualizationViewSupported(displayView),
+				"An unsupported jitter owner does not silently reinterpret temporal depth");
+			displayView.m_ProjectionSupported = true;
 			displayView.m_TemporalAA = false;
-			displayView.m_JitterPixels[0] = 0.25f;
-			context.Check(!IsGIProbeVisualizationViewSupported(displayView), "A jittered display is explicitly unsupported");
-			displayView.m_JitterPixels = {};
-			displayView.m_RenderExtent[0] = 320;
-			context.Check(!IsGIProbeVisualizationViewSupported(displayView), "Upscaled display is explicitly unsupported");
+			context.Check(!IsGIProbeVisualizationViewSupported(displayView), "Upscaling requires its temporal resolve");
+			GIFieldSummary countsSummary;
+			countsSummary.m_Field.m_Generation = 4;
+			countsSummary.m_ReceiverView.m_Revision = 99;
+			auto& countsDisplay = countsSummary.m_Visualization;
+			countsDisplay.m_View = logical;
+			countsDisplay.m_View.m_Revision = 7;
+			countsDisplay.m_View.m_TemporalAA = true;
+			countsDisplay.m_CompletedView = countsDisplay.m_View;
+			countsDisplay.m_CompletedSettings = countsDisplay.m_Settings;
+			countsDisplay.m_CompletedObservation = GIObservationStamp{ .m_Field = countsSummary.m_Field };
+			countsDisplay.m_View.m_TemporalFrameIndex = 5;
+			countsDisplay.m_View.m_JitterPixels = { 0.25f, -0.125f };
+			context.Check(MatchesGIProbeVisualizationCounts(countsSummary),
+				"Completed visualization counts match across jitter phases independently of the receiver clock");
+			++countsDisplay.m_View.m_Revision;
+			context.Check(!MatchesGIProbeVisualizationCounts(countsSummary),
+				"A new logical visualization view makes older completed counts historical");
+			--countsDisplay.m_View.m_Revision;
+			++countsSummary.m_Field.m_Generation;
+			context.Check(!MatchesGIProbeVisualizationCounts(countsSummary),
+				"Completed visualization counts retain their original field generation");
 			GIField first(info);
 			GIField replacement(info);
 			const auto summary = first.GetCaptureState().m_Summary;

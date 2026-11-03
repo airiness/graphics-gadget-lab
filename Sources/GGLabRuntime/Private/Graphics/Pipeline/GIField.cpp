@@ -298,7 +298,7 @@ namespace gglab
 			state.m_ReceiverView = AdvanceGIReceiverView(state.m_ReceiverView, next);
 		}
 		state.m_Visualization.Prepare(frame, services,
-			frame.GetDisplayViewRenderSettings().m_GIProbes, state.m_ReceiverView);
+			frame.GetDisplayViewRenderSettings().m_GIProbes);
 		if (!state.m_Info.m_ConstantEnvironment)
 		{
 			const auto bake = services.m_Environment->GetBakingStatus();

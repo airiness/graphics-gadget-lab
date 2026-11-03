@@ -103,7 +103,7 @@ def validate(root):
                     resource, data = arrays(directory)
                     summary = resource["frame"]["readiness"]["giField"]["summary"]
                     display = summary["probeVisualization"]
-                    require(display["schemaVersion"] == 2 and display["available"] and display["viewSupported"] and
+                    require(display["schemaVersion"] == 3 and display["available"] and display["viewSupported"] and
                             display["depthSubnormalConversion"] == "positive-subnormal-to-zero",
                             "Native display schema/availability is incorrect")
                     require(display["depthMode"] == ("scene-depth" if depth_mode else "xray") and
@@ -134,9 +134,9 @@ def validate(root):
                     # decisions are tested separately against actual D32 bits in conformance().
                     difference = probe_depth.astype(np.float64) - scene_depth
                     margin = np.maximum(np.abs(scene_depth) * 2e-6, 2e-7)
-                    clear = scene_depth == (0 if summary["receiverView"]["reversedDepth"] else 1)
-                    front = difference > margin if summary["receiverView"]["reversedDepth"] else difference < -margin
-                    back = difference < -margin if summary["receiverView"]["reversedDepth"] else difference > margin
+                    clear = scene_depth == (0 if display["view"]["reversedDepth"] else 1)
+                    front = difference > margin if display["view"]["reversedDepth"] else difference < -margin
+                    back = difference < -margin if display["view"]["reversedDepth"] else difference > margin
                     visible = mask & (front | clear) if depth_mode else mask
                     occluded = mask & back & ~clear if depth_mode else np.zeros_like(mask)
                     require(visible.sum() > 20, f"{backend}/{fixture}: too few visible interior pixels")

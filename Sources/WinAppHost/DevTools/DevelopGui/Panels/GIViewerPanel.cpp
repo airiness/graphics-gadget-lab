@@ -78,7 +78,7 @@ namespace gglab
 			}
 			ImGui::InputFloat("Maximum center distance (0 = off)", &settings.m_MaximumDistance);
 			settings = ResolveGIProbeVisualizationSettings(settings);
-			ImGui::TextDisabled("Native, TAA off | scene depth is read-only | own depth resolves sphere overlaps");
+			ImGui::TextDisabled("Native / TAA / Quality | read-only display depth | own depth resolves overlaps");
 			const auto* summary = context.m_GIFieldSummary;
 			const auto effectiveMode = summary ? summary->m_Visualization.m_Settings.m_Mode : settings.m_Mode;
 			ImGui::TextDisabled(effectiveMode == GIProbeVisualizationMode::Irradiance ?
@@ -98,18 +98,25 @@ namespace gglab
 			ImGui::Text("Effective mode: %s | Preview EV %.2f",
 				GetGIProbeVisualizationModeName(display.m_Settings.m_Mode).data(), display.m_Settings.m_PreviewExposureEV);
 			ImGui::Text("Effective depth: %s", GetGIProbeDepthModeName(display.m_Settings.m_DepthMode).data());
+			ImGui::TextDisabled("Depth alignment: %s", GetGIProbeVisualizationDepthAlignmentName(display.m_View).data());
+			if (summary->m_ReceiverView.m_ReceiversAvailable)
+			{
+				ImGui::TextDisabled("Receiver diagnostic raster requires this recipe to use Native, TAA off.");
+			}
+			if (display.m_View.m_TemporalAA && !display.m_View.m_PostTemporalJittered)
+			{
+				ImGui::TextDisabled("Scene-depth silhouettes approximate the temporal image.");
+			}
 			if (display.m_Settings.m_Enabled && !display.m_Available)
 			{
-				ImGui::TextDisabled(!display.m_ViewSupported ? "Unsupported view: use Native with TAA off." :
+				ImGui::TextDisabled(!display.m_ViewSupported ? "Unsupported projection or display resolution." :
 					"Probe display unavailable: pipeline, field or count readback could not prepare.");
 			}
 			if (display.m_CompletedObservation)
 			{
 				const auto& stamp = *display.m_CompletedObservation;
 				const auto& counts = display.m_CompletedCounts;
-				const bool historical = stamp.m_Field != summary->m_Field ||
-					display.m_CompletedSettings != display.m_Settings ||
-					display.m_CompletedView.m_Revision != summary->m_ReceiverView.m_Revision;
+				const bool historical = !MatchesGIProbeVisualizationCounts(*summary);
 				ImGui::Text("%s counts at completed frame %llu: %u / %u displayed, %u budget drops",
 					historical ? "Historical" : "Latest", static_cast<unsigned long long>(stamp.m_ProducingFrame),
 					counts.m_Rendered, counts.m_Enumerated, counts.m_BudgetDropped);

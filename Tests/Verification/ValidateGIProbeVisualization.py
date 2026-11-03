@@ -39,11 +39,11 @@ def oracle(summary, classes):
     selected &= ((1 << category) & settings["classificationMask"]) != 0
     counts.append(int(selected.sum()))
     centers = np.asarray(summary["minimum"], np.float64) + xyz * summary["spacing"]
-    view = summary["receiverView"]
+    view = summary["probeVisualization"].get("view", summary["receiverView"])
     if settings["maximumDistance"] > 0:
         selected &= np.linalg.norm(centers - np.asarray(view["cameraPosition"]), axis=1) <= settings["maximumDistance"]
     counts.append(int(selected.sum()))
-    matrix = np.asarray(view["viewProjection"], np.float64).reshape(4, 4)
+    matrix = np.asarray(view.get("unjitteredViewProjection", view["viewProjection"]), np.float64).reshape(4, 4)
     x, y, z, w = matrix.T
     planes = np.asarray((w + x, w - x, w + y, w - y, z, w - z))
     signed = np.column_stack((centers, np.ones(len(ids)))) @ planes.T

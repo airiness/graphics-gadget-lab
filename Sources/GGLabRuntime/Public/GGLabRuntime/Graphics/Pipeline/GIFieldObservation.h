@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Pipeline/GIFieldReadiness.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIProbeVisualization.h"
+#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 
 #include <array>
 #include <cmath>
@@ -64,11 +65,86 @@ namespace gglab
 		bool operator==(const GIReceiverViewSnapshot&) const = default;
 	};
 
-	[[nodiscard]] inline bool IsGIProbeVisualizationViewSupported(const GIReceiverViewSnapshot& view) noexcept
+	struct GIProbeVisualizationViewSnapshot
 	{
-		return view.m_Revision != 0 && view.m_RenderExtent == view.m_DisplayExtent &&
+		uint64_t m_Revision = 0;
+		uint32_t m_ViewId = 0;
+		std::array<uint32_t, 2> m_RenderExtent{};
+		std::array<uint32_t, 2> m_DisplayExtent{};
+		std::array<float, 3> m_CameraPosition{};
+		// Row-major matrices for row-vector multiplication; clip depth is [0,1].
+		std::array<float, 16> m_View{};
+		std::array<float, 16> m_UnjitteredProjection{};
+		std::array<float, 16> m_UnjitteredViewProjection{};
+		// The actual post-temporal projection for this execution, before viewport mapping.
+		std::array<float, 16> m_Projection{};
+		std::array<float, 16> m_ViewProjection{};
+		std::array<float, 2> m_JitterPixels{};
+		std::array<float, 2> m_NearFar{};
+		uint32_t m_TemporalFrameIndex = 0;
+		TemporalAAResolutionPreset m_ResolutionPreset = TemporalAAResolutionPreset::Native;
+		bool m_ReversedDepth = false;
+		bool m_TemporalAA = false;
+		bool m_PostTemporalJittered = false;
+		bool m_ProjectionSupported = false;
+		bool m_Valid = false;
+		bool operator==(const GIProbeVisualizationViewSnapshot&) const = default;
+	};
+
+	[[nodiscard]] inline std::string_view GetGIProbeVisualizationDepthSourceName(
+		const GIProbeVisualizationViewSnapshot& view) noexcept
+	{
+		return view.m_RenderExtent == view.m_DisplayExtent ?
+			"DisplayView.DepthBuffer" : "DisplayView.DisplayDepth";
+	}
+
+	[[nodiscard]] inline std::string_view GetGIProbeVisualizationDepthAlignmentName(
+		const GIProbeVisualizationViewSnapshot& view) noexcept
+	{
+		if (view.m_RenderExtent != view.m_DisplayExtent)
+		{
+			return "upscaled-nearest-sample-approximation";
+		}
+		if (!view.m_TemporalAA)
+		{
+			return "native-exact";
+		}
+		return view.m_PostTemporalJittered ?
+			"native-jittered-aligned" : "native-jittered-depth-approximation";
+	}
+
+	[[nodiscard]] inline bool IsGIProbeVisualizationViewSupported(
+		const GIProbeVisualizationViewSnapshot& view) noexcept
+	{
+		const auto expected = ResolveTemporalAAViewResolution(
+			{ view.m_DisplayExtent[0], view.m_DisplayExtent[1] }, view.m_ResolutionPreset);
+		return view.m_Revision != 0 && view.m_Valid && view.m_ProjectionSupported &&
 			view.m_DisplayExtent[0] != 0 && view.m_DisplayExtent[1] != 0 &&
-			!view.m_TemporalAA && view.m_JitterPixels == std::array<float, 2>{};
+			(view.m_ResolutionPreset == TemporalAAResolutionPreset::Native ||
+				view.m_ResolutionPreset == TemporalAAResolutionPreset::Quality) &&
+			(!view.m_PostTemporalJittered || (view.m_TemporalAA &&
+				view.m_ResolutionPreset == TemporalAAResolutionPreset::Native)) &&
+			view.m_RenderExtent == std::array{ expected.m_Render.m_Width, expected.m_Render.m_Height } &&
+			(view.m_TemporalAA || (view.m_ResolutionPreset == TemporalAAResolutionPreset::Native &&
+				view.m_JitterPixels == std::array<float, 2>{}));
+	}
+
+	[[nodiscard]] inline GIProbeVisualizationViewSnapshot AdvanceGIProbeVisualizationView(
+		const GIProbeVisualizationViewSnapshot& previous, GIProbeVisualizationViewSnapshot next) noexcept
+	{
+		// Execution phase and raster matrices change with jitter; logical camera,
+		// projection policy and resolution changes invalidate a future selection request.
+		auto logical = [](GIProbeVisualizationViewSnapshot value)
+			{
+				value.m_Revision = 0;
+				value.m_TemporalFrameIndex = 0;
+				value.m_JitterPixels = {};
+				value.m_Projection = value.m_UnjitteredProjection;
+				value.m_ViewProjection = value.m_UnjitteredViewProjection;
+				return value;
+			};
+		next.m_Revision = previous.m_Revision + (logical(previous) != logical(next) ? 1 : 0);
+		return next;
 	}
 
 	// The revision follows logical camera/configuration changes, not frame advancement.
@@ -96,7 +172,8 @@ namespace gglab
 		uint64_t m_ReadbackBufferBytes = 0;
 		std::optional<GIObservationStamp> m_Observation;
 		std::optional<GIObservationStamp> m_CompletedObservation;
-		GIReceiverViewSnapshot m_CompletedView;
+		GIProbeVisualizationViewSnapshot m_View;
+		GIProbeVisualizationViewSnapshot m_CompletedView;
 		GIProbeVisualizationSettings m_CompletedSettings;
 		GIProbeVisualizationCounts m_CompletedCounts;
 	};
@@ -119,6 +196,15 @@ namespace gglab
 		GIReceiverViewSnapshot m_ReceiverView;
 		GIProbeVisualizationSnapshot m_Visualization;
 	};
+
+	// A completed execution can match the current logical view at a different jitter phase.
+	[[nodiscard]] inline bool MatchesGIProbeVisualizationCounts(const GIFieldSummary& summary) noexcept
+	{
+		const auto& display = summary.m_Visualization;
+		return display.m_CompletedObservation && display.m_CompletedObservation->m_Field == summary.m_Field &&
+			display.m_CompletedSettings == display.m_Settings &&
+			display.m_CompletedView.m_Revision == display.m_View.m_Revision;
+	}
 
 	struct GIProbeInspectionRequest
 	{

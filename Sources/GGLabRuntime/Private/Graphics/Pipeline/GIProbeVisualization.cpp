@@ -77,17 +77,19 @@ namespace gglab
 			float m_PreviewExposureScale = 1;
 			uint32_t m_DepthMode = 0;
 			uint32_t m_SceneDepth = 0;
+			std::array<float, 16> m_UnjitteredViewProjection{};
 		};
-		static_assert(sizeof(Parameters) == 208 && offsetof(Parameters, m_ViewProjection) == 48 &&
+		static_assert(sizeof(Parameters) == 272 && offsetof(Parameters, m_ViewProjection) == 48 &&
 			offsetof(Parameters, m_Camera) == 112 && offsetof(Parameters, m_Stats) == 152 &&
 			offsetof(Parameters, m_Mode) == 160 && offsetof(Parameters, m_DisplayMode) == 192 &&
 			offsetof(Parameters, m_PreviewExposureScale) == 196 &&
-			offsetof(Parameters, m_DepthMode) == 200 && offsetof(Parameters, m_SceneDepth) == 204);
+			offsetof(Parameters, m_DepthMode) == 200 && offsetof(Parameters, m_SceneDepth) == 204 &&
+			offsetof(Parameters, m_UnjitteredViewProjection) == 208);
 		struct Slot
 		{
 			RHIFencePoint m_Fence;
 			GIObservationStamp m_Observation;
-			GIReceiverViewSnapshot m_View;
+			GIProbeVisualizationViewSnapshot m_View;
 			GIProbeVisualizationSettings m_Settings;
 		};
 		// Deferred commits retain CPU values only. Native buffers are retained by
@@ -112,7 +114,7 @@ namespace gglab
 		GraphicsPipelineSlot m_DrawSlot;
 		ResolvedRenderPipeline m_Select;
 		ResolvedRenderPipeline m_Draw;
-		GIReceiverViewSnapshot m_View;
+		GIProbeVisualizationViewSnapshot m_View;
 		std::shared_ptr<Progress> m_Progress = std::make_shared<Progress>();
 		std::shared_ptr<Resources> m_Resources = std::make_shared<Resources>();
 		void Poll() noexcept
@@ -173,13 +175,40 @@ namespace gglab
 	}
 
 	void GIProbeVisualization::Prepare(const RenderFrameContext& frame, const RenderServices& services,
-		GIProbeVisualizationSettings settings, const GIReceiverViewSnapshot& view) noexcept
+		GIProbeVisualizationSettings settings) noexcept
 	{
 		auto& state = *m_State;
 		state.Poll();
 		auto& snapshot = state.m_Progress->m_Snapshot;
 		snapshot.m_Settings = ResolveGIProbeVisualizationSettings(settings);
-		state.m_View = view;
+		const auto& raster = frame.GetDisplayRenderView();
+		const auto& plan = frame.GetTemporalFramePlan();
+		const auto& temporal = frame.GetDisplayViewRenderSettings().m_TemporalAA;
+		const bool taa = plan.IsConsumerActive(TemporalConsumer::TemporalAA);
+		const bool jittered = taa && raster.GetResolution().IsNative() &&
+			temporal.m_PostTemporalView == TemporalAAPostTemporalView::Jittered;
+		GIProbeVisualizationViewSnapshot next{
+			.m_ViewId = static_cast<uint32_t>(raster.m_ViewId),
+			.m_RenderExtent = { raster.m_Width, raster.m_Height },
+			.m_DisplayExtent = { raster.m_DisplayWidth, raster.m_DisplayHeight },
+			.m_CameraPosition = { raster.m_CameraPosition.m_X, raster.m_CameraPosition.m_Y, raster.m_CameraPosition.m_Z },
+			.m_View = raster.m_View.ToArray(),
+			.m_UnjitteredProjection = raster.m_UnjitteredProj.ToArray(),
+			.m_UnjitteredViewProjection = raster.m_UnjitteredViewProj.ToArray(),
+			.m_Projection = (jittered ? raster.m_RasterProj : raster.m_UnjitteredProj).ToArray(),
+			.m_ViewProjection = (jittered ? raster.m_RasterViewProj : raster.m_UnjitteredViewProj).ToArray(),
+			.m_JitterPixels = { raster.m_JitterPixels.m_X, raster.m_JitterPixels.m_Y },
+			.m_NearFar = { raster.m_Near, raster.m_Far },
+			.m_TemporalFrameIndex = raster.m_TemporalFrameIndex,
+			.m_ResolutionPreset = taa ? temporal.m_ResolutionPreset : TemporalAAResolutionPreset::Native,
+			.m_ReversedDepth = raster.m_DepthConvention == DepthConvention::Reversed,
+			.m_TemporalAA = taa,
+			.m_PostTemporalJittered = jittered,
+			.m_ProjectionSupported = !taa || plan.GetProjectionJitterOwner() == TemporalConsumer::TemporalAA,
+			.m_Valid = raster.m_IsValid };
+		state.m_View = AdvanceGIProbeVisualizationView(state.m_View, next);
+		const auto& view = state.m_View;
+		snapshot.m_View = view;
 		snapshot.m_ViewSupported = IsGIProbeVisualizationViewSupported(view);
 		snapshot.m_Available = false;
 		snapshot.m_PrivateDepthLogicalBytes = 0;
@@ -266,7 +295,8 @@ namespace gglab
 				uint32_t(observation.m_FieldUpdate), uint32_t(observation.m_FieldUpdate >> 32) },
 			.m_DisplayMode = static_cast<uint32_t>(settings.m_Mode),
 			.m_PreviewExposureScale = std::exp2(settings.m_PreviewExposureEV),
-			.m_DepthMode = static_cast<uint32_t>(settings.m_DepthMode) };
+			.m_DepthMode = static_cast<uint32_t>(settings.m_DepthMode),
+			.m_UnjitteredViewProjection = view.m_UnjitteredViewProjection };
 		RGTextureId stats;
 		RGTextureId ids;
 		struct SelectData

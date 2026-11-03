@@ -49,6 +49,7 @@ namespace gglab
 		const LabParameterId FieldEnabledId("gi_reference.field_enabled");
 		const LabParameterId FieldIrradianceWidthId("gi_reference.field_irradiance_width");
 		const LabParameterId FieldSamplingId("gi_reference.field_sampling");
+		const LabParameterId ReceiverDiagnosticsId("gi_reference.receiver_diagnostics");
 		const LabParameterId FieldReadinessId("gi_reference.field_readiness");
 		const LabParameterId FieldRefreshNoiseId("gi_reference.field_refresh_noise");
 		const LabParameterId FieldSteadyNoiseId("gi_reference.field_steady_noise");
@@ -136,9 +137,10 @@ namespace gglab
 			GIReferencePipeline(World& world, AssetManager& assets, std::shared_ptr<GIProbeUpdateExperiment> update) noexcept :
 				m_World(world), m_Assets(assets), m_Scene(update->GetRayScene()),
 				m_Raster(CreateRenderPipelineForwardPlus({ .m_GIProbeUpdate = std::move(update) })) {}
-			GIReferencePipeline(World& world, AssetManager& assets, std::shared_ptr<GIField> field) noexcept :
+			GIReferencePipeline(World& world, AssetManager& assets, std::shared_ptr<GIField> field,
+				bool receiverDiagnostics) noexcept :
 				m_World(world), m_Assets(assets), m_Scene(field->GetRayScene()),
-				m_Raster(CreateRenderPipelineForwardPlus({ .m_EnableGIReceiver = true, .m_GIField = std::move(field) })) {}
+				m_Raster(CreateRenderPipelineForwardPlus({ .m_EnableGIReceiver = receiverDiagnostics, .m_GIField = std::move(field) })) {}
 			std::string_view GetName() const noexcept override { return "GI fixed-depth reference"; }
 			GIFieldCaptureState GetGIFieldCaptureState() const noexcept override
 			{
@@ -329,6 +331,10 @@ namespace gglab
 			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
 			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = true }));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldSamplingId, .m_Name = "Compose field diffuse irradiance",
+			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
+			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = true }));
+		GGLAB_UNUSED(parameters.Add({ .m_Id = ReceiverDiagnosticsId,
+			.m_Name = "Receiver diagnostic raster (Native, TAA off)",
 			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
 			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = true }));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = ProbeTransformId, .m_Name = "Probe scene translation step",
@@ -973,7 +979,7 @@ namespace gglab
 				m_Field = std::make_shared<GIField>(std::move(info));
 			}
 			SetRenderPipeline(std::make_unique<GIReferencePipeline>(m_World,
-				*m_Services.m_AssetManager, m_Field));
+				*m_Services.m_AssetManager, m_Field, GetParameters().Get(ReceiverDiagnosticsId, true)));
 			return;
 		}
 		m_Field.reset();

@@ -24,6 +24,7 @@ cbuffer Parameters : register(b2)
 	float PreviewExposureScale;
 	uint DepthMode;
 	uint SceneDepthIndex;
+	row_major float4x4 UnjitteredViewProjection;
 };
 
 uint3 Coordinate(uint id)
@@ -34,10 +35,10 @@ uint3 Coordinate(uint id)
 
 bool IntersectsFrustum(float3 center)
 {
-	const float4 x = float4(ViewProjection[0][0], ViewProjection[1][0], ViewProjection[2][0], ViewProjection[3][0]);
-	const float4 y = float4(ViewProjection[0][1], ViewProjection[1][1], ViewProjection[2][1], ViewProjection[3][1]);
-	const float4 z = float4(ViewProjection[0][2], ViewProjection[1][2], ViewProjection[2][2], ViewProjection[3][2]);
-	const float4 w = float4(ViewProjection[0][3], ViewProjection[1][3], ViewProjection[2][3], ViewProjection[3][3]);
+	const float4 x = float4(UnjitteredViewProjection[0][0], UnjitteredViewProjection[1][0], UnjitteredViewProjection[2][0], UnjitteredViewProjection[3][0]);
+	const float4 y = float4(UnjitteredViewProjection[0][1], UnjitteredViewProjection[1][1], UnjitteredViewProjection[2][1], UnjitteredViewProjection[3][1]);
+	const float4 z = float4(UnjitteredViewProjection[0][2], UnjitteredViewProjection[1][2], UnjitteredViewProjection[2][2], UnjitteredViewProjection[3][2]);
+	const float4 w = float4(UnjitteredViewProjection[0][3], UnjitteredViewProjection[1][3], UnjitteredViewProjection[2][3], UnjitteredViewProjection[3][3]);
 	const float4 planes[6] = { w + x, w - x, w + y, w - y, z, w - z };
 	[unroll]
 	for (uint plane = 0; plane < 6; ++plane)

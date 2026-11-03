@@ -13,7 +13,7 @@ namespace gglab
 		GIProbeVisualization() noexcept;
 		~GIProbeVisualization();
 		void Prepare(const RenderFrameContext& frame, const RenderServices& services,
-			GIProbeVisualizationSettings settings, const GIReceiverViewSnapshot& view) noexcept;
+			GIProbeVisualizationSettings settings) noexcept;
 		void AddPasses(RenderGraph& graph, const RenderFrameContext& frame,
 			const GIObservationStamp& observation) noexcept;
 		[[nodiscard]] GIProbeVisualizationSnapshot GetSnapshot() const noexcept;

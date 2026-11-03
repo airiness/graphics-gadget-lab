@@ -9,13 +9,14 @@ from ValidateGIFieldSampling import bilinear
 from ValidateGIProbeVisualization import load, oracle, require
 
 
-def raster(summary, selected, full=False):
+def raster(summary, selected, full=False, edge_guard=0.0):
     """Independent FP64 triangle rasterization, perspective interpolation and D32 ownership."""
-    view = summary["receiverView"]
+    view = summary["probeVisualization"].get("view", summary["receiverView"])
     width, height = view["displayExtent"]
     matrix = np.asarray(view["viewProjection"], np.float64).reshape(4, 4)
     reversed_z = view["reversedDepth"]
     depth = np.full((height, width), 0.0 if reversed_z else 1.0)
+    uncertain_depth = depth.copy()
     winners = np.full((height, width), -1, dtype=np.int32)
     normals = np.zeros((height, width, 3))
     positions = np.zeros_like(normals)
@@ -44,8 +45,8 @@ def raster(summary, selected, full=False):
             if np.any(clip[ix, 3] <= 0) or np.any(ndc[ix, 2] < 0) or np.any(ndc[ix, 2] > 1):
                 continue
             triangle = screen[ix]
-            lo = np.maximum(np.ceil(triangle.min(axis=0) - .5).astype(int), 0)
-            hi = np.minimum(np.floor(triangle.max(axis=0) - .5).astype(int), (width - 1, height - 1))
+            lo = np.maximum(np.ceil(triangle.min(axis=0) - .5 - edge_guard).astype(int), 0)
+            hi = np.minimum(np.floor(triangle.max(axis=0) - .5 + edge_guard).astype(int), (width - 1, height - 1))
             if np.any(lo > hi):
                 continue
             a, b, c = triangle
@@ -59,6 +60,17 @@ def raster(summary, selected, full=False):
             barycentric = np.stack((1 - beta - gamma, beta, gamma), axis=-1)
             covered = np.all(barycentric >= 0, axis=-1)
             comparable = (barycentric @ ndc[ix, 2]).astype(np.float32)
+            if edge_guard:
+                # A nearer sphere's quantized silhouette can cover a pixel just outside
+                # its FP64 triangle and hide an otherwise interior farther sphere. Track
+                # all potentially winning edges, rather than only the CPU winner's edges.
+                altitudes = abs(determinant) / np.maximum(np.linalg.norm(
+                    np.stack((b - c, a - c, a - b)), axis=-1), 1e-12)
+                distances = barycentric * altitudes
+                edge = (np.min(distances, axis=-1) >= -edge_guard) & (np.min(np.abs(distances), axis=-1) <= edge_guard)
+                previous = uncertain_depth[yy, xx]
+                uncertain = edge & ((comparable > previous) if reversed_z else (comparable < previous))
+                uncertain_depth[yy[uncertain], xx[uncertain]] = comparable[uncertain]
             old = depth[yy, xx]
             wins = covered & ((comparable > old) if reversed_z else (comparable < old))
             if not wins.any():
@@ -77,6 +89,8 @@ def raster(summary, selected, full=False):
     facing = np.abs(np.sum(normals * toward_camera, axis=-1))
     # Stay away from the deliberately neutral silhouette and triangle raster edges.
     mask = (winners >= 0) & interior & (facing > .45)
+    if edge_guard:
+        mask &= (uncertain_depth < depth) if reversed_z else (uncertain_depth > depth)
     if full:
         return mask, winners, normals, depth
     return mask, winners[mask], normals[mask]
