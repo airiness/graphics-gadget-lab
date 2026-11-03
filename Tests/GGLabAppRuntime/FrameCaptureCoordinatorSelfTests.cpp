@@ -2514,7 +2514,8 @@ namespace gglab
 					}
 					m_Capture.OnFrameSubmitted();
 					const FrameSequenceObservation observation = m_Sequence.WantsGpuTiming() ?
-						FrameSequenceObservation{ m_Capture.HasFrameGraphExports(m_RenderSerial), {} } :
+						FrameSequenceObservation{ m_Capture.HasFrameGraphExports(m_RenderSerial), {},
+							static_cast<double>(m_RenderSerial) * 0.125 } :
 						FrameSequenceObservation{};
 					const auto parameters = m_FreezeParameters ?
 						std::make_shared<ParameterFrameState>(ParameterFrameState{
@@ -3566,6 +3567,9 @@ namespace gglab
 				const auto product = nlohmann::json::parse(ReadText(status.m_TimingPublication->m_Files.front()));
 				const auto manifest = nlohmann::json::parse(ReadText(status.m_TimingPublication->m_Manifest));
 				context.Check(product["coverage"]["requestedSamples"] == 4 && product["coverage"]["recordedSamples"] == 4 &&
+					product["schemaVersion"] == 2 && manifest["products"][0]["schemaVersion"] == 2 &&
+					product["coverage"]["samples"][0]["cpuBuildRecordMilliseconds"] ==
+						static_cast<double>(serials[3]) * 0.125 &&
 					product["coverage"]["samples"][0]["sequenceFrame"] == 1 &&
 					product["coverage"]["samples"][0]["referenceSample"] == 1 &&
 					product["coverage"]["samples"][2]["firstFrame"] == true &&
@@ -3759,6 +3763,10 @@ namespace gglab
 					status.m_SubmittedFrames == 9 && status.m_GpuTiming->m_FrameMilliseconds.size() == 9 &&
 					status.m_GpuTiming->m_FrameMilliseconds.front() == static_cast<double>(firstSerial) &&
 					status.m_GpuTiming->m_FrameMilliseconds.back() == static_cast<double>(firstSerial + 8) &&
+					status.m_GpuTiming->m_Samples.front().m_Observation.m_CpuBuildRecordMilliseconds ==
+						static_cast<double>(firstSerial) * 0.125 &&
+					status.m_GpuTiming->m_Samples.back().m_Observation.m_CpuBuildRecordMilliseconds ==
+						static_cast<double>(firstSerial + 8) * 0.125 &&
 					status.m_GpuTiming->m_Scopes.front().m_Milliseconds.size() == 9,
 					std::format("Serial membership includes every sequence frame and its delayed tail (delay {})", delay));
 			}

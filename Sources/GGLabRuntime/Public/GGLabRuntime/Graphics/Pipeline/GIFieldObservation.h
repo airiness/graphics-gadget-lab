@@ -218,6 +218,8 @@ namespace gglab
 		uint64_t m_PrivateDepthLogicalBytes = 0;
 		uint64_t m_SelectionLogicalBytes = 0;
 		uint64_t m_ReadbackBufferBytes = 0;
+		// Retained native ring allocation, including alignment; unavailable is not zero.
+		std::optional<uint64_t> m_ReadbackAllocatedBytes;
 		std::optional<GIObservationStamp> m_Observation;
 		std::optional<GIObservationStamp> m_CompletedObservation;
 		GIProbeVisualizationViewSnapshot m_View;

@@ -259,6 +259,56 @@ measurements cover an experimental update chain, not production field or complet
 GI performance acceptance. Keep hardware-specific numbers and run history in
 experiment reports, not this guide.
 
+### Probe viewer overhead and usability
+
+Run `TestGIProbeViewer.ps1` through the `gi-probe-viewer` catalog suite in Develop.
+It captures the full F4/Coastal grids on both backends, independently checks stable
+IDs and filter/budget/highlight counts, and exercises native hidden-window resize
+and field replacement. The owning `WinAppTests --suite app-devtools-view-profile`
+checks the real GUI controls, truncation text, numeric selection/clear, session
+precedence and panel closure. Receiver prerequisites/markers have separate graph
+allocation evidence. These validation runs provide no performance conclusion.
+The viewer starts disabled and inherits a 4096-probe budget. Use
+`TestGIProbeViewer.ps1 -DefaultsOnly` for a focused dual-RHI F4/Coastal check that
+leaves the budget unassigned and verifies the inherited value reaches GPU work.
+Scene Depth can hide retained first-N probes; use the explicit truncation counts,
+layers, a larger budget or X-ray when diagnosing an apparently empty display.
+
+`MeasureGIProbeViewer.ps1` requires Release with `GGLAB_ENABLE_PIX=0`. It measures
+viewer off, Classification, Irradiance and Classification plus one independent
+selected highlight at 1280x720, Native/TAA off, on F4 and the complete 12,870-probe
+Coastal volume. Defaults are budgets 256/2048/4096/16384, both depth modes, two repeats
+with reversed arm order and bracketing off baselines, and 120 warmup frames.
+Images and full graph/allocation captures finish outside each timed sequence.
+All 360 raw samples remain published; reporting explicitly excludes the first
+30 sequence frames to allow profiling and frame-local state to settle.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/RunVerification.ps1 -Suite gi-probe-viewer -Configuration Develop -Rhi dx12,vulkan -Python $python
+powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/MeasureGIProbeViewer.ps1 -Rhi dx12,vulkan -Python $python
+```
+
+Require the runner's final `result.json` as well as `validation.json` and
+`report.md`. Timed ranges reject validation/DevTools/PIX, images, graph/resource
+exports, non-finite watches, missing provenance, activation work and incomplete
+matrix coverage. Compare within one backend/device/configuration. GPU viewer
+totals join scope sample indices before aggregation; frame deltas are differences
+of pooled medians against viewer-off baselines. Small frame deltas require repeats.
+
+Sequence `gglab.gpu-timing` v2 adds nullable per-sample
+`cpuBuildRecordMilliseconds`, joined to the same submitted RenderFrame serial as
+the GPU result, including delayed/out-of-order completions. Production measures
+owner-thread elapsed time after RenderHost BeginFrame through render recording,
+before EndFrame. It excludes frame-slot acquisition, content Update,
+submission/Present and readback tails; it is not whole-process CPU utilization.
+Readers retain v1 support; a null CPU value is unavailable and cannot qualify a
+viewer cost sample. Visualization summary v5 adds nullable retained native
+`readbackAllocatedBytes`; logical ring bytes, private D32 and selection resources
+remain separate. Graph allocator totals include other owners and retained pools,
+and are not resident memory. B's receiver prerequisites and marker work are
+reported separately from C and E's future 1x1 picking. No GI performance,
+convergence or readiness acceptance follows from viewer overhead measurements.
+
 ## Results and artifacts
 
 - The catalog writes `result.json` and step logs under a unique child of

@@ -69,6 +69,8 @@ namespace gglab
 				{ "referenceSample", sample.m_ReferenceSample },
 				{ "firstFrame", sample.m_FirstFrame },
 				{ "cameraCut", sample.m_CameraCut },
+				{ "cpuBuildRecordMilliseconds", sample.m_Observation.m_CpuBuildRecordMilliseconds ?
+					Json(*sample.m_Observation.m_CpuBuildRecordMilliseconds) : Json(nullptr) },
 				{ "conditions",{
 					{ "gpuProfiling", true },
 					{ "profilingStateChanged", sample.m_ProfilingStateChanged },
@@ -95,7 +97,7 @@ namespace gglab
 		const Json environment = Json::parse(m_Capture->GetEnvironmentJson());
 		return Json{
 			{ "schema", "gglab.gpu-timing" },
-			{ "schemaVersion", 1 },
+			{ "schemaVersion", 2 },
 			{ "sequence",{
 				{ "id", m_Status->m_SequenceId },
 				{ "path", m_Status->m_CameraPathId },
@@ -961,6 +963,13 @@ namespace gglab
 		}
 		if (WantsGpuTiming())
 		{
+			if (observation.m_CpuBuildRecordMilliseconds &&
+				(!std::isfinite(*observation.m_CpuBuildRecordMilliseconds) ||
+					*observation.m_CpuBuildRecordMilliseconds < 0.0))
+			{
+				Fail("Sequence CPU build/record timing must be finite and non-negative.");
+				return;
+			}
 			m_PendingGpuTimingFrames.push_back({ .m_RenderFrameSerial = renderFrameSerial,
 				.m_SubmissionOrdinal = m_GpuTimingSubmissionCount,
 				.m_SequenceFrame = m_Frame, .m_ReferenceSample = m_Sample,

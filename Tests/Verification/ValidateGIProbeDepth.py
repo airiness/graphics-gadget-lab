@@ -103,7 +103,7 @@ def validate(root):
                     resource, data = arrays(directory)
                     summary = resource["frame"]["readiness"]["giField"]["summary"]
                     display = summary["probeVisualization"]
-                    require(display["schemaVersion"] == 4 and display["available"] and display["viewSupported"] and
+                    require(display["schemaVersion"] in (4, 5) and display["available"] and display["viewSupported"] and
                             display["depthSubnormalConversion"] == "positive-subnormal-to-zero",
                             "Native display schema/availability is incorrect")
                     require(display["depthMode"] == ("scene-depth" if depth_mode else "xray") and

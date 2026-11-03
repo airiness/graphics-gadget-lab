@@ -135,6 +135,9 @@ namespace gglab
 	{
 		bool m_Graph = false;
 		RGObservationActivity m_Nodes;
+		// Owner-thread elapsed time after BeginFrame, through render recording, before
+		// EndFrame. Excludes frame-slot acquisition, submission/presentation and readback tails.
+		std::optional<double> m_CpuBuildRecordMilliseconds;
 	};
 
 	struct FrameSequenceGpuTimingSample

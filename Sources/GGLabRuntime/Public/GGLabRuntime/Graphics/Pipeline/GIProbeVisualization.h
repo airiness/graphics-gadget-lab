@@ -58,7 +58,7 @@ namespace gglab
 		bool m_Enabled = false;
 		bool m_Bounds = true;
 		float m_Radius = 0.12f;
-		uint32_t m_Budget = 2048;
+		uint32_t m_Budget = 4096;
 		uint32_t m_SliceAxis = 0;
 		uint32_t m_LayerMinimum = 0;
 		uint32_t m_LayerMaximum = 65535;

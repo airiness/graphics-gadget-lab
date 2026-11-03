@@ -175,7 +175,7 @@ namespace gglab
 				LabParameterValue{ LabParameterId("view.gi_probes.budget"), uint32_t(17) } };
 			ApplyHostViewParameters(sessionDisplay, resolvedDisplay.m_View, true);
 			context.Check(resolvedDisplay.m_View.m_GIProbes.m_Budget == 17 &&
-				displayOverrides.m_GIProbes.m_Budget == 2048,
+				displayOverrides.m_GIProbes.m_Budget == 4096,
 				"Session display settings override GUI intent without modifying its owned request");
 			ImGui::ActivateItemByID(ImHashStr("Probe array", 0, ImHashStr("GIViewerFixture")));
 			GGLAB_UNUSED(draw());
@@ -185,6 +185,30 @@ namespace gglab
 			GIInspectionProbe inspection;
 			gui.m_GIFieldSummary = &fieldSummary;
 			gui.m_GIProbeInspection = &inspection;
+			// Exercise full Coastal counts through the actual panel and a smaller window.
+			displayOverrides.m_GIProbes.m_Budget = 2048;
+			fieldSummary.m_Counts = { 33, 10, 39 };
+			fieldSummary.m_Visualization.m_Settings = displayOverrides.m_GIProbes;
+			fieldSummary.m_Visualization.m_CompletedObservation = GIObservationStamp{
+				.m_Field = fieldSummary.m_Field, .m_ProducingFrame = 101 };
+			fieldSummary.m_Visualization.m_CompletedCounts = {
+				.m_Enumerated = 12870, .m_AfterSlice = 12870, .m_AfterClassification = 12870,
+				.m_AfterDistance = 12870, .m_AfterFrustum = 8000,
+				.m_Rendered = 2048, .m_BudgetDropped = 5952 };
+			ImGui::ActivateItemByID(ImHashStr("Probe array", 0, ImHashStr("GIViewerFixture")));
+			const auto budgetText = draw();
+			context.Check(budgetText.find("2048 / 12870 displayed, 5952 budget drops") != std::string::npos &&
+				budgetText.find("Scene Depth can hide the retained first-N probes") != std::string::npos,
+				"Full Coastal counts distinguish display-budget truncation from filtering");
+			ImGui::SetWindowSize("GIViewerFixture", ImVec2(640, 400));
+			const auto resizedText = draw();
+			context.Check(resizedText.find("5952 budget drops") != std::string::npos &&
+				displayOverrides.m_GIProbes.m_Budget == 2048,
+				"Resizing the Viewer retains its budget and truncation explanation");
+			ImGui::SetWindowSize("GIViewerFixture", ImVec2(760, 660));
+			ImGui::ActivateItemByID(ImHashStr("Probe array", 0, ImHashStr("GIViewerFixture")));
+			GGLAB_UNUSED(draw());
+			fieldSummary.m_Counts = { 4, 4, 4 };
 			GGLAB_UNUSED(draw());
 			ImGui::ActivateItemByID(ImHashStr("Inspect probe", 0, ImHashStr("GIViewerFixture")));
 			const auto inspectionText = draw();
@@ -195,6 +219,12 @@ namespace gglab
 			context.Check(displayOverrides.m_GIProbes.m_Selection &&
 				displayOverrides.m_GIProbes.m_Selection->m_ExpectedGeneration == 73,
 				"Inspecting a coordinate selects the same field-bound diagnostic highlight");
+			ImGui::ActivateItemByID(ImHashStr("Cancel / clear", 0, ImHashStr("GIViewerFixture")));
+			GGLAB_UNUSED(draw());
+			context.Check(!displayOverrides.m_GIProbes.m_Selection && !inspection.m_Result,
+				"Clearing the numeric inspector releases its GUI selection and retained result");
+			ImGui::ActivateItemByID(ImHashStr("Select / highlight probe", 0, ImHashStr("GIViewerFixture")));
+			GGLAB_UNUSED(draw());
 			fieldSummary.m_Field.m_Generation = 74;
 			GGLAB_UNUSED(draw());
 			context.Check(displayOverrides.m_GIProbes.m_Selection &&

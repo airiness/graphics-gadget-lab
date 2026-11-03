@@ -631,7 +631,7 @@ namespace gglab
 			using Json = nlohmann::json;
 			const auto& counts = snapshot.m_CompletedCounts;
 			return {
-				{ "schemaVersion", 4 },
+				{ "schemaVersion", 5 },
 				{ "mode", GetGIProbeVisualizationModeName(snapshot.m_Settings.m_Mode) },
 				{ "irradianceQuantity", "white-Lambertian-E-over-pi" },
 				{ "irradianceMapping", "atlas-M=E/pi; exp2(previewEV); ACES-fitted; sRGB" },
@@ -653,6 +653,8 @@ namespace gglab
 				{ "privateDepthLogicalBytes", snapshot.m_PrivateDepthLogicalBytes },
 				{ "selectionLogicalBytes", snapshot.m_SelectionLogicalBytes },
 				{ "readbackBufferBytes", snapshot.m_ReadbackBufferBytes },
+				{ "readbackAllocatedBytes", snapshot.m_ReadbackAllocatedBytes ?
+					Json(*snapshot.m_ReadbackAllocatedBytes) : Json(nullptr) },
 				{ "observation", snapshot.m_Observation ? GIStampJson(*snapshot.m_Observation) : Json(nullptr) },
 				{ "countsResource", "GI.Probes.Counts" },
 				{ "orderedIDsResource", "GI.Probes.RenderedIDs" },

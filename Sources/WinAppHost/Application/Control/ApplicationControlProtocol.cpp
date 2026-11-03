@@ -1964,7 +1964,7 @@ namespace gglab
 				{ "resultConsumption", "explicit" } } },
 			{ "captureJobs", true },
 			{ "giProbeVisualization", {
-				{ "schemaVersion", 4 },
+				{ "schemaVersion", 5 },
 				{ "parameters", "Host view.gi_probes.*" },
 				{ "summary", "frame.giField.summary.probeVisualization" },
 				{ "modes", { "classification", "irradiance" } },
@@ -2035,7 +2035,7 @@ namespace gglab
 			{ "sequenceTimingProducts", true },
 			{ "sequenceCancelVerdicts", true },
 			{ "gpuTimingSchema", "gglab.gpu-timing" },
-			{ "gpuTimingSchemaVersion", 1 },
+			{ "gpuTimingSchemaVersion", 2 },
 			{ "hostViewControlState", {
 				{ "version", 1 },
 				{ "stamp", { "runIdentity", "contentIdentity", "hostViewRevision" } },

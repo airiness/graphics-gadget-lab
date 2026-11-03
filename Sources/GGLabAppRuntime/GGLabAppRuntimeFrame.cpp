@@ -515,6 +515,9 @@ namespace gglab
 				AppRuntimeTickResult::Continue :
 				FailRuntime("The render host failed to begin a frame.");
 		}
+		const bool measureCpu = m_FrameSequence->WantsGpuTiming();
+		const auto cpuBuildRecordStart = measureCpu ?
+			std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
 		const auto sequencePose = m_FrameSequence->PrepareFrame(
 			m_FrameCapture->GetLastFrameState(), demo->GetCameraRig().GetCameraPaths(),
 			m_ParameterControl->GetContentIdentity(),
@@ -952,6 +955,9 @@ namespace gglab
 			GGLAB_CPU_PROFILE_SCOPE("RenderGraph Execute");
 			m_RenderHost->Render(rendererFrame, renderGraph, renderContext);
 		}
+		const std::optional<double> cpuBuildRecordMilliseconds = measureCpu ?
+			std::optional(std::chrono::duration<double, std::milli>(
+				std::chrono::steady_clock::now() - cpuBuildRecordStart).count()) : std::nullopt;
 		RHIFrameEndResult frameEndResult = RHIFrameEndResult::Fatal();
 		{
 			GGLAB_CPU_PROFILE_SCOPE("RenderHost EndFrame");
@@ -967,7 +973,7 @@ namespace gglab
 		m_FrameCapture->OnFrameSubmitted();
 		const FrameSequenceObservation sequenceObservation = m_FrameSequence->WantsGpuTiming() ?
 			FrameSequenceObservation{ m_FrameCapture->HasFrameGraphExports(frame.m_FrameSerial),
-				renderGraph.GetObservationActivity() } :
+				renderGraph.GetObservationActivity(), cpuBuildRecordMilliseconds } :
 			FrameSequenceObservation{};
 
 		m_ParameterControl->OnFrameSubmitted({

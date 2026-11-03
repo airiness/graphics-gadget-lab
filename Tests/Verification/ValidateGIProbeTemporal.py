@@ -16,7 +16,7 @@ def validate_frame(directory, resource_path, image_metadata, arm, fixture, scene
     resource = load(resource_path)
     summary = resource["frame"]["readiness"]["giField"]["summary"]
     display, view = summary["probeVisualization"], summary["probeVisualization"]["view"]
-    require(display["schemaVersion"] == 4 and display["available"] and display["viewSupported"] and
+    require(display["schemaVersion"] in (4, 5) and display["available"] and display["viewSupported"] and
             not resource["frame"]["developmentTools"], "Temporal display unavailable or requires DevTools")
     require(image_metadata["readiness"]["giField"]["summary"]["probeVisualization"]["view"] == view,
             "Image and resource execution views are not frozen together")

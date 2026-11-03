@@ -122,6 +122,11 @@ namespace gglab
 					counts.m_Rendered, counts.m_Enumerated, counts.m_BudgetDropped);
 				ImGui::Text("After slice / class / distance / frustum: %u / %u / %u / %u",
 					counts.m_AfterSlice, counts.m_AfterClassification, counts.m_AfterDistance, counts.m_AfterFrustum);
+				if (counts.m_BudgetDropped && display.m_Settings.m_DepthMode == GIProbeDepthMode::SceneDepth)
+				{
+					ImGui::TextWrapped("Scene Depth can hide the retained first-N probes. "
+						"Increase the array budget, select layers, or use X-ray.");
+				}
 			}
 			else
 			{

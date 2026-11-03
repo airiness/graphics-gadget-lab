@@ -1665,7 +1665,7 @@ namespace gglab
 				IsCoastalGIFixture(fixture) == (index == 11 || index == 12 || index == 15) &&
 				IsGIProbeFixture(fixture) == (index == 14 || index == 15 || index == 16) &&
 				UsesGIPrimaryReceiverMaterials(fixture) == (index >= 10 && index <= 13) &&
-				UsesGIStaticCostPath(fixture) == (index >= 12 && index <= 16) &&
+				UsesGIStaticCostPath(fixture) == (index == 4 || (index >= 12 && index <= 16)) &&
 				IsGIContractFixture(fixture) == (index >= 5 && index != 19),
 				"Named fixture capabilities preserve frozen IDs without ordering-based dispatch");
 		}

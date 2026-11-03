@@ -17,6 +17,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstring>
+#include <vector>
 
 namespace gglab
 {
@@ -284,6 +285,24 @@ namespace gglab
 				state.m_Resources->m_Readbacks.push_back(std::move(buffer));
 			}
 			state.m_Progress->m_Slots.resize(slots);
+			uint64_t allocatedBytes = 0;
+			bool allocationKnown = true;
+			std::vector<uint64_t> allocations;
+			for (const auto& buffer : state.m_Resources->m_Readbacks)
+			{
+				const auto facts = device->QueryBufferAllocationFacts(buffer.Get());
+				allocationKnown &= facts.m_Status == RHIAllocationFactsStatus::Known;
+				if (facts.m_Status == RHIAllocationFactsStatus::Known &&
+					std::ranges::find(allocations, facts.m_NativeAllocationId) == allocations.end())
+				{
+					allocations.push_back(facts.m_NativeAllocationId);
+					allocatedBytes += facts.m_AllocatedBytes;
+				}
+			}
+			if (allocationKnown)
+			{
+				snapshot.m_ReadbackAllocatedBytes = allocatedBytes;
+			}
 		}
 		snapshot.m_ReadbackBufferBytes = state.m_Resources->m_Readbacks.size() * StatsFootprint.m_SizeInBytes;
 		snapshot.m_PrivateDepthLogicalBytes = uint64_t(view.m_DisplayExtent[0]) * view.m_DisplayExtent[1] * 4;

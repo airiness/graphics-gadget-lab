@@ -83,7 +83,8 @@ namespace gglab
 
 	constexpr bool UsesGIStaticCostPath(GIReferenceFixture fixture) noexcept
 	{
-		return fixture == GIReferenceFixture::CoastalDiffuse ||
+		return fixture == GIReferenceFixture::SunlitColoredRoom ||
+			fixture == GIReferenceFixture::CoastalDiffuse ||
 			fixture == GIReferenceFixture::SmallSmoothReceiver || IsGIProbeFixture(fixture);
 	}
 
