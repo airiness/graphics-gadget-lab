@@ -93,6 +93,8 @@ namespace gglab
 		return fixture == GIReferenceFixture::IsolatedPlane ||
 			fixture == GIReferenceFixture::ThickWallRoom ||
 			fixture == GIReferenceFixture::SunlitColoredRoom ||
+			fixture == GIReferenceFixture::FieldCoverage ||
+			fixture == GIReferenceFixture::FieldUnsupportedCage ||
 			fixture == GIReferenceFixture::BlackField;
 	}
 

@@ -6,6 +6,7 @@ param(
     [string]$OutputDirectory,
     [string]$RunDirectory,
     [string]$Python = 'python',
+    [string]$ShaderCacheDirectory,
     [int]$TimeoutSeconds = 300
 )
 $ErrorActionPreference = 'Stop'
@@ -19,6 +20,14 @@ $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Import-Module "$root/Scripts/Verification/VerificationSupport.psm1"
 if (-not $OutputDirectory -and -not $RunDirectory) { $OutputDirectory = "$root/Build/Validation/GIInvalidUpdates" }
 $output = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory -RunId ([Guid]::NewGuid().ToString('N').Substring(0,8))
+function Prepare-ShaderState([string]$Backend, [string]$State) {
+    if ($ShaderCacheDirectory) {
+        $null = New-Item -ItemType Directory -Path $State -Force
+        foreach ($name in @('ShaderCache','ShaderArtifacts')) {
+            Copy-Item -LiteralPath "$ShaderCacheDirectory/$Backend/$name" -Destination "$State/$name" -Recurse
+        }
+    }
+}
 function Set-Inputs([hashtable]$Values) {
     $changes = foreach ($key in $Values.Keys) {
         @{id="gi_reference.$key";type=$(if ($key -in @('fixture','ev100')) {'enum'} elseif ($Values[$key] -is [bool]) {'bool'} else {'uint'});value=$Values[$key]}
@@ -53,12 +62,13 @@ function Binary-Identity {
         @{file=$_;sha256=(Get-FileHash -LiteralPath "$root/Build/Output/x64/$($Configuration[0])/$_" -Algorithm SHA256).Hash}
     })
 }
-function Test-ProductionRejection([string]$Backend, [string]$Directory) {
+function Test-ProductionRejection([string]$Backend, [string]$Directory, [bool]$Feedback = $false) {
     New-Item -ItemType Directory -Path $Directory -Force | Out-Null
     $session = 'gi-invalid-production-'+[Guid]::NewGuid().ToString('N').Substring(0,8)
     $start = $null
     $process = $null
     try {
+        Prepare-ShaderState $Backend "$Directory/state"
         $start = Invoke-VerificationSession start $session @{Configuration=$Configuration[0];Rhi=$Backend;
             Lab='gglab.lab.gi_reference';WindowSize='320x200';NoDevTools=$true;Validation='standard';
             WatchNonFinite=$true;StateRoot="$Directory/state";StartTimeoutSeconds=$TimeoutSeconds}
@@ -72,7 +82,7 @@ function Test-ProductionRejection([string]$Backend, [string]$Directory) {
             Timing='after-ready';SettleFrames=1;OutputDirectory="$Directory/warmup";TimeoutSeconds=$TimeoutSeconds}
         if ($warmup.publication -ne 'Published') { throw 'Production rejection content warmup failed.' }
         Write-VerificationJson "$Directory/warmup.json" $warmup
-        Set-Inputs @{fixture=1;field_enabled=$true;field_readiness=$false;field_sampling=$true;probe_enabled=$false;ev100=10}
+        Set-Inputs @{fixture=1;field_enabled=$true;field_feedback=$Feedback;field_readiness=$false;field_sampling=$true;probe_enabled=$false;ev100=10}
         $inject = @{point='pass-gi-probe-update.trace.sample';value='NaN';x=0;y=5;component=1} | ConvertTo-Json -Compress
         $null = Invoke-VerificationSession watch $session @{WatchMode='report';WatchClaims=@('production');Inject=$inject}
         $activationError = $null
@@ -116,6 +126,7 @@ try {
         $session = 'gi-invalid-'+[Guid]::NewGuid().ToString('N').Substring(0,8)
         $start = $null
         try {
+            Prepare-ShaderState $backend "$directory/state"
             $start = Invoke-VerificationSession start $session @{Configuration=$Configuration[0];Rhi=$backend;
                 Lab='gglab.lab.gi_reference';WindowSize='320x200';NoDevTools=$true;Validation='standard';
                 WatchNonFinite=$true;StateRoot="$directory/state";StartTimeoutSeconds=$TimeoutSeconds}
@@ -125,18 +136,19 @@ try {
             $null = Wait-VerificationCondition -Poll {
                 Invoke-VerificationSession status $session @{ExpectedRunIdentity=$run}
             } -Until { param($r) $r.frame -and $r.frame.ready } -TimeoutSeconds $TimeoutSeconds
-            foreach ($mode in @('direct','shared','field')) {
-                $prefix = if ($mode -eq 'field') { 'GI.Field' } else { 'GI.ProbeUpdate' }
+            foreach ($mode in @('direct','shared','field','field-feedback')) {
+                $isField = $mode.StartsWith('field')
+                $prefix = if ($isField) { 'GI.Field' } else { 'GI.ProbeUpdate' }
                 foreach ($case in $cases) {
                     $path = "$directory/$mode/$($case.name)"
                     New-Item -ItemType Directory -Path $path -Force | Out-Null
                     Write-VerificationJson "$path/case.json" $case
                     $null = Invoke-VerificationSession watch $session @{WatchOff=$true}
-                    $fixture = if ($mode -eq 'field') { 16 } else { 14 }
-                    Set-Inputs @{fixture=$fixture;probe_enabled=$false;field_enabled=($mode -eq 'field');field_readiness=$false;field_sampling=$false;
+                    $fixture = if ($isField) { 16 } else { 14 }
+                    Set-Inputs @{fixture=$fixture;probe_enabled=$false;field_enabled=$isField;field_feedback=($mode -eq 'field-feedback');field_readiness=$false;field_sampling=$false;
                         probe_shared_blend=($mode -ne 'direct');probe_updates=0;probe_rays=256;ev100=15}
                     if ($case.error -eq 2) {
-                        if ($mode -eq 'field') {
+                        if ($isField) {
                             # The tiny cage is inside the cube. Seed finite, nonzero irradiance history
                             # through the existing Debug injection point before rejecting a bad read.
                             $prime = @{point='pass-gi-probe-update.storetexel.history';value='Overflow';
@@ -154,11 +166,11 @@ try {
                     Capture "$path/bad" $prefix
                     $null = Invoke-VerificationSession watch $session @{WatchOff=$true}
                     Capture "$path/frozen" $prefix
-                    if ($mode -eq 'field') { Capture "$path/query-frozen" $prefix -QueryDiagnostics }
+                    if ($isField) { Capture "$path/query-frozen" $prefix -QueryDiagnostics }
                     Set-Inputs @{probe_enabled=$false}
                     Set-Inputs @{probe_enabled=$true}
                     Capture "$path/replaced" $prefix
-                    if ($mode -eq 'field') { Capture "$path/query-replaced" $prefix -QueryDiagnostics }
+                    if ($isField) { Capture "$path/query-replaced" $prefix -QueryDiagnostics }
                 }
             }
         } finally {
@@ -173,6 +185,7 @@ try {
     }
     foreach ($backend in $Rhi) {
         Test-ProductionRejection $backend "$output/$backend/production-rejection"
+        Test-ProductionRejection $backend "$output/$backend/production-feedback-rejection" $true
     }
     $scripts = @("$PSScriptRoot/ValidateGIInvalidUpdates.py", "$root/Scripts/Verification/ValidateCaptureBundles.py",
         "$root/Scripts/Verification/ValidateResourceExports.py", "$root/Scripts/Verification/ValidateRenderGraphExports.py")
@@ -190,7 +203,7 @@ try {
         (ConvertTo-Json -InputObject @($finalSource) -Depth 4 -Compress) -or
         (ConvertTo-Json -InputObject @($binaries) -Compress) -cne
         (ConvertTo-Json -InputObject @($finalBinaries) -Compress)) { throw 'Sources or binaries changed during GI injection verification.' }
-    Write-VerificationJson "$output/result.json" @{status='passed';cases=($Rhi.Count*3*$cases.Count);backends=$Rhi;productionRejections=$Rhi.Count}
+    Write-VerificationJson "$output/result.json" @{status='passed';cases=($Rhi.Count*4*$cases.Count);backends=$Rhi;productionRejections=(2*$Rhi.Count)}
 } catch {
     Write-VerificationJson "$output/result.json" @{status='failed';error=[string]$_}
     [Console]::Out.WriteLine((@{ok=$false;directory=$output;error=[string]$_} | ConvertTo-Json -Compress))

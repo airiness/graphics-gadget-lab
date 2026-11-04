@@ -5,11 +5,13 @@
 #include <Lighting/GIHitLighting.hlsli>
 #include <Lighting/GIShaderConstants.hlsli>
 #include <Lighting/GISampling.hlsli>
+#include <Lighting/GIFieldSampling.hlsli>
 
 StructuredBuffer<float4> ProbeRayInput : register(t11);
 RWStructuredBuffer<float4> ProbeRayOutput : register(u1);
 RWStructuredBuffer<uint4> ProbeUpdateStatus : register(u2);
 RWStructuredBuffer<float4> ProbeReadiness : register(u3);
+RWStructuredBuffer<uint4> ProbeFeedback : register(u4);
 
 // Field order matches GIProbeUpdateWorkload.cpp::Parameters, including explicit padding.
 cbuffer Parameters : register(b2)
@@ -32,7 +34,7 @@ cbuffer Parameters : register(b2)
 	uint ClassificationIndex;
 	uint TransmittanceIndex;
 	uint AtmosphereSampler;
-	uint LightingPadding;
+	uint FieldFlags; // 1: full-volume field, 2: previous-field feedback.
 	uint TraverseScene;
 	float4 Rotation;
 	float Hysteresis;
@@ -43,6 +45,8 @@ cbuffer Parameters : register(b2)
 	uint ReadinessEpoch;
 	float DistanceHysteresis;
 	uint ReadinessDistance;
+	float FeedbackViewBias;
+	uint3 FeedbackPadding;
 };
 
 static const float ProbeGoldenAngleTurns = 0.3819660112501051;
@@ -88,7 +92,7 @@ float3 ProbeDirection(uint probe, uint ray)
 	precise float angle = phase * TWO_PI;
 	const float radius = sqrt(max(0.0, 1.0 - z * z));
 	float3 direction = float3(radius * cos(angle), radius * sin(angle), z);
-	if (ClassificationIndex != 0xffffffffu)
+	if ((FieldFlags & 1u) != 0)
 	{
 		// A common rotation correlates every cage corner's narrow-emitter error.
 		// Decorrelate both probes and updates: nearby CPU seeds otherwise permute
@@ -120,9 +124,9 @@ float3 OctahedralDirection(uint2 texel, uint size)
 	return normalize(direction);
 }
 
-void InvalidateUpdate(uint error, uint probe, uint element)
+void InvalidateUpdate(uint error, uint probe, uint element, bool publishField)
 {
-	if (ClassificationIndex != 0xffffffffu)
+	if (publishField && ClassificationIndex != 0xffffffffu)
 	{
 		RWTexture2DArray<uint> classification = ResourceDescriptorHeap[NonUniformResourceIndex(ClassificationIndex)];
 		InterlockedOr(classification[uint3(0, 0, 0)], GIProbeFieldInvalidBit);
@@ -155,6 +159,12 @@ void Initialize(uint3 id : SV_DispatchThreadID)
 	if (id.x < GridSize.x && id.y < GridSize.z && id.z < GridSize.y)
 	{
 		ProbeState()[id] = 0.0.xxxx;
+		if ((FieldFlags & 2u) != 0)
+		{
+			const uint probe = id.x + GridSize.x * (id.y + GridSize.z * id.z);
+			ProbeFeedback[2 * probe] = 0;
+			ProbeFeedback[2 * probe + 1] = 0;
+		}
 		if (ClassificationIndex != 0xffffffffu)
 		{
 			RWTexture2DArray<uint> classification = ResourceDescriptorHeap[NonUniformResourceIndex(ClassificationIndex)];
@@ -184,8 +194,10 @@ void Initialize(uint3 id : SV_DispatchThreadID)
 }
 
 groupshared uint4 QueryCounts[GIProbeGroupThreads];
+groupshared uint4 FeedbackSupport[GIProbeGroupThreads];
+groupshared uint4 FeedbackObservation[GIProbeGroupThreads];
 groupshared uint UpdateBlocked;
-bool IsUpdateBlocked(uint thread)
+bool IsUpdateBlocked(uint thread, bool publishField = false)
 {
 	if (thread == 0)
 	{
@@ -193,6 +205,13 @@ bool IsUpdateBlocked(uint thread)
 	}
 	// Every thread must take the same return path before subsequent group barriers.
 	GroupMemoryBarrierWithGroupSync();
+	if (publishField && thread == 0 && UpdateBlocked != GIUpdateErrorNone && ClassificationIndex != 0xffffffffu)
+	{
+		// Trace samples classification through an SRV. Publish its sticky verdict
+		// here, after that read-only phase and before any field consumer.
+		RWTexture2DArray<uint> classification = ResourceDescriptorHeap[NonUniformResourceIndex(ClassificationIndex)];
+		InterlockedOr(classification[uint3(0, 0, 0)], GIProbeFieldInvalidBit);
+	}
 	return UpdateBlocked != GIUpdateErrorNone;
 }
 
@@ -222,7 +241,7 @@ void Classify(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 		counts.x = outcome == GIHitBackface ? 1u : 0u;
 		if (outcome == GIHitInvalid)
 		{
-			InvalidateUpdate(GIUpdateErrorInvalidRay, probe, thread);
+			InvalidateUpdate(GIUpdateErrorInvalidRay, probe, thread, true);
 			counts.y = 1;
 		}
 	}
@@ -258,6 +277,8 @@ void Trace(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 	const uint3 coordinate = ProbeCoordinate(probe);
 	const float3 origin = GridMinimum + ProbeSpacing * (float3)(coordinate.xzy);
 	uint4 counts = 0; // Miss, surface, backface, invalid.
+	uint4 support = 0;
+	uint4 observation = 0;
 	const float mip = ConstantEnvironment == 0 ? GIEnvironmentMip(0) : 0.0;
 	for (uint index = thread; index < RaysPerProbe; index += GIProbeGroupThreads)
 	{
@@ -294,6 +315,50 @@ void Trace(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 				{
 					distance = length(hit.Position - origin);
 					radiance = EvaluateGIHitSun(hit, MaximumDistance, TransmittanceIndex, AtmosphereSampler);
+					if ((FieldFlags & 2u) != 0)
+					{
+						if (UpdateIndex == 0)
+						{
+							// No previous observation exists at bootstrap. Never query
+							// freshly zeroed distance moments as if they were support.
+							observation.x++;
+						}
+						else
+						{
+							GIFieldSamplingParameters field;
+							field.Counts = GridSize;
+							field.IrradianceInteriorWidth = IrradianceInteriorWidth;
+							field.Minimum = GridMinimum;
+							field.Spacing = ProbeSpacing;
+							field.Irradiance = IrradianceIndex;
+							field.Distance = DistanceIndex;
+							field.Classification = ClassificationIndex;
+							field.ViewBias = FeedbackViewBias;
+							const GIFieldQuery query = SampleGIField(field, hit.Position,
+								hit.VertexNormal, hit.VertexNormal, -direction);
+							if (query.Compatible == 0)
+							{
+								observation.y++;
+								outcome = GIHitInvalid;
+							}
+							else if (query.Support == GIFieldValid || query.Support == GIFieldLowConfidence)
+							{
+								// Shared raw field query: no IBL fallback, confidence
+								// darkening, exposure or extra bounce-energy multiplier.
+								radiance += hit.Albedo * query.Irradiance / PI;
+								support[query.Support == GIFieldValid ? 0 : 1]++;
+								observation.z = 1;
+							}
+							else if (query.Support == GIFieldNoValidSupport)
+							{
+								support.z++;
+							}
+							else
+							{
+								support.w++;
+							}
+						}
+					}
 				}
 				else if (outcome == GIHitBackface)
 				{
@@ -314,7 +379,7 @@ void Trace(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 			NF_SITE_GI_PROBE_UPDATE_TRACE_ISFINITE, float4(radiance, distance)))))
 		{
 			// Keep the raw diagnostic; no part of this update may become valid history.
-			InvalidateUpdate(GIUpdateErrorInvalidRay, probe, index);
+			InvalidateUpdate(GIUpdateErrorInvalidRay, probe, index, false);
 			radiance = asfloat(0x7fc00000u).xxx;
 			distance = asfloat(0x7fc00000u);
 			counts.w++;
@@ -334,18 +399,28 @@ void Trace(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 		ProbeRayOutput[probe * RaysPerProbe + index] = float4(radiance, distance);
 	}
 	QueryCounts[thread] = counts;
+	FeedbackSupport[thread] = support;
+	FeedbackObservation[thread] = observation;
 	GroupMemoryBarrierWithGroupSync();
 	for (uint stride = GIProbeGroupThreads / 2; stride != 0; stride >>= 1)
 	{
 		if (thread < stride)
 		{
 			QueryCounts[thread] += QueryCounts[thread + stride];
+			FeedbackSupport[thread] += FeedbackSupport[thread + stride];
+			FeedbackObservation[thread].xy += FeedbackObservation[thread + stride].xy;
+			FeedbackObservation[thread].z |= FeedbackObservation[thread + stride].z;
 		}
 		GroupMemoryBarrierWithGroupSync();
 	}
 	if (thread == 0)
 	{
 		ProbeState()[coordinate] = (float4)(QueryCounts[0]) / (float)(RaysPerProbe);
+		if ((FieldFlags & 2u) != 0)
+		{
+			ProbeFeedback[2 * probe] = FeedbackSupport[0];
+			ProbeFeedback[2 * probe + 1] = uint4(FeedbackObservation[0].xyz, UpdateIndex + 1);
+		}
 	}
 }
 
@@ -471,13 +546,13 @@ float2 StoreTexel(uint probe, uint texel, float4 value)
 			uint2(probe, texel), IrradianceAtlas()[target]);
 		if (!all(isfinite(NonFiniteObserveValue(NF_SITE_GI_PROBE_UPDATE_STORETEXEL_ISFINITE, previous))))
 		{
-			InvalidateUpdate(GIUpdateErrorInvalidHistory, probe, texel);
+			InvalidateUpdate(GIUpdateErrorInvalidHistory, probe, texel, true);
 			return 0.0.xx;
 		}
 		const float3 blended = lerp(value.xyz, previous.xyz, Hysteresis);
 		if (!all(isfinite(NonFiniteObserveValue(NF_SITE_GI_PROBE_UPDATE_STORETEXEL_ISFINITE, blended))))
 		{
-			InvalidateUpdate(GIUpdateErrorInvalidBlend, probe, texel);
+			InvalidateUpdate(GIUpdateErrorInvalidBlend, probe, texel, true);
 			return 0.0.xx;
 		}
 		IrradianceAtlas()[target] = float4(blended, 1);
@@ -498,13 +573,13 @@ float2 StoreTexel(uint probe, uint texel, float4 value)
 			uint2(probe, texel), DistanceAtlas()[target]);
 		if (!all(isfinite(NonFiniteObserveValue(NF_SITE_GI_PROBE_UPDATE_STORETEXEL_ISFINITE, previous))))
 		{
-			InvalidateUpdate(GIUpdateErrorInvalidHistory, probe, texel);
+			InvalidateUpdate(GIUpdateErrorInvalidHistory, probe, texel, true);
 			return 0.0.xx;
 		}
 		const float2 blended = lerp(value.xy, previous, DistanceHysteresis);
 		if (!all(isfinite(NonFiniteObserveValue(NF_SITE_GI_PROBE_UPDATE_STORETEXEL_ISFINITE, blended))))
 		{
-			InvalidateUpdate(GIUpdateErrorInvalidBlend, probe, texel);
+			InvalidateUpdate(GIUpdateErrorInvalidBlend, probe, texel, true);
 			return 0.0.xx;
 		}
 		DistanceAtlas()[target] = blended;
@@ -519,7 +594,7 @@ float2 StoreTexel(uint probe, uint texel, float4 value)
 void BlendDirect(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 {
 	// Trace and blend publish a sticky GPU verdict before any later consumer.
-	if (IsUpdateBlocked(thread))
+	if (IsUpdateBlocked(thread, true))
 	{
 		return;
 	}
@@ -539,7 +614,7 @@ void BlendDirect(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 void BlendShared(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 {
 	// Trace and blend publish a sticky GPU verdict before any later consumer.
-	if (IsUpdateBlocked(thread))
+	if (IsUpdateBlocked(thread, true))
 	{
 		return;
 	}

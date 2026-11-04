@@ -7,6 +7,7 @@ param(
     [ValidateRange(64,524288)][int]$InitialF4Samples = 4096,
     [ValidateRange(128,1048576)][int]$MaximumSamples = 32768,
     [string[]]$DiagnosticReadyOffsets = @(),
+    [string]$ShaderCacheDirectory,
     [string]$OutputDirectory,
     [string]$RunDirectory,
     [string]$Python = 'python',
@@ -93,6 +94,13 @@ try {
         $start = $null
         $primaryFailure = $null
         try {
+            if ($ShaderCacheDirectory) {
+                $null = New-Item -ItemType Directory -Path "$output/$backend/state" -Force
+                foreach ($name in @('ShaderCache','ShaderArtifacts')) {
+                    Copy-Item -LiteralPath "$ShaderCacheDirectory/$backend/$name" `
+                        -Destination "$output/$backend/state/$name" -Recurse
+                }
+            }
             $start = Invoke-VerificationSession start $session @{Configuration=$Configuration[0];Rhi=$backend;
                 Lab='gglab.lab.gi_reference';WindowSize='320x200';NoDevTools=$true;Validation='standard';
                 StateRoot="$output/$backend/state";StartTimeoutSeconds=$TimeoutSeconds}
@@ -106,7 +114,7 @@ try {
                 $null = New-Item -ItemType Directory -Path "$directory/baseline-gated","$directory/settled" -Force
                 Write-VerificationJson "$directory/case.json" $case
                 $referenceInputs = @{fixture=$case.fixture;environment=0;albedo=0;secondary_albedo=0;ev100=10;
-                    field_enabled=$false;field_sampling=$true;field_readiness=$true;receiver_diagnostics=$true;
+                    field_enabled=$false;field_feedback=$false;field_sampling=$true;field_readiness=$true;receiver_diagnostics=$true;
                     field_irradiance_width=0;probe_enabled=$true;accumulate=$true;depth=1;batch_samples=64;
                     field_refresh_noise=0.0;field_steady_noise=0.0}
                 $null = Set-Inputs $session $run $referenceInputs

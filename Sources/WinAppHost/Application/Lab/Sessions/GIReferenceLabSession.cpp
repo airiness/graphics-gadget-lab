@@ -51,6 +51,7 @@ namespace gglab
 		const LabParameterId FieldSamplingId("gi_reference.field_sampling");
 		const LabParameterId ReceiverDiagnosticsId("gi_reference.receiver_diagnostics");
 		const LabParameterId FieldReadinessId("gi_reference.field_readiness");
+		const LabParameterId FieldFeedbackId("gi_reference.field_feedback");
 		const LabParameterId FieldRefreshNoiseId("gi_reference.field_refresh_noise");
 		const LabParameterId FieldSteadyNoiseId("gi_reference.field_steady_noise");
 		const LabParameterId ProbeEnabledId("gi_reference.probe_enabled");
@@ -347,6 +348,9 @@ namespace gglab
 		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldReadinessId, .m_Name = "Observe field readiness and refresh",
 			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
 			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = true }));
+		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldFeedbackId, .m_Name = "Previous-field diffuse feedback",
+			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
+			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = false }));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldSamplingId, .m_Name = "Compose field diffuse irradiance",
 			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
 			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = true }));
@@ -966,6 +970,7 @@ namespace gglab
 			{
 				GIFieldCreateInfo info{ .m_RayScene = m_RayScene };
 				info.m_EnableReceiverSampling = GetParameters().Get(FieldSamplingId, true);
+				info.m_EnableFeedback = GetParameters().Get(FieldFeedbackId, false);
 				info.m_Readiness.m_Enabled = GetParameters().Get(FieldReadinessId, true);
 				info.m_Readiness.m_NoiseSigma = GetParameters().Get(FieldRefreshNoiseId, 0.0f);
 				info.m_Readiness.m_SteadyNoiseSigma = GetParameters().Get(FieldSteadyNoiseId, 0.0f);
@@ -1407,6 +1412,12 @@ namespace gglab
 				field.m_ProbeCount, field.m_RayCapacityBytes, field.m_FieldLogicalBytes,
 				field.m_Initialized ? 1 : 0, field.m_Invalid ? 1 : 0, field.m_StatusReadbackSlots) });
 			const auto& readiness = field.m_Readiness;
+			const auto& feedback = field.m_Feedback;
+			diagnostics.m_Metrics.push_back({ "GI field feedback", std::format(
+				"enabled={};completed={};source={};valid={};lowConfidence={};noSupport={};outside={};initializing={};incompatible={}",
+				feedback.m_Enabled, feedback.m_CompletedUpdate, feedback.m_SourceUpdate,
+				feedback.m_Valid, feedback.m_LowConfidence, feedback.m_NoValidSupport,
+				feedback.m_OutsideCoverage, feedback.m_Initializing, feedback.m_Incompatible) });
 			diagnostics.m_Metrics.push_back({ "GI field readiness", std::format(
 				"state={};enabled={};refresh={};completed={};readyUpdate={};activeBlocks={};excludedBlocks={};quietBlocks={};"
 				"maximumChange={};threshold={};noiseSigma={};irradianceFloor={};hysteresis={}",

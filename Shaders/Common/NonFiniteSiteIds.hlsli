@@ -98,5 +98,5 @@ static const uint NF_INJECT_PASS_GI_PROBE_UPDATE_STORETEXEL_HISTORY = 5u;
 static const uint NF_INJECTION_POINT_COUNT = 6u;
 
 static const uint NF_ABI_VERSION = 2u;
-static const uint NF_INVENTORY_LOW = 0x2e8fc4f4u;
-static const uint NF_INVENTORY_HIGH = 0xd65f7087u;
+static const uint NF_INVENTORY_LOW = 0x2efebdedu;
+static const uint NF_INVENTORY_HIGH = 0xa5be6669u;

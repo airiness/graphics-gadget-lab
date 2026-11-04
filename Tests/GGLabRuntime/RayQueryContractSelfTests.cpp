@@ -1061,6 +1061,15 @@ namespace gglab
 				"Completed visualization counts retain their original field generation");
 			GIField first(info);
 			GIField replacement(info);
+			context.Check(!first.GetDiagnostics().m_Feedback.m_Enabled,
+				"Static fields retain the independently qualified feedback-off default");
+			auto feedbackInfo = info;
+			feedbackInfo.m_EnableFeedback = true;
+			GIField feedbackField(feedbackInfo);
+			const auto feedback = feedbackField.GetDiagnostics().m_Feedback;
+			context.Check(feedback.m_Enabled && feedback.m_CompletedUpdate == 0 && feedback.m_SourceUpdate == 0 &&
+				feedback.m_Valid == 0 && feedback.m_Initializing == 0,
+				"Configured feedback cannot invent a completed GPU observation before submission");
 			const auto summary = first.GetCaptureState().m_Summary;
 			for (int query = 0; query < 100; ++query)
 			{

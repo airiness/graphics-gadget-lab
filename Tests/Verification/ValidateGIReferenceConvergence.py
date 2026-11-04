@@ -127,12 +127,14 @@ def file_receipts(directory):
     return {str(p.relative_to(directory)).replace("\\", "/"): hashlib.sha256(p.read_bytes()).hexdigest() for p in files}
 
 
-def summarize(root, case):
+def summarize(root, case, extent):
     masks = None
     if case["fixture"] in (12, 13):
         values, frame, masks = read_coastal_case(root, case)
     else:
         values, frame = read_case(root, case)
+    require(frame["temporal"]["renderExtent"] == frame["temporal"]["displayExtent"] == extent,
+            "Reference observation does not match its frozen recipe extent")
     actual = {p["id"].split(".", 1)[1]: p["value"] for p in frame["parameters"]["values"]
               if p["id"].startswith("gi_reference.")}
     require(actual.get("tile_pixels", 0) == case.get("tile_pixels", 0), "Wrong tile partition provenance")
@@ -185,6 +187,8 @@ def validate_recipe(p):
     if coastal:
         require(p["extent"] == [1280, 800] and
                 p["inputsSha256"] == hashlib.sha256(INPUT_PATH.read_bytes()).hexdigest(), "Changed Coastal input lock/extent")
+    else:
+        require(p["extent"] in ([640, 400], [320, 200]), "Unsupported fixture reference extent")
     require(p["depths"] in ([8, 16], [8, 16, 32], [8, 16, 32, 64],
                             [8, 16, 32, 64, 128], [8, 16, 32, 64, 128, 256]), "Invalid depth ladder")
     require(p["relativeLimit"] == .01 and p["absoluteFloor"] == 1e-6, "Qualification thresholds are frozen")
@@ -259,8 +263,10 @@ def compare_rhi(root):
 
 def self_test():
     p = dict(schemaVersion=SCHEMA, views=["F4_Floor"], depths=[8, 16, 32], initialSamples=2,
-             initialF4Samples=2, maximumSamples=16, batchSamples=7, relativeLimit=.01, absoluteFloor=1e-6)
+             initialF4Samples=2, maximumSamples=16, batchSamples=7, relativeLimit=.01, absoluteFloor=1e-6,
+             extent=[640, 400])
     validate_recipe(p)
+    validate_recipe(dict(p, extent=[320, 200]))
     state = dict(recipe=p, observations={})
     for depth in (8, 16, 32):
         for n in (2, 4, 8):
@@ -366,7 +372,7 @@ def main():
         case = load(args.ingest)
         name = key(case["view"], case["depth"], case["samples"], case["seed"])
         require(name not in state["observations"], "Completed cache entries are immutable")
-        state["observations"][name] = summarize(root, case)
+        state["observations"][name] = summarize(root, case, p["extent"])
         save(checkpoint, state)
     result = plan(state)
     result.update(schemaVersion=SCHEMA, recipeIdentity=state["recipeIdentity"], observations=len(state["observations"]),

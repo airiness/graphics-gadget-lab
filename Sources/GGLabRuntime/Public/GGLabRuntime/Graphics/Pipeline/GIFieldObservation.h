@@ -15,6 +15,21 @@
 
 namespace gglab
 {
+	// Last fence-completed full-volume feedback update. Counts include all traced
+	// surface hits; every consumed probe belongs to the previous submitted update.
+	struct GIFieldFeedbackSnapshot
+	{
+		bool m_Enabled = false;
+		uint64_t m_CompletedUpdate = 0;
+		uint64_t m_SourceUpdate = 0;
+		uint64_t m_Valid = 0;
+		uint64_t m_LowConfidence = 0;
+		uint64_t m_NoValidSupport = 0;
+		uint64_t m_OutsideCoverage = 0;
+		uint64_t m_Initializing = 0;
+		uint64_t m_Incompatible = 0;
+	};
+
 	struct GIFieldIdentity
 	{
 		uint64_t m_Generation = 0;

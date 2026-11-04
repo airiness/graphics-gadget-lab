@@ -1639,7 +1639,7 @@
       "function": "Trace",
       "operation": "isfinite",
       "count": 1,
-      "bodySha256": "cdbbe0c6cfde95db1133b38cd7abdd600c3b1a48e0de418fda7a3a9e14759dcd",
+      "bodySha256": "a1e07464cfd004cd91581e3507a763fddd8638cb3215b0c4ab0aa3e228ef5282",
       "programs": [
         "gglab.shader.gi-field",
         "gglab.shader.gi-probe-update"
@@ -1658,7 +1658,7 @@
       "function": "StoreTexel",
       "operation": "isfinite",
       "count": 4,
-      "bodySha256": "08389ebfbc7a2dbf6838950191b8e4648a451d67989087aafc57fa2063db1f74",
+      "bodySha256": "1e5563bc22a3511e174f181a66550f38d28c198a5ddb563eae78a77d8f604cca",
       "programs": [
         "gglab.shader.gi-field",
         "gglab.shader.gi-probe-update"

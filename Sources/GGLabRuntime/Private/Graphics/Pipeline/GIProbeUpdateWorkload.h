@@ -17,7 +17,7 @@ namespace gglab
 	public:
 		static constexpr size_t ProgramCount = 7;
 		GIProbeUpdateWorkload(std::shared_ptr<RayScene> scene, GIProbeUpdateProfile profile,
-			bool field = false, GIFieldReadinessSettings readiness = {}) noexcept;
+			bool field = false, GIFieldReadinessSettings readiness = {}, bool feedback = false) noexcept;
 		~GIProbeUpdateWorkload();
 		[[nodiscard]] std::shared_ptr<RayScene> GetRayScene() const noexcept;
 		[[nodiscard]] GIProbeUpdateDiagnostics GetDiagnostics(bool allocations = false) const noexcept;
@@ -25,6 +25,7 @@ namespace gglab
 		[[nodiscard]] RenderFrameValidationResult Prepare(const RenderFrameContext& frame,
 			const RenderServices& services) noexcept;
 		[[nodiscard]] GIFieldReadinessSnapshot GetReadiness() const noexcept;
+		[[nodiscard]] GIFieldFeedbackSnapshot GetFeedback() const noexcept;
 		[[nodiscard]] std::shared_ptr<const GIFieldChangeObservation> GetChangeObservation() const noexcept;
 		[[nodiscard]] std::optional<GIObservationStamp> GetCompletedObservation() const noexcept;
 		[[nodiscard]] uint64_t GetRefreshEpoch() const noexcept;

@@ -96,6 +96,12 @@ namespace gglab
 				return ResourceExportSemantics{ .m_Role = "gi-field-readiness", .m_Units = "relative change / scene-referred lux / uint bits",
 					.m_Space = "field refresh epoch", .m_Description = "v1 float4 records: header (positive irradiance floor, previous Active-probe upper median E luminance, Active count, span=4); then two records per X-fastest/Z/Y probe: four recent per-update texel/channel maxima; (mean E luminance, four-update mean change, Active flag, uint update count reinterpreted as float bits). Includes normalized distance-mean change after hard reset. Observed stationarity is not reference convergence or temporal RMS." };
 			}
+			if (name == "GI.Field.Feedback")
+			{
+				return ResourceExportSemantics{ .m_Role = "gi-field-feedback", .m_Units = "uint counts and update indices",
+					.m_Space = "full-volume field update",
+					.m_Description = "v1: two uint4 records per X-fastest/Z/Y probe. First: Valid, LowConfidence, NoValidSupport, OutsideCoverage surface-hit counts. Second: initializing, incompatible, consumed age (0 or 1), one-based update. Bootstrap uses zero higher-bounce energy. Later queries consume the previous full update, regardless of readiness; unsupported hits never use an IBL fallback. Incompatible queries invalidate the update." };
+			}
 			if (name == "GI.ProbeUpdate.UpdateStatus" || name == "GI.Field.UpdateStatus")
 			{
 				return ResourceExportSemantics{ .m_Role = "gi-update-status", .m_Units = "integer error and indices",
@@ -284,6 +290,11 @@ namespace gglab
 				if (target.m_Address.m_Resource == "GI.Field.Readiness")
 				{
 					static constexpr std::array fields{ GpuBufferFieldLayout{ "record", 0, GpuBufferScalar::Float32, 4 } };
+					layout = { 16, fields };
+				}
+				if (target.m_Address.m_Resource == "GI.Field.Feedback")
+				{
+					static constexpr std::array fields{ GpuBufferFieldLayout{ "record", 0, GpuBufferScalar::Uint32, 4 } };
 					layout = { 16, fields };
 				}
 				if (target.m_Address.m_Resource == "GI.ProbeUpdate.UpdateStatus" ||

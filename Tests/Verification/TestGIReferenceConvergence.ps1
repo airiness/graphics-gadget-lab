@@ -18,6 +18,7 @@ param(
     [ValidateRange(1,524288)][int]$InitialF4Samples = 4096,
     [ValidateRange(1,524288)][int]$InitialCoastalSamples = 4096,
     [string]$ShaderCacheDirectory,
+    [ValidateSet('640x400','320x200')][string]$FixtureExtent = '640x400',
     [ValidateRange(2,1048576)][int]$MaximumSamples = 1048576,
     [ValidateSet(16,32,64,128,256)][int]$MaximumDepth = 256,
     [ValidateRange(1,4096)][int]$BatchSamples = 64,
@@ -115,7 +116,7 @@ try {
                     }
                 }
                 $start = Invoke-VerificationSession start $session @{Configuration=$config;Rhi=$backend;
-                    Lab='gglab.lab.gi_reference';WindowSize=$(if ($Coastal) {'1280x800'} else {'640x400'});
+                    Lab='gglab.lab.gi_reference';WindowSize=$(if ($Coastal) {'1280x800'} else {$FixtureExtent});
                     NoDevTools=$true;Validation='standard';StateRoot=$stateRoot;StartTimeoutSeconds=$TimeoutSeconds}
                 Write-VerificationJson "$directory/start-$attempt.json" $start
                 if ($start.ownership -ne 'created') { throw 'Convergence runner must own its session.' }
@@ -129,7 +130,7 @@ try {
                     initialCoastalSamples=$InitialCoastalSamples;
                     inputsSha256=(Get-ReferenceFileHash "$PSScriptRoot/GlobalIllumination/Inputs.json").ToLowerInvariant();
                     relativeLimit=0.01;absoluteFloor=0.000001;configuration=$config;rhi=$backend;
-                    extent=$(if ($Coastal) {@(1280,800)} else {@(640,400)});
+                    extent=$(if ($Coastal) {@(1280,800)} else {@($FixtureExtent -split 'x' | ForEach-Object { [int]$_ })});
                     sourceIdentity=$sourceIdentity;binaries=$binaries;
                     adapterDriverIdentity=$bundle.environment.device.compatibilityIdentity;
                     build=$bundle.environment.build;shaderArtifactIdentity='unavailable; source and compiler binaries hashed'}

@@ -1668,7 +1668,8 @@ namespace gglab
 				IsGIProbeFixture(fixture) == (index == 14 || index == 15 || index == 16) &&
 				UsesGIPrimaryReceiverMaterials(fixture) == (index >= 10 && index <= 13) &&
 				UsesGIStaticCostPath(fixture) == (index == 4 || (index >= 12 && index <= 16)) &&
-				UsesGIStaticObservationPaths(fixture) == (index == 1 || index == 2 || index == 4 || index == 19) &&
+				UsesGIStaticObservationPaths(fixture) ==
+					(index == 1 || index == 2 || index == 4 || (index >= 17 && index <= 19)) &&
 				IsGIContractFixture(fixture) == (index >= 5 && index != 19),
 				"Named fixture capabilities preserve frozen IDs without ordering-based dispatch");
 		}

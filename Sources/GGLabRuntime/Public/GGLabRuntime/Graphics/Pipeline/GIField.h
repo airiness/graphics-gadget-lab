@@ -41,6 +41,8 @@ namespace gglab
 		float m_ViewBias = 0.3f;
 		// Update-only controls can inspect atlases without changing opaque lighting.
 		bool m_EnableReceiverSampling = true;
+		// Immutable transport choice; replace the field when switching feedback.
+		bool m_EnableFeedback = false;
 		GIFieldReadinessSettings m_Readiness;
 		// Analytic fixtures may supply incident constant radiance; geometry is still traced.
 		bool m_ConstantEnvironment = false;
@@ -68,6 +70,7 @@ namespace gglab
 		uint32_t m_StatusReadbackSlots = 0;
 		GIUpdateStatus m_UpdateStatus;
 		GIFieldReadinessSnapshot m_Readiness;
+		GIFieldFeedbackSnapshot m_Feedback;
 		bool m_Initialized = false;
 		bool m_Invalid = false;
 		std::string m_Reason;
@@ -81,7 +84,8 @@ namespace gglab
 	// Static scene and shader inputs require replacement. With readiness enabled,
 	// published lighting changes retain history and restart irradiance-only refresh;
 	// fixed-settling diagnostics retain the sealed-lighting contract. Lookup remains
-	// single-bounce; observed readiness does not establish reference convergence.
+	// single-bounce with feedback off; feedback uses the previous full update.
+	// Observed readiness does not establish reference convergence.
 	// Numerical failure rejects production preparation; update-only owners can retain
 	// raw evidence. A GPU failure flag prevents sampling invalid in-place contents.
 	class GIField final

@@ -32,7 +32,7 @@ CASES = {
 DEFAULTS = dict(fixture=0, seed=61051, depth=1, samples=64, batch_samples=64,
                 albedo=0, secondary_albedo=0, environment=0, ev100=10,
                 accumulate=True, probe_enabled=True, field_enabled=False,
-                field_sampling=True, field_readiness=True, receiver_diagnostics=True,
+                field_sampling=True, field_feedback=False, field_readiness=True, receiver_diagnostics=True,
                 field_refresh_noise=0., field_steady_noise=0., field_irradiance_width=0)
 
 
@@ -83,7 +83,7 @@ def validate_frame(frame, case, field):
     require(frame["content"]["labId"] == "gglab.lab.gi_reference" and
             p["fixture"] == case["fixture"] and p["albedo"] == p["secondary_albedo"] == 0 and
             p["environment"] == 0 and p["ev100"] == 10 and p["accumulate"] and
-            p["probe_enabled"] and p["field_enabled"] == field and p["field_sampling"] and
+            p["probe_enabled"] and p["field_enabled"] == field and p["field_sampling"] and not p["field_feedback"] and
             p["receiver_diagnostics"] and p["field_readiness"], "Wrong baseline fixture/field inputs")
     temporal = frame["temporal"]
     require(temporal["status"] == "disabled" and temporal["jitterPixels"] == [0, 0] and

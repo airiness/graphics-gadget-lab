@@ -158,7 +158,8 @@ namespace gglab
 		GraphicsPipelineSlot m_ReceiverMarkerSlot;
 		ResolvedRenderPipeline m_ReceiverMarkerPipeline;
 		State(GIFieldCreateInfo info) noexcept :
-			m_Info(std::move(info)), m_Workload(m_Info.m_RayScene, UpdateProfile(m_Info), true, m_Info.m_Readiness) {}
+			m_Info(std::move(info)), m_Workload(m_Info.m_RayScene, UpdateProfile(m_Info), true,
+				m_Info.m_Readiness, m_Info.m_EnableFeedback) {}
 	};
 
 	GIField::GIField(GIFieldCreateInfo info) noexcept :
@@ -194,6 +195,7 @@ namespace gglab
 			.m_StatusReadbackSlots = update.m_StatusReadbackSlots,
 			.m_UpdateStatus = update.m_UpdateStatus,
 			.m_Readiness = state.m_Workload.GetReadiness(),
+			.m_Feedback = state.m_Workload.GetFeedback(),
 			.m_Initialized = update.m_Initialized,
 			.m_Invalid = state.m_Update->IsInvalid() || update.m_Failed,
 			.m_Reason = state.m_Update->IsInvalid() ? "GI field submission failed or completion is unknown" : update.m_Reason,

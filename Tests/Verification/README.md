@@ -277,6 +277,35 @@ distance history. Readiness-disabled fixed-settling controls keep their legacy
 EMA. Noise inputs must be measured for the current integration schedule rather
 than copied from a prior implementation; none of them certifies reference accuracy.
 
+`gi-field-feedback` checks the opt-in `gi_reference.field_feedback` transport.
+The Lab control safely restarts the session and field; the Runtime creation flag
+is immutable. Trace reads the previous irradiance/distance/classification through
+declared SRVs, and Blend publishes sticky numerical failure before consumers.
+`GI.Field.Feedback` exports v1 pairs of uint4 records per probe: support counts
+(Valid, LowConfidence, NoValidSupport, OutsideCoverage), then initializing,
+incompatible, consumed age and one-based update. Completed CPU counters are in
+`GIFieldDiagnostics::m_Feedback`. The first update contributes zero higher-bounce
+energy; later full updates consume age one, including before Ready.
+
+The standalone `TestGIFieldFeedback.ps1` verifies safe toggles, support accounting,
+same-update readbacks, Trace-before-Blend graph versions, and an independent FP64
+previous-atlas hit-lighting oracle on F1. Off/disabled controls explicitly wait
+for 512 additional fence-completed updates in the same field generation and
+validate the exported GPU age against the settling receipt; `next-frame` exports
+alone do not establish settling. The runner records 120 consecutive Ready-plus-120
+observations and separate export-free GPU timing ranges on/off. Timing is scoped
+to the recorded configuration/extent, not production performance acceptance.
+Without `-ReferenceDirectory`, F4 feedback-on accuracy remains explicitly
+unqualified. Supply a matching `TestGIReferenceConvergence.ps1` run collected with
+`-FixtureExtent 320x200` and qualified by both seed/sample and depth doubling;
+the original fixture default remains 640x400. D=1 cannot certify feedback-on
+energy. `gi-field-feedback-contracts` runs the CPU/adversarial checks.
+
+The baseline and feedback runners accept `-ShaderCacheDirectory` with matching
+`dx12`/`vulkan` shader cache/artifact directories. Each run copies only those
+artifacts into its own state; scene/session settings remain isolated. This can
+avoid the host's bounded cold shader compilation startup timeout.
+
 ## Standalone measurements
 
 Measurements are separate from the catalog's correctness regressions. For the
