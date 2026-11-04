@@ -260,6 +260,23 @@ nonzero while retaining its measurements, artifact audits and identity seals.
 No renderer threshold, profile, GI default, whole-G3 acceptance or quiet timing
 qualification is changed. CPU/adversarial checks use `gi-field-baseline-contracts`.
 
+For settling diagnosis, the standalone runner accepts `-DiagnosticReadyOffsets
+512,1024,2048` (at most four increasing offsets in [512,8192]). Each additional
+120-update window waits for the original field's fence-completed Ready update
+plus that offset, then records its actual GPU update range and ROI luminance
+series. It must retain the same epoch, Ready stamp, camera and inputs. These
+windows appear as `diagnosticOnly` in `validation.json`: a later accurate window
+never replaces or grants the primary Ready-plus-120 qualification. F4 reference
+sampling can be bounded separately with `-InitialF4Samples` / `-MaximumSamples`.
+
+Readiness-enabled fields normalize their finite integration mass when switching
+from refresh to steady decay. The nominal profile decays are unchanged; the
+readiness snapshot reports the actual effective hysteresis for its completed
+update. Irradiance lighting refresh retains its rapid response without restarting
+distance history. Readiness-disabled fixed-settling controls keep their legacy
+EMA. Noise inputs must be measured for the current integration schedule rather
+than copied from a prior implementation; none of them certifies reference accuracy.
+
 ## Standalone measurements
 
 Measurements are separate from the catalog's correctness regressions. For the

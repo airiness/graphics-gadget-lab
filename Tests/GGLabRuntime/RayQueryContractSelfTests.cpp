@@ -42,6 +42,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <initializer_list>
 #include <limits>
@@ -644,8 +645,51 @@ namespace gglab
 				GIReceiverInspectionValidity::MalformedPayload, "A truncated GPU record cannot publish a valid receiver");
 		}
 
+		void RunGIFieldIntegrationTests(SelfTestContext& context) noexcept
+		{
+			GIFieldIntegrationHistory history;
+			const auto first = history.Next(0.5f, true);
+			context.Check(first.m_Hysteresis == 0 && first.m_Weight == 1 && history.m_Weight == 0,
+				"The first field sample has no invented black history and preview does not publish mass");
+			for (uint32_t update = 0; update < 64; ++update)
+			{
+				history = history.Next(0.5f, true);
+			}
+			context.Check(history.m_Hysteresis == 0.5f && std::abs(history.m_Weight - 2) < 1.0e-9,
+				"A short refresh retains its real two-unit integration mass");
+			const auto pending = history.Next(0.998f, false);
+			context.Check(history.m_Weight == 2 && pending.m_Weight == history.Next(0.998f, false).m_Weight,
+				"Discarding a preview cannot age the next submitted integration");
+			float value = 1.25f;
+			for (uint32_t update = 0; update < 120; ++update)
+			{
+				history = history.Next(0.998f, false);
+				value = std::lerp(1.0f, value, history.m_Hysteresis);
+			}
+			context.Check(std::abs(value - 1) < 0.01f && 0.25f * std::pow(0.998f, 120) > 0.19f,
+				"A noisy short refresh cannot gain the full steady mass and preserve a 19% residual");
+			context.Check(history.m_Hysteresis < 0.998f && history.m_Weight < 500,
+				"Finite integration approaches rather than immediately inventing the steady history");
+			for (uint32_t update = 0; update < 8192; ++update)
+			{
+				history = history.Next(0.998f, false);
+			}
+			context.Check(std::abs(history.m_Hysteresis - 0.998f) < 1.0e-6f &&
+				std::abs(history.m_Weight - 1.0 / (1.0 - double(0.998f))) < 0.001,
+				"Normalized finite history converges to the unchanged nominal decay");
+			const auto relit = history.Next(0.5f, true);
+			const auto distance = history.Next(0.998f, false);
+			context.Check(relit.m_Hysteresis == 0.5f && relit.m_Weight == 2 &&
+				distance.m_Hysteresis > 0.997f && distance.m_Weight > 499,
+				"Lighting refresh keeps rapid irradiance response without restarting distance history");
+			context.Check(history.Next(0.25f, false).m_Hysteresis == 0.25f &&
+				history.Next(0.0f, false).m_Hysteresis == 0,
+				"A smaller nominal decay caps retained mass and zero decay uses only the current sample");
+		}
+
 		void RunGIFieldTests(SelfTestContext& context) noexcept
 		{
+			RunGIFieldIntegrationTests(context);
 			GIFieldReadinessEstimator estimator;
 			const std::array<uint32_t, 3> readinessCounts{ 5, 5, 5 };
 			GIFieldReadinessSettings readinessSettings;

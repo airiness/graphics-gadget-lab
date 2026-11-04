@@ -6,6 +6,7 @@ param(
     [string[]]$CaseId = @('plane','sealed','sunroom','sunroom-back','black'),
     [ValidateRange(64,524288)][int]$InitialF4Samples = 4096,
     [ValidateRange(128,1048576)][int]$MaximumSamples = 32768,
+    [string[]]$DiagnosticReadyOffsets = @(),
     [string]$OutputDirectory,
     [string]$RunDirectory,
     [string]$Python = 'python',
@@ -18,6 +19,11 @@ Import-Module "$root/Scripts/Verification/VerificationSupport.psm1"
 $Configuration = @($Configuration | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
 $Rhi = @($Rhi | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
 $CaseId = @($CaseId | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
+$readyOffsets = @($DiagnosticReadyOffsets | ForEach-Object { $_ -split ',' } | ForEach-Object { [int]$_ })
+if ($readyOffsets.Count -gt 4 -or @($readyOffsets | Where-Object { $_ -lt 512 -or $_ -gt 8192 }).Count -or
+    (($readyOffsets | Sort-Object -Unique) -join ',') -ne ($readyOffsets -join ',')) {
+    throw 'Diagnostic offsets must be at most four strictly increasing completed-update offsets in [512,8192].'
+}
 $cases = @(
     @{id='plane';fixture=1;view='F1_Plane';counts=@(13,13,13)},
     @{id='sealed';fixture=2;view='F2_Interior';counts=@(9,9,9)},
@@ -55,6 +61,24 @@ function Require-Publication($Capture) {
         throw 'Required baseline observation did not publish.'
     }
 }
+function Capture-Window($Session, $Run, $Case, $Directory, $Label) {
+    $null = New-Item -ItemType Directory -Path $Directory -Force
+    $targets = @('GI.Field.ReceiverIrradiance','GI.Field.ReceiverQuery','GI.Receiver.Position',
+        'GI.Field.Readiness' | ForEach-Object { @{resource=$_} })
+    $exports = @(0..119 | ForEach-Object {
+        $frameTargets = @($targets)
+        if ($_ -eq 0) { $frameTargets += @{resource='GI.Field.Classification'} }
+        @{frame=$_;targets=$frameTargets;graph=($_ -eq 0 -or $_ -eq 119)}
+    })
+    Write-VerificationJson "$Directory/exports.json" $exports
+    $sequence = Invoke-VerificationSession sequence $Session @{ExpectedRunIdentity=$Run;
+        CameraPath="GI_Static_$($Case.view)";CaptureFrames='0,119';Source='scene';
+        ExportsFile="$Directory/exports.json";
+        OutputDirectory="$Directory/samples";TimeoutSeconds=$TimeoutSeconds;Label=$Label}
+    Write-VerificationJson "$Directory/sequence.json" $sequence
+    if ($sequence.sequence.state -ne 'completed' -or
+        $sequence.sequence.parameterPublication.outcome -ne 'Published') { throw 'Static baseline range did not complete.' }
+}
 try {
     $Python = (Get-Command $Python -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
     $source = Source-Identity
@@ -63,6 +87,7 @@ try {
     Write-VerificationJson "$output/binaries.json" $binaries
     Write-VerificationJson "$output/cases.json" @($cases.id)
     Write-VerificationJson "$output/backends.json" $Rhi
+    Write-VerificationJson "$output/diagnostic-ready-offsets.json" $readyOffsets
     foreach ($backend in $Rhi) {
         $session = 'gi-baseline-'+[Guid]::NewGuid().ToString('N').Substring(0,10)
         $start = $null
@@ -137,21 +162,26 @@ try {
                 Write-VerificationJson "$directory/settled/receipt.json" $settled
                 if ($settled.status -eq 'completed') {
                     Require-Publication $settled
-                    $targets = @('GI.Field.ReceiverIrradiance','GI.Field.ReceiverQuery','GI.Receiver.Position',
-                        'GI.Field.Readiness' | ForEach-Object { @{resource=$_} })
-                    $exports = @(0..119 | ForEach-Object {
-                        $frameTargets = @($targets)
-                        if ($_ -eq 0) { $frameTargets += @{resource='GI.Field.Classification'} }
-                        @{frame=$_;targets=$frameTargets;graph=($_ -eq 0 -or $_ -eq 119)}
-                    })
-                    Write-VerificationJson "$directory/exports.json" $exports
-                    $sequence = Invoke-VerificationSession sequence $session @{ExpectedRunIdentity=$run;
-                        CameraPath="GI_Static_$($case.view)";CaptureFrames='0,119';Source='scene';
-                        ExportsFile="$directory/exports.json";
-                        OutputDirectory="$directory/samples";TimeoutSeconds=$TimeoutSeconds;Label='baseline'}
-                    Write-VerificationJson "$directory/sequence.json" $sequence
-                    if ($sequence.sequence.state -ne 'completed' -or
-                        $sequence.sequence.parameterPublication.outcome -ne 'Published') { throw 'Static baseline range did not complete.' }
+                    Capture-Window $session $run $case $directory 'baseline'
+                    $anchor = $settled.products[0].metadata.readiness.giField
+                    foreach ($offset in $readyOffsets) {
+                        $observed = Wait-VerificationCondition -Poll {
+                            $current = Invoke-VerificationSession status $session @{ExpectedRunIdentity=$run}
+                            $field = $current.frame.giField
+                            if ($field.generation -ne $anchor.generation -or $field.state -ne 'Ready' -or
+                                $field.readyUpdate -ne $anchor.readyUpdate -or
+                                $field.summary.field.refreshEpoch -ne $anchor.summary.field.refreshEpoch) {
+                                throw 'Diagnostic window lost its original field epoch or Ready stamp.'
+                            }
+                            $current
+                        } -Until { param($r) $r.frame.giField.completedUpdates -ge $anchor.readyUpdate+$offset } `
+                            -TimeoutSeconds $TimeoutSeconds
+                        $diagnostic = "$directory/diagnostics/ready-$offset"
+                        $null = New-Item -ItemType Directory -Path $diagnostic -Force
+                        Write-VerificationJson "$diagnostic/admission.json" @{readyOffset=$offset;
+                            readyUpdate=$anchor.readyUpdate;field=$anchor.summary.field;status=$observed}
+                        Capture-Window $session $run $case $diagnostic "diagnostic-$offset"
+                    }
                 } elseif ($settled.status -ne 'failed' -or ($settled | ConvertTo-Json -Depth 24) -notmatch 'Unconverged') {
                     throw 'Settled baseline failed for a reason other than Unconverged.'
                 }

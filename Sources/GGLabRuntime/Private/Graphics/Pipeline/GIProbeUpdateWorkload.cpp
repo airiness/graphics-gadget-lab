@@ -174,6 +174,8 @@ namespace gglab
 			bool m_StorageInitialized = false;
 			GIFieldReadinessEstimator m_Readiness;
 			GIFieldReadinessSettings m_ReadinessSettings;
+			GIFieldIntegrationHistory m_IrradianceHistory;
+			GIFieldIntegrationHistory m_DistanceHistory;
 			uint64_t m_ReadinessEpoch = 0;
 			uint64_t m_RefreshEpoch = 1;
 			std::optional<GIObservationStamp> m_CompletedObservation;
@@ -709,8 +711,15 @@ namespace gglab
 		const auto profile = state.m_Profile;
 		const bool initialized = progress->m_StorageInitialized;
 		const auto readiness = GetReadiness();
-		const float updateHysteresis = readiness.m_Enabled && readiness.m_Refreshing ?
+		const float irradianceDecay = readiness.m_Enabled && readiness.m_Refreshing ?
 			progress->m_ReadinessSettings.m_RefreshHysteresis : profile.m_Hysteresis;
+		const bool refreshDistance = readiness.m_Refreshing && progress->m_RefreshDistance;
+		const float distanceDecay = readiness.m_Enabled && refreshDistance ?
+			progress->m_ReadinessSettings.m_RefreshHysteresis : profile.m_Hysteresis;
+		const auto irradianceHistory = progress->m_IrradianceHistory.Next(irradianceDecay, readiness.m_Refreshing);
+		const auto distanceHistory = progress->m_DistanceHistory.Next(distanceDecay, refreshDistance);
+		const float updateHysteresis = readiness.m_Enabled ? irradianceHistory.m_Hysteresis : irradianceDecay;
+		const float distanceHysteresis = readiness.m_Enabled ? distanceHistory.m_Hysteresis : distanceDecay;
 		const uint32_t update = static_cast<uint32_t>(progress->m_Diagnostics.m_SubmittedUpdates);
 		const uint32_t total = progress->m_Diagnostics.m_ProbeCount;
 		const bool record = !progress->m_Diagnostics.m_Failed &&
@@ -881,8 +890,7 @@ namespace gglab
 							.m_IrradianceInteriorWidth = profile.m_IrradianceInteriorWidth,
 							.m_ReadinessEnabled = readiness.m_Enabled ? 1u : 0u,
 							.m_ReadinessEpoch = static_cast<uint32_t>(progress->m_ReadinessEpoch),
-							.m_DistanceHysteresis = readiness.m_Enabled && readiness.m_Refreshing && progress->m_RefreshDistance ?
-								progress->m_ReadinessSettings.m_RefreshHysteresis : profile.m_Hysteresis,
+							.m_DistanceHysteresis = distanceHysteresis,
 							.m_ReadinessDistance = progress->m_RefreshDistance ? 1u : 0u };
 						builder.SideEffect();
 					},
@@ -975,7 +983,8 @@ namespace gglab
 							{
 								fieldUpdate->MarkRecorded(frame.m_FrameSerial);
 							}
-							execute.DeferCommit([progress, update, fieldUpdate, serial = frame.m_FrameSerial]
+							execute.DeferCommit([progress, update, fieldUpdate, irradianceHistory, distanceHistory,
+								readinessEnabled = readiness.m_Enabled, serial = frame.m_FrameSerial]
 								(const RGCommitContext&) noexcept
 								{
 									if (fieldUpdate)
@@ -986,6 +995,11 @@ namespace gglab
 										{
 											return;
 										}
+									}
+									if (readinessEnabled)
+									{
+										progress->m_IrradianceHistory = irradianceHistory;
+										progress->m_DistanceHistory = distanceHistory;
 									}
 									progress->m_StorageInitialized = true;
 									progress->m_Diagnostics.m_SubmittedUpdates = uint64_t(update) + 1;

@@ -282,11 +282,12 @@ def temporal_metrics(samples, reference):
                 temporalStabilityPassed=rms <= .02)
 
 
-def validate_readiness(field, previous, current_update):
+def validate_readiness(field, previous, current_update, ready_offset=120):
+    require(ready_offset >= 120, "A diagnostic cannot shorten the primary settling gate")
     require(field["schemaVersion"] == 1 and field["generation"] > 0 and field["enabled"] and
             not field["failed"] and not field["refreshing"] and field["state"] == "Ready" and
-            field["readyUpdate"] > 0 and field["completedUpdates"] >= field["readyUpdate"]+120,
-            "Observation is not Ready plus 120 completed updates")
+            field["readyUpdate"] > 0 and field["completedUpdates"] >= field["readyUpdate"]+ready_offset,
+            "Observation has not reached its completed-update offset after Ready")
     summary = field["summary"]
     stamp = summary["field"]
     require(summary["initialized"] and not summary["invalid"] and stamp["generation"] == field["generation"] and
@@ -300,7 +301,25 @@ def validate_readiness(field, previous, current_update):
                 "Temporal baseline skipped an update, replaced/refreshed the field or lost Ready")
 
 
-def inspect_case(directory, backend):
+def validate_offsets(offsets):
+    require(isinstance(offsets, list) and len(offsets) <= 4 and
+            all(type(offset) is int and 512 <= offset <= 8192 for offset in offsets) and
+            sorted(set(offsets)) == offsets, "Invalid diagnostic completed-update offsets")
+
+
+def validate_window_relation(previous, current):
+    require(previous["field"] == current["field"] and previous["readyUpdate"] == current["readyUpdate"] and
+            previous["captureBinding"] == current["captureBinding"] and
+            current["observedUpdates"][0] > previous["observedUpdates"][-1],
+            "Diagnostic windows changed field/Ready/inputs or overlap GPU updates")
+
+
+def selected_qualification(results, cross_rhi):
+    # Later diagnostic success never grants (or replaces) the primary qualification.
+    return all(r["passed"] for r in results) and all(r["passed"] for r in cross_rhi)
+
+
+def inspect_case(directory, backend, diagnostic_offsets=()):
     case = load(directory/"case.json")
     validate_case(case)
     reference, masks, reference_values, reference_frame = qualify_reference(directory)
@@ -320,6 +339,28 @@ def inspect_case(directory, backend):
         return dict(case=case["id"], passed=False, reference=reference, readinessPassed=False,
                     temporalStabilityQualified=False, reason="Unconverged", rois={})
     require(settled["publication"] == "Published", "Settled baseline was not published")
+    result = inspect_window(directory, case, reference, masks, reference_values, reference_frame, noise)
+    diagnostics = []
+    previous = result
+    for offset in diagnostic_offsets:
+        window = directory/"diagnostics"/f"ready-{offset}"
+        admission = load(window/"admission.json")
+        observed = admission["status"]["frame"]["giField"]
+        require(admission["readyOffset"] == offset and admission["readyUpdate"] == result["readyUpdate"] and
+                admission["field"] == result["field"] and observed["summary"]["field"] == result["field"] and
+                observed["state"] == "Ready" and observed["readyUpdate"] == result["readyUpdate"] and
+                observed["completedUpdates"] >= result["readyUpdate"]+offset,
+                "Diagnostic admission does not meet the original completed-update/epoch anchor")
+        current = inspect_window(window, case, reference, masks, reference_values, reference_frame, noise, offset)
+        validate_window_relation(previous, current)
+        current["diagnosticOnly"] = True
+        diagnostics.append(current)
+        previous = current
+    result["diagnostics"] = diagnostics
+    return result
+
+
+def inspect_window(directory, case, reference, masks, reference_values, reference_frame, noise, ready_offset=120):
     sequence = load(directory/"sequence.json")["sequence"]
     require(sequence["state"] == "completed" and sequence["frameCount"] == FRAME_COUNT and
             sequence["parameterPublication"]["outcome"] == "Published", "Incomplete static baseline sequence")
@@ -398,7 +439,7 @@ def inspect_case(directory, backend):
                 np.isfinite(probe_records[2::2, :3]).all(), "Mixed/nonfinite GPU observation updates")
         current_update = int(raw_updates[0])
         field = frame["readiness"]["giField"]
-        validate_readiness(field, previous, current_update)
+        validate_readiness(field, previous, current_update, ready_offset)
         summary = field["summary"]
         minimum = [-3.125, -1.3125, -3.0625] if case["fixture"] == 4 else (
             [-3, -3, -3] if case["fixture"] == 1 else [-4, -2, -4])
@@ -439,6 +480,7 @@ def inspect_case(directory, backend):
         else:
             energy_ok = result["maximumEnergyError"] <= .1
         result.update(pixels=reference["rois"][name]["pixels"], referenceMean=ref,
+                      luminanceSeries=(np.asarray(samples) @ LUMA).tolist(),
                       energyPassed=bool(energy_ok), chromaticityPassed=result["chromaticityError"] is None or
                       result["chromaticityError"] <= .02)
         result["passed"] = result["energyPassed"] and result["chromaticityPassed"] and result["temporalStabilityPassed"]
@@ -447,6 +489,7 @@ def inspect_case(directory, backend):
     return dict(case=case["id"], passed=reference["referenceSamplingQualified"] and ready and all(r["passed"] for r in rois.values()),
                 reference=reference, readinessPassed=ready, readyUpdate=first_field["readyUpdate"],
                 firstCompletedUpdate=first_field["completedUpdates"], field=first_field["summary"]["field"],
+                readyOffset=ready_offset, captureBinding=digest({k: v for k, v in binding.items() if k != "sequenceId"}),
                 frameSerials=serials, observedUpdates=updates, samples=FRAME_COUNT,
                 refreshNoiseInput=noise["refreshNoiseEstimate"], steadyNoiseInput=noise["steadyNoiseEstimate"],
                 temporalStabilityQualified=all(r["temporalStabilityPassed"] for r in rois.values()), rois=rois)
@@ -454,13 +497,16 @@ def inspect_case(directory, backend):
 
 def validate(root):
     case_ids, backends = load(root/"cases.json"), load(root/"backends.json")
+    offsets_path = root/"diagnostic-ready-offsets.json"
+    offsets = load(offsets_path) if offsets_path.exists() else []
+    validate_offsets(offsets)
     require(case_ids and len(set(case_ids)) == len(case_ids) and all(c in CASES for c in case_ids), "Invalid baseline cases")
     require(backends and len(set(backends)) == len(backends) and all(b in ("dx12", "vulkan") for b in backends),
             "Invalid baseline backends")
     results = []
     for backend in backends:
         for case_id in case_ids:
-            result = inspect_case(root/backend/case_id, backend)
+            result = inspect_case(root/backend/case_id, backend, offsets)
             results.append(dict(backend=backend, **result))
     cross_rhi = []
     if len(backends) == 2:
@@ -472,10 +518,11 @@ def validate(root):
                 a, b = (np.asarray(r["rois"][roi]["mean"]) for r in pair)
                 error = float(abs((a-b) @ LUMA)/max(abs(b @ LUMA), FLOOR))
                 cross_rhi.append(dict(case=case_id, roi=roi, relativeDifference=error, passed=error <= .02))
-    passed = all(r["passed"] for r in results) and all(r["passed"] for r in cross_rhi)
+    passed = selected_qualification(results, cross_rhi)
     return dict(schemaVersion=1, status="passed" if passed else "failed", selectedCasesQualified=passed,
                 referenceDepth=1, referenceDepthConvergenceQualified=False, wholeG3Qualified=False,
-                performanceQualified=False, extent=[320, 200], results=results, crossRhi=cross_rhi)
+                performanceQualified=False, diagnosticReadyOffsets=offsets,
+                extent=[320, 200], results=results, crossRhi=cross_rhi)
 
 
 def self_test():
@@ -509,12 +556,31 @@ def self_test():
     checks += 1
     for value in (constant[:-1], np.full_like(constant, np.nan), np.full_like(constant, np.inf), -constant):
         reject(lambda value=value: temporal_metrics(value, [2., 2., 2.]))
+    validate_offsets([512, 1024, 2048])
+    checks += 1
+    for offsets in ([120], [512, 512], [1024, 512], [8193], [True], [512.], list(range(512, 517))):
+        reject(lambda offsets=offsets: validate_offsets(offsets))
+    require(not selected_qualification([dict(passed=False, diagnostics=[dict(passed=True)])], []),
+            "A passing late diagnostic hid a failed primary window")
+    checks += 1
+    require(selected_qualification([dict(passed=True, diagnostics=[dict(passed=False)])], []),
+            "A diagnostic changed the selected primary quality gate")
+    checks += 1
+    window = dict(field=dict(generation=1), readyUpdate=96, captureBinding="frozen", observedUpdates=[220, 339])
+    later = dict(window, observedUpdates=[610, 729])
+    validate_window_relation(window, later)
+    checks += 1
+    for key, value in (("field", dict(generation=2)), ("readyUpdate", 97),
+                       ("captureBinding", "changed"), ("observedUpdates", [339, 458])):
+        reject(lambda key=key, value=value: validate_window_relation(window, dict(later, **{key: value})))
     field = dict(schemaVersion=1, generation=1, enabled=True, failed=False, refreshing=False, state="Ready",
                  readyUpdate=96, completedUpdates=216,
                  summary=dict(initialized=True, invalid=False, submittedUpdates=218,
                               field=dict(generation=1, epochOriginUpdate=0, refreshEpoch=0)))
     validate_readiness(field, None, 219)
     checks += 1
+    reject(lambda: validate_readiness(field, None, 219, 119))
+    reject(lambda: validate_readiness(field, None, 219, 512))
     for key, value in (("state", "Settling"), ("enabled", False), ("failed", True), ("refreshing", True),
                        ("completedUpdates", 215), ("readyUpdate", 0)):
         bad = copy.deepcopy(field)

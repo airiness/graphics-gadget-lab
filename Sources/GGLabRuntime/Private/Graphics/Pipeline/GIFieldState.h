@@ -27,6 +27,30 @@ namespace gglab
 	};
 	static_assert(sizeof(GIFieldProbeChange) == 32);
 
+	struct GIFieldIntegrationHistory
+	{
+		double m_Weight = 0;
+		float m_Hysteresis = 0;
+		bool m_Refreshing = false;
+
+		// Preview only. Publish the returned mass with the matching Submitted update.
+		[[nodiscard]] GIFieldIntegrationHistory Next(float decay, bool refreshing) const noexcept
+		{
+			const double maximumWeight = 1.0 / (1.0 - decay);
+			// A refresh keeps the atlas but deliberately reduces its old lighting's
+			// influence. Distance has its own history and never enters a lighting refresh.
+			const double previous = refreshing && !m_Refreshing && m_Weight > 0 ?
+				maximumWeight :
+				std::min(m_Weight, maximumWeight);
+			const double retained = decay * previous;
+			const double weight = retained + 1;
+			// A short 0.5 refresh history must not acquire the full mass of a 0.998
+			// steady filter. Normalize real integration weight, not fictitious samples.
+			return { .m_Weight = weight, .m_Hysteresis = static_cast<float>(retained / weight),
+				.m_Refreshing = refreshing };
+		}
+	};
+
 	class GIFieldReadinessEstimator final
 	{
 	public:
