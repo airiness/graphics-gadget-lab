@@ -4159,6 +4159,12 @@ namespace gglab
 			checks.Check(until([&]() { return abortedPublication; }) &&
 				!sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_FirstConsumed,
 				"An aborted publication frame keeps its stamp without becoming firstConsumed");
+			const auto* publicationFrame = runtime.GetFrameCaptureCoordinator()->GetLastFrameState();
+			checks.Check(publicationFrame && publicationFrame->m_Readiness.IsReady() &&
+				publicationFrame->m_FrameSerial ==
+					sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_Published &&
+				publicationFrame->m_Outcome == FrameCaptureFrameOutcome::Aborted,
+				"Build-time lighting publication updates readiness in that exact frame without inventing consumption");
 			probe.m_ParameterBuiltCallback = {};
 			checks.Check(until([&]() { return sequence.GetStatus()->IsTerminal(); }) &&
 				sequence.GetStatus()->m_State == FrameSequenceState::Completed &&

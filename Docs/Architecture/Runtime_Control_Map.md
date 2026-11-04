@@ -160,6 +160,14 @@ scope job and batch handles to their process before admission or lookup.
 `OnFrameBuilt` checks effects against the built view and frozen scene/table identities.
 Lab projections borrow only current-build inputs; missing inputs remain unknown.
 `OnFrameSubmitted` records consumption only after a successful EndFrame.
+Readiness is frozen after frame building, which may publish a completed IBL bake;
+its lighting gate and the built scene must describe the same generation.
+
+[FrameSequenceCoordinator](../../Sources/GGLabAppRuntime/Capture/FrameSequenceCoordinator.cpp)
+covers its own published lighting effect's Pending field refresh only while
+requested/built/field lighting generations match and field/scene/refresh identities
+remain fixed, until steady Ready. Ordinary after-ready capture readiness and
+temporal continuity are unchanged.
 
 Full [graph exports](../../Sources/GGLabRuntime/Private/Diagnostics/Builders/RenderGraphSnapshotJson.cpp)
 record culled passes and executed pass indices. Consumer-side checks are described

@@ -306,6 +306,53 @@ The baseline and feedback runners accept `-ShaderCacheDirectory` with matching
 artifacts into its own state; scene/session settings remain isolated. This can
 avoid the host's bounded cold shader compilation startup timeout.
 
+### Static-geometry published-lighting response experiment
+
+`gi-field-light-step` runs [TestGIFieldLightStep.ps1](TestGIFieldLightStep.ps1).
+It explicitly enables the default-off `gi_reference.lighting_step_experiment`
+in the F4 geometry to select Physical Sky, not the frozen constant-sky F7 fixture.
+Without this flag F4 keeps its original lighting, including its existing handling
+of the generic environment parameter. `gi_reference.sun_step_lux` is a Deferred lighting binding available
+only in this experiment; the existing restart-class `sun_lux` is unchanged.
+`GI_LightStep_F4_Floor` retains the authored view/exposure for 360 submitted frames,
+with a 10000-to-20000 lux event at frame 30. No field/session rebuild or temporal
+reset is permitted at the event. After initial publication, pending IBL requests
+must not pause GI: updates keep using the built frame's active bank until the
+new generation publishes. Feedback off/on and unjittered GI-only/Native
+TAA Final are separate replays. The standalone `-Tap` and `-Feedback` options
+select a smaller evidence scope; shader seed directories work as above.
+
+`sequenceGIFieldRefresh` advertises the narrow readiness binding: only the
+sequence's actual published/consumed lighting receipt, the current requested/built
+generation and an initialized unchanged field/scene can cover that field's refresh.
+Its epoch must remain fixed through the estimator's existing refresh-to-steady
+quiet-window handoff. That handoff requires an observed refresh-mode Ready and
+matching completed steady-mode measurement identity; coverage closes at steady
+Ready. Failed gates, unrelated changes and readiness loss after steady Ready still
+fail. A last frame that remains Pending or only refresh-mode Ready cannot complete
+the sequence. No estimator, hysteresis or threshold is changed; the first
+refresh-mode Ready and its own-endpoint error remain separately observable. Ordinary after-ready captures
+still require every gate; `expectEffects` grants no exception.
+
+Every frame exports its numerical tap and raw per-probe irradiance/change/update
+records. Final is scene-linear TAA output divided by recorded pre-exposure; its
+interior masks are replayed independently from the same unjittered authored view.
+The validator joins the event's `firstConsumed` to exact submitted-frame metadata,
+reports `t_enter`, `t_confirm` (30-frame hold), overshoot, endpoint RMS and the
+recipe's own endpoint error when the field first reports Ready. The 45/60-frame
+and 10% overshoot targets are reported, not redefined. Missing response is never
+counted as a timing pass. `gi-field-light-step-contracts` checks attribution and
+response arithmetic adversarially. The headless AppRuntime executable accepts
+`--suite <suite-id>` (or `all`); `gi-field-lighting-refresh` isolates the receipt,
+phase-handoff and rejection regressions, while `gpu-fault-lifecycle` includes the
+build-time publication/aborted-frame regression.
+
+This is an experiment/transport check, not response-quality qualification:
+independent reference amplitude/sign, reference-correlated readiness, downward
+steps, F7, G3 exit and production performance remain separate gates. Inspect
+`validation.json` even when transport passes; `observedResponseTargetsPassed`
+is distinct from `contractsPassed` and `responseQualityQualified`.
+
 ## Standalone measurements
 
 Measurements are separate from the catalog's correctness regressions. For the

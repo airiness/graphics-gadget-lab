@@ -5,10 +5,21 @@
 #include "GGLabRuntime/Graphics/Pipeline/GIFieldObservation.h"
 
 #include <cstddef>
+#include <cstdint>
 
 namespace gglab
 {
 	class GIFieldUpdateState;
+
+	// A new request must not pause an existing field or sample staging textures.
+	// Before the first accepted update, wait for initial publication as before.
+	[[nodiscard]] constexpr bool CanUpdateGIPublishedEnvironment(bool hasActiveBake,
+		uint64_t activeGeneration, uint64_t requestedGeneration, uint64_t builtGeneration,
+		bool hasSubmittedHistory) noexcept
+	{
+		return hasActiveBake && activeGeneration != 0 && activeGeneration == builtGeneration &&
+			(hasSubmittedHistory || activeGeneration == requestedGeneration);
+	}
 
 	// Shared GPU implementation. Experimental controls stay behind the experiment facade;
 	// GIField supplies a full-update profile and a separate settlement participant.

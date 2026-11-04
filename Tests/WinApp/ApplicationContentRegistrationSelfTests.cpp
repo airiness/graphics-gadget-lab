@@ -1698,6 +1698,22 @@ namespace gglab
 		}
 		context.Check(!EvaluateCameraPath(observationPath, GIStaticObservationFrameCount),
 			"Static GI observation paths have an exact bounded sample range");
+		const auto lightStepPath = MakeGILightStepObservationPath(observationView);
+		context.Check(IsCameraPathValid(lightStepPath) &&
+			lightStepPath.m_Id == "GI_LightStep_F4_Floor" &&
+			GetCameraPathFrameCount(lightStepPath) == GILightStepObservationFrameCount &&
+			lightStepPath.m_ManualEV100 == observationView.m_ManualEV100 &&
+			lightStepPath.m_ExposureCompensationEV == observationView.m_ExposureCompensationEV,
+			"The bounded light-step experiment has its own path without changing static qualification");
+		for (uint32_t frame = 0; frame < GILightStepObservationFrameCount; ++frame)
+		{
+			const auto pose = EvaluateCameraPath(lightStepPath, frame);
+			context.Check(pose &&
+				(pose->m_Position - observationView.m_Position).LengthSquared() == 0.0f &&
+				(pose->m_Target - observationView.m_Target).LengthSquared() == 0.0f &&
+				pose->m_Cut == (frame == 0),
+				"Light-step samples preserve pose and do not reset TAA at the lighting event");
+		}
 		constexpr std::array expectedTextures
 		{
 			-1, -1, 0, 0, 0, 0, 0, 0, 2, 3, 4, 5, 0, -1, -1, -1, -1, -1, -1, 0, -1, 6, -1,

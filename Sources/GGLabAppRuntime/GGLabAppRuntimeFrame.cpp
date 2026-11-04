@@ -682,6 +682,13 @@ namespace gglab
 			.m_BackBufferIndex = backBufferIndex,
 			.m_FrameSerial = rendererFrame.GetSerial(),
 		};
+		// Building can publish a completed IBL generation. Freeze readiness after
+		// that boundary so its gate agrees with the built scene and effect receipts.
+		RenderFrameBuildResult frame;
+		{
+			GGLAB_CPU_PROFILE_SCOPE("RenderHostFrameBuilder");
+			frame = m_RenderHost->BuildFrame(frameBuildRequest);
+		}
 		// Captures due this frame, including a sequence frame capture, are issued
 		// before its graph binds capture taps.
 		FrameCaptureFrameState captureFrameState = BuildCaptureFrameState({
@@ -712,11 +719,6 @@ namespace gglab
 				.m_ForcedReference = referenceSample ? &framePatch : nullptr,
 			});
 
-		RenderFrameBuildResult frame;
-		{
-			GGLAB_CPU_PROFILE_SCOPE("RenderHostFrameBuilder");
-			frame = m_RenderHost->BuildFrame(frameBuildRequest);
-		}
 		m_ParameterControl->OnFrameBuilt(frame.m_FrameSerial, frame.m_RenderScene.m_WorldLightingGeneration,
 			frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)],
 			&frame.m_RenderViews[utils::ToIndex(frame.m_DisplayViewId)], &frame.m_RenderScene);
@@ -812,7 +814,8 @@ namespace gglab
 			{
 				return m_ParameterControl->CoversReadinessGate(
 					ParameterBatchOwner::Sequence(m_FrameSequence->GetStatus()->m_SequenceId), gate);
-			}))
+			}, { .m_RequestedGeneration = m_RenderServiceBindings.m_Environment->GetBakeRequestGeneration(),
+				.m_BuiltGeneration = frame.m_RenderScene.m_WorldLightingGeneration }))
 		{
 			UpdateSequenceParameterEvents();
 			toolingFrame.Complete();

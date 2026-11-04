@@ -2,6 +2,7 @@
 #include "AssetTestServices.h"
 #include "Graphics/Pipeline/GIReferenceObservation.h"
 #include "Graphics/Pipeline/GIComputeDispatch.h"
+#include "Graphics/Pipeline/GIProbeUpdateWorkload.h"
 #include "Graphics/Pipeline/GIObservationSceneIdentity.h"
 #include "Graphics/Pipeline/GIObservationHistoryViews.h"
 #include "Graphics/RenderGraph/RGExecutionPlan.h"
@@ -57,6 +58,37 @@ namespace gglab
 {
 	namespace
 	{
+		void RunGIPublishedEnvironmentTests(SelfTestContext& context) noexcept
+		{
+			struct Case
+			{
+				bool m_HasActive;
+				uint64_t m_Active;
+				uint64_t m_Requested;
+				uint64_t m_Built;
+				bool m_HasSubmittedHistory;
+				bool m_Expected;
+			};
+			constexpr std::array cases
+			{
+				Case{ false, 0, 1, 0, false, false },
+				Case{ true, 0, 1, 0, true, false },
+				Case{ true, 7, 8, 7, false, false },
+				Case{ true, 7, 7, 7, false, true },
+				Case{ true, 7, 8, 7, true, true },
+				Case{ true, 7, 8, 8, true, false },
+				Case{ true, 8, 8, 7, true, false },
+				Case{ true, 8, 8, 8, true, true },
+				Case{ false, 7, 8, 7, true, false },
+			};
+			for (const auto& test : cases)
+			{
+				context.Check(CanUpdateGIPublishedEnvironment(test.m_HasActive, test.m_Active,
+					test.m_Requested, test.m_Built, test.m_HasSubmittedHistory) == test.m_Expected,
+					"GI waits for initial publication but keeps updating the built active bank during a later bake");
+			}
+		}
+
 		void RunSunVisibilityGraphTests(SelfTestContext& context) noexcept
 		{
 			class Samplers final : public RenderSamplerAccess
@@ -3061,6 +3093,7 @@ namespace gglab
 		RunRaySceneQueryTests(context);
 		RunProbeUpdateProfileTests(context);
 		RunGIFieldTests(context);
+		RunGIPublishedEnvironmentTests(context);
 		RunGIReceiverObservationTests(context);
 		RunGIReferenceObservationTests(context);
 		RunSpecularVisibilityTests(context);

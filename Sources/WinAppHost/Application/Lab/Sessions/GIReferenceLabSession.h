@@ -2,6 +2,7 @@
 #include "AssetPreparationTracker.h"
 #include "Application/Lab/Sessions/GIReferenceLabFixture.h"
 #include "Lab/LabSessionBase.h"
+#include "GGLabRuntime/Core/Math/Vector.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingOverrideBase.h"
 #include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabRuntime/Graphics/CameraReferenceView.h"
@@ -24,10 +25,12 @@ namespace gglab
 	class GIField;
 
 	inline constexpr uint32_t GIStaticObservationFrameCount = 120;
+	inline constexpr uint32_t GILightStepObservationFrameCount = 360;
 
 	// Replay the authored receiver view without moving it or changing exposure.
 	// Readiness and post-Ready settling remain the caller's separate prerequisites.
 	[[nodiscard]] CameraPath MakeGIStaticObservationPath(const CameraReferenceView& view) noexcept;
+	[[nodiscard]] CameraPath MakeGILightStepObservationPath(const CameraReferenceView& view) noexcept;
 
 	class GIReferenceLabSession final : public LabSessionBase
 	{
@@ -44,6 +47,10 @@ namespace gglab
 		[[nodiscard]] bool SupportsImmediateParameter(const LabParameterId& id) const noexcept override;
 		[[nodiscard]] std::optional<LabValue> ReadImmediateParameterFrameValue(
 			const LabParameterId& id, const LabParameterFrameContext& frame) const noexcept override;
+		[[nodiscard]] bool SupportsWorldLightingParameter(const LabParameterId& id) const noexcept override;
+		[[nodiscard]] std::unique_ptr<PreparedWorldLightingMutationBase> PrepareWorldLightingParameter(
+			const LabParameterId& id, const LabValue& value, WorldLightingControlBase& control,
+			uint64_t contentIdentity, std::string& error) noexcept override;
 		void BuildDiagnostics(LabDiagnosticsSnapshot& diagnostics) const noexcept override;
 		void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept override;
 		std::optional<FrameCaptureAssetBundle> GetCaptureAssetBundle() const noexcept override
@@ -68,6 +75,8 @@ namespace gglab
 		double m_InitializationGpuMilliseconds = 0;
 		std::map<std::string, std::pair<uint32_t, double>> m_ActivationGpu;
 		entt::entity m_ProbeEntity = entt::null;
+		entt::entity m_SunEntity = entt::null;
+		Vector3 m_AuthoredSunDirection = Vector3::Forward;
 		void BuildMaterialContract() noexcept;
 		void BuildVisibilityContract() noexcept;
 		void ApplyVisibilityMaterial() noexcept;

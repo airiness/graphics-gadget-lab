@@ -790,9 +790,12 @@ namespace gglab
 		if (!state.m_Profile.m_ConstantEnvironment)
 		{
 			const auto& bake = services.m_Environment->GetBakingStatus();
-			if (!bake.m_HasActiveBake || bake.m_ActiveGeneration != services.m_Environment->GetBakeRequestGeneration())
+			if (!CanUpdateGIPublishedEnvironment(bake.m_HasActiveBake, bake.m_ActiveGeneration,
+				services.m_Environment->GetBakeRequestGeneration(),
+				frame.m_RenderScene.m_WorldLightingGeneration, state.m_Progress->m_StorageInitialized))
 			{
-				// The bounded experiment starts only after its requested environment is published.
+				// Initial work waits for publication; existing work must follow the
+				// built active generation, not pause for a newer staging bake.
 				return;
 			}
 		}

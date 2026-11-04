@@ -63,8 +63,10 @@ GI stages share one recipe-owned import of their prepared `RayScene`. Reference
 and visibility observations cache primary matches, using paired raster positions
 only for primary coverage. Observation reset invalidates both cache and accumulation;
 submission and completion follow [frame settlement](Frame_Execution_Map.md#frame-settlement).
-Non-constant probe environments consume the requested IBL publication. Persistent
-resource exports define the next frame's import state, including after updates stop.
+Non-constant probe environments wait for initial requested IBL publication. After
+the first submitted update, later bakes do not interrupt use of the built frame's
+matching active bank; staging resources are never sampled. Persistent resource
+exports define the next frame's import state, including after updates stop.
 
 Scene and shader changes require field replacement. With readiness enabled,
 published lighting changes refresh irradiance in place.

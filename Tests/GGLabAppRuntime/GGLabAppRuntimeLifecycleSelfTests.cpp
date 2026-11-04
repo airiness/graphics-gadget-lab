@@ -784,25 +784,43 @@ int main(int argumentCount, char* arguments[])
 		}
 		return gglab::RunGpuFaultLifecycleChild(arguments[2], arguments[3]);
 	}
-	if (argumentCount != 1)
+	std::string_view selected = "all";
+	if (argumentCount == 3 && std::string_view(arguments[1]) == "--suite")
+	{
+		selected = arguments[2];
+	}
+	else if (argumentCount != 1)
 	{
 		return 2;
 	}
 	gglab::ConsoleSelfTestReporter reporter;
-	const bool lifecycleSucceeded = gglab::RunSelfTestSuite({
-		.m_Id = "app-runtime-lifecycle",
-		.m_Run = &gglab::RunLifecycleSelfTests,
-		}, reporter);
-	const bool frameCaptureSucceeded = gglab::RunSelfTestSuite({
-		.m_Id = "frame-capture-coordinator",
-		.m_Run = &gglab::RunFrameCaptureCoordinatorSelfTests,
-		}, reporter);
-	const bool watchSucceeded = gglab::RunSelfTestSuite({ .m_Id = "nonfinite-watch-coordinator",
-		.m_Run = &gglab::RunNonFiniteWatchCoordinatorSelfTests }, reporter);
-	const bool faultLifecycleSucceeded = gglab::RunSelfTestSuite({ .m_Id = "gpu-fault-lifecycle",
-		.m_Run = &gglab::RunGpuFaultLifecycleSelfTests }, reporter);
-	const bool parametersSucceeded = gglab::RunSelfTestSuite({
-		.m_Id = "parameter-transactions", .m_Run = &gglab::RunParameterTransactionSelfTests }, reporter);
-	return lifecycleSucceeded && frameCaptureSucceeded && watchSucceeded &&
-		faultLifecycleSucceeded && parametersSucceeded ? 0 : 1;
+	if (selected == "gi-field-lighting-refresh")
+	{
+		return gglab::RunSelfTestSuite({ .m_Id = selected,
+			.m_Run = &gglab::RunGIFieldLightingRefreshSelfTests }, reporter) ? 0 : 1;
+	}
+	const gglab::SelfTestSuiteDesc suites[]
+	{
+		{ "app-runtime-lifecycle", &gglab::RunLifecycleSelfTests },
+		{ "frame-capture-coordinator", &gglab::RunFrameCaptureCoordinatorSelfTests },
+		{ "nonfinite-watch-coordinator", &gglab::RunNonFiniteWatchCoordinatorSelfTests },
+		{ "gpu-fault-lifecycle", &gglab::RunGpuFaultLifecycleSelfTests },
+		{ "parameter-transactions", &gglab::RunParameterTransactionSelfTests },
+	};
+	bool matched = false;
+	bool succeeded = true;
+	for (const auto& suite : suites)
+	{
+		if (selected == "all" || selected == suite.m_Id)
+		{
+			matched = true;
+			const bool passed = gglab::RunSelfTestSuite(suite, reporter);
+			succeeded = passed && succeeded;
+		}
+	}
+	if (!matched)
+	{
+		return 2;
+	}
+	return succeeded ? 0 : 1;
 }

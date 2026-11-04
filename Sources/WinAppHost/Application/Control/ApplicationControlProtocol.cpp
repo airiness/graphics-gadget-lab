@@ -2216,6 +2216,7 @@ namespace gglab
 			{ "sequenceCaptureJobs", true },
 			{ "sequenceImmediateEvents", true },
 			{ "sequenceDeferredEvents", true },
+			{ "sequenceGIFieldRefresh", true },
 			{ "parameterFrameProvenance", true },
 			{ "sequenceEventDomains", Json::array({ "lighting" }) },
 			{ "sequenceTimingProducts", true },

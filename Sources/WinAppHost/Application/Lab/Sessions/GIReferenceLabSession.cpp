@@ -16,6 +16,7 @@
 #include "GGLabRuntime/Graphics/RenderServices.h"
 #include "GGLabRuntime/Graphics/Asset/AssetManager.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
+#include "GGLabRuntime/Graphics/WorldLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentAssetController.h"
 #include "GGLabRuntime/Graphics/Atmosphere.h"
@@ -79,6 +80,8 @@ namespace gglab
 		const LabParameterId IntensityId("gi_reference.intensity");
 		const LabParameterId YawId("gi_reference.yaw");
 		const LabParameterId SunId("gi_reference.sun_lux");
+		const LabParameterId SunStepId("gi_reference.sun_step_lux");
+		const LabParameterId LightStepExperimentId("gi_reference.lighting_step_experiment");
 		const LabParameterId SecondaryAlbedoId("gi_reference.secondary_albedo");
 		const LabParameterId AtmosphereId("gi_reference.atmosphere");
 		const LabParameterId MaterialCaseId("gi_reference.material_case");
@@ -106,7 +109,9 @@ namespace gglab
 		GIReferenceEnvironment ResolveEnvironment(const LabParameterSet& parameters,
 			GIReferenceFixture fixture) noexcept
 		{
-			if (IsCoastalGIFixture(fixture))
+			if (IsCoastalGIFixture(fixture) ||
+				(fixture == GIReferenceFixture::SunlitColoredRoom &&
+					parameters.Get(LightStepExperimentId, false)))
 			{
 				return GIReferenceEnvironment::PhysicalSky;
 			}
@@ -219,6 +224,16 @@ namespace gglab
 			.m_ExposureCompensationEV = view.m_ExposureCompensationEV, .m_Keys = { first, last } };
 	}
 
+	CameraPath MakeGILightStepObservationPath(const CameraReferenceView& view) noexcept
+	{
+		auto path = MakeGIStaticObservationPath(view);
+		path.m_Id = "GI_LightStep_" + view.m_Id;
+		path.m_Name = "Light step " + view.m_Name;
+		path.m_Purpose = "Static-geometry published-lighting response experiment (not F7)";
+		path.m_Keys.back().m_Frame = GILightStepObservationFrameCount - 1;
+		return path;
+	}
+
 	GIReferenceLabSession::GIReferenceLabSession(const LabSessionCreateInfo& info) noexcept :
 		LabSessionBase(GetDescriptor(), info, CreateRenderPipelineForwardPlus())
 	{
@@ -287,6 +302,15 @@ namespace gglab
 		GGLAB_UNUSED(parameters.Add({ .m_Id = SunId, .m_Name = "Contract sun illuminance", .m_Group = "Lighting contracts",
 			.m_Type = LabParameterType::Enum, .m_Impact = LabChangeImpact::RestartSession,
 			.m_DefaultValue = int32_t(10000), .m_EnumItems = { { 10000, "10000 lux" }, { 20000, "20000 lux" } } }));
+		GGLAB_UNUSED(parameters.Add({ .m_Id = LightStepExperimentId,
+			.m_Name = "Physical Sky light-step experiment (not F7)", .m_Group = "Lighting experiments",
+			.m_Type = LabParameterType::Bool, .m_Impact = LabChangeImpact::RestartSession,
+			.m_DefaultValue = false }));
+		GGLAB_UNUSED(parameters.Add({ .m_Id = SunStepId, .m_Name = "Published sun step illuminance",
+			.m_Group = "Lighting experiments", .m_Type = LabParameterType::Enum,
+			.m_Impact = LabChangeImpact::Immediate, .m_DefaultValue = int32_t(10000),
+			.m_EnumItems = { { 10000, "10000 lux" }, { 20000, "20000 lux" } },
+			.m_EffectClass = ParameterEffectClass::Deferred }));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = SecondaryAlbedoId, .m_Name = "Contract secondary albedo", .m_Group = "Lighting contracts",
 			.m_Type = LabParameterType::Enum, .m_Impact = LabChangeImpact::RestartSession,
 			.m_DefaultValue = int32_t(0), .m_EnumItems = { { 0, "Neutral (0.8,0.8,0.8)" }, { 1, "Red (0.8,0.05,0.05)" } } }));
@@ -383,6 +407,8 @@ namespace gglab
 		m_InitializationGpuMilliseconds = 0;
 		m_ActivationGpu.clear();
 		m_ProbeEntity = entt::null;
+		m_SunEntity = entt::null;
+		m_AuthoredSunDirection = Vector3::Forward;
 		const auto fixture = ReadFixture(GetParameters());
 		const bool coastal = IsCoastalGIFixture(fixture);
 		const float exposure = static_cast<float>(GetParameters().Get(ExposureId, int32_t(10)));
@@ -654,12 +680,20 @@ namespace gglab
 				CoastalSceneLightingProfiles.front().m_Inputs.m_SunDirection :
 				fixture == GIReferenceFixture::SunlitColoredRoom ? Vector3(0.2f, -1, -1) : Vector3(0, -1, 1);
 			direction.Normalize();
+			m_SunEntity = light;
+			m_AuthoredSunDirection = direction;
 			components::TransformComponent transform;
-			transform.m_Rotation = math::RotationFromTo(Vector3::Forward, direction);
+			transform.m_Rotation = fixture == GIReferenceFixture::SunlitColoredRoom &&
+				environment == GIReferenceEnvironment::PhysicalSky ?
+					ResolveWorldLightingRotation(m_AuthoredSunDirection) :
+					math::RotationFromTo(Vector3::Forward, direction);
 			registry.emplace<components::TransformComponent>(light, transform);
 			components::LightComponent sun;
 			sun.m_WorldSun = WorldSunSettings{
-				.m_PerpendicularIlluminanceLux = fixture == GIReferenceFixture::SunlitColoredRoom ? 10000.0f :
+				.m_PerpendicularIlluminanceLux = fixture == GIReferenceFixture::SunlitColoredRoom ?
+					ResolveEnvironment(GetParameters(), fixture) == GIReferenceEnvironment::PhysicalSky ?
+						static_cast<float>(GetParameters().Get(SunStepId, int32_t(10000))) :
+						10000.0f :
 					static_cast<float>(GetParameters().Get(SunId, int32_t(10000))) };
 			if (coastal)
 			{
@@ -681,6 +715,11 @@ namespace gglab
 			for (const auto& view : views)
 			{
 				observationPaths.push_back(MakeGIStaticObservationPath(view));
+				if (fixture == GIReferenceFixture::SunlitColoredRoom &&
+					GetParameters().Get(LightStepExperimentId, false))
+				{
+					observationPaths.push_back(MakeGILightStepObservationPath(view));
+				}
 			}
 		}
 		const auto firstView = views.front().m_Id;
@@ -1574,6 +1613,42 @@ namespace gglab
 				input.m_Resource.Index(), input.m_Resource.Generation(), input.m_SrvIndex, uint32_t(input.m_Format),
 				input.m_Width, input.m_Height, input.m_MipLevels, input.m_SelectedMip) });
 		}
+	}
+
+	bool GIReferenceLabSession::SupportsWorldLightingParameter(const LabParameterId& id) const noexcept
+	{
+		return id == SunStepId && ReadFixture(GetParameters()) == GIReferenceFixture::SunlitColoredRoom &&
+			ResolveEnvironment(GetParameters(), ReadFixture(GetParameters())) == GIReferenceEnvironment::PhysicalSky &&
+			m_World.GetRegistry().valid(m_SunEntity);
+	}
+
+	std::unique_ptr<PreparedWorldLightingMutationBase> GIReferenceLabSession::PrepareWorldLightingParameter(
+		const LabParameterId& id, const LabValue& value, WorldLightingControlBase& control,
+		uint64_t contentIdentity, std::string& error) noexcept
+	{
+		const auto publication = control.GetWorldLightingPublication();
+		const auto* lux = std::get_if<int32_t>(&value);
+		if (!SupportsWorldLightingParameter(id) || !lux || !publication.m_Requested ||
+			publication.m_Requested->m_SessionIdentity != contentIdentity)
+		{
+			error = "LightingPreparationFailed: the physical-sky light-step experiment is unavailable.";
+			return {};
+		}
+		const auto* transform = m_World.GetRegistry().try_get<components::TransformComponent>(m_SunEntity);
+		const auto expected = ResolveWorldLightingRotation(m_AuthoredSunDirection);
+		if (!transform || transform->m_Rotation.m_X != expected.m_X ||
+			transform->m_Rotation.m_Y != expected.m_Y || transform->m_Rotation.m_Z != expected.m_Z ||
+			transform->m_Rotation.m_W != expected.m_W)
+		{
+			error = "LightingPreparationFailed: the light-step experiment's authored sun direction changed.";
+			return {};
+		}
+		// Keep the original direction through rotation round trips: changing only lux
+		// must not introduce direction drift or make an identical request publish again.
+		auto inputs = publication.m_Requested->m_Inputs;
+		inputs.m_SunDirection = m_AuthoredSunDirection;
+		inputs.m_Sun.m_PerpendicularIlluminanceLux = static_cast<float>(*lux);
+		return control.PrepareWorldLightingInputs(m_World, contentIdentity, inputs, error);
 	}
 
 	void GIReferenceLabSession::TickPrepare() noexcept

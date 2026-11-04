@@ -4,6 +4,7 @@
 #include "Parameters/ParameterBatch.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/CameraPath.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIFieldObservation.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettingsPatch.h"
@@ -242,6 +243,13 @@ namespace gglab
 		}
 	};
 
+	// Application-owned inputs of the built frame, not client-supplied allowances.
+	struct FrameSequenceLightingState
+	{
+		uint64_t m_RequestedGeneration = 0;
+		uint64_t m_BuiltGeneration = 0;
+	};
+
 	// Pose the runtime applies to the active content's main camera for this frame.
 	struct FrameSequencePoseRequest
 	{
@@ -312,7 +320,8 @@ namespace gglab
 		// frame's capture when requested.
 		// False aborts this frame before rendering when admission must retry or fails.
 		[[nodiscard]] bool BeginFrame(const FrameCaptureFrameState& state,
-			const std::function<bool(const FrameCaptureGate&)>& coversReadinessGate = {}) noexcept;
+			const std::function<bool(const FrameCaptureGate&)>& coversReadinessGate = {},
+			FrameSequenceLightingState lighting = {}) noexcept;
 		// Called for every successful runtime submission, including ordinary frames
 		// that publish remaining profiles while the sequence is Finishing.
 		void OnFrameSubmitted(uint64_t renderFrameSerial,
@@ -350,6 +359,8 @@ namespace gglab
 			FrameSequenceObservation m_Observation;
 		};
 
+		[[nodiscard]] bool CoversGIFieldRefresh(const FrameCaptureFrameState& state,
+			const FrameCaptureGate& gate, FrameSequenceLightingState lighting) noexcept;
 		void Fail(std::string failure) noexcept;
 		void CancelCaptureJobs() noexcept;
 		void CompleteIfFinished() noexcept;
@@ -380,6 +391,10 @@ namespace gglab
 		std::vector<PendingCaptureJob> m_CaptureJobs;
 		bool m_AdmissionDeferred = false;
 		std::optional<FrameCaptureSettleKey> m_LastSettleKey;
+		std::optional<GIFieldIdentity> m_InitialGIField;
+		std::optional<GIFieldIdentity> m_LightingRefresh;
+		uint64_t m_ReadyLightingGeneration = 0;
+		bool m_RefreshPhaseReady = false;
 		std::vector<PendingGpuTimingFrame> m_PendingGpuTimingFrames;
 		uint64_t m_GpuTimingSubmissionCount = 0;
 		uint64_t m_LastTimingSubmissionSerial = 0;

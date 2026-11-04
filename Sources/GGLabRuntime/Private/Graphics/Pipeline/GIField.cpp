@@ -325,10 +325,13 @@ namespace gglab
 		if (!state.m_Info.m_ConstantEnvironment)
 		{
 			const auto bake = services.m_Environment->GetBakingStatus();
-			if (!bake.m_HasActiveBake || bake.m_ActiveGeneration != services.m_Environment->GetBakeRequestGeneration())
+			if (!CanUpdateGIPublishedEnvironment(bake.m_HasActiveBake, bake.m_ActiveGeneration,
+				services.m_Environment->GetBakeRequestGeneration(),
+				frame.m_RenderScene.m_WorldLightingGeneration,
+				state.m_Workload.GetDiagnostics().m_SubmittedUpdates != 0))
 			{
-				// IBL baking itself needs this frame to render. Skip only field work,
-				// otherwise waiting for publication prevents the producer from advancing.
+				// Render to advance the initial bake. Once history exists, continue
+				// using the built frame's active bank while a newer request is pending.
 				return RenderFrameValidationResult::Ready();
 			}
 		}
