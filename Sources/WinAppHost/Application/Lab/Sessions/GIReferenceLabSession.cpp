@@ -205,6 +205,19 @@ namespace gglab
 		}
 	}
 
+	CameraPath MakeGIStaticObservationPath(const CameraReferenceView& view) noexcept
+	{
+		const CameraPathKey first{ .m_Frame = 0, .m_Position = view.m_Position,
+			.m_Target = view.m_Target, .m_VerticalFovDegrees = view.m_VerticalFovDegrees };
+		auto last = first;
+		last.m_Frame = GIStaticObservationFrameCount - 1;
+		return { .m_Id = "GI_Static_" + view.m_Id, .m_Name = "Static " + view.m_Name,
+			.m_Purpose = "Fixed-receiver GI quality and temporal-stability observations",
+			.m_Version = view.m_ProfileVersion, .m_NearPlane = view.m_NearPlane,
+			.m_FarPlane = view.m_FarPlane, .m_ManualEV100 = view.m_ManualEV100,
+			.m_ExposureCompensationEV = view.m_ExposureCompensationEV, .m_Keys = { first, last } };
+	}
+
 	GIReferenceLabSession::GIReferenceLabSession(const LabSessionCreateInfo& info) noexcept :
 		LabSessionBase(GetDescriptor(), info, CreateRenderPipelineForwardPlus())
 	{
@@ -658,6 +671,14 @@ namespace gglab
 				m_World.m_Atmosphere = AtmosphereSettings{};
 			}
 		}
+		std::vector<CameraPath> observationPaths;
+		if (UsesGIStaticObservationPaths(fixture))
+		{
+			for (const auto& view : views)
+			{
+				observationPaths.push_back(MakeGIStaticObservationPath(view));
+			}
+		}
 		const auto firstView = views.front().m_Id;
 		const bool registered = GetCameraRig().SetReferenceViews(std::move(views));
 		const bool restored = GetCameraRig().RestoreReferenceView(firstView);
@@ -690,6 +711,13 @@ namespace gglab
 					{ .m_Frame = 8, .m_Position = { 1.5f, 1.5f, -1 }, .m_Target = { 1.5f, 1.5f, 0 }, .m_VerticalFovDegrees = 100 },
 					{ .m_Frame = 10, .m_Position = { 1.5f, 1.5f, 0 }, .m_Target = { 0, 0, 0 }, .m_VerticalFovDegrees = 100 },
 					{ .m_Frame = 12, .m_Position = { 1.5f, 1.5f, 1 }, .m_Target = { 1.5f, 1.5f, 0 }, .m_VerticalFovDegrees = 100 } } } });
+			GGLAB_ASSERT(paths);
+		}
+		if (!observationPaths.empty())
+		{
+			const auto existing = GetCameraRig().GetCameraPaths();
+			observationPaths.insert(observationPaths.end(), existing.begin(), existing.end());
+			const bool paths = GetCameraRig().SetCameraPaths(std::move(observationPaths));
 			GGLAB_ASSERT(paths);
 		}
 		m_RayScene = std::make_shared<RayScene>(RaySceneCapacity{},

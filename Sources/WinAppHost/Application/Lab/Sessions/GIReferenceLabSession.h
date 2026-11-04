@@ -3,12 +3,15 @@
 #include "Application/Lab/Sessions/GIReferenceLabFixture.h"
 #include "Lab/LabSessionBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingOverrideBase.h"
+#include "GGLabRuntime/Graphics/CameraPath.h"
+#include "GGLabRuntime/Graphics/CameraReferenceView.h"
 
 #include "GGLabRuntime/Graphics/GraphicsHandles.h"
 
 #include <entt/entity/entity.hpp>
 
 #include <array>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <map>
@@ -19,6 +22,12 @@ namespace gglab
 	class RayScene;
 	class GIProbeUpdateExperiment;
 	class GIField;
+
+	inline constexpr uint32_t GIStaticObservationFrameCount = 120;
+
+	// Replay the authored receiver view without moving it or changing exposure.
+	// Readiness and post-Ready settling remain the caller's separate prerequisites.
+	[[nodiscard]] CameraPath MakeGIStaticObservationPath(const CameraReferenceView& view) noexcept;
 
 	class GIReferenceLabSession final : public LabSessionBase
 	{

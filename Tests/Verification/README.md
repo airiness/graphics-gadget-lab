@@ -234,6 +234,31 @@ Its F1/F2/F4 quality measurements preserve passing and failing thresholds in
 reference convergence, target-extent acceptance or complete GI performance.
 The field coverage contract is a separate fixture, not frozen F8 qualification.
 
+### Single-bounce field baseline
+
+`RunVerification.ps1 -Suite gi-field-baseline -Configuration Develop -Rhi dx12,vulkan
+-Python $python` runs [TestGIFieldBaseline.ps1](TestGIFieldBaseline.ps1). It keeps
+transport unchanged and measures the existing feedback-off field on F1 plane,
+F2 interior, F4 floor/back and F10 at Native 320x200. `-CaseId` on the standalone
+script selects a smaller scope; it does not qualify omitted fixtures or adapters.
+
+Independent seeds at N and 2N must agree within 1% per frozen ROI for total, Sun
+and environment E; F4 additionally checks independent quadrature. D=1 sampling
+qualification is not depth convergence or per-pixel reference qualification.
+Bounded sample doubling preserves unqualified observations instead of increasing
+thresholds. The runner separately retains the zero-noise readiness job, measures
+refresh/steady change noise and explicitly adopts it with a different field seed.
+
+After Ready plus at least 120 completed updates, each `GI_Static_<reference-view>`
+path exports 120 consecutive receiver E/query/position and GPU update records.
+The validator rejects gaps, view/input/field-epoch changes, incomplete receivers
+and stale readiness. Energy/chromaticity and temporal RMS are separate gates;
+stable bias cannot pass accuracy, and accurate mean energy cannot hide flicker.
+Read `validation.json` even when a gate fails. A failed selected baseline exits
+nonzero while retaining its measurements, artifact audits and identity seals.
+No renderer threshold, profile, GI default, whole-G3 acceptance or quiet timing
+qualification is changed. CPU/adversarial checks use `gi-field-baseline-contracts`.
+
 ## Standalone measurements
 
 Measurements are separate from the catalog's correctness regressions. For the

@@ -88,6 +88,14 @@ namespace gglab
 			fixture == GIReferenceFixture::SmallSmoothReceiver || IsGIProbeFixture(fixture);
 	}
 
+	constexpr bool UsesGIStaticObservationPaths(GIReferenceFixture fixture) noexcept
+	{
+		return fixture == GIReferenceFixture::IsolatedPlane ||
+			fixture == GIReferenceFixture::ThickWallRoom ||
+			fixture == GIReferenceFixture::SunlitColoredRoom ||
+			fixture == GIReferenceFixture::BlackField;
+	}
+
 	constexpr bool IsGIContractFixture(GIReferenceFixture fixture) noexcept
 	{
 		return fixture == GIReferenceFixture::SunTransport ||

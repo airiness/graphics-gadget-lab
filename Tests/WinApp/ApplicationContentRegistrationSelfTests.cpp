@@ -6,6 +6,7 @@
 #include "Application/Demo/CoastalSceneReferenceViews.h"
 #include "Application/Lab/LightingContractReferenceViews.h"
 #include "Application/Lab/Sessions/GIReferenceLabFixture.h"
+#include "Application/Lab/Sessions/GIReferenceLabSession.h"
 #include "Application/Lab/AtmosphereRangeReferenceViews.h"
 #include "GGLabFoundation/Platform/Win/Win32TaskWorkerLifecycle.h"
 #include "GGLabTestCore/SelfTest.h"
@@ -16,6 +17,7 @@
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
 #include "GGLabRuntime/Graphics/CameraPath.h"
+#include "GGLabRuntime/Graphics/CameraReferenceView.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderProgramCatalog.h"
@@ -1666,9 +1668,35 @@ namespace gglab
 				IsGIProbeFixture(fixture) == (index == 14 || index == 15 || index == 16) &&
 				UsesGIPrimaryReceiverMaterials(fixture) == (index >= 10 && index <= 13) &&
 				UsesGIStaticCostPath(fixture) == (index == 4 || (index >= 12 && index <= 16)) &&
+				UsesGIStaticObservationPaths(fixture) == (index == 1 || index == 2 || index == 4 || index == 19) &&
 				IsGIContractFixture(fixture) == (index >= 5 && index != 19),
 				"Named fixture capabilities preserve frozen IDs without ordering-based dispatch");
 		}
+		const CameraReferenceView observationView{ .m_Id = "F4_Floor", .m_Name = "Floor",
+			.m_ProfileVersion = 3, .m_Position = { 0, 1.6f, 1.4f }, .m_Target = { 0, 0, -0.5f },
+			.m_VerticalFovDegrees = 90, .m_NearPlane = 0.2f, .m_FarPlane = 100,
+			.m_ManualEV100 = 10, .m_ExposureCompensationEV = 1 };
+		const auto observationPath = MakeGIStaticObservationPath(observationView);
+		context.Check(IsCameraPathValid(observationPath) &&
+			observationPath.m_Id == "GI_Static_F4_Floor" && observationPath.m_Version == 3 &&
+			GetCameraPathFrameCount(observationPath) == 120 &&
+			observationPath.m_NearPlane == observationView.m_NearPlane &&
+			observationPath.m_FarPlane == observationView.m_FarPlane &&
+			observationPath.m_ManualEV100 == observationView.m_ManualEV100 &&
+			observationPath.m_ExposureCompensationEV == observationView.m_ExposureCompensationEV,
+			"Static GI observations preserve the reference projection, exposure and version");
+		for (uint32_t frame = 0; frame < GIStaticObservationFrameCount; ++frame)
+		{
+			const auto pose = EvaluateCameraPath(observationPath, frame);
+			context.Check(pose &&
+				(pose->m_Position - observationView.m_Position).LengthSquared() == 0.0f &&
+				(pose->m_Target - observationView.m_Target).LengthSquared() == 0.0f &&
+				pose->m_VerticalFovDegrees == observationView.m_VerticalFovDegrees &&
+				pose->m_Cut == (frame == 0),
+				"Every static GI sample keeps the authored receiver pose without repeated cuts");
+		}
+		context.Check(!EvaluateCameraPath(observationPath, GIStaticObservationFrameCount),
+			"Static GI observation paths have an exact bounded sample range");
 		constexpr std::array expectedTextures
 		{
 			-1, -1, 0, 0, 0, 0, 0, 0, 2, 3, 4, 5, 0, -1, -1, -1, -1, -1, -1, 0, -1, 6, -1,
@@ -1742,8 +1770,8 @@ namespace gglab
 			"Coordinate conformance selection contributes seven stable shader demands");
 		checkSelectedDemand("gglab.lab.ray_query", 54,
 			"Ray-query selection contributes query, preview and pipeline-identity artifacts without changing raster startup demand");
-		checkSelectedDemand("gglab.lab.gi_reference", 70,
-			"GI diagnostics opt into receiver/reference/visibility/material shaders without changing ordinary raster startup demand");
+		checkSelectedDemand("gglab.lab.gi_reference", 71,
+			"GI diagnostics include probe picking alongside receiver/reference/visibility/material shaders");
 		for (const auto& lab : desktop.m_Labs)
 		{
 			if (lab.m_Descriptor.m_Id == LabId("gglab.lab.gi_reference"))
@@ -1752,6 +1780,9 @@ namespace gglab
 				context.Check(unique.AddRange(lab.m_ShaderPrograms) &&
 					unique.GetPrograms().size() == lab.m_ShaderPrograms.size(),
 					"GI diagnostics declare each optional shader demand once before set deduplication");
+				context.Check(std::ranges::find(lab.m_ShaderPrograms, shader_programs::GIProbePickingPixel) !=
+					lab.m_ShaderPrograms.end(),
+					"GI diagnostics explicitly demand the asynchronous probe-picking pixel program");
 			}
 		}
 		checkSelectedDemand("gglab.lab.coastal_ray_scene", 55,
