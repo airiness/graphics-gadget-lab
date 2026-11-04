@@ -69,8 +69,8 @@ try {
                         $null = New-Item -ItemType Directory -Path $path -Force
                         Set-ProbeViewerCase $session $run $case $TimeoutSeconds
                         # Allocation and completed-count evidence is deliberately outside the timed range.
-                        # Reapply that view to start Ready temporal continuity after activation.
-                        # An earlier unready epoch can otherwise leave the capture settle counter at zero.
+                        # The AfterReady capture reapplies that view on ready history after activation.
+                        # NextFrame could cut while loading and leave the later settle counter at zero.
                         $null = Invoke-ProbeViewerCapture $session $run "$path/allocation" ($case.kind -ne 'off') 32 $false $TimeoutSeconds $warmupView
                         $null = Wait-ProbeViewerWarmup -Session $session -Run $run -Frames $WarmupFrames `
                             -Directory "$path/warmup" -TimeoutSeconds $TimeoutSeconds

@@ -78,7 +78,9 @@ function Invoke-ProbeViewerCapture($Session, $Run, $Directory, [bool]$Enabled, [
         $products += @{kind='resource';targets=@(@{resource='GI.Probes.Counts'},
             @{resource='GI.Probes.RenderedIDs'},@{resource='GI.Field.Classification'})}
     }
-    $result = Invoke-VerificationSession capture $Session @{ExpectedRunIdentity=$Run;Timing='next-frame';
+    # AfterReady owns the ready-frame history restart, including a view requested while loading.
+    # NextFrame can publish before readiness and leave the later settle counter stuck at zero.
+    $result = Invoke-VerificationSession capture $Session @{ExpectedRunIdentity=$Run;Timing='after-ready';
         View=$View;
         SettleFrames=$SettleFrames;Products=(ConvertTo-Json -InputObject @($products) -Depth 8 -Compress);
         OutputDirectory=$Directory;TimeoutSeconds=$TimeoutSeconds}

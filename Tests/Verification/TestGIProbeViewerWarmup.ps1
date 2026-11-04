@@ -27,6 +27,10 @@ function Sample([uint64]$Serial, [uint32]$Settled) {
 }
 & $module {
     function script:Invoke-VerificationSession($Command, $Session, $Parameters) {
+        if ($Command -eq 'capture') {
+            $script:captureParameters = $Parameters
+            return [pscustomobject]@{status='completed';publication='Published'}
+        }
         if ($Command -ne 'status') { throw 'Warmup must observe submitted frames through status.' }
         if ($script:queue.Count -eq 0) { throw 'No submitted warmup progress.' }
         return $script:queue.Dequeue()
@@ -46,6 +50,14 @@ function Reject($Samples, [string]$Pattern, [string]$Name) {
         return
     }
     throw "Expected rejection: $Name"
+}
+# NextFrame can apply the view while loading and leave history permanently unready.
+# AfterReady owns the ready-frame cut/recovery before these allocation captures.
+foreach ($view in @('', 'F4_Floor')) {
+    $null = Invoke-ProbeViewerCapture fixture fixture-run "$output/allocation-$view" $false 32 $false 2 $view
+    $capture = & $module { $script:captureParameters }
+    Check ($capture.Timing -eq 'after-ready' -and $capture.SettleFrames -eq 32 -and
+        $capture.View -eq $view -and $capture.ExpectedRunIdentity -eq 'fixture-run') "allocation-ready-history-$view"
 }
 $proof = Run-Trace @((Sample 1000 10),(Sample 1060 70),(Sample 1120 130)) exact
 Check ($proof.submittedFrames -eq 120 -and $proof.samples.Count -eq 3) 'counts-additional-submitted-frames'

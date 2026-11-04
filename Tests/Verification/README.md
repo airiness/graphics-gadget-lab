@@ -366,8 +366,10 @@ viewer off, Classification, Irradiance and Classification plus one independent
 selected highlight at 1280x720, Native/TAA off, on F4 and the complete 12,870-probe
 Coastal volume. Defaults are budgets 256/2048/4096/16384, both depth modes, two repeats
 with reversed arm order and bracketing off baselines, and at least 120 verified
-submitted warmup frames after each arm and its allocation capture. The runner
-records a Ready settle-counter baseline and waits for the configured additional
+submitted warmup frames after each arm and its allocation capture. Allocation
+captures use AfterReady so a cold or rebuilt scene starts Ready temporal continuity
+before the warmup baseline; a NextFrame view cut during loading is insufficient.
+The runner records a Ready settle-counter baseline and waits for the configured additional
 submissions with unchanged run/content/parameter/view/field/viewer bindings.
 `warmup/submitted-frames.json` retains status observations and start/end serials;
 polling can overshoot the requested minimum. A completed next-frame capture does
