@@ -16,8 +16,9 @@ build/test commands.
 
 - Run commands below from the repository root in PowerShell on Windows with
   repository script execution enabled.
-- Select a Python environment with `jsonschema` and `numpy`; image-based checks
-  may also require `Pillow`. Pass its executable through `-Python`.
+- Select a Python environment with `jsonschema`, `numpy` and `Pillow`. The
+  contracts group includes the GI Viewer validator, which imports Pillow even
+  for its CPU self-test. Pass the Python executable through `-Python`.
 - GPU checks require the selected application build and its shader compiler/DXC
   deployment. Follow [AGENTS.md](../../AGENTS.md#build-and-verification) for the
   MSVC toolchain and build settings. Stop running applications before linking.
