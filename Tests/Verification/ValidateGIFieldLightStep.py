@@ -1,10 +1,12 @@
 """Audit a bounded Physical Sky step experiment, without claiming F7 or G3 exit.
 
-Timing uses the recipe's own settled endpoints. Independent reference amplitude,
-reference-correlated readiness and production performance remain unqualified.
+Timing always uses the recipe's own settled endpoints. Optional independently
+certified references add GI accuracy/sign/amplitude and two distinct Ready reports;
+Final stays a composite signal. This is not F7, whole-G3 or performance qualification.
 """
 import argparse
 import copy
+import hashlib
 import json
 from pathlib import Path
 
@@ -12,6 +14,7 @@ import numpy as np
 
 from ValidateGIFieldBaseline import camera_inputs, parameters
 from ValidateGIFieldReadiness import records as readiness_records
+from ValidateGIFieldLightStepReference import certified_endpoint, endpoint_inputs, roi_masks
 
 LUMA = np.array([.2126, .7152, .0722])
 FRAME_COUNT = 360
@@ -84,18 +87,6 @@ def response(values, t0, old, new, limit):
                 targetsPassed=bool(enter is not None and enter-t0 <= limit and overshoot <= .1))
 
 
-def roi_masks(position):
-    p = np.asarray(position)
-    require(p.shape == (1, 200, 320, 4) and np.isfinite(p).all(), "Invalid receiver-mask ABI")
-    x, y, z, covered = (p[0, ..., i] for i in range(4))
-    floor = (covered == 1) & (np.abs(y) < 1e-5) & (np.abs(x) <= 1.5) & (z >= -1.5) & (z <= .5)
-    masks = {"floor": floor, "red-adjacent": floor & (x <= -.5),
-             "green-adjacent": floor & (x >= .5),
-             "simple-patch": floor & (np.abs(x) <= .25) & (z >= -1) & (z <= 0)}
-    require(all(m.sum() >= 32 for m in masks.values()), "A frozen required experiment ROI is empty")
-    return masks
-
-
 def read_group(path):
     record = load(path)
     require(record["submission"]["completed"] and
@@ -103,7 +94,73 @@ def read_group(path):
     return record
 
 
-def validate_case(root, case):
+def invariant_inputs(frame):
+    inputs = endpoint_inputs(frame)
+    sun = inputs["scene"]["sun"]
+    for key in ("toaIlluminanceLux", "directIlluminance", "diskRadiance"):
+        sun.pop(key)
+    inputs["parameters"] = {k: v for k, v in parameters(frame).items() if k != "sun_step_lux"}
+    return inputs
+
+
+def reference_error(rgb, reference):
+    rgb, reference = np.asarray(rgb, dtype=np.float64), np.asarray(reference, dtype=np.float64)
+    require(rgb.ndim == 2 and rgb.shape[1] == 3 and reference.shape == (3,) and
+            np.isfinite(rgb).all() and np.isfinite(reference).all() and (rgb >= 0).all() and (reference >= 0).all(),
+            "Invalid independent endpoint series/reference")
+    y, ref_y = rgb @ LUMA, float(reference @ LUMA)
+    energy = float(np.max(np.abs(y-ref_y))/max(ref_y, FLOOR))
+    chroma = None
+    if reference.sum() > FLOOR:
+        if np.any(rgb.sum(axis=1) <= FLOOR):
+            return dict(energyError=energy, chromaticityError=None, temporalRms=None, passed=False,
+                        reason="MissingNonblackResponse")
+        chroma = float(np.max(np.abs(rgb[:, :2]/rgb.sum(axis=1)[:, None]-reference[:2]/reference.sum())))
+    rms = float(np.std(y)/max(ref_y, FLOOR))
+    return dict(meanRGB=rgb.mean(0).tolist(), referenceRGB=reference.tolist(),
+                meanLuminance=float(y.mean()), referenceLuminance=ref_y,
+                signedLuminanceBias=float((y.mean()-ref_y)/max(ref_y, FLOOR)),
+                energyError=energy, chromaticityError=chroma,
+                temporalRms=rms if len(rgb) > 1 else None, samples=len(rgb),
+                passed=bool(energy <= .1 and (chroma is None or chroma <= .02) and rms <= .02))
+
+
+def reference_response(old, new, ref_old, ref_new):
+    delta, ref_delta = float(new-old), float(ref_new-ref_old)
+    amplitude, ref_amplitude = abs(delta), abs(ref_delta)
+    return dict(signedChange=delta, referenceSignedChange=ref_delta,
+                amplitude=amplitude, referenceAmplitude=ref_amplitude, required=True,
+                referenceMeasurable=ref_amplitude >= FLOOR,
+                signPassed=bool(ref_amplitude < FLOOR or delta*ref_delta > 0),
+                amplitudePassed=bool(amplitude >= .5*ref_amplitude),
+                passed=bool(ref_amplitude >= FLOOR and delta*ref_delta > 0 and amplitude >= .5*ref_amplitude))
+
+
+def reference_metrics(rgb, references, first_ready, steady_ready):
+    old, new = references
+    if any(r["status"] != "ReferenceConverged" for r in references):
+        return dict(status="ReferenceUnconverged", responseQualityQualified=False,
+                    referenceAmplitudeQualified=False, referenceCorrelatedReadinessQualified=False)
+    rows = {}
+    for roi, values in rgb.items():
+        values = np.asarray(values)
+        a, b = np.asarray(old["rois"][roi]), np.asarray(new["rois"][roi])
+        amplitude = reference_response(values[:EVENT_FRAME].mean(0) @ LUMA, values[-HOLD:].mean(0) @ LUMA,
+                                       a @ LUMA, b @ LUMA)
+        rows[roi] = dict(oldEndpoint=reference_error(values[:EVENT_FRAME], a),
+                        newEndpoint=reference_error(values[-HOLD:], b), response=amplitude,
+                        firstRefreshReady=reference_error(values[first_ready:first_ready+1], b),
+                        firstSteadyReady=reference_error(values[steady_ready:steady_ready+1], b))
+    endpoints = all(r[k]["passed"] for r in rows.values() for k in ("oldEndpoint", "newEndpoint"))
+    amplitude = all(r["response"]["passed"] for r in rows.values())
+    return dict(status="ReferenceConverged", references=references, rois=rows,
+                endpointQualityPassed=endpoints, referenceAmplitudeQualified=amplitude,
+                responseQualityQualified=endpoints and amplitude,
+                referenceCorrelatedReadinessQualified=all(r[k]["passed"] for r in rows.values()
+                    for k in ("firstRefreshReady", "firstSteadyReady")))
+
+
+def validate_case(root, case, qualify_references=False):
     require(case["fixture"] == 4 and case["environment"] == 3 and case["view"] == "F4_Floor" and
             case["frameCount"] == FRAME_COUNT and case["eventFrame"] == EVENT_FRAME and
             case["oldLux"] == 10000 and case["newLux"] == 20000 and case["tap"] in ("gi", "final"),
@@ -143,6 +200,7 @@ def validate_case(root, case):
     updates = []
     raw_field = []
     series = {name: [] for name in masks}
+    rgb_series = {name: [] for name in masks}
     ready_frames = []
     steady_ready_frames = []
     refresh_ready = False
@@ -163,6 +221,7 @@ def validate_case(root, case):
                 temporal["status"] == ("disabled" if case["tap"] == "gi" else "active") and
                 not temporal["gtao"]["enabled"] and not frame["developmentTools"] and
                 not frame["sceneInputs"]["postProcess"]["bloomEnabled"], "Changed Native/tap composition")
+        require(invariant_inputs(frame) == invariant_inputs(frames[0]), "A non-step parameter or effective scene input changed")
         require(camera_inputs(frame) == camera_inputs(frames[0]) and
                 temporal["resetIdentity"] == frames[0]["temporal"]["resetIdentity"] and
                 frame["sceneInputs"]["exposure"] == frames[0]["sceneInputs"]["exposure"],
@@ -214,9 +273,13 @@ def validate_case(root, case):
             require(pre_exposure > 0, "Invalid Final pre-exposure")
             rgb /= pre_exposure
         for roi, mask in masks.items():
-            series[roi].append((rgb[mask].mean(axis=0) @ LUMA).item())
+            mean = rgb[mask].mean(axis=0)
+            rgb_series[roi].append(mean.tolist())
+            series[roi].append((mean @ LUMA).item())
     require(np.all(np.diff(updates) == 1), "Sequence skipped or inserted GI update frames")
-    require(ready_frames and steady_ready_frames and frames[-1]["readiness"]["ready"] and
+    require(ready_frames and steady_ready_frames and
+            measurement_phase(frames[ready_frames[0]]["readiness"]["giField"]) == "refresh" and
+            frames[-1]["readiness"]["ready"] and
             measurement_phase(frames[-1]["readiness"]["giField"]) == "steady",
             "The lighting refresh did not finish steady Ready")
     metrics = {}
@@ -227,22 +290,47 @@ def validate_case(root, case):
                             endpointTemporalRms=float(np.std(values[-HOLD:])/max(abs(new), FLOOR)),
                             errorAtFirstReady=float(abs(values[ready_frames[0]]-new)/max(abs(new), FLOOR)))
         require(metrics[roi]["endpointTemporalRms"] <= .02, "The measured endpoint is not temporally stable")
+    reference = dict(status="NotApplicableComposite" if case["tap"] == "final" else "NotRequested")
+    if qualify_references and case["tap"] == "gi":
+        for f in (initial, frames[-1]["readiness"]["giField"]):
+            require(f["completedUpdates"] >= f["readyUpdate"]+120, "Reference accuracy requires settled Ready plus 120")
+        mode = "multibounce" if case["feedback"] else "single-bounce"
+        binaries = {b["file"]: b["sha256"] for b in load(root/"binaries.json")}
+        # Match the existing convergence runner's ordinal, upper-case hash recipe.
+        source = load(root/"source-identity.json")
+        source_rows = [r["path"]+" "+r["sha256"] for r in source if
+                       r["path"].startswith(("Sources/", "Shaders/", "Tests/Verification/", "Scripts/Verification/"))]
+        source_identity = hashlib.sha256("\n".join(source_rows).encode()).hexdigest()
+        references = []
+        for lux, frame in ((10000, frames[0]), (20000, frames[-1])):
+            arm = "on" if case["feedback"] else "off"
+            ref_root = root/"refs"/f"{arm}-{lux}"/case["configuration"]/case["backend"]
+            require(load(ref_root/"recipe.json")["sourceIdentity"] == source_identity, "Reference/experiment sources differ")
+            references.append(certified_endpoint(ref_root, mode, lux, frame, masks, binaries))
+        reference = reference_metrics(rgb_series, references, ready_frames[0], steady_ready_frames[0])
     return dict(case=case, t0=t0, requested=effect["requested"], published=effect["published"],
                 firstConsumed=effect["firstConsumed"], firstFieldReady=ready_frames[0],
                 firstSteadyFieldReady=steady_ready_frames[0],
                 fieldGeneration=initial["generation"], refreshEpoch=target_epoch,
-                rawFieldMeanLuminance=raw_field, roiSeries=series, rois=metrics,
+                rawFieldMeanLuminance=raw_field, roiSeries=series, rois=metrics, reference=reference,
                 observedResponseTargetsPassed=all(m["targetsPassed"] for m in metrics.values()))
 
 
-def validate(root):
+def validate(root, qualify_references=False):
     cases = load(root/"cases.json")
     require(cases and len({c["directory"] for c in cases}) == len(cases), "Missing/duplicate experiment cases")
-    result = [validate_case(root, case) for case in cases]
-    return dict(contractsPassed=True, experimentOnly=True, responseQualityQualified=False,
-                referenceAmplitudeQualified=False, referenceCorrelatedReadinessQualified=False,
-                wholeG3Qualified=False, performanceQualified=False, observations=result,
-                observedResponseTargetsPassed=all(r["observedResponseTargetsPassed"] for r in result))
+    result = [validate_case(root, case, qualify_references) for case in cases]
+    references = [r["reference"] for r in result if r["case"]["tap"] == "gi"]
+    require(not qualify_references or references, "Reference qualification needs a GI-only arm")
+    reference_ready = bool(qualify_references and references and all(r["status"] == "ReferenceConverged" for r in references))
+    timing = all(r["observedResponseTargetsPassed"] for r in result)
+    return dict(contractsPassed=True, experimentOnly=True,
+                referenceStatus="ReferenceConverged" if reference_ready else (
+                    "ReferenceUnconverged" if qualify_references else "NotRequested"),
+                responseQualityQualified=bool(reference_ready and timing and all(r["responseQualityQualified"] for r in references)),
+                referenceAmplitudeQualified=bool(reference_ready and all(r["referenceAmplitudeQualified"] for r in references)),
+                referenceCorrelatedReadinessQualified=bool(reference_ready and all(r["referenceCorrelatedReadinessQualified"] for r in references)),
+                wholeG3Qualified=False, performanceQualified=False, observations=result, observedResponseTargetsPassed=timing)
 
 
 def self_test():
@@ -300,18 +388,36 @@ def self_test():
         except ValueError:
             rejected += 1
     require(rejected == 3, "Mixed, zero or incorrectly global readiness ages were accepted")
-    print(json.dumps(dict(status="passed", checks=21)))
+    require(reference_response(1, 1.4, 1, 2)["passed"] is False, "Missing half-reference response was accepted")
+    require(reference_response(1, 1.5, 1, 2)["passed"], "The half-amplitude boundary changed")
+    require(not reference_response(2, 1, 1, 2)["signPassed"], "Opposite GI-only sign was accepted")
+    require(not reference_response(1, 1, 1, 1)["passed"], "Unmeasurable reference cannot qualify")
+    require(reference_error(np.ones((30, 3)), np.ones(3))["passed"], "Matching independent endpoint failed")
+    require(not reference_error(np.ones((30, 3)), np.full(3, 2))["passed"], "Stable wrong energy was accepted")
+    require(not reference_error(np.array([[2., 1., 1.]]), np.ones(3))["passed"], "Chromaticity drift was accepted")
+    require(not reference_error(np.zeros((30, 3)), np.ones(3))["passed"], "Missing nonblack energy was accepted")
+    require(reference_metrics({}, [dict(status="ReferenceUnconverged")]*2, 30, 40)["status"] ==
+            "ReferenceUnconverged", "Unconverged references were blamed on DDGI")
+    rgb = np.r_[np.ones((30, 3)), np.full((330, 3), 2.)]
+    rgb[69] = 1.5
+    refs = [dict(status="ReferenceConverged", rois={"floor": [x]*3}) for x in (1., 2.)]
+    result = reference_metrics({"floor": rgb}, refs, 69, 120)
+    require(result["responseQualityQualified"] and not result["referenceCorrelatedReadinessQualified"] and
+            not result["rois"]["floor"]["firstRefreshReady"]["passed"] and
+            result["rois"]["floor"]["firstSteadyReady"]["passed"], "Two Ready times were conflated with endpoint accuracy")
+    print(json.dumps(dict(status="passed", checks=31)))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path)
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--qualify-references", action="store_true")
     args = parser.parse_args()
     if args.self_test:
         self_test()
     else:
         require(args.root is not None, "An experiment run directory is required")
-        result = validate(args.root)
+        result = validate(args.root, args.qualify_references)
         (args.root/"validation.json").write_text(json.dumps(result, indent=2, allow_nan=False)+"\n", encoding="utf-8")
         print(json.dumps({k: v for k, v in result.items() if k != "observations"}))

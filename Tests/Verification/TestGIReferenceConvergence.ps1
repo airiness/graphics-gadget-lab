@@ -9,6 +9,8 @@ param(
     [string[]]$Rhi = @('dx12','vulkan'),
     [string[]]$Views = @('F1_Plane','F2_Floor','F3_Floor','F4_Floor','F4_Back'),
     [switch]$Coastal,
+    [ValidateSet(0,10000,20000)][int]$LightingStepLux = 0,
+    [switch]$SingleBounce,
     [string]$OutputDirectory,
     [string]$RunDirectory,
     [switch]$Resume,
@@ -35,6 +37,11 @@ $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 if ($Coastal -and -not $PSBoundParameters.ContainsKey('Views')) {
     $Views = @('Retreat_SeaPassage','Retreat_Courtyard','GI_InteriorExterior','Retreat_Lounge')
 }
+if ($LightingStepLux) {
+    if ($Coastal -or $FixtureExtent -ne '320x200') { throw 'Lighting-step references require Native 320x200 fixtures.' }
+    if (-not $PSBoundParameters.ContainsKey('Views')) { $Views = @('F4_Floor') }
+    if ($Views.Count -ne 1 -or $Views[0] -ne 'F4_Floor') { throw 'Lighting-step references require F4_Floor.' }
+} elseif ($SingleBounce) { throw 'SingleBounce is only available for explicit lighting-step references.' }
 $coastalViews = @('Retreat_SeaPassage','Retreat_Courtyard','GI_InteriorExterior','Retreat_Lounge')
 if (@($Views | Where-Object { $_ -in $coastalViews }).Count -gt 0 -and -not $Coastal) {
     throw 'Coastal views require -Coastal and the frozen 1280x800 extent.'
@@ -50,7 +57,8 @@ if ($Resume) {
 } else {
     $output = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory -RunId ([Guid]::NewGuid().ToString('N'))
 }
-$validator = "$PSScriptRoot/ValidateGIReferenceConvergence.py"
+$validator = if ($LightingStepLux) { "$PSScriptRoot/ValidateGIFieldLightStepReference.py" }
+    else { "$PSScriptRoot/ValidateGIReferenceConvergence.py" }
 $summaries = @()
 $failed = $false
 $directory = $null
@@ -134,12 +142,38 @@ try {
                     sourceIdentity=$sourceIdentity;binaries=$binaries;
                     adapterDriverIdentity=$bundle.environment.device.compatibilityIdentity;
                     build=$bundle.environment.build;shaderArtifactIdentity='unavailable; source and compiler binaries hashed'}
+                if ($LightingStepLux) {
+                    $recipe.schemaVersion = 1
+                    $recipe.experiment = 'gi-field-light-step'
+                    $recipe.sunLux = $LightingStepLux
+                    $recipe.referenceMode = if ($SingleBounce) { 'single-bounce' } else { 'multibounce' }
+                    if ($SingleBounce) { $recipe.depths = @(1) }
+                }
                 $candidate = "$directory/recipe-$attempt.json"
                 Write-VerificationJson $candidate $recipe
                 if ($Resume) {
                     $null = Invoke-Planner $directory @('--check-recipe',$candidate)
                 } else { Copy-Item -LiteralPath $candidate -Destination "$directory/recipe.json" }
                 $plan = Invoke-Planner $directory @('--initialize','--audit')
+                if ($LightingStepLux) {
+                    # The Deferred binding exists only AFTER the experiment activation
+                    # has been consumed. Do not mix its creation with its first use.
+                    $activation = @(
+                        @{id='gi_reference.fixture';type='enum';value=4},
+                        @{id='gi_reference.environment';type='enum';value=3},
+                        @{id='gi_reference.lighting_step_experiment';type='bool';value=$true},
+                        @{id='gi_reference.field_enabled';type='bool';value=$false},
+                        @{id='gi_reference.field_feedback';type='bool';value=$false})
+                    $activated = Invoke-VerificationSession set $session @{ExpectedRunIdentity=$run;WaitConsumed=$true;
+                        Changes=(ConvertTo-Json -InputObject $activation -Compress);TimeoutSeconds=$TimeoutSeconds}
+                    Write-VerificationJson "$directory/activation-$attempt.json" $activated
+                    if (-not $activated.batch.succeeded) { throw 'Reference experiment activation failed.' }
+                    $sun = Invoke-VerificationSession set $session @{ExpectedRunIdentity=$run;WaitConsumed=$true;
+                        Changes="[{`"id`":`"gi_reference.sun_step_lux`",`"type`":`"enum`",`"value`":$LightingStepLux}]";
+                        TimeoutSeconds=$TimeoutSeconds}
+                    Write-VerificationJson "$directory/sun-$attempt.json" $sun
+                    if (-not $sun.batch.succeeded) { throw 'Reference endpoint illumination was not consumed.' }
+                }
                 $targets = @('GI.Reference.Irradiance','GI.Reference.Diagnostics','GI.Reference.Position',
                     'GI.Reference.Identity','GI.Receiver.HitAlbedo','GI.Reference.PathDiagnostics',
                     'GI.Reference.SunIrradiance','GI.Reference.EnvironmentIrradiance') | ForEach-Object {@{resource=$_}}
@@ -186,7 +220,7 @@ try {
                     Write-VerificationJson "$captureDirectory/case.json" $case
                     if ($capture.status -eq 'cancelled') { throw 'Reference capture cancelled.' }
                     if ($capture.status -ne 'completed' -or $capture.publication -ne 'Published') { throw 'Incomplete reference capture.' }
-                    if ($case.fixture -in @(12,13)) {
+                    if ($LightingStepLux -or $case.fixture -in @(12,13)) {
                         $receiverTargets = @('GI.Receiver.FaceNormal','GI.Receiver.VertexNormal','GI.Receiver.ShadingNormal',
                             'GI.Receiver.DiffuseWeight','GI.Receiver.Position','DisplayView.DepthBuffer') | ForEach-Object {@{resource=$_}}
                         $receiverProducts = @(@{kind='resource';targets=@($receiverTargets)},@{kind='graph'}) | ConvertTo-Json -Depth 8 -Compress

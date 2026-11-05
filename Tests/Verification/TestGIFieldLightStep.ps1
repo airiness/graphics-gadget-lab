@@ -5,6 +5,11 @@ param(
     [string[]]$Rhi = @('dx12','vulkan'),
     [string[]]$Tap = @('gi','final'),
     [string[]]$Feedback = @('off','on'),
+    [switch]$QualifyReferences,
+    [ValidateRange(1,131072)][int]$ReferenceInitialSamples = 4096,
+    [ValidateRange(2,262144)][int]$ReferenceMaximumSamples = 262144,
+    [ValidateSet(16,32)][int]$ReferenceMaximumDepth = 32,
+    [ValidateRange(1,3600)][int]$ReferenceMaximumSeconds = 3600,
     [string]$ShaderCacheDirectory,
     [string]$OutputDirectory,
     [string]$RunDirectory,
@@ -25,6 +30,7 @@ if ($Configuration.Count -ne 1 -or $Configuration[0] -notin @('Debug','Develop',
     -not $Feedback.Count -or @($Feedback | Where-Object { $_ -notin @('off','on') }).Count) {
     throw 'Invalid light-step configuration.'
 }
+if ($QualifyReferences -and 'gi' -notin $Tap) { throw 'Independent reference qualification requires a GI-only arm.' }
 if (-not $OutputDirectory -and -not $RunDirectory) { $OutputDirectory = "$root/Build/Validation/GIFieldLightStep" }
 $output = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory `
     -RunId ([Guid]::NewGuid().ToString('N').Substring(0,8))
@@ -51,6 +57,23 @@ try {
     $binaries = Get-VerificationBinaryIdentity $root $Configuration[0]
     Write-VerificationJson "$output/source-identity.json" $source
     Write-VerificationJson "$output/binaries.json" $binaries
+    if ($QualifyReferences) {
+        foreach ($feedbackMode in $Feedback) {
+            $mode = if ($feedbackMode -eq 'on') { 'multibounce' } else { 'single-bounce' }
+            foreach ($lux in @(10000,20000)) {
+                $parameters = @{Configuration=$Configuration;Rhi=$Rhi;Views=@('F4_Floor');FixtureExtent='320x200';
+                    LightingStepLux=$lux;SingleBounce=($feedbackMode -eq 'off');Python=$Python;
+                    InitialF4Samples=$ReferenceInitialSamples;MaximumSamples=$ReferenceMaximumSamples;
+                    MaximumDepth=$ReferenceMaximumDepth;MaximumSeconds=$ReferenceMaximumSeconds;
+                    TimeoutSeconds=$TimeoutSeconds;RunDirectory="$output/refs/$feedbackMode-$lux"}
+                if ($ShaderCacheDirectory) { $parameters.ShaderCacheDirectory = $ShaderCacheDirectory }
+                $execution = Invoke-VerificationScript "$PSScriptRoot/TestGIReferenceConvergence.ps1" $parameters
+                Write-VerificationJson "$output/refs/$feedbackMode-$lux/runner.json" $execution
+                if ($execution.exitCode -ne 0) { throw "Reference acquisition failed: $mode $lux lux" }
+                # ReferenceUnconverged is retained as unavailable quality, not a GI failure.
+            }
+        }
+    }
     foreach ($backend in $Rhi) {
         $script:session = 'gi-step-'+[Guid]::NewGuid().ToString('N').Substring(0,10)
         $start = $null; $failure = $null
@@ -75,7 +98,7 @@ try {
                 foreach ($tapMode in $Tap) {
                     $directory = "$output/$backend/$feedbackMode-$tapMode"
                     $null = New-Item -ItemType Directory -Path $directory -Force
-                    $case = @{backend=$backend;feedback=($feedbackMode -eq 'on');tap=$tapMode;
+                    $case = @{backend=$backend;configuration=$Configuration[0];feedback=($feedbackMode -eq 'on');tap=$tapMode;
                         fixture=4;environment=3;view='F4_Floor';frameCount=360;eventFrame=30;oldLux=10000;newLux=20000;
                         directory="$backend/$feedbackMode-$tapMode"}
                     $cases += $case
@@ -144,12 +167,22 @@ try {
     Assert-VerificationIdentity $source $finalSource 'Light-step sources changed during verification.'
     Assert-VerificationIdentity $binaries $finalBinaries 'Light-step binaries changed during verification.' -Depth 2
     Assert-VerificationArtifacts $root $output $Python 'Light-step artifact audit failed'
-    & $Python "$PSScriptRoot/ValidateGIFieldLightStep.py" --root $output
+    $analysisOptions = @('--root',$output)
+    if ($QualifyReferences) { $analysisOptions += '--qualify-references' }
+    & $Python "$PSScriptRoot/ValidateGIFieldLightStep.py" @analysisOptions
     if ($LASTEXITCODE -ne 0) { throw 'Light-step evidence validation failed.' }
     Assert-VerificationIdentity $source (Source-Identity) 'Light-step sources changed during analysis.'
     Assert-VerificationIdentity $binaries (Get-VerificationBinaryIdentity $root $Configuration[0]) `
         'Light-step binaries changed during analysis.' -Depth 2
-    $result = @{ok=$true;status='passed';experimentOnly=$true;responseQualityQualified=$false;wholeG3Qualified=$false;directory=$output}
+    $validation = Get-Content -LiteralPath "$output/validation.json" -Raw | ConvertFrom-Json
+    $passed = $validation.observedResponseTargetsPassed -and (-not $QualifyReferences -or $validation.responseQualityQualified)
+    $status = if ($passed) { 'passed' } elseif ($validation.referenceStatus -eq 'ReferenceUnconverged') {
+        'ReferenceUnconverged'
+    } else { 'failed' }
+    $result = @{ok=[bool]$passed;status=$status;experimentOnly=$true;
+        responseQualityQualified=$validation.responseQualityQualified;referenceStatus=$validation.referenceStatus;
+        referenceCorrelatedReadinessQualified=$validation.referenceCorrelatedReadinessQualified;
+        wholeG3Qualified=$false;directory=$output}
 } catch { $result = @{ok=$false;status='failed';experimentOnly=$true;responseQualityQualified=$false;
     wholeG3Qualified=$false;directory=$output;error=$_.Exception.Message} }
 Write-VerificationJson "$output/result.json" $result

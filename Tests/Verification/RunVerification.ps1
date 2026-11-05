@@ -73,7 +73,9 @@ $catalog = @(
     @{ name = 'gi-field-feedback'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIFieldFeedback.ps1' }) },
     @{ name = 'gi-field-feedback-contracts'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/ValidateGIFieldFeedback.py'; arguments = @('--self-test') }) },
     @{ name = 'gi-field-light-step'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIFieldLightStep.ps1' }) },
-    @{ name = 'gi-field-light-step-contracts'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/ValidateGIFieldLightStep.py'; arguments = @('--self-test') }) },
+    @{ name = 'gi-field-light-step-contracts'; group = 'contracts'; steps = @(
+        @{ path = 'Tests/Verification/ValidateGIFieldLightStep.py'; arguments = @('--self-test') },
+        @{ path = 'Tests/Verification/ValidateGIFieldLightStepReference.py'; arguments = @('--self-test') }) },
     @{ name = 'gi-invalid-updates'; group = 'gpu'; configurations = @('Debug', 'Develop'); steps = @(@{ path = 'Tests/Verification/TestGIInvalidUpdates.ps1' }) },
     @{ name = 'gi-probe-update'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIProbeUpdate.ps1' }) },
     @{ name = 'gi-specular-visibility'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGISpecularVisibility.ps1' }) },

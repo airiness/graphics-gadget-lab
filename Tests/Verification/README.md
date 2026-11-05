@@ -347,11 +347,45 @@ response arithmetic adversarially. The headless AppRuntime executable accepts
 phase-handoff and rejection regressions, while `gpu-fault-lifecycle` includes the
 build-time publication/aborted-frame regression.
 
-This is an experiment/transport check, not response-quality qualification:
-independent reference amplitude/sign, reference-correlated readiness, downward
-steps, F7, G3 exit and production performance remain separate gates. Inspect
-`validation.json` even when transport passes; `observedResponseTargetsPassed`
-is distinct from `contractsPassed` and `responseQualityQualified`.
+By default this is an experiment/transport check, not response-quality
+qualification. Add `-QualifyReferences` to collect independent 10000/20000-lux
+endpoints before the selected replays. This reuses the convergence runner's
+explicit `-LightingStepLux <10000|20000> -FixtureExtent 320x200` mode, with
+`-SingleBounce` for feedback off; feedback on requires sample- and depth-converged
+multibounce transport. It does not reuse or reinterpret constant-sky F4/F7
+certificates. All four required ROIs, RGB/luminance and total/sun/environment
+components retain the independent-seed, N/2N, <1% reference gates and 1e-6 floor.
+D=1 qualifies sampling only, never depth convergence. Default acquisition caps
+are 262144 samples, depth 32 and 3600 seconds per endpoint/backend; the
+`-ReferenceInitialSamples`, `-ReferenceMaximumSamples`, `-ReferenceMaximumDepth`
+and `-ReferenceMaximumSeconds` options can bound the run further.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/TestGIFieldLightStep.ps1 `
+    -Configuration Develop -Rhi dx12,vulkan -Tap gi,final -Feedback off,on `
+    -QualifyReferences -ShaderCacheDirectory Build/Validation/GIFieldFeedback/Seeds `
+    -Python <numpy-python> -RunDirectory <new-run-directory>
+```
+
+Reference records must match source, binaries, backend/device, effective lighting,
+authored view and exact receiver masks. GI-only endpoint windows must be Ready
+plus 120 updates and retain the 10% energy, 2% chromaticity and 2% temporal RMS
+gates. Every declared required ROI must have the reference sign and at least half
+its independent amplitude. Response timing/bands still use the realtime recipe's
+own endpoints. Final is never compared to irradiance or forced to share its sign.
+The original transport runner also fails if its own response targets fail.
+
+`validation.json` separates `contractsPassed`, `observedResponseTargetsPassed`,
+`referenceStatus`, `referenceAmplitudeQualified`, `responseQualityQualified` and
+`referenceCorrelatedReadinessQualified`. Budget exhaustion is
+`ReferenceUnconverged`, not a DDGI failure or a passing quality result. Errors at
+the first completed refresh Ready and first steady Ready are reported separately;
+these single-frame energy/chromaticity observations do not certify temporal RMS
+or redefine estimator Ready as reference convergence. Their diagnostic flag is
+independent of settled endpoint/response quality. The contract suite exercises
+both analyzers, including missing response, wrong sign, biased but stable energy,
+phase provenance and bounded reference exhaustion. Downward/small steps, frozen
+F7, G3 exit, TAA-confidence behavior and production performance remain separate.
 
 ## Standalone measurements
 
