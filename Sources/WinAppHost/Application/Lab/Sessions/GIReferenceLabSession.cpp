@@ -309,7 +309,10 @@ namespace gglab
 		GGLAB_UNUSED(parameters.Add({ .m_Id = SunStepId, .m_Name = "Published sun step illuminance",
 			.m_Group = "Lighting experiments", .m_Type = LabParameterType::Enum,
 			.m_Impact = LabChangeImpact::Immediate, .m_DefaultValue = int32_t(10000),
-			.m_EnumItems = { { 10000, "10000 lux" }, { 20000, "20000 lux" } },
+			.m_EnumItems = {
+				{ 10000, "10000 lux" },
+				{ 12000, "12000 lux" },
+				{ 20000, "20000 lux" } },
 			.m_EffectClass = ParameterEffectClass::Deferred }));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = SecondaryAlbedoId, .m_Name = "Contract secondary albedo", .m_Group = "Lighting contracts",
 			.m_Type = LabParameterType::Enum, .m_Impact = LabChangeImpact::RestartSession,

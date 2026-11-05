@@ -315,7 +315,14 @@ Without this flag F4 keeps its original lighting, including its existing handlin
 of the generic environment parameter. `gi_reference.sun_step_lux` is a Deferred lighting binding available
 only in this experiment; the existing restart-class `sun_lux` is unchanged.
 `GI_LightStep_F4_Floor` retains the authored view/exposure for 360 submitted frames,
-with a 10000-to-20000 lux event at frame 30. No field/session rebuild or temporal
+with the selected illuminance event at frame 30. The default `-Step increase`
+remains 10000-to-20000 lux. The version-1
+[recipe catalog](GIFieldLightStepRecipes.json) also declares `decrease`
+(20000-to-10000), `small-increase` (10000-to-12000), and `small-decrease`
+(12000-to-10000). Pass comma-separated `-Step` IDs to collect multiple recipes.
+Only the experimental Deferred control gains 12000 lux; ordinary `sun_lux`,
+fixture IDs and production profiles do not change. The starting illumination is
+consumed before constructing each calibration field. No field/session rebuild or temporal
 reset is permitted at the event. After initial publication, pending IBL requests
 must not pause GI: updates keep using the built frame's active bank until the
 new generation publishes. Feedback off/on and unjittered GI-only/Native
@@ -348,9 +355,13 @@ phase-handoff and rejection regressions, while `gpu-fault-lifecycle` includes th
 build-time publication/aborted-frame regression.
 
 By default this is an experiment/transport check, not response-quality
-qualification. Add `-QualifyReferences` to collect independent 10000/20000-lux
-endpoints before the selected replays. This reuses the convergence runner's
-explicit `-LightingStepLux <10000|20000> -FixtureExtent 320x200` mode, with
+qualification. Add `-QualifyReferences` to collect independent endpoints for all
+selected recipes before the replays. Endpoints are shared across directions only
+within the same sealed source/binary/device/input cohort. The experiment reference
+schema is version 2 for the additional 12000-lux endpoint; version 1 remains readable
+only for its original 10000/20000-lux endpoints. The ordinary reference schema is
+unchanged. This reuses the convergence runner's explicit
+`-LightingStepLux <10000|12000|20000> -FixtureExtent 320x200` mode, with
 `-SingleBounce` for feedback off; feedback on requires sample- and depth-converged
 multibounce transport. It does not reuse or reinterpret constant-sky F4/F7
 certificates. All four required ROIs, RGB/luminance and total/sun/environment
@@ -367,9 +378,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Verification/TestGIFie
     -Python <numpy-python> -RunDirectory <new-run-directory>
 ```
 
+Add `-Step decrease,small-increase,small-decrease` for the downward and small-signal
+matrix (24 replays with both RHIs, feedback modes and taps); include `increase` to
+collect all four recipes in one 32-replay cohort.
+
 Reference records must match source, binaries, backend/device, effective lighting,
-authored view and exact receiver masks. GI-only endpoint windows must be Ready
-plus 120 updates and retain the 10% energy, 2% chromaticity and 2% temporal RMS
+authored view and exact receiver masks. The reference fingerprint uses ordinal
+UTF-16 path order regardless of the shared seal's enumeration order; changed,
+missing, additional or duplicate source paths are not waived. Every sample in a
+GI-only settled endpoint window must be steady Ready plus 120 updates and retain the 10% energy, 2% chromaticity and 2% temporal RMS
 gates. Every declared required ROI must have the reference sign and at least half
 its independent amplitude. Response timing/bands still use the realtime recipe's
 own endpoints. Final is never compared to irradiance or forced to share its sign.

@@ -5,6 +5,7 @@ param(
     [string[]]$Rhi = @('dx12','vulkan'),
     [string[]]$Tap = @('gi','final'),
     [string[]]$Feedback = @('off','on'),
+    [string[]]$Step = @('increase'),
     [switch]$QualifyReferences,
     [ValidateRange(1,131072)][int]$ReferenceInitialSamples = 4096,
     [ValidateRange(2,262144)][int]$ReferenceMaximumSamples = 262144,
@@ -24,6 +25,16 @@ $Configuration = @($Configuration | ForEach-Object { $_ -split ',' })
 $Rhi = @($Rhi | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
 $Tap = @($Tap | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
 $Feedback = @($Feedback | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
+$Step = @($Step | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
+$stepCatalog = Get-Content -LiteralPath "$PSScriptRoot/GIFieldLightStepRecipes.json" -Raw | ConvertFrom-Json
+if ($stepCatalog.schemaVersion -ne 1 -or $stepCatalog.steps.Count -ne 4 -or -not $Step.Count -or
+    @($Step | Where-Object { $_ -cnotin $stepCatalog.steps.id }).Count) { throw 'Invalid bounded step recipe.' }
+$selectedSteps = @($Step | ForEach-Object { $id=$_; $stepCatalog.steps | Where-Object { $_.id -ceq $id } })
+$referenceLux = @($selectedSteps | ForEach-Object { $_.oldLux; $_.newLux } | Sort-Object -Unique)
+$arms = @($selectedSteps | ForEach-Object {
+    $recipe=$_
+    foreach ($feedbackMode in $Feedback) { @{recipe=$recipe;feedback=$feedbackMode} }
+})
 if ($Configuration.Count -ne 1 -or $Configuration[0] -notin @('Debug','Develop','Release') -or
     -not $Rhi.Count -or @($Rhi | Where-Object { $_ -notin @('dx12','vulkan') }).Count -or
     -not $Tap.Count -or @($Tap | Where-Object { $_ -notin @('gi','final') }).Count -or
@@ -60,7 +71,7 @@ try {
     if ($QualifyReferences) {
         foreach ($feedbackMode in $Feedback) {
             $mode = if ($feedbackMode -eq 'on') { 'multibounce' } else { 'single-bounce' }
-            foreach ($lux in @(10000,20000)) {
+            foreach ($lux in $referenceLux) {
                 $parameters = @{Configuration=$Configuration;Rhi=$Rhi;Views=@('F4_Floor');FixtureExtent='320x200';
                     LightingStepLux=$lux;SingleBounce=($feedbackMode -eq 'off');Python=$Python;
                     InitialF4Samples=$ReferenceInitialSamples;MaximumSamples=$ReferenceMaximumSamples;
@@ -94,15 +105,23 @@ try {
             $status = Wait-VerificationCondition -Poll { Invoke-VerificationSession status $session @{ExpectedRunIdentity=$run} } `
                 -Until { param($r) $r.frame -and $r.frame.ready } -TimeoutSeconds $TimeoutSeconds
             if (-not $status.capabilities.sequenceGIFieldRefresh) { throw 'The executable has no GI field refresh binding.' }
-            foreach ($feedbackMode in $Feedback) {
+            Write-VerificationJson "$output/$backend/experiment.json" (Set-Inputs @{
+                fixture=4;environment=3;lighting_step_experiment=$true;field_enabled=$false;field_feedback=$false})
+            foreach ($arm in $arms) {
+                $feedbackMode = $arm.feedback
+                $recipe = $arm.recipe
+                $stepId = $recipe.id
                 foreach ($tapMode in $Tap) {
-                    $directory = "$output/$backend/$feedbackMode-$tapMode"
+                    $directory = "$output/$backend/$stepId-$feedbackMode-$tapMode"
                     $null = New-Item -ItemType Directory -Path $directory -Force
                     $case = @{backend=$backend;configuration=$Configuration[0];feedback=($feedbackMode -eq 'on');tap=$tapMode;
-                        fixture=4;environment=3;view='F4_Floor';frameCount=360;eventFrame=30;oldLux=10000;newLux=20000;
-                        directory="$backend/$feedbackMode-$tapMode"}
+                        fixture=4;environment=3;view='F4_Floor';frameCount=360;eventFrame=30;
+                        step=$stepId;oldLux=$recipe.oldLux;newLux=$recipe.newLux;
+                        directory="$backend/$stepId-$feedbackMode-$tapMode"}
                     $cases += $case
                     Write-VerificationJson "$output/cases.json" $cases
+                    # Consume the starting illumination before constructing the calibration field.
+                    Write-VerificationJson "$directory/old-lighting.json" (Set-Inputs @{sun_step_lux=$case.oldLux})
                     Write-VerificationJson "$directory/inputs.json" (Set-Inputs @{fixture=4;environment=3;lighting_step_experiment=$true;
                         albedo=0;secondary_albedo=0;ev100=10;field_enabled=$true;field_feedback=$case.feedback;
                         field_sampling=$true;field_readiness=$true;receiver_diagnostics=$true;
@@ -131,7 +150,7 @@ try {
                     $targets = @(@{resource=$tapResource},@{resource='GI.Field.Readiness'})
                     $exports = @(0..359 | ForEach-Object { @{frame=$_;targets=$targets;graph=($_ -in @(0,30,359))} })
                     Write-VerificationJson "$directory/exports.json" $exports
-                    $events = @(@{frame=30;set=@{'gi_reference.sun_step_lux'=20000};expectEffects=@('lighting')})
+                    $events = @(@{frame=30;set=@{'gi_reference.sun_step_lux'=$case.newLux};expectEffects=@('lighting')})
                     $sequence = Invoke-VerificationSession sequence $session @{ExpectedRunIdentity=$run;
                         CameraPath='GI_LightStep_F4_Floor';CaptureFrames='0,29,359';
                         TemporalAA="enabled=$($tapMode -eq 'final')";Events=(ConvertTo-Json -InputObject $events -Depth 8 -Compress);
@@ -140,12 +159,12 @@ try {
                     Write-VerificationJson "$directory/sequence.json" $sequence
                     if ($sequence.sequence.state -ne 'completed' -or $sequence.sequence.submittedFrames -ne 360 -or
                         $sequence.sequence.parameterPublication.outcome -ne 'Published') { throw 'Light-step sequence did not publish the complete range.' }
-                    $repeat = Set-Inputs @{sun_step_lux=20000}
+                    $repeat = Set-Inputs @{sun_step_lux=$case.newLux}
                     Write-VerificationJson "$directory/repeat.json" $repeat
                     if ($repeat.batch.items[0].state -ne 'NoChange' -or $null -ne $repeat.batch.items[0].firstConsumed) {
                         throw 'Identical sun illuminance drifted or started a new lighting effect.'
                     }
-                    Write-VerificationJson "$directory/reset.json" (Set-Inputs @{sun_step_lux=10000})
+                    Write-VerificationJson "$directory/reset.json" (Set-Inputs @{sun_step_lux=$case.oldLux})
                 }
             }
         } catch { $failure=$_; throw }

@@ -9,7 +9,7 @@ param(
     [string[]]$Rhi = @('dx12','vulkan'),
     [string[]]$Views = @('F1_Plane','F2_Floor','F3_Floor','F4_Floor','F4_Back'),
     [switch]$Coastal,
-    [ValidateSet(0,10000,20000)][int]$LightingStepLux = 0,
+    [ValidateSet(0,10000,12000,20000)][int]$LightingStepLux = 0,
     [switch]$SingleBounce,
     [string]$OutputDirectory,
     [string]$RunDirectory,
@@ -143,7 +143,7 @@ try {
                     adapterDriverIdentity=$bundle.environment.device.compatibilityIdentity;
                     build=$bundle.environment.build;shaderArtifactIdentity='unavailable; source and compiler binaries hashed'}
                 if ($LightingStepLux) {
-                    $recipe.schemaVersion = 1
+                    $recipe.schemaVersion = 2
                     $recipe.experiment = 'gi-field-light-step'
                     $recipe.sunLux = $LightingStepLux
                     $recipe.referenceMode = if ($SingleBounce) { 'single-bounce' } else { 'multibounce' }

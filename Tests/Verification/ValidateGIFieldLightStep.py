@@ -14,7 +14,7 @@ import numpy as np
 
 from ValidateGIFieldBaseline import camera_inputs, parameters
 from ValidateGIFieldReadiness import records as readiness_records
-from ValidateGIFieldLightStepReference import certified_endpoint, endpoint_inputs, roi_masks
+from ValidateGIFieldLightStepReference import LIGHT_STEPS, certified_endpoint, endpoint_inputs, roi_masks
 
 LUMA = np.array([.2126, .7152, .0722])
 FRAME_COUNT = 360
@@ -30,6 +30,16 @@ def require(condition, message):
 
 def load(path):
     return json.loads(Path(path).read_text(encoding="utf-8-sig"))
+
+
+def reference_source_identity(source):
+    rows = [r["path"]+" "+r["sha256"] for r in source if
+            r["path"].startswith(("Sources/", "Shaders/", "Tests/Verification/", "Scripts/Verification/"))]
+    require(len(rows) == len({r.rsplit(" ", 1)[0] for r in rows}), "Duplicate reference source paths")
+    # The shared seal preserves its enumeration order; the reference publisher
+    # hashes ordinal UTF-16 path order. Do not confuse ordering with source drift.
+    rows.sort(key=lambda row: row.encode("utf-16-be"))
+    return hashlib.sha256("\n".join(rows).encode()).hexdigest()
 
 
 def first_consumed(effect, frames):
@@ -160,10 +170,25 @@ def reference_metrics(rgb, references, first_ready, steady_ready):
                     for k in ("firstRefreshReady", "firstSteadyReady")))
 
 
+def step_recipe(case):
+    name = case.get("step", "increase")
+    require(name in LIGHT_STEPS, "Unknown bounded lighting-step recipe")
+    recipe = LIGHT_STEPS[name]
+    require((case["oldLux"], case["newLux"]) == (recipe["oldLux"], recipe["newLux"]),
+            "Changed recipe endpoint pair")
+    return recipe
+
+
+def settled_endpoint(field):
+    return (field["state"] == "Ready" and field["completedUpdates"] >= field["readyUpdate"]+120 and
+            measurement_phase(field) == "steady")
+
+
 def validate_case(root, case, qualify_references=False):
+    step_recipe(case)
     require(case["fixture"] == 4 and case["environment"] == 3 and case["view"] == "F4_Floor" and
             case["frameCount"] == FRAME_COUNT and case["eventFrame"] == EVENT_FRAME and
-            case["oldLux"] == 10000 and case["newLux"] == 20000 and case["tap"] in ("gi", "final"),
+            case["tap"] in ("gi", "final"),
             "Changed bounded experiment inputs")
     directory = root/case["directory"]
     receipt = load(directory/"sequence.json")["sequence"]
@@ -234,7 +259,7 @@ def validate_case(root, case, qualify_references=False):
         require(field["lightingGeneration"] == field["environmentGeneration"] == identity["lightingGeneration"] ==
                 identity["environmentGeneration"] == expected_generation and
                 frame["parameters"]["lighting"]["active"]["generation"] == expected_generation and
-                frame["sceneInputs"]["sun"]["toaIlluminanceLux"] == (10000 if index < t0 else 20000),
+                frame["sceneInputs"]["sun"]["toaIlluminanceLux"] == (case["oldLux"] if index < t0 else case["newLux"]),
                 "Field and actual sun do not follow the built frame's published lighting generation")
         phase = measurement_phase(field)
         if index >= t0:
@@ -292,17 +317,15 @@ def validate_case(root, case, qualify_references=False):
         require(metrics[roi]["endpointTemporalRms"] <= .02, "The measured endpoint is not temporally stable")
     reference = dict(status="NotApplicableComposite" if case["tap"] == "final" else "NotRequested")
     if qualify_references and case["tap"] == "gi":
-        for f in (initial, frames[-1]["readiness"]["giField"]):
-            require(f["completedUpdates"] >= f["readyUpdate"]+120, "Reference accuracy requires settled Ready plus 120")
+        # Every sample used as a settled endpoint needs the prerequisite, not
+        # merely the last frame of a window that began too early.
+        require(all(settled_endpoint(f["readiness"]["giField"]) for f in frames[:EVENT_FRAME]+frames[-HOLD:]),
+                "Reference endpoint windows require steady Ready plus 120 throughout")
         mode = "multibounce" if case["feedback"] else "single-bounce"
         binaries = {b["file"]: b["sha256"] for b in load(root/"binaries.json")}
-        # Match the existing convergence runner's ordinal, upper-case hash recipe.
-        source = load(root/"source-identity.json")
-        source_rows = [r["path"]+" "+r["sha256"] for r in source if
-                       r["path"].startswith(("Sources/", "Shaders/", "Tests/Verification/", "Scripts/Verification/"))]
-        source_identity = hashlib.sha256("\n".join(source_rows).encode()).hexdigest()
+        source_identity = reference_source_identity(load(root/"source-identity.json"))
         references = []
-        for lux, frame in ((10000, frames[0]), (20000, frames[-1])):
+        for lux, frame in ((case["oldLux"], frames[0]), (case["newLux"], frames[-1])):
             arm = "on" if case["feedback"] else "off"
             ref_root = root/"refs"/f"{arm}-{lux}"/case["configuration"]/case["backend"]
             require(load(ref_root/"recipe.json")["sourceIdentity"] == source_identity, "Reference/experiment sources differ")
@@ -334,6 +357,47 @@ def validate(root, qualify_references=False):
 
 
 def self_test():
+    for name, recipe in LIGHT_STEPS.items():
+        case = dict(step=name, oldLux=recipe["oldLux"], newLux=recipe["newLux"])
+        step_recipe(case)
+        old, new = case["oldLux"]/10000., case["newLux"]/10000.
+        require(response(np.r_[np.full(30, old), np.full(330, new)], 30, old, new, 45)["targetsPassed"] and
+                reference_response(old, new, old, new)["passed"], "A declared signed step failed")
+    step_recipe(dict(oldLux=10000, newLux=20000))
+    for bad in (dict(step="unknown", oldLux=10000, newLux=20000),
+                dict(step="decrease", oldLux=10000, newLux=20000)):
+        try:
+            step_recipe(bad)
+            raise AssertionError("Unknown or mislabeled recipe accepted")
+        except ValueError:
+            pass
+    require(not reference_response(1.2, 1.3, 1.2, 1.)["passed"], "Opposite small-step response passed")
+    require(not reference_response(1.2, 1.11, 1.2, 1.)["passed"], "Weak small-step response passed")
+    settled = dict(state="Ready", readyUpdate=80, completedUpdates=200, summary=dict(
+        field=dict(refreshEpoch=2), changeObservation=dict(phase="steady", state="Ready",
+        observation=dict(kind="completed-readiness", field=dict(refreshEpoch=2), readinessUpdate=200))))
+    require(settled_endpoint(settled), "Ready plus 120 boundary changed")
+    require(not settled_endpoint(dict(settled, readyUpdate=81)), "An endpoint window started before Ready plus 120")
+    require(not settled_endpoint(dict(settled, state="Settling")), "Pending endpoints were certified")
+    settled["summary"]["changeObservation"]["phase"] = "refresh"
+    require(not settled_endpoint(settled), "Refresh-only Ready certified a settled endpoint")
+    source = [dict(path="Sources/Passes/B.cpp", sha256="B"*64),
+              dict(path="Sources/PBR/A.cpp", sha256="A"*64)]
+    expected = hashlib.sha256(("Sources/PBR/A.cpp "+"A"*64+"\nSources/Passes/B.cpp "+"B"*64).encode()).hexdigest()
+    require(reference_source_identity(source) == reference_source_identity(source[::-1]) == expected,
+            "Source enumeration order changed the ordinal reference fingerprint")
+    changed = copy.deepcopy(source)
+    changed[0]["sha256"] = "C"*64
+    require(reference_source_identity(changed) != expected, "Changed source bytes were hidden")
+    require(reference_source_identity(source[:1]) != expected, "Missing sources were hidden")
+    require(reference_source_identity(source+[dict(path="Sources/Extra.cpp", sha256="D"*64)]) != expected,
+            "Additional sources were hidden")
+    rejected = False
+    try:
+        reference_source_identity(source+source[:1])
+    except ValueError:
+        rejected = True
+    require(rejected, "Duplicate source paths were accepted")
     effect = dict(state="Consumed", identity=dict(domain="lighting", generation=8),
                   requested=100, applied=100, published=102, firstConsumed=103)
     frames = [dict(frame=dict(serial=serial), parameters=dict(lighting=dict(active=dict(generation=g))))
@@ -405,7 +469,7 @@ def self_test():
     require(result["responseQualityQualified"] and not result["referenceCorrelatedReadinessQualified"] and
             not result["rois"]["floor"]["firstRefreshReady"]["passed"] and
             result["rois"]["floor"]["firstSteadyReady"]["passed"], "Two Ready times were conflated with endpoint accuracy")
-    print(json.dumps(dict(status="passed", checks=31)))
+    print(json.dumps(dict(status="passed", checks=49)))
 
 
 if __name__ == "__main__":

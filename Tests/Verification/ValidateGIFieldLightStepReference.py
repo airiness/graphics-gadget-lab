@@ -17,8 +17,21 @@ from ValidateGIReferenceConvergence import (COMPONENTS, LUMA, SEEDS, compare, co
     file_receipts, key, load, merge_errors, plan as depth_plan, qualified, require, save,
     validate_recipe as validate_depth_recipe)
 
-SCHEMA = 1
+SCHEMA = 2
 ROIS = ("floor", "red-adjacent", "green-adjacent", "simple-patch")
+
+
+def light_step_recipes():
+    document = load(Path(__file__).with_name("GIFieldLightStepRecipes.json"))
+    steps = document["steps"]
+    require(document["schemaVersion"] == 1 and len(steps) == 4 and
+            {s["id"] for s in steps} == {"increase", "decrease", "small-increase", "small-decrease"} and
+            all(s["oldLux"] in (10000, 12000, 20000) and s["newLux"] in (10000, 12000, 20000) and
+                s["oldLux"] != s["newLux"] for s in steps), "Changed bounded lighting-step catalog")
+    return {s["id"]: s for s in steps}
+
+
+LIGHT_STEPS = light_step_recipes()
 
 
 def roi_masks(position):
@@ -44,8 +57,9 @@ def endpoint_inputs(frame):
 
 
 def validate_recipe(p):
-    require(p["schemaVersion"] == SCHEMA and p["experiment"] == "gi-field-light-step" and
-            p["sunLux"] in (10000, 20000) and p["referenceMode"] in ("single-bounce", "multibounce") and
+    allowed_lux = (10000, 20000) if p["schemaVersion"] == 1 else (10000, 12000, 20000)
+    require(p["schemaVersion"] in (1, SCHEMA) and p["experiment"] == "gi-field-light-step" and
+            p["sunLux"] in allowed_lux and p["referenceMode"] in ("single-bounce", "multibounce") and
             p["views"] == ["F4_Floor"] and p["extent"] == [320, 200], "Changed lighting-step reference recipe")
     proxy = dict(p, schemaVersion=2)
     if p["referenceMode"] == "single-bounce":
@@ -147,7 +161,7 @@ def certified_endpoint(root, expected_mode, lux, frame, masks, binaries):
     state, report = load(root/"checkpoint.json"), load(root/"report.json")
     p = state["recipe"]
     validate_recipe(p)
-    require(state["schemaVersion"] == SCHEMA and state["recipeIdentity"] == report["recipeIdentity"] == digest(p) and
+    require(state["schemaVersion"] == p["schemaVersion"] and state["recipeIdentity"] == report["recipeIdentity"] == digest(p) and
             p["referenceMode"] == expected_mode and p["sunLux"] == lux and
             p["rhi"] == frame["backend"] and p["adapterDriverIdentity"] == frame["adapterDriverIdentity"] and
             {k: v.lower() for k, v in p["binaries"].items()} == {k: v.lower() for k, v in binaries.items()},
@@ -180,6 +194,17 @@ def self_test():
              views=["F4_Floor"], extent=[320, 200], depths=[1], initialSamples=2, initialF4Samples=2,
              maximumSamples=8, batchSamples=2, relativeLimit=.01, absoluteFloor=1e-6)
     validate_recipe(p)
+    require({name: (s["oldLux"], s["newLux"]) for name, s in LIGHT_STEPS.items()} == {
+        "increase": (10000, 20000), "decrease": (20000, 10000),
+        "small-increase": (10000, 12000), "small-decrease": (12000, 10000)}, "Frozen recipe endpoints changed")
+    validate_recipe(dict(p, sunLux=12000))
+    validate_recipe(dict(p, schemaVersion=1))
+    rejected_legacy = False
+    try:
+        validate_recipe(dict(p, schemaVersion=1, sunLux=12000))
+    except ValueError:
+        rejected_legacy = True
+    require(rejected_legacy, "The old reference schema accepted a new endpoint")
     state = dict(recipe=p, observations={})
     require(plan(state)["request"]["environment"] == 3, "Constant-sky F4 must not be reused")
     for n in (2, 4):
@@ -246,7 +271,7 @@ def self_test():
                 raise AssertionError("Unbacked certificate or wrong transport mode accepted")
             except ValueError:
                 pass
-    print('{"status":"passed","checks":15}')
+    print('{"status":"passed","checks":19}')
 
 
 def main():
@@ -274,9 +299,9 @@ def main():
         return
     checkpoint = root/"checkpoint.json"
     if args.initialize and not checkpoint.exists():
-        save(checkpoint, dict(schemaVersion=SCHEMA, recipe=p, recipeIdentity=digest(p), observations={}))
+        save(checkpoint, dict(schemaVersion=p["schemaVersion"], recipe=p, recipeIdentity=digest(p), observations={}))
     state = load(checkpoint)
-    require(state["schemaVersion"] == SCHEMA and state["recipeIdentity"] == digest(p), "Changed checkpoint identity")
+    require(state["schemaVersion"] == p["schemaVersion"] and state["recipeIdentity"] == digest(p), "Changed checkpoint identity")
     if args.audit:
         for row in state["observations"].values():
             require(row["files"] == file_receipts(root/row["case"]["directory"]), "Modified cached reference")
@@ -287,7 +312,7 @@ def main():
         state["observations"][name] = summarize(root, case, p)
         save(checkpoint, state)
     result = plan(state)
-    result.update(schemaVersion=SCHEMA, recipeIdentity=digest(p), observations=len(state["observations"]),
+    result.update(schemaVersion=p["schemaVersion"], recipeIdentity=digest(p), observations=len(state["observations"]),
                   runtimeCompletionIsConvergence=False)
     if not args.audit or args.initialize or args.ingest:
         save(root/"report.json", result)
