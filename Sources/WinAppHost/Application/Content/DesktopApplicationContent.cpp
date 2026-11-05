@@ -94,7 +94,7 @@ namespace gglab
 					shader_programs::GIProbeBlendDirectCompute, shader_programs::GIProbeBlendSharedCompute,
 					shader_programs::GIProbeBordersCompute,
 					shader_programs::GIProbeClassifyCompute, shader_programs::GIFieldLookupCompute,
-					shader_programs::GIProbeInspectionCompute,
+					shader_programs::GIProbeInspectionCompute, shader_programs::GIProbeIntegrationInspectionCompute,
 					shader_programs::GIReceiverInspectionCompute, shader_programs::GIReceiverMarkersVertex,
 					shader_programs::GIReceiverMarkersPixel,
 					shader_programs::GIProbeVisualizationCompute, shader_programs::GIProbeVisualizationVertex,

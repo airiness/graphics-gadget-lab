@@ -1658,7 +1658,7 @@
       "function": "StoreTexel",
       "operation": "isfinite",
       "count": 4,
-      "bodySha256": "1e5563bc22a3511e174f181a66550f38d28c198a5ddb563eae78a77d8f604cca",
+      "bodySha256": "c497ee32a526ca6587d8f2ef80cae95e2b60da5baf76577150fb6c19137520f4",
       "programs": [
         "gglab.shader.gi-field",
         "gglab.shader.gi-probe-update"

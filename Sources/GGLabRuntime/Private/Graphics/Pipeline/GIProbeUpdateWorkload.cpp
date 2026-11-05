@@ -42,6 +42,7 @@ namespace gglab
 			Borders,
 			Classify,
 			ReadinessFloor,
+			IntegrationInspection,
 			Count,
 		};
 		enum class ProbeSurface : size_t
@@ -53,7 +54,8 @@ namespace gglab
 		};
 		constexpr std::array FieldSurfaces{ "GI.Field.Irradiance", "GI.Field.Distance", "GI.Field.State", "GI.Field.Classification" };
 		constexpr std::array FieldPasses{ "GI.Field.Initialize", "GI.Field.TraceShade",
-			"GI.Field.BlendDirect", "GI.Field.BlendShared", "GI.Field.Borders", "GI.Field.Classify", "GI.Field.ReadinessFloor" };
+			"GI.Field.BlendDirect", "GI.Field.BlendShared", "GI.Field.Borders", "GI.Field.Classify",
+			"GI.Field.ReadinessFloor", "GI.Field.IntegrationInspection.Prepare" };
 		struct SurfaceInfo
 		{
 			const char* m_Name;
@@ -100,7 +102,7 @@ namespace gglab
 			&shader_programs::GIProbeInitializeCompute, &shader_programs::GIProbeTraceCompute,
 			&shader_programs::GIProbeBlendDirectCompute, &shader_programs::GIProbeBlendSharedCompute,
 			&shader_programs::GIProbeBordersCompute, &shader_programs::GIProbeClassifyCompute,
-			&shader_programs::GIFieldReadinessFloorCompute
+			&shader_programs::GIFieldReadinessFloorCompute, &shader_programs::GIProbeIntegrationInspectionCompute
 		};
 		const std::array PassInfos
 		{
@@ -118,6 +120,8 @@ namespace gglab
 				.m_CategoryName = "Global Illumination", .m_Category = RenderPassCategory::Lighting, .m_Type = RenderPassType::Compute },
 			RenderPassInfo{ .m_TypeName = "GI.Field.ReadinessFloor", .m_DisplayName = "Field readiness irradiance floor",
 				.m_CategoryName = "Global Illumination", .m_Category = RenderPassCategory::Lighting, .m_Type = RenderPassType::Compute },
+			RenderPassInfo{ .m_TypeName = "GI.Field.IntegrationInspection.Prepare", .m_DisplayName = "Prepare integration witness",
+				.m_CategoryName = "Global Illumination", .m_Category = RenderPassCategory::Debug, .m_Type = RenderPassType::Compute },
 		};
 		static_assert(ProgramRefs.size() == static_cast<size_t>(ProbeStage::Count));
 		static_assert(ProgramRefs.size() == GIProbeUpdateWorkload::ProgramCount);
@@ -151,13 +155,18 @@ namespace gglab
 			float m_DistanceHysteresis = 0;
 			uint32_t m_ReadinessDistance = 0;
 			float m_FeedbackViewBias = 0;
-			std::array<uint32_t, 3> m_FeedbackPadding{};
+			uint32_t m_InspectionIndex = UINT32_MAX;
+			uint32_t m_InspectedProbe = UINT32_MAX;
+			uint32_t m_InspectionReplayIndex = 0;
+			std::array<float, 4> m_InspectionReplayRotation{};
 		};
-		static_assert(sizeof(Parameters) == 176 && offsetof(Parameters, m_Targets) == 80 &&
+		static_assert(sizeof(Parameters) == 192 && offsetof(Parameters, m_Targets) == 80 &&
 			offsetof(Parameters, m_Rotation) == 112 && offsetof(Parameters, m_Hysteresis) == 128 &&
 			offsetof(Parameters, m_IrradianceInteriorWidth) == 140 &&
 			offsetof(Parameters, m_ReadinessEnabled) == 144 && offsetof(Parameters, m_ReadinessDistance) == 156 &&
-			offsetof(Parameters, m_FieldFlags) == 104 && offsetof(Parameters, m_FeedbackViewBias) == 160);
+			offsetof(Parameters, m_FieldFlags) == 104 && offsetof(Parameters, m_FeedbackViewBias) == 160 &&
+			offsetof(Parameters, m_InspectionIndex) == 164 &&
+			offsetof(Parameters, m_InspectionReplayRotation) == 176);
 
 		struct FeedbackRecord
 		{
@@ -784,7 +793,7 @@ namespace gglab
 	void GIProbeUpdateWorkload::AddPasses(RenderGraph& graph, const RenderFrameContext& frame,
 		const RenderServices& services, const RaySceneGraphResources& scene,
 		std::shared_ptr<GIFieldUpdateState> fieldUpdate, bool compose, float viewBias,
-		GIFieldIdentity identity) noexcept
+		GIFieldIdentity identity, std::optional<GIProbeInspectionRequest> inspection) noexcept
 	{
 		auto& state = *m_State;
 		if (!state.m_Profile.m_ConstantEnvironment)
@@ -818,6 +827,19 @@ namespace gglab
 		const uint32_t total = progress->m_Diagnostics.m_ProbeCount;
 		const bool record = !progress->m_Diagnostics.m_Failed &&
 			(profile.m_MaximumUpdates == 0 || update < profile.m_MaximumUpdates);
+		const bool inspect = state.m_Field && inspection && inspection->m_IntegrationReplayUpdate &&
+			inspection->m_ExpectedGeneration == identity.m_Generation &&
+			(!inspection->m_ExpectedRefreshEpoch || *inspection->m_ExpectedRefreshEpoch == identity.m_RefreshEpoch) &&
+			inspection->m_Coordinate[0] < profile.m_Counts[0] &&
+			inspection->m_Coordinate[1] < profile.m_Counts[1] &&
+			inspection->m_Coordinate[2] < profile.m_Counts[2];
+		const uint32_t replayIndex = inspect && *inspection->m_IntegrationReplayUpdate != 0 ?
+			*inspection->m_IntegrationReplayUpdate - 1 :
+			update;
+		const uint32_t inspectionTexels = profile.m_IrradianceInteriorWidth * profile.m_IrradianceInteriorWidth;
+		const uint32_t inspectionBlockRows = (inspectionTexels + profile.m_RaysPerProbe - 1) / profile.m_RaysPerProbe;
+		const uint32_t inspectionRows = gi_shader::GIIntegrationInspectionHeaderRows +
+			gi_shader::GIIntegrationInspectionBlocks * inspectionBlockRows + inspectionTexels;
 		const auto range = GetGIProbeUpdateRange(profile, update);
 		const uint32_t begin = range.m_First;
 		const uint32_t count = range.m_Count;
@@ -827,6 +849,7 @@ namespace gglab
 			RGBufferId m_Status;
 			RGBufferId m_Readiness;
 			RGBufferId m_Feedback;
+			RGTextureId m_Inspection;
 			std::array<RGTextureId, Surfaces.size()> m_Textures;
 		};
 		auto imported = std::make_shared<Imported>();
@@ -867,7 +890,8 @@ namespace gglab
 			});
 		if (record)
 		{
-			const std::array stages{ ProbeStage::Initialize, ProbeStage::Classify, ProbeStage::ReadinessFloor, ProbeStage::TraceShade,
+			const std::array stages{ ProbeStage::Initialize, ProbeStage::Classify, ProbeStage::ReadinessFloor,
+				ProbeStage::IntegrationInspection, ProbeStage::TraceShade,
 				profile.m_SharedBlend ? ProbeStage::BlendShared : ProbeStage::BlendDirect, ProbeStage::Borders };
 			for (const auto stage : stages)
 			{
@@ -876,6 +900,11 @@ namespace gglab
 				const bool measuring = stage == ProbeStage::ReadinessFloor;
 				const bool classifying = stage == ProbeStage::Classify;
 				const bool querying = tracing || classifying;
+				const bool inspecting = stage == ProbeStage::IntegrationInspection;
+				if (inspecting && !inspect)
+				{
+					continue;
+				}
 				const bool blending = stage == ProbeStage::BlendDirect || stage == ProbeStage::BlendShared;
 				if (stage == ProbeStage::Initialize && initialized)
 				{
@@ -893,6 +922,7 @@ namespace gglab
 				{
 					std::array<RGTextureViewId, Surfaces.size()> m_Views;
 					RGTextureViewId m_Transmittance;
+					RGTextureViewId m_Inspection;
 					TypedConstantSnapshot<AtmosphereGPU> m_Atmosphere;
 					Parameters m_Parameters;
 				};
@@ -926,9 +956,24 @@ namespace gglab
 						{
 							builder.WriteInPlace(imported->m_Feedback, RGBufferAccess::StorageWrite, RHIStage::ComputeShader);
 						}
+						if (inspecting)
+						{
+							imported->m_Inspection = builder.CreateTexture("GI.Field.IntegrationInspection", {
+								.m_Format = RHIFormat::R32Uint,
+								.m_Extent = { 4 * profile.m_RaysPerProbe, inspectionRows, 1 } });
+							builder.WriteInPlace(imported->m_Inspection, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+						}
+						else if (blending && inspect)
+						{
+							builder.ReadWriteInPlace(imported->m_Inspection, RGTextureAccess::StorageReadWrite, RHIStage::ComputeShader);
+						}
+						if (inspect && (inspecting || blending))
+						{
+							data.m_Inspection = builder.CreateView<RHITextureViewType::UnorderedAccess>(imported->m_Inspection);
+						}
 						for (size_t index = 0; index < Surfaces.size(); ++index)
 						{
-							if (!imported->m_Textures[index].IsValid())
+							if (inspecting || !imported->m_Textures[index].IsValid())
 							{
 								continue;
 							}
@@ -1007,7 +1052,15 @@ namespace gglab
 							.m_ReadinessEpoch = static_cast<uint32_t>(progress->m_ReadinessEpoch),
 							.m_DistanceHysteresis = distanceHysteresis,
 							.m_ReadinessDistance = progress->m_RefreshDistance ? 1u : 0u,
-							.m_FeedbackViewBias = viewBias };
+							.m_FeedbackViewBias = viewBias,
+							.m_InspectedProbe = inspect ?
+								inspection->m_Coordinate[0] + profile.m_Counts[0] *
+									(inspection->m_Coordinate[2] + profile.m_Counts[2] * inspection->m_Coordinate[1]) :
+								UINT32_MAX,
+							.m_InspectionReplayIndex = replayIndex,
+							.m_InspectionReplayRotation = inspect ?
+								Rotation(profile.m_Seed ^ (profile.m_RotateDirections ? replayIndex : 0u)) :
+								std::array<float, 4>{} };
 						builder.SideEffect();
 					},
 					[=, this, &frame, &services](RGExecuteContext& execute, PassData& data)
@@ -1064,12 +1117,21 @@ namespace gglab
 						{
 							parameters.m_Transmittance = execute.GetViewDescriptor(data.m_Transmittance).m_Index;
 						}
+						if (data.m_Inspection.IsValid())
+						{
+							parameters.m_InspectionIndex = execute.GetViewDescriptor(data.m_Inspection).m_Index;
+						}
 						parameters.m_AtmosphereSampler = services.m_Samplers->GetSamplerIndex(SamplerPreset::LinearClamp);
 						if (!commands->SetConstantBufferData(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
 						{
 							return;
 						}
-						if (stage == ProbeStage::Initialize)
+						if (inspecting)
+						{
+							commands->Dispatch((profile.m_RaysPerProbe * inspectionRows +
+								gi_shader::GIProbeGroupThreads - 1) / gi_shader::GIProbeGroupThreads, 1, 1);
+						}
+						else if (stage == ProbeStage::Initialize)
 						{
 							const uint32_t width = std::max(SurfaceTileWidth(profile, 0),
 								gi_shader::GIProbeDistanceTileWidth);

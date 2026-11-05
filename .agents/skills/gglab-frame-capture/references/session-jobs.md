@@ -54,8 +54,17 @@ mean/second moment. Each result carries its request, validity, units and GPU
 observation stamp, independently of the cached readiness stamp. Readiness update
 equals field-lifetime update U minus `epochOriginUpdate`; producing frame is separate.
 
-Native probe payload is at most 20,496 bytes. One distinct coordinate issues per
-frame; conflicting jobs wait for a later frame.
+Native compact probe payload is at most 20,496 bytes. One distinct request issues
+per frame; conflicting coordinates or replay settings wait for a later frame.
+
+If `capabilities.giProbeInspection.integrationInspection` is present, optional
+`integrationReplayUpdate` enables a separate raw `GI.Field.IntegrationInspection`
+witness and probe value schema v2 (ordinary results remain v1). Zero observes the
+current update; a positive one-based update replays sampling directions only,
+without changing Trace, field history, readiness or the actual update index.
+Use only for bounded numerical diagnosis; it can add up to 3,784,704 GPU bytes.
+See [integration numerical inspection](../../../../Tests/Verification/README.md#integration-numerical-inspection)
+for the versioned layout, conditional FP64 checks and historical-replay limits.
 
 ### Probe visualization selection
 

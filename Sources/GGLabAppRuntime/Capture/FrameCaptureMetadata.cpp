@@ -818,7 +818,7 @@ namespace gglab
 
 	std::string SerializeGIProbeInspection(const GIProbeInspectionResult& result) noexcept
 	{
-		return nlohmann::json{
+		auto value = nlohmann::json{
 			{ "schemaVersion", 1 },
 			{ "request", {
 				{ "coordinate", result.m_Request.m_Coordinate },
@@ -836,7 +836,13 @@ namespace gglab
 			{ "irradianceTileWidth", result.m_IrradianceTileWidth },
 			{ "distanceTileWidth", result.m_DistanceTileWidth },
 			{ "irradiance", result.m_Irradiance },
-			{ "distance", result.m_Distance } }.dump();
+			{ "distance", result.m_Distance } };
+		if (result.m_Request.m_IntegrationReplayUpdate)
+		{
+			value["schemaVersion"] = 2;
+			value["request"]["integrationReplayUpdate"] = *result.m_Request.m_IntegrationReplayUpdate;
+		}
+		return value.dump();
 	}
 
 	std::string SerializeGIReceiverInspection(const GIReceiverInspectionResult& result) noexcept

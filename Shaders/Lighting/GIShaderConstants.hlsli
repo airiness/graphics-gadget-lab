@@ -68,6 +68,11 @@ static const uint GIProbeIrradianceTileTexels = GIProbeIrradianceTileWidth * GIP
 static const uint GIProbeTileTexels = GIProbeIrradianceTileTexels + GIProbeDistanceTileWidth * GIProbeDistanceTileWidth;
 static const uint GIProbeGroupThreads = 64;
 static const uint GIProbeMaximumRays = 256;
+// Raw integration witness ABI; each record is four bit-preserved R32Uint texels.
+static const uint GIIntegrationInspectionMagic = 0x47494d31u;
+static const uint GIIntegrationInspectionVersion = 1;
+static const uint GIIntegrationInspectionHeaderRows = 4;
+static const uint GIIntegrationInspectionBlocks = 5;
 static const uint GIProbeClassificationRays = 32;
 static const uint GIProbeUnclassified = 0;
 static const uint GIProbeActive = 1;

@@ -430,8 +430,13 @@ namespace gglab
 		}
 		const bool tracked = services.m_GIFieldFrameState->Track(m_State->m_Update, frame.m_FrameSerial);
 		GGLAB_ASSERT_MSG(tracked, "A GI field must participate in exactly one matching renderer frame.");
+		const auto& request = m_State->m_Inspection;
+		const auto inspection = request && MatchesGIProbeInspection(*request, *m_State->m_Summary) ?
+			request :
+			std::nullopt;
 		m_State->m_Workload.AddPasses(graph, frame, services, scene, m_State->m_Update,
-			m_State->m_Info.m_EnableReceiverSampling, m_State->m_Info.m_ViewBias, m_State->m_Summary->m_Field);
+			m_State->m_Info.m_EnableReceiverSampling, m_State->m_Info.m_ViewBias,
+			m_State->m_Summary->m_Field, inspection);
 	}
 
 	void GIField::AddReceiverDiagnostics(RenderGraph& graph, const RenderFrameContext& frame,

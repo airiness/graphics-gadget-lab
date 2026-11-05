@@ -255,7 +255,22 @@ namespace gglab
 				probe.m_Request->m_Capture.m_RequiredProducts.size() == 2 &&
 				std::get<ResourceCaptureProduct>(probe.m_Request->m_Capture.m_RequiredProducts.back()).m_Targets[0].m_Resource ==
 					"GI.Field.ProbeInspection", "Typed probe inspection adds the bounded resource to the same-frame job");
+			for (const uint32_t update : { 0u, 563u, UINT32_MAX })
+			{
+				const auto math = ParseApplicationControlRequest(std::format(
+					R"({{"protocol":4,"id":51,"command":"capture","giProbeInspection":{{"coordinate":[2,3,4],"expectedGeneration":7,"integrationReplayUpdate":{}}}}})", update));
+				context.Check(math.m_Request &&
+					math.m_Request->m_Capture.m_GIProbeInspection->m_IntegrationReplayUpdate == update &&
+					std::get<ResourceCaptureProduct>(math.m_Request->m_Capture.m_RequiredProducts.back()).m_Targets.size() == 2,
+					"Integration witnesses are explicitly opt-in and add their same-frame raw resource");
+			}
+			context.Check(probe.m_Request && !probe.m_Request->m_Capture.m_GIProbeInspection->m_IntegrationReplayUpdate,
+				"Ordinary probe inspection does not enable integration instrumentation");
 			for (std::string_view invalid : {
+				R"({"coordinate":[0,0,0],"expectedGeneration":1,"integrationReplayUpdate":-1})",
+				R"({"coordinate":[0,0,0],"expectedGeneration":1,"integrationReplayUpdate":1.5})",
+				R"({"coordinate":[0,0,0],"expectedGeneration":1,"integrationReplayUpdate":true})",
+				R"({"coordinate":[0,0,0],"expectedGeneration":1,"integrationReplayUpdate":4294967296})",
 				R"({"coordinate":[-1,0,0],"expectedGeneration":1})",
 				R"({"coordinate":[0,0],"expectedGeneration":1})",
 				R"({"coordinate":[0,0,0],"expectedGeneration":0})",

@@ -1,19 +1,20 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gglab.gi-probe-inspection",
-  "title": "GGLab bounded probe inspection v1",
+  "title": "GGLab bounded probe inspection v1/v2",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "request", "observation", "worldPosition", "positionUnits", "classification", "validity", "tileLayout", "irradianceUnits", "distanceUnits", "irradianceTileWidth", "distanceTileWidth", "irradiance", "distance"],
   "properties": {
-    "schemaVersion": {"const": 1},
+    "schemaVersion": {"enum": [1, 2]},
     "request": {
       "type": "object", "additionalProperties": false,
       "required": ["coordinate", "expectedGeneration", "expectedRefreshEpoch"],
       "properties": {
         "coordinate": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "integer", "minimum": 0, "maximum": 4294967295}},
         "expectedGeneration": {"type": "integer", "minimum": 1},
-        "expectedRefreshEpoch": {"type": ["integer", "null"], "minimum": 1}
+        "expectedRefreshEpoch": {"type": ["integer", "null"], "minimum": 1},
+        "integrationReplayUpdate": {"type": "integer", "minimum": 0, "maximum": 4294967295}
       }
     },
     "observation": {
@@ -50,6 +51,11 @@
     "irradiance": {"type": "array", "maxItems": 1024, "items": {"$ref": "#/$defs/texel"}},
     "distance": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/texel"}}
   },
+  "allOf": [{
+    "if": {"properties": {"schemaVersion": {"const": 2}}},
+    "then": {"properties": {"request": {"required": ["integrationReplayUpdate"]}}},
+    "else": {"properties": {"request": {"not": {"required": ["integrationReplayUpdate"]}}}}
+  }],
   "$defs": {
     "texel": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": ["number", "null"]}}
   }

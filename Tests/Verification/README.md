@@ -187,6 +187,51 @@ runs [TestGIProbeSelection.ps1](TestGIProbeSelection.ps1). It checks generation-
 selection, ordinary-budget isolation and independent numeric inspection. Inspect
 `validation.json`, artifact audits and native logs.
 
+### Integration numerical inspection
+
+`TestGIProbeInspection.ps1 -IntegrationDiagnostics` retains the ordinary probe
+inspection matrix and adds two Native/TAA-off selected-probe arithmetic captures
+per backend. `-ShaderCacheDirectory` optionally seeds isolated session state.
+`gi-probe-integration-contracts` runs the GPU-free analyzer tests.
+
+The default-off `capture.giProbeInspection.integrationReplayUpdate` requests
+`GI.Field.IntegrationInspection`: zero selects the current update, while a positive
+one-based update replays **sampling directions only**. It never changes production
+Trace, history, readiness or the field's actual update index. Ordinary inspection
+keeps its v1 value schema and 20,496-byte compact payload. Opt-in results use value
+schema v2; the separate raw witness has its own GPU ABI v1.
+
+For R rays and T interior irradiance texels, the R32Uint witness has extent
+`[4*R, 4+5*ceil(T/R)+T]`, at most 3,784,704 bytes. Four adjacent uint32 texels form
+one bit-preserved record. Row 0 holds magic/version/update/probe, actual and replay
+common quaternions, sampling dimensions/update/epoch origin, observed blend coefficients,
+grid/rotation settings and field flags. Rows 1/2/3 hold actual Blend directions,
+paired Trace ray values and replay directions. Five packed T-record blocks contain
+actual octahedral normals, integrated M, previous M, blended M and RGB numerator
+plus weight sum. The final T rows hold per-ray actual signed/clamped cosine and
+replay signed/clamped cosine. M is irradiance divided by pi, not a display value.
+RenderGraph orders witness initialization, integration read/write and export;
+ordinary capture completion owns readback and publication.
+
+[ValidateGIProbeIntegration.py](ValidateGIProbeIntegration.py) checks paired GPU
+updates/rays/atlas versions, FP64 integration conditional on observed inputs,
+dot-product forward rounding and Blend separately. Its M comparisons retain the
+0.5% component budget and 0.001 normalization floor. Reconstructed-direction
+counterfactuals remain separately reported, including their failures. These
+comparisons are not an additive attribution or a fitted correction.
+
+Optional `-HistoricalPoint <point.json> -HistoricalRoot <original-collection>`
+reuses immutable original rays/history only for the requested direction replay.
+It is not an original-binary rerun, independent transport/reference qualification,
+response-quality acceptance or a waiver of any retained original failure. Analysis
+writes a fresh `integration-analysis` directory and hashes its raw inputs before
+and after use.
+
+`GGLabAppRuntimeTests.exe --suite gi-probe-inspection` runs the focused native
+admission, value-serialization and cancellation cases also owned by the aggregate
+capture suite; `WinAppTests.exe --suite app-control` covers wire parsing. Require
+the suite's completion banner/check count, not merely a zero exit code.
+
 ### Field readiness
 
 `RunVerification.ps1 -Suite gi-field-readiness` runs F1 plane, F2, F4, an excluded-block

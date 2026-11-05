@@ -519,7 +519,8 @@ $pythonIdentity = if ($Python) { & $Python --version } else { '' }
         'nonfinite-sites', 'render-graph-schema',
         'resource-export-schema', 'nonfinite-coverage-schema', 'capture-comparison', 'taa-comparison-workflow',
         'capture-bundle-schema', 'gpu-timing-schema', 'parameter-frames-schema', 'gi-reference-contracts',
-        'gi-specular-visibility-contracts', 'gi-probe-update-contracts', 'gi-probe-viewer-contracts', 'gi-field-sampling-contracts',
+        'gi-specular-visibility-contracts', 'gi-probe-update-contracts', 'gi-probe-integration-contracts',
+        'gi-probe-viewer-contracts', 'gi-field-sampling-contracts',
         'gi-field-baseline-contracts', 'gi-field-feedback-contracts', 'gi-field-light-step-contracts'
     )
     foreach ($leaf in $gpuLeaves.Values) {

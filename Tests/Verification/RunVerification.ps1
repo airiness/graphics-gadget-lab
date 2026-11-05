@@ -56,6 +56,8 @@ $catalog = @(
         @{ path = 'Tests/Verification/TestGIProbeViewerWarmup.ps1' },
         @{ path = 'Tests/Verification/ValidateGIProbeViewer.py'; arguments = @('--self-test') }) },
     @{ name = 'gi-field'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIField.ps1' }) },
+    @{ name = 'gi-probe-integration-contracts'; group = 'contracts'; steps = @(
+        @{ path = 'Tests/Verification/ValidateGIProbeIntegration.py'; arguments = @('--self-test') }) },
     @{ name = 'gi-probe-inspection'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIProbeInspection.ps1' }) },
     @{ name = 'gi-probe-visualization'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIProbeVisualization.ps1' }) },
     @{ name = 'gi-probe-depth'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIProbeDepth.ps1' }) },

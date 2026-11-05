@@ -298,6 +298,9 @@ namespace gglab
 		uint64_t m_ExpectedGeneration = 0;
 		// Omit to select the current epoch at issue; generation is always required.
 		std::optional<uint64_t> m_ExpectedRefreshEpoch;
+		// Presence requests the versioned raw integration witness. Zero uses the current
+		// update; a positive one-based update replays directions only, never field history.
+		std::optional<uint32_t> m_IntegrationReplayUpdate;
 		bool operator==(const GIProbeInspectionRequest&) const = default;
 	};
 

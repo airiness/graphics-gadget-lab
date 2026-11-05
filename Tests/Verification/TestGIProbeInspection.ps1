@@ -6,6 +6,10 @@ param(
     [string]$OutputDirectory,
     [string]$RunDirectory,
     [string]$Python = 'python',
+    [string]$ShaderCacheDirectory,
+    [switch]$IntegrationDiagnostics,
+    [string]$HistoricalPoint,
+    [string]$HistoricalRoot,
     [int]$TimeoutSeconds = 600
 )
 $ErrorActionPreference = 'Stop'
@@ -19,14 +23,19 @@ if ($Configuration.Count -ne 1 -or -not $Rhi.Count -or @($Rhi | Where-Object { $
 }
 if (-not $OutputDirectory -and -not $RunDirectory) { $OutputDirectory = "$root/Build/Validation/GIProbeInspection" }
 $output = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory -RunId ([Guid]::NewGuid().ToString('N').Substring(0,8))
-function Set-Field($Session, $Run, $Fixture, [bool]$Readiness = $true) {
+if (($HistoricalPoint -or $HistoricalRoot) -and
+    (-not $IntegrationDiagnostics -or -not $HistoricalPoint -or -not $HistoricalRoot)) {
+    throw 'Historical replay requires explicit integration diagnostics, point and original collection root.'
+}
+$integrationCases = [Collections.Generic.List[object]]::new()
+function Set-Field($Session, $Run, $Fixture, [bool]$Readiness = $true, [uint32]$Seed = 61051) {
     $changes = @(
         @{id='gi_reference.fixture';type='enum';value=$Fixture},
         @{id='gi_reference.field_enabled';type='bool';value=$true},
         @{id='gi_reference.field_sampling';type='bool';value=$true},
         @{id='gi_reference.field_readiness';type='bool';value=$Readiness},
         @{id='gi_reference.probe_enabled';type='bool';value=$true},
-        @{id='gi_reference.seed';type='uint';value=61051}
+        @{id='gi_reference.seed';type='uint';value=$Seed}
     )
     $effect = Invoke-VerificationSession set $Session @{ExpectedRunIdentity=$Run;WaitConsumed=$true;
         Changes=(ConvertTo-Json -InputObject $changes -Compress);TimeoutSeconds=$TimeoutSeconds}
@@ -45,9 +54,16 @@ try {
         $session = 'gi-inspect-'+[Guid]::NewGuid().ToString('N').Substring(0,10)
         $start = $null
         try {
+            $stateRoot = "$output/$backend/state"
+            New-Item -ItemType Directory -Path $stateRoot -Force | Out-Null
+            if ($ShaderCacheDirectory) {
+                foreach ($name in @('ShaderCache','ShaderArtifacts')) {
+                    Copy-Item -LiteralPath "$ShaderCacheDirectory/$backend/$name" -Destination "$stateRoot/$name" -Recurse
+                }
+            }
             $start = Invoke-VerificationSession start $session @{Configuration=$Configuration[0];Rhi=$backend;
                 Lab='gglab.lab.gi_reference';WindowSize='320x200';NoDevTools=$true;Validation='standard';
-                StateRoot="$output/$backend/state";StartTimeoutSeconds=$TimeoutSeconds}
+                StateRoot=$stateRoot;StartTimeoutSeconds=$TimeoutSeconds}
             Write-VerificationJson "$output/$backend/start.json" $start
             if ($start.ownership -ne 'created') { throw 'Probe verification requires an owned session.' }
             $run = $start.runIdentity
@@ -87,6 +103,37 @@ try {
                 Write-VerificationJson "$output/$backend/$($case.id)/stale.json" $stale
                 if ($stale.status -ne 'failed' -or $stale.failureCode -ne 'GIProbeIdentityMismatch') { throw 'Stale identity did not fail explicitly.' }
             }
+            if ($IntegrationDiagnostics) {
+                if (-not $status.capabilities.giProbeInspection.integrationInspection) {
+                    throw 'Integration inspection capability is unavailable.'
+                }
+                $changes = @(@{id='view.taa.enabled';type='bool';value=$false},
+                    @{id='view.taa.resolution_preset';type='enum';value=0})
+                $viewEffect = Invoke-VerificationSession set $session @{ExpectedRunIdentity=$run;WaitConsumed=$true;
+                    Changes=(ConvertTo-Json -InputObject $changes -Compress);TimeoutSeconds=$TimeoutSeconds}
+                Write-VerificationJson "$output/$backend/math-view.json" $viewEffect
+                if (-not $viewEffect.batch.succeeded) { throw 'Native/TAA-off setup failed.' }
+                $status = Set-Field $session $run 4 $true 61052
+                foreach ($replay in @(0,563)) {
+                    $directory = "$backend/math-$replay"
+                    New-Item -ItemType Directory -Path "$output/$directory" -Force | Out-Null
+                    $request = @{coordinate=@(5,4,8);expectedGeneration=$status.frame.giField.generation;
+                        expectedRefreshEpoch=$status.frame.giField.summary.field.refreshEpoch;integrationReplayUpdate=$replay}
+                    $products = @(@{kind='graph'},@{kind='resource';targets=@(
+                        @{resource='GI.Field.Irradiance';at=@{before='GI.Field.BlendShared'};slices=@(4,1)},
+                        @{resource='GI.Field.Irradiance';slices=@(4,1)},
+                        @{resource='GI.Field.Rays'},@{resource='GI.Field.Readiness'})})
+                    $capture = Invoke-VerificationSession capture $session @{ExpectedRunIdentity=$run;Timing='next-frame';SettleFrames=0;
+                        GIProbeInspection=(ConvertTo-Json -InputObject $request -Compress);
+                        Products=(ConvertTo-Json -InputObject $products -Depth 8 -Compress);
+                        OutputDirectory="$output/$directory";TimeoutSeconds=$TimeoutSeconds}
+                    Write-VerificationJson "$output/$directory/receipt.json" $capture -Depth 32
+                    if ($capture.status -ne 'completed' -or $capture.publication -ne 'Published') {
+                        throw 'Integration witness did not publish.'
+                    }
+                    $integrationCases.Add(@{directory=$directory;backend=$backend;seed=61052;replayUpdate=$replay})
+                }
+            }
         } finally {
             if ($start -and $start.ownership -eq 'created') {
                 $stop = Invoke-VerificationSession stop $session @{ExpectedRunIdentity=$start.runIdentity}
@@ -99,6 +146,12 @@ try {
         }
     }
     Invoke-VerificationPython $Python "$PSScriptRoot/ValidateGIProbeInspection.py" @('--root',$output) "$output/oracle-result.json" 'Probe inspection failed'
+    if ($IntegrationDiagnostics) {
+        Write-VerificationJson "$output/integration-cases.json" @($integrationCases.ToArray())
+        $arguments = @('--root',$output)
+        if ($HistoricalPoint) { $arguments += @('--historical-point',$HistoricalPoint,'--historical-root',$HistoricalRoot) }
+        Invoke-VerificationPython $Python "$PSScriptRoot/ValidateGIProbeIntegration.py" $arguments "$output/integration-oracle-result.json" 'Integration inspection failed'
+    }
     Assert-VerificationArtifacts $root $output $Python 'Probe inspection failed'
     Assert-VerificationIdentity $source (Get-VerificationSourceIdentity $root @('Sources','Shaders','Tests/Verification','Scripts/Verification','Schemas','Projects')) 'Probe source changed during verification'
     Assert-VerificationIdentity $binaries (Get-VerificationBinaryIdentity $root $Configuration[0]) 'Probe binaries changed during verification'

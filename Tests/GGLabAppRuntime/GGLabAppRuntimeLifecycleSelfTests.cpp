@@ -799,6 +799,11 @@ int main(int argumentCount, char* arguments[])
 		return gglab::RunSelfTestSuite({ .m_Id = selected,
 			.m_Run = &gglab::RunGIFieldLightingRefreshSelfTests }, reporter) ? 0 : 1;
 	}
+	if (selected == "gi-probe-inspection")
+	{
+		return gglab::RunSelfTestSuite({ .m_Id = selected,
+			.m_Run = &gglab::RunGIProbeInspectionSelfTests }, reporter) ? 0 : 1;
+	}
 	const gglab::SelfTestSuiteDesc suites[]
 	{
 		{ "app-runtime-lifecycle", &gglab::RunLifecycleSelfTests },

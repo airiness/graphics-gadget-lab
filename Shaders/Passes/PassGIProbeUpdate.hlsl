@@ -46,7 +46,10 @@ cbuffer Parameters : register(b2)
 	float DistanceHysteresis;
 	uint ReadinessDistance;
 	float FeedbackViewBias;
-	uint3 FeedbackPadding;
+	uint InspectionIndex;
+	uint InspectedProbe;
+	uint InspectionReplayIndex;
+	float4 InspectionReplayRotation;
 };
 
 static const float ProbeGoldenAngleTurns = 0.3819660112501051;
@@ -82,7 +85,7 @@ uint3 ProbeCoordinate(uint probe)
 	return uint3(probe % GridSize.x, (probe / GridSize.x) % GridSize.z,
 		probe / (GridSize.x * GridSize.z));
 }
-float3 ProbeDirection(uint probe, uint ray)
+float3 ProbeDirection(uint probe, uint ray, uint directionUpdate, float4 commonRotation)
 {
 	const float z = 1.0 - 2.0 * ((float)(ray) + 0.5) / (float)(RaysPerProbe);
 	// Bound sin/cos arguments: large-angle error is amplified at grazing texels.
@@ -97,7 +100,7 @@ float3 ProbeDirection(uint probe, uint ray)
 		// A common rotation correlates every cage corner's narrow-emitter error.
 		// Decorrelate both probes and updates: nearby CPU seeds otherwise permute
 		// overlapping histories. The experiment keeps its common directions.
-		const uint update = RotateDirections != 0 ? GIHash(UpdateIndex) : 0;
+		const uint update = RotateDirections != 0 ? GIHash(directionUpdate) : 0;
 		uint state = GIHash(probe ^ update);
 		const float u = GIRandom(state);
 		const float v = TWO_PI * GIRandom(state);
@@ -108,9 +111,14 @@ float3 ProbeDirection(uint probe, uint ray)
 	}
 	if (RotateDirections != 0)
 	{
-		direction += 2.0 * cross(Rotation.xyz, cross(Rotation.xyz, direction) + Rotation.w * direction);
+		direction += 2.0 * cross(commonRotation.xyz,
+			cross(commonRotation.xyz, direction) + commonRotation.w * direction);
 	}
 	return direction;
+}
+float3 ProbeDirection(uint probe, uint ray)
+{
+	return ProbeDirection(probe, ray, UpdateIndex, Rotation);
 }
 float3 OctahedralDirection(uint2 texel, uint size)
 {
@@ -122,6 +130,84 @@ float3 OctahedralDirection(uint2 texel, uint size)
 			direction.y >= 0 ? 1 : -1);
 	}
 	return normalize(direction);
+}
+
+// Versioned, opt-in witness. It observes inputs/intermediates, never feeds the estimator.
+void WriteIntegrationRecord(uint column, uint row, uint4 value)
+{
+	RWTexture2D<uint> output = ResourceDescriptorHeap[NonUniformResourceIndex(InspectionIndex)];
+	const uint2 pixel = uint2(4 * column, row);
+	output[pixel] = value.x;
+	output[pixel + uint2(1, 0)] = value.y;
+	output[pixel + uint2(2, 0)] = value.z;
+	output[pixel + uint2(3, 0)] = value.w;
+}
+float4 ReadIntegrationRecord(uint column, uint row)
+{
+	RWTexture2D<uint> input = ResourceDescriptorHeap[NonUniformResourceIndex(InspectionIndex)];
+	const uint2 pixel = uint2(4 * column, row);
+	return asfloat(uint4(input[pixel], input[pixel + uint2(1, 0)],
+		input[pixel + uint2(2, 0)], input[pixel + uint2(3, 0)]));
+}
+uint IntegrationBlockRows()
+{
+	return (IrradianceInteriorTexels() + RaysPerProbe - 1) / RaysPerProbe;
+}
+void WriteIntegrationTexel(uint block, uint texel, float4 value)
+{
+	WriteIntegrationRecord(texel % RaysPerProbe,
+		GIIntegrationInspectionHeaderRows + block * IntegrationBlockRows() + texel / RaysPerProbe,
+		asuint(value));
+}
+[numthreads(GIProbeGroupThreads, 1, 1)]
+void InspectIntegration(uint3 dispatch : SV_DispatchThreadID)
+{
+	const uint rows = GIIntegrationInspectionHeaderRows +
+		GIIntegrationInspectionBlocks * IntegrationBlockRows() + IrradianceInteriorTexels();
+	if (dispatch.x >= RaysPerProbe * rows)
+	{
+		return;
+	}
+	const uint column = dispatch.x % RaysPerProbe;
+	const uint row = dispatch.x / RaysPerProbe;
+	uint4 record = 0;
+	if (row == 0)
+	{
+		if (column == 0)
+		{
+			record = uint4(GIIntegrationInspectionMagic, GIIntegrationInspectionVersion, UpdateIndex + 1, InspectedProbe);
+		}
+		else if (column == 1)
+		{
+			record = asuint(Rotation);
+		}
+		else if (column == 2)
+		{
+			record = asuint(InspectionReplayRotation);
+		}
+		else if (column == 3)
+		{
+			record = uint4(RaysPerProbe, IrradianceInteriorWidth, InspectionReplayIndex + 1, ReadinessEpoch);
+		}
+		else if (column == 4)
+		{
+			record = asuint(float4(Hysteresis, DistanceHysteresis, 0, 0));
+		}
+		else if (column == 5)
+		{
+			record = uint4(GridSize, RotateDirections);
+		}
+		else if (column == 6)
+		{
+			record = uint4(FieldFlags, 0, 0, 0);
+		}
+	}
+	else if (row == 3)
+	{
+		record = asuint(float4(ProbeDirection(InspectedProbe, column,
+			InspectionReplayIndex, InspectionReplayRotation), 0));
+	}
+	WriteIntegrationRecord(column, row, record);
 }
 
 void InvalidateUpdate(uint error, uint probe, uint element, bool publishField)
@@ -512,6 +598,17 @@ void ReadinessFloor(uint thread : SV_GroupIndex)
 groupshared float2 ReadinessMeasures[GIProbeGroupThreads];
 groupshared float4 SharedRays[GIProbeMaximumRays];
 groupshared float3 SharedDirections[GIProbeMaximumRays];
+void InspectIntegrationInputs(uint probe, uint thread)
+{
+	if (InspectionIndex != 0xffffffffu && probe == InspectedProbe)
+	{
+		for (uint ray = thread; ray < RaysPerProbe; ray += GIProbeGroupThreads)
+		{
+			WriteIntegrationRecord(ray, 1, asuint(float4(SharedDirections[ray], 0)));
+			WriteIntegrationRecord(ray, 2, asuint(ProbeRayInput[probe * RaysPerProbe + ray]));
+		}
+	}
+}
 float4 IntegrateTexel(uint probe, uint texel, bool useShared)
 {
 	const bool irradiance = texel < IrradianceInteriorTexels();
@@ -524,12 +621,27 @@ float4 IntegrateTexel(uint probe, uint texel, bool useShared)
 	for (uint ray = 0; ray < RaysPerProbe; ++ray)
 	{
 		const float4 value = useShared ? SharedRays[ray] : ProbeRayInput[probe * RaysPerProbe + ray];
-		const float cosine = max(dot(direction, SharedDirections[ray]), 0.0);
+		const float signedCosine = dot(direction, SharedDirections[ray]);
+		const float cosine = max(signedCosine, 0.0);
 		const float weight = irradiance ? cosine : pow(cosine, ProbeDistanceWeightExponent);
 		const float distance = min(abs(value.w), ProbeDistanceCellDiagonals * sqrt(3.0) * ProbeSpacing);
 		radiance += weight * value.xyz;
 		moments += weight * float2(distance, distance * distance);
 		sum += weight;
+		if (InspectionIndex != 0xffffffffu && probe == InspectedProbe && irradiance)
+		{
+			const float3 replayDirection = ReadIntegrationRecord(ray, 3).xyz;
+			const float replayCosine = dot(direction, replayDirection);
+			WriteIntegrationRecord(ray, GIIntegrationInspectionHeaderRows +
+				GIIntegrationInspectionBlocks * IntegrationBlockRows() + texel,
+				asuint(float4(signedCosine, cosine, replayCosine, max(replayCosine, 0.0))));
+		}
+	}
+	if (InspectionIndex != 0xffffffffu && probe == InspectedProbe && irradiance)
+	{
+		WriteIntegrationTexel(0, texel, float4(direction, 0));
+		WriteIntegrationTexel(1, texel, float4(radiance / max(sum, ProbeMinimumIntegrationWeight), 1));
+		WriteIntegrationTexel(4, texel, float4(radiance, sum));
 	}
 	return irradiance ?
 		float4(radiance / max(sum, ProbeMinimumIntegrationWeight), 1) :
@@ -556,6 +668,11 @@ float2 StoreTexel(uint probe, uint texel, float4 value)
 			return 0.0.xx;
 		}
 		IrradianceAtlas()[target] = float4(blended, 1);
+		if (InspectionIndex != 0xffffffffu && probe == InspectedProbe)
+		{
+			WriteIntegrationTexel(2, texel, previous);
+			WriteIntegrationTexel(3, texel, float4(blended, 1));
+		}
 		if (ReadinessEnabled != 0)
 		{
 			const float3 change = abs(blended - previous.xyz) * PI /
@@ -604,6 +721,7 @@ void BlendDirect(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 		SharedDirections[ray] = ProbeDirection(probe, ray);
 	}
 	GroupMemoryBarrierWithGroupSync();
+	InspectIntegrationInputs(probe, thread);
 	for (uint texel = thread; texel < IrradianceInteriorTexels() + GIProbeDistanceInteriorTexels;
 		texel += GIProbeGroupThreads)
 	{
@@ -625,6 +743,7 @@ void BlendShared(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 		SharedDirections[ray] = ProbeDirection(probe, ray);
 	}
 	GroupMemoryBarrierWithGroupSync();
+	InspectIntegrationInputs(probe, thread);
 	float2 measure = 0.0.xx;
 	for (uint texel = thread; texel < IrradianceInteriorTexels() + GIProbeDistanceInteriorTexels;
 		texel += GIProbeGroupThreads)

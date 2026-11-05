@@ -78,6 +78,8 @@ AppRuntime forwards a capture-selected probe coordinate through pipeline wrapper
 via `RenderPipelineBase::SetGIProbeInspection`. Runtime extracts the graph-owned
 `GI.Field.ProbeInspection` resource before final field export; resource capture
 publishes its [CPU observation values](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GIFieldObservation.h).
+An opt-in `GI.Field.IntegrationInspection` witness records integration intermediates;
+its sampling-direction replay never changes field updates or history.
 The [GUI adapter](../../Sources/GGLabAppRuntime/Capture/GIProbeInspectionControl.h)
 owns its capture job and result independently of session jobs.
 

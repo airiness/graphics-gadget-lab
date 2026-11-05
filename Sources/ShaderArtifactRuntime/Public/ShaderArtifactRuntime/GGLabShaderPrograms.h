@@ -179,6 +179,8 @@ namespace gglab::shader_programs
 		"gglab.shader.gi-field", "compute.classify", ShaderStage::Compute };
 	inline const ShaderProgramRef GIFieldReadinessFloorCompute{
 		"gglab.shader.gi-field", "compute.readiness-floor", ShaderStage::Compute };
+	inline const ShaderProgramRef GIProbeIntegrationInspectionCompute{
+		"gglab.shader.gi-field", "compute.integration-inspection", ShaderStage::Compute };
 	inline const ShaderProgramRef GIFieldLookupCompute{
 		"gglab.shader.gi-field", "compute.lookup-diagnostics", ShaderStage::Compute };
 	inline const ShaderProgramRef GIProbeInspectionCompute{

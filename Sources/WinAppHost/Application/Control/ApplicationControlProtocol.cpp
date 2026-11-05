@@ -1267,13 +1267,14 @@ namespace gglab
 				else if (key == "giProbeInspection" && !graph && !resources)
 				{
 					if (!value.is_object() || !value.contains("coordinate") ||
-						!value.contains("expectedGeneration") || value.size() < 2 || value.size() > 3)
+						!value.contains("expectedGeneration") || value.size() < 2 || value.size() > 4)
 					{
-						return "giProbeInspection requires coordinate and expectedGeneration; expectedRefreshEpoch is optional.";
+						return "giProbeInspection requires coordinate and expectedGeneration; refresh epoch and integration replay update are optional.";
 					}
 					for (const auto& [name, field] : value.items())
 					{
-						if (name != "coordinate" && name != "expectedGeneration" && name != "expectedRefreshEpoch")
+						if (name != "coordinate" && name != "expectedGeneration" && name != "expectedRefreshEpoch" &&
+							name != "integrationReplayUpdate")
 						{
 							return "Unknown giProbeInspection field.";
 						}
@@ -1293,6 +1294,15 @@ namespace gglab
 					if (value.contains("expectedRefreshEpoch"))
 					{
 						inspection.m_ExpectedRefreshEpoch = value["expectedRefreshEpoch"].get<uint64_t>();
+					}
+					if (value.contains("integrationReplayUpdate"))
+					{
+						const auto& update = value["integrationReplayUpdate"];
+						if (!update.is_number_unsigned() || update.get<uint64_t>() > UINT32_MAX)
+						{
+							return "integrationReplayUpdate requires an unsigned one-based update, or zero for current.";
+						}
+						inspection.m_IntegrationReplayUpdate = update.get<uint32_t>();
 					}
 					capture.m_GIProbeInspection = inspection;
 				}
@@ -1370,6 +1380,10 @@ namespace gglab
 					if (capture.m_GIProbeInspection)
 					{
 						names.push_back("GI.Field.ProbeInspection");
+						if (capture.m_GIProbeInspection->m_IntegrationReplayUpdate)
+						{
+							names.push_back("GI.Field.IntegrationInspection");
+						}
 					}
 					if (capture.m_GIReceiverInspection)
 					{
@@ -2185,7 +2199,14 @@ namespace gglab
 				{ "maximumBytes", GIProbeInspectionMaximumBytes },
 				{ "result", "products[].metadata.giProbeInspection" },
 				{ "requiredGeneration", true },
-				{ "optionalRefreshEpoch", true } } },
+				{ "optionalRefreshEpoch", true },
+				{ "integrationInspection", {
+					{ "version", 1 },
+					{ "request", "capture.giProbeInspection.integrationReplayUpdate" },
+					{ "resource", "GI.Field.IntegrationInspection" },
+					{ "resultSchemaVersion", 2 },
+					{ "zeroMeansCurrentUpdate", true },
+					{ "changesFieldUpdate", false } } } } },
 			{ "requiredProducts", Json::array({ "image", "diagnostic", "graph", "resource" }) },
 			{ "consistency", "SameFrame" },
 			{ "resourceProductsPerJob", 1 },

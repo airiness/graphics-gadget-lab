@@ -2180,6 +2180,25 @@ namespace gglab
 			withoutResource.m_RequiredProducts = { ImageCaptureProduct{} };
 			context.Check(coordinator.CheckJobAdmission(withoutResource).m_Reason == CaptureAdmissionReason::InvalidPlan,
 				"A typed inspection cannot omit its required compact resource");
+			auto math = plan(0);
+			math.m_GIProbeInspection->m_IntegrationReplayUpdate = 563;
+			GIProbeInspectionResult witness;
+			const auto ordinaryJson = nlohmann::json::parse(SerializeGIProbeInspection(witness));
+			witness.m_Request = *math.m_GIProbeInspection;
+			const auto witnessJson = nlohmann::json::parse(SerializeGIProbeInspection(witness));
+			context.Check(ordinaryJson["schemaVersion"] == 1 &&
+				!ordinaryJson["request"].contains("integrationReplayUpdate") &&
+				witnessJson["schemaVersion"] == 2 && witnessJson["request"]["integrationReplayUpdate"] == 563,
+				"Only opt-in integration inspection publishes the extended v2 request schema");
+			context.Check(coordinator.CheckJobAdmission(math).m_Reason == CaptureAdmissionReason::InvalidPlan,
+				"An integration witness cannot omit its same-frame raw resource");
+			std::get<ResourceCaptureProduct>(math.m_RequiredProducts[0]).m_Targets.push_back(
+				{ .m_Resource = "GI.Field.IntegrationInspection" });
+			context.Check(coordinator.CheckJobAdmission(math).m_Status == CaptureAdmissionStatus::Accepted,
+				"A generation-bound integration witness uses ordinary inspection admission");
+			std::get<ResourceCaptureProduct>(math.m_RequiredProducts[0]).m_Targets.back().m_Mip = 1;
+			context.Check(coordinator.CheckJobAdmission(math).m_Reason == CaptureAdmissionReason::InvalidPlan,
+				"Integration witness subresource mismatches reject before GPU work");
 			const auto summaryJson = nlohmann::json::parse(SerializeGIFieldSummary(*summary));
 			context.Check(summaryJson["completedMeasurement"].is_null() &&
 				summaryJson["field"]["epochOriginUpdate"] == 80 &&
@@ -6145,6 +6164,12 @@ namespace gglab
 	void RunGIFieldLightingRefreshSelfTests(SelfTestContext& context) noexcept
 	{
 		RunGIFieldLightingRefreshTests(context);
+	}
+
+	void RunGIProbeInspectionSelfTests(SelfTestContext& context) noexcept
+	{
+		RunGIProbeInspectionTests(context);
+		RunGIInspectionCancellationTests(context);
 	}
 
 	void RunFrameCaptureCoordinatorSelfTests(SelfTestContext& context) noexcept

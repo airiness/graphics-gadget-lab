@@ -308,19 +308,24 @@ namespace gglab
 		if (plan.m_GIProbeInspection)
 		{
 			bool compactTarget = false;
+			bool integrationTarget = false;
 			for (const auto& product : plan.m_RequiredProducts)
 			{
 				if (const auto* resource = std::get_if<ResourceCaptureProduct>(&product))
 				{
-					compactTarget = std::ranges::any_of(resource->m_Targets, [](const auto& target)
+					for (const auto& target : resource->m_Targets)
+					{
+						if (target.m_Position == RGObservationPosition::Final && target.m_Mip == 0 &&
+							target.m_FirstSlice == 0 && (!target.m_SliceCount || *target.m_SliceCount == 1))
 						{
-							return target.m_Resource == "GI.Field.ProbeInspection" &&
-								target.m_Position == RGObservationPosition::Final && target.m_Mip == 0 &&
-								target.m_FirstSlice == 0 && (!target.m_SliceCount || *target.m_SliceCount == 1);
-						});
+							compactTarget |= target.m_Resource == "GI.Field.ProbeInspection";
+							integrationTarget |= target.m_Resource == "GI.Field.IntegrationInspection";
+						}
+					}
 				}
 			}
-			if (!compactTarget || plan.m_GIProbeInspection->m_ExpectedGeneration == 0 || plan.m_Sequence)
+			if (!compactTarget || (plan.m_GIProbeInspection->m_IntegrationReplayUpdate && !integrationTarget) ||
+				plan.m_GIProbeInspection->m_ExpectedGeneration == 0 || plan.m_Sequence)
 			{
 				return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::InvalidPlan };
 			}
