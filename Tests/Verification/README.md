@@ -354,6 +354,44 @@ response arithmetic adversarially. The headless AppRuntime executable accepts
 phase-handoff and rejection regressions, while `gpu-fault-lifecycle` includes the
 build-time publication/aborted-frame regression.
 
+For small-signal engineering attribution, use `-TransientAttribution -Tap gi
+-Feedback off -Step small-increase,small-decrease`. Optional `-TraceSeed
+61052,71052,81052` and `-PreEventSettleFrames 128,145` expand the Cartesian replay
+matrix without changing the default qualification recipe. Calibration still uses
+independent seed 61051; trace seeds must differ. Settling requests are minimum
+pre-event waits, not exact update-phase locks: the analyzer reports the actual
+one-based update at `firstConsumed`. This mode cannot request references or Final.
+
+The opt-in mode observes frames 29–80 and 359 with eight paired payloads:
+receiver irradiance/readiness, the pre-blend and final irradiance atlases, final
+distance/classification, rays, and receiver query. Atlas slices are planned from
+all required receivers' eight-corner cages; a separate paired geometry/normal
+capture supplies the immutable authored view. Only frame 0 requests an image,
+avoiding the eight-slot capture budget. It does not change GPU algorithms or
+production diagnostics. Export-free performance is not measured.
+
+[AnalyzeGIFieldTransient.py](AnalyzeGIFieldTransient.py) also accepts a historical
+`--root` and a **fresh** `--output` directory. It re-reads the raw observations,
+retains every required ROI and own-target failure, writes `firstConsumed`-aligned
+CSV curves with both step/endpoint normalization, and seals its numerical inputs
+and exact analysis-code snapshot. Historical two-target captures supply only
+population-level probe observations, not receiver contributions. Rich captures
+add FP64 receiver closure, exact symmetric atlas/normalized-weight decomposition
+against frame 359, static classification checks, and FP64 Trace/Blend checks for
+the 16 highest-influence probes during the pre-Ready refresh interval. The single
+settled decomposition frame is not substituted for the 30-frame timing endpoint.
+The decomposition attributes exported signal changes; it does not by itself prove
+an estimator root cause. Trace arithmetic retains its 0.5% component budget and
+0.001 normalization floor: mismatches are aggregated into the saved report, keep
+`contractsPassed: false`, and return a nonzero analyzer exit. Neither complete
+collection nor near-black conditioning turns a failed arithmetic check into a
+pass. These checks join `gi-field-light-step-contracts`.
+
+A complete engineering collection returns `engineering-complete` even if response
+targets fail, retaining `observedResponseTargetsPassed: false` separately.
+Engineering completion is never independent-reference response quality, F7, G3 or
+performance qualification; transport/arithmetic failures still fail the runner.
+
 By default this is an experiment/transport check, not response-quality
 qualification. Add `-QualifyReferences` to collect independent endpoints for all
 selected recipes before the replays. Endpoints are shared across directions only

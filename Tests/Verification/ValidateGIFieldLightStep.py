@@ -184,8 +184,33 @@ def settled_endpoint(field):
             measurement_phase(field) == "steady")
 
 
+def transient_frame(case, index):
+    return bool(case.get("transientAttribution") and (29 <= index <= 80 or index == 359))
+
+
+def observation_targets(record, case, index):
+    # Preserve the strict two-target qualification recipe. Only explicit engineering
+    # cases may observe the six extra addresses, including both atlas versions.
+    targets = record["targets"]
+    keys = [(t["address"]["resource"], json.dumps(t["address"]["at"], sort_keys=True)) for t in targets]
+    expected = [("GI.Field.ReceiverIrradiance" if case["tap"] == "gi" else "TAA.ResolvedSceneColor", '"final"'),
+                ("GI.Field.Readiness", '"final"')]
+    if transient_frame(case, index):
+        expected += [("GI.Field.Irradiance", json.dumps(dict(before="GI.Field.BlendShared"))),
+                     *[("GI.Field."+name, '"final"') for name in
+                       ("Irradiance", "Distance", "Classification", "Rays", "ReceiverQuery")]]
+    require(len(keys) == len(expected) and set(keys) == set(expected), "Incomplete/changed numerical observation")
+    return {t["address"]["resource"]: t for t in targets if t["address"]["at"] == "final"}
+
+
 def validate_case(root, case, qualify_references=False):
     step_recipe(case)
+    engineering = case.get("transientAttribution", False)
+    if engineering:
+        require(not qualify_references and case["tap"] == "gi" and not case["feedback"] and
+                case["step"] in ("small-increase", "small-decrease") and
+                0 <= case["traceSeed"] <= 0xffffffff and case["traceSeed"] != 61051 and
+                128 <= case["preEventSettleFrames"] <= 512, "Changed engineering-only transient recipe")
     require(case["fixture"] == 4 and case["environment"] == 3 and case["view"] == "F4_Floor" and
             case["frameCount"] == FRAME_COUNT and case["eventFrame"] == EVENT_FRAME and
             case["tap"] in ("gi", "final"),
@@ -214,7 +239,11 @@ def validate_case(root, case, qualify_references=False):
     require(len(mask_paths) == 1, "Missing independently replayed unjittered receiver mask")
     mask_record = read_group(mask_paths[0])
     mask_meta = mask_record["frame"]
-    mask_target = mask_record["targets"][0]
+    mask_targets = {t["address"]["resource"]: t for t in mask_record["targets"]}
+    require(len(mask_targets) == len(mask_record["targets"]) == (3 if engineering else 1) and
+            set(mask_targets) == ({"GI.Receiver.Position", "GI.Receiver.VertexNormal", "GI.Receiver.ShadingNormal"}
+                                 if engineering else {"GI.Receiver.Position"}), "Changed geometry observation")
+    mask_target = mask_targets["GI.Receiver.Position"]
     require(mask_target["address"]["resource"] == "GI.Receiver.Position" and
             parameters(mask_meta)["fixture"] == 4 and parameters(mask_meta)["environment"] == 3 and
             camera_inputs(mask_meta) == camera_inputs(frames[0]), "Mask is not the same authored geometry/view")
@@ -261,6 +290,9 @@ def validate_case(root, case, qualify_references=False):
                 frame["parameters"]["lighting"]["active"]["generation"] == expected_generation and
                 frame["sceneInputs"]["sun"]["toaIlluminanceLux"] == (case["oldLux"] if index < t0 else case["newLux"]),
                 "Field and actual sun do not follow the built frame's published lighting generation")
+        if engineering:
+            require(p["seed"] == case["traceSeed"] and settled_endpoint(initial),
+                    "Trace seed changed or old endpoint lacks steady Ready plus 120")
         phase = measurement_phase(field)
         if index >= t0:
             target_epoch = target_epoch or identity["refreshEpoch"]
@@ -279,8 +311,7 @@ def validate_case(root, case, qualify_references=False):
                      not steady_ready_frames and
                      ((field["refreshing"] and not refresh_ready) or
                       (refresh_ready and phase == "steady"))), "An unrelated readiness failure was hidden")
-        targets = {t["address"]["resource"]: t for t in record["targets"]}
-        require(len(targets) == 2 and "GI.Field.Readiness" in targets, "Incomplete numerical observation")
+        targets = observation_targets(record, case, index)
         readiness = readiness_records(path.parent/targets["GI.Field.Readiness"]["array"])
         require(readiness.shape == (1+2*18**3, 4) and np.isfinite(readiness[:, :3]).all(), "Invalid field measurement ABI")
         update = np.ascontiguousarray(readiness[2::2, 3]).view(np.uint32)
@@ -315,6 +346,9 @@ def validate_case(root, case, qualify_references=False):
                             endpointTemporalRms=float(np.std(values[-HOLD:])/max(abs(new), FLOOR)),
                             errorAtFirstReady=float(abs(values[ready_frames[0]]-new)/max(abs(new), FLOOR)))
         require(metrics[roi]["endpointTemporalRms"] <= .02, "The measured endpoint is not temporally stable")
+    if engineering:
+        require(all(settled_endpoint(f["readiness"]["giField"]) for f in frames[:EVENT_FRAME]+frames[-HOLD:]),
+                "Engineering endpoint windows require steady Ready plus 120 throughout")
     reference = dict(status="NotApplicableComposite" if case["tap"] == "final" else "NotRequested")
     if qualify_references and case["tap"] == "gi":
         # Every sample used as a settled endpoint needs the prerequisite, not
@@ -334,7 +368,7 @@ def validate_case(root, case, qualify_references=False):
     return dict(case=case, t0=t0, requested=effect["requested"], published=effect["published"],
                 firstConsumed=effect["firstConsumed"], firstFieldReady=ready_frames[0],
                 firstSteadyFieldReady=steady_ready_frames[0],
-                fieldGeneration=initial["generation"], refreshEpoch=target_epoch,
+                fieldGeneration=initial["generation"], refreshEpoch=target_epoch, globalUpdates=updates,
                 rawFieldMeanLuminance=raw_field, roiSeries=series, rois=metrics, reference=reference,
                 observedResponseTargetsPassed=all(m["targetsPassed"] for m in metrics.values()))
 

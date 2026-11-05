@@ -7,6 +7,9 @@ param(
     [string[]]$Feedback = @('off','on'),
     [string[]]$Step = @('increase'),
     [switch]$QualifyReferences,
+    [switch]$TransientAttribution,
+    [uint32[]]$TraceSeed = @(61052),
+    [int[]]$PreEventSettleFrames = @(128),
     [ValidateRange(1,131072)][int]$ReferenceInitialSamples = 4096,
     [ValidateRange(2,262144)][int]$ReferenceMaximumSamples = 262144,
     [ValidateSet(16,32)][int]$ReferenceMaximumDepth = 32,
@@ -33,7 +36,13 @@ $selectedSteps = @($Step | ForEach-Object { $id=$_; $stepCatalog.steps | Where-O
 $referenceLux = @($selectedSteps | ForEach-Object { $_.oldLux; $_.newLux } | Sort-Object -Unique)
 $arms = @($selectedSteps | ForEach-Object {
     $recipe=$_
-    foreach ($feedbackMode in $Feedback) { @{recipe=$recipe;feedback=$feedbackMode} }
+    foreach ($feedbackMode in $Feedback) {
+        foreach ($seed in $TraceSeed) {
+            foreach ($settle in $PreEventSettleFrames) {
+                @{recipe=$recipe;feedback=$feedbackMode;seed=$seed;settle=$settle}
+            }
+        }
+    }
 })
 if ($Configuration.Count -ne 1 -or $Configuration[0] -notin @('Debug','Develop','Release') -or
     -not $Rhi.Count -or @($Rhi | Where-Object { $_ -notin @('dx12','vulkan') }).Count -or
@@ -42,6 +51,21 @@ if ($Configuration.Count -ne 1 -or $Configuration[0] -notin @('Debug','Develop',
     throw 'Invalid light-step configuration.'
 }
 if ($QualifyReferences -and 'gi' -notin $Tap) { throw 'Independent reference qualification requires a GI-only arm.' }
+if ($TransientAttribution) {
+    if ($QualifyReferences -or $Tap.Count -ne 1 -or $Tap[0] -cne 'gi' -or
+        $Feedback.Count -ne 1 -or $Feedback[0] -cne 'off' -or
+        @($Step | Where-Object { $_ -cnotin @('small-increase','small-decrease') }).Count -or
+        -not $TraceSeed.Count -or -not $PreEventSettleFrames.Count -or
+        @($TraceSeed | Where-Object { $_ -eq 61051 }).Count -or
+        @($PreEventSettleFrames | Where-Object { $_ -lt 128 -or $_ -gt 512 }).Count -or
+        @($TraceSeed | Select-Object -Unique).Count -ne $TraceSeed.Count -or
+        @($PreEventSettleFrames | Select-Object -Unique).Count -ne $PreEventSettleFrames.Count) {
+        throw 'Transient attribution requires small steps, GI-only, feedback-off, distinct trace seeds (not calibration seed 61051), and 128..512 settling frames; no reference qualification.'
+    }
+} elseif ($TraceSeed.Count -ne 1 -or $TraceSeed[0] -ne 61052 -or
+          $PreEventSettleFrames.Count -ne 1 -or $PreEventSettleFrames[0] -ne 128) {
+    throw 'Seed/settling variations require explicit transient attribution mode.'
+}
 if (-not $OutputDirectory -and -not $RunDirectory) { $OutputDirectory = "$root/Build/Validation/GIFieldLightStep" }
 $output = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory `
     -RunId ([Guid]::NewGuid().ToString('N').Substring(0,8))
@@ -112,12 +136,19 @@ try {
                 $recipe = $arm.recipe
                 $stepId = $recipe.id
                 foreach ($tapMode in $Tap) {
-                    $directory = "$output/$backend/$stepId-$feedbackMode-$tapMode"
+                    $caseName = "$stepId-$feedbackMode-$tapMode"
+                    if ($TransientAttribution) { $caseName += "-s$($arm.seed)-p$($arm.settle)" }
+                    $directory = "$output/$backend/$caseName"
                     $null = New-Item -ItemType Directory -Path $directory -Force
                     $case = @{backend=$backend;configuration=$Configuration[0];feedback=($feedbackMode -eq 'on');tap=$tapMode;
                         fixture=4;environment=3;view='F4_Floor';frameCount=360;eventFrame=30;
                         step=$stepId;oldLux=$recipe.oldLux;newLux=$recipe.newLux;
-                        directory="$backend/$stepId-$feedbackMode-$tapMode"}
+                        directory="$backend/$caseName"}
+                    if ($TransientAttribution) {
+                        $case.transientAttribution = $true
+                        $case.traceSeed = $arm.seed
+                        $case.preEventSettleFrames = $arm.settle
+                    }
                     $cases += $case
                     Write-VerificationJson "$output/cases.json" $cases
                     # Consume the starting illumination before constructing the calibration field.
@@ -131,28 +162,49 @@ try {
                         -Until { param($r) $f=$r.frame.giField; $f -and $f.refreshNoiseSamples -ge 30 -and
                             $f.steadyNoiseSamples -eq 64 } -TimeoutSeconds $TimeoutSeconds
                     Write-VerificationJson "$directory/noise.json" $noise
-                    Write-VerificationJson "$directory/calibration.json" (Set-Inputs @{seed=61052;
+                    Write-VerificationJson "$directory/calibration.json" (Set-Inputs @{seed=$arm.seed;
                         field_refresh_noise=[float]$noise.frame.giField.refreshNoiseEstimate;
                         field_steady_noise=[float]$noise.frame.giField.steadyNoiseEstimate})
                     $mask = Invoke-VerificationSession export $session @{ExpectedRunIdentity=$run;View='F4_Floor';
-                        Timing='after-ready';SettleFrames=128;Targets='[{"resource":"GI.Receiver.Position"}]';
+                        Timing='after-ready';SettleFrames=128;Targets=$(if ($TransientAttribution) {
+                            '[{"resource":"GI.Receiver.Position"},{"resource":"GI.Receiver.VertexNormal"},{"resource":"GI.Receiver.ShadingNormal"}]'
+                        } else { '[{"resource":"GI.Receiver.Position"}]' });
                         OutputDirectory="$directory/mask";TimeoutSeconds=$TimeoutSeconds}
                     Write-VerificationJson "$directory/mask/receipt.json" $mask
                     if ($mask.status -ne 'completed' -or $mask.publication -ne 'Published') { throw 'Receiver mask did not publish.' }
+                    if ($TransientAttribution) {
+                        & $Python "$PSScriptRoot/AnalyzeGIFieldTransient.py" --geometry "$directory/mask" --output "$directory/layers.json"
+                        if ($LASTEXITCODE -ne 0) { throw 'Unable to plan complete ROI cage layers.' }
+                        $case.atlasSlices = (Get-Content "$directory/layers.json" -Raw | ConvertFrom-Json).atlasSlices
+                        Write-VerificationJson "$output/cases.json" $cases
+                    }
                     if ($tapMode -eq 'final') {
                         Write-VerificationJson "$directory/final-mode.json" (Set-Inputs @{receiver_diagnostics=$false})
                     }
                     $ready = Invoke-VerificationSession capture $session @{ExpectedRunIdentity=$run;View='F4_Floor';
-                        SettleFrames=128;OutputDirectory="$directory/ready";TimeoutSeconds=$TimeoutSeconds}
+                        SettleFrames=$arm.settle;OutputDirectory="$directory/ready";TimeoutSeconds=$TimeoutSeconds}
                     Write-VerificationJson "$directory/ready/receipt.json" $ready
                     if ($ready.status -ne 'completed' -or $ready.publication -ne 'Published') { throw 'Old endpoint did not become Ready.' }
                     $tapResource = if ($tapMode -eq 'gi') { 'GI.Field.ReceiverIrradiance' } else { 'TAA.ResolvedSceneColor' }
                     $targets = @(@{resource=$tapResource},@{resource='GI.Field.Readiness'})
-                    $exports = @(0..359 | ForEach-Object { @{frame=$_;targets=$targets;graph=($_ -in @(0,30,359))} })
+                    $exports = @(0..359 | ForEach-Object {
+                        $frameTargets = $targets
+                        if ($TransientAttribution -and (($_ -ge 29 -and $_ -le 80) -or $_ -eq 359)) {
+                            # Eight payload slots: no image on these frames. Geometry is captured
+                            # separately from the same sealed authored view before the event.
+                            $frameTargets = $targets + @(
+                                @{resource='GI.Field.Irradiance';at=@{before='GI.Field.BlendShared'};slices=$case.atlasSlices},
+                                @{resource='GI.Field.Irradiance';slices=$case.atlasSlices},
+                                @{resource='GI.Field.Distance';slices=$case.atlasSlices},
+                                @{resource='GI.Field.Classification';slices=$case.atlasSlices},@{resource='GI.Field.Rays'},
+                                @{resource='GI.Field.ReceiverQuery'})
+                        }
+                        @{frame=$_;targets=$frameTargets;graph=($_ -in @(0,30,359))}
+                    })
                     Write-VerificationJson "$directory/exports.json" $exports
                     $events = @(@{frame=30;set=@{'gi_reference.sun_step_lux'=$case.newLux};expectEffects=@('lighting')})
                     $sequence = Invoke-VerificationSession sequence $session @{ExpectedRunIdentity=$run;
-                        CameraPath='GI_LightStep_F4_Floor';CaptureFrames='0,29,359';
+                        CameraPath='GI_LightStep_F4_Floor';CaptureFrames=$(if ($TransientAttribution) { '0' } else { '0,29,359' });
                         TemporalAA="enabled=$($tapMode -eq 'final')";Events=(ConvertTo-Json -InputObject $events -Depth 8 -Compress);
                         ExportsFile="$directory/exports.json";OutputDirectory="$directory/samples";
                         TimeoutSeconds=$TimeoutSeconds;Label='light-step'}
@@ -194,11 +246,19 @@ try {
     Assert-VerificationIdentity $binaries (Get-VerificationBinaryIdentity $root $Configuration[0]) `
         'Light-step binaries changed during analysis.' -Depth 2
     $validation = Get-Content -LiteralPath "$output/validation.json" -Raw | ConvertFrom-Json
+    if ($TransientAttribution) {
+        & $Python "$PSScriptRoot/AnalyzeGIFieldTransient.py" --root $output --output "$output/attribution"
+        if ($LASTEXITCODE -ne 0) { throw 'Transient attribution contracts failed.' }
+        Assert-VerificationIdentity $source (Source-Identity) 'Sources changed during attribution.'
+        Assert-VerificationIdentity $binaries (Get-VerificationBinaryIdentity $root $Configuration[0]) `
+            'Binaries changed during attribution.' -Depth 2
+    }
     $passed = $validation.observedResponseTargetsPassed -and (-not $QualifyReferences -or $validation.responseQualityQualified)
-    $status = if ($passed) { 'passed' } elseif ($validation.referenceStatus -eq 'ReferenceUnconverged') {
+    $status = if ($TransientAttribution) { 'engineering-complete' } elseif ($passed) { 'passed' } elseif ($validation.referenceStatus -eq 'ReferenceUnconverged') {
         'ReferenceUnconverged'
     } else { 'failed' }
-    $result = @{ok=[bool]$passed;status=$status;experimentOnly=$true;
+    $result = @{ok=[bool]($passed -or $TransientAttribution);status=$status;experimentOnly=$true;
+        observedResponseTargetsPassed=$validation.observedResponseTargetsPassed;engineeringOnly=[bool]$TransientAttribution;
         responseQualityQualified=$validation.responseQualityQualified;referenceStatus=$validation.referenceStatus;
         referenceCorrelatedReadinessQualified=$validation.referenceCorrelatedReadinessQualified;
         wholeG3Qualified=$false;directory=$output}
@@ -206,4 +266,4 @@ try {
     wholeG3Qualified=$false;directory=$output;error=$_.Exception.Message} }
 Write-VerificationJson "$output/result.json" $result
 [Console]::Out.WriteLine(($result | ConvertTo-Json -Depth 10 -Compress))
-if ($result.status -ne 'passed') { exit 1 }
+if (-not $result.ok) { exit 1 }
