@@ -72,7 +72,7 @@ Its whole-image worst-case matching must fit the separate cap; explicitly raise 
 for larger stateless views (for example 83 * width * height). This is a work-count
 admission rule, not a millisecond guarantee. Progress reports logical cache bytes;
 native reservation and replacement overlap remain pool/graph diagnostics.
-See the [receiver-cache suite](../README.md#gi-receiver-preparation-cache) for
+See the [receiver-cache suite](../README.md#gi-checks) for
 byte-exact before/after and sum/compensation/RNG controls.
 
 ## Independent checks and masks
