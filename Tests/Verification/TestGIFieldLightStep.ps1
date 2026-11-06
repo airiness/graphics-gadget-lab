@@ -56,8 +56,12 @@ if ($Configuration.Count -ne 1 -or $Configuration[0] -notin @('Debug','Develop',
     throw 'Invalid light-step configuration.'
 }
 if ($QualifyReferences -and 'gi' -notin $Tap) { throw 'Independent reference qualification requires a GI-only arm.' }
-if ($ProgressiveSampling -and (-not $ProgressiveRefresh -or $Feedback.Count -ne 1 -or $Feedback[0] -cne 'off')) {
-    throw 'Progressive sampling requires explicit progressive refresh and feedback-off only.'
+if ($ProgressiveSampling -and (-not $ProgressiveRefresh -or $Feedback.Count -ne 1)) {
+    throw 'Progressive sampling requires explicit progressive refresh and one selected feedback arm.'
+}
+if ($ProgressiveSampling -and $Feedback[0] -ceq 'on' -and
+    ($Tap.Count -ne 1 -or $Tap[0] -cne 'gi' -or $TransientAttribution -or $ProgressiveAttribution)) {
+    throw 'Progressive sampling feedback-on requires GI-only response without attribution.'
 }
 $attribution = $TransientAttribution -or $ProgressiveAttribution
 if ($AttributionStartFrame -ne 29 -and -not $ProgressiveAttribution) {

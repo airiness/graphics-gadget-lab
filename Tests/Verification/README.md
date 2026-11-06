@@ -182,8 +182,10 @@ without the historical fixed-filter attribution oracle. Passing this experiment
 does not adopt a production default or complete G3.
 `-ProgressiveSampling` additionally selects default-off `field_progressive_sampling`:
 contiguous 2D Sobol blocks mapped onto the sphere with fixed per-probe/seed rotations.
-It requires explicit progressive refresh and feedback off. History coefficients,
-ray budget, response/reference gates and independent reference sampling stay unchanged.
+It requires explicit progressive refresh and one selected feedback arm. Feedback-on
+currently admits GI-only response without either attribution mode; Final with this
+combined policy remains outside that admission. History coefficients, ray budget,
+response/reference gates and independent reference sampling stay unchanged.
 The sample index follows submitted global updates (modulo 2^32 rays), never a
 lighting epoch or CPU-completion snapshot. Sampling-policy mismatches reject joins.
 This is an experimental sequence, not production adoption or a variance certificate.

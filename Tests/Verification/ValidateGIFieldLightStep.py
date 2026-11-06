@@ -217,12 +217,21 @@ def observation_targets(record, case, index):
     return {t["address"]["resource"]: t for t in targets if t["address"]["at"] == "final"}
 
 
+def validate_sampling_policy(case):
+    sampling, progressive = case.get("progressiveSampling", False), case.get("progressiveRefresh", False)
+    require(type(sampling) is bool and type(progressive) is bool, "Invalid sampling/history policy type")
+    if sampling:
+        require(progressive and type(case["feedback"]) is bool,
+                "Progressive sampling requires explicit progressive history and feedback policy")
+        require(not case["feedback"] or (case["tap"] == "gi" and not transient_case(case)),
+                "Progressive sampling feedback-on requires GI-only response without attribution")
+
+
 def validate_case(root, case, qualify_references=False):
     step_recipe(case)
     engineering = transient_case(case)
     progressive = case.get("progressiveRefresh", False)
-    require(not case.get("progressiveSampling") or (progressive and not case["feedback"]),
-            "Progressive sampling requires progressive history and feedback off")
+    validate_sampling_policy(case)
     if "attributionStartFrame" in case:
         start = case["attributionStartFrame"]
         require(type(start) is int and 1 <= start <= 29 and case.get("progressiveAttribution"),
@@ -565,7 +574,19 @@ def self_test():
             raise AssertionError("Unbounded or implicit early attribution window accepted")
         except ValueError:
             pass
-    print(json.dumps(dict(status="passed", checks=59)))
+    candidate = dict(progressiveRefresh=True, progressiveSampling=True, feedback=True, tap="gi")
+    for case in (dict(feedback=True, tap="final"), candidate,
+                 dict(candidate, feedback=False), dict(candidate, feedback=False, tap="final")):
+        validate_sampling_policy(case)
+    for case in (dict(candidate, progressiveRefresh=False), dict(candidate, tap="final"),
+                 dict(candidate, transientAttribution=True), dict(candidate, progressiveAttribution=True),
+                 dict(candidate, feedback=1), dict(candidate, progressiveSampling=1)):
+        try:
+            validate_sampling_policy(case)
+            raise AssertionError("Implicit, mistyped or out-of-scope progressive feedback response accepted")
+        except ValueError:
+            pass
+    print(json.dumps(dict(status="passed", checks=69)))
 
 
 if __name__ == "__main__":
