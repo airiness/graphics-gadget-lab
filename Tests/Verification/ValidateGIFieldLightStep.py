@@ -184,6 +184,16 @@ def settled_endpoint(field):
             measurement_phase(field) == "steady")
 
 
+def progressive_hysteresis(update):
+    require(update >= 1, "Progressive refresh requires a completed epoch update")
+    if update == 1:
+        return .5
+    decay = float(np.float32(.998))  # Frozen F4 profile, not a fitted response coefficient.
+    tail = decay**(update-1)
+    weight = 2*tail+(1-tail)/(1-decay)
+    return 1-1/weight
+
+
 def transient_frame(case, index):
     return bool(case.get("transientAttribution") and (29 <= index <= 80 or index == 359))
 
@@ -206,6 +216,12 @@ def observation_targets(record, case, index):
 def validate_case(root, case, qualify_references=False):
     step_recipe(case)
     engineering = case.get("transientAttribution", False)
+    progressive = case.get("progressiveRefresh", False)
+    require(not (engineering and progressive), "Historical attribution requires fixed refresh integration")
+    if progressive:
+        require(isinstance(case["traceSeed"], int) and 0 <= case["traceSeed"] <= 0xffffffff and
+                case["traceSeed"] != 61051 and 128 <= case["preEventSettleFrames"] <= 512,
+                "Invalid progressive-refresh replay inputs")
     if engineering:
         require(not qualify_references and case["tap"] == "gi" and not case["feedback"] and
                 case["step"] in ("small-increase", "small-decrease") and
@@ -266,6 +282,7 @@ def validate_case(root, case, qualify_references=False):
         require(frame["backend"] == case["backend"] and frame["content"]["labId"] == "gglab.lab.gi_reference" and
                 p["fixture"] == 4 and p["environment"] == 3 and p.get("lighting_step_experiment") and p["field_enabled"] and p["field_sampling"] and
                 p["field_readiness"] and p["field_feedback"] == case["feedback"] and
+                p.get("field_progressive_refresh", False) == progressive and
                 p["receiver_diagnostics"] == (case["tap"] == "gi"), "Wrong experiment composition")
         require(frame["parameters"]["frameSerial"] == parameter_frames[index]["parameters"]["frameSerial"] ==
                 frame["frame"]["serial"] and frame["parameters"] == parameter_frames[index]["parameters"],
@@ -290,7 +307,7 @@ def validate_case(root, case, qualify_references=False):
                 frame["parameters"]["lighting"]["active"]["generation"] == expected_generation and
                 frame["sceneInputs"]["sun"]["toaIlluminanceLux"] == (case["oldLux"] if index < t0 else case["newLux"]),
                 "Field and actual sun do not follow the built frame's published lighting generation")
-        if engineering:
+        if engineering or progressive:
             require(p["seed"] == case["traceSeed"] and settled_endpoint(initial),
                     "Trace seed changed or old endpoint lacks steady Ready plus 120")
         phase = measurement_phase(field)
@@ -298,6 +315,9 @@ def validate_case(root, case, qualify_references=False):
             target_epoch = target_epoch or identity["refreshEpoch"]
             require(identity["refreshEpoch"] == target_epoch > initial_identity["refreshEpoch"] and
                     identity["epochOriginUpdate"] > 0, "Lighting refresh reset history or changed epoch during the observation")
+            if progressive and field["completedUpdates"] > 0:
+                require(abs(field["hysteresis"]-progressive_hysteresis(field["completedUpdates"])) < 1e-6,
+                        "Progressive integration does not match the completed epoch's actual sample mass")
             if field["state"] == "Ready":
                 ready_frames.append(index)
                 if phase == "refresh":
@@ -391,6 +411,9 @@ def validate(root, qualify_references=False):
 
 
 def self_test():
+    require(progressive_hysteresis(1) == .5 and .66 < progressive_hysteresis(2) < .67 and
+            .97 < progressive_hysteresis(45) < .98,
+            "Progressive refresh fabricated steady history or retained the two-sample filter")
     for name, recipe in LIGHT_STEPS.items():
         case = dict(step=name, oldLux=recipe["oldLux"], newLux=recipe["newLux"])
         step_recipe(case)
@@ -503,7 +526,7 @@ def self_test():
     require(result["responseQualityQualified"] and not result["referenceCorrelatedReadinessQualified"] and
             not result["rois"]["floor"]["firstRefreshReady"]["passed"] and
             result["rois"]["floor"]["firstSteadyReady"]["passed"], "Two Ready times were conflated with endpoint accuracy")
-    print(json.dumps(dict(status="passed", checks=49)))
+    print(json.dumps(dict(status="passed", checks=50)))
 
 
 if __name__ == "__main__":

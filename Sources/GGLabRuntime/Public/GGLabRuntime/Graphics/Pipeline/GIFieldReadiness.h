@@ -39,6 +39,9 @@ namespace gglab
 		float m_NoiseSigma = 0;
 		float m_SteadyNoiseSigma = 0;
 		float m_RefreshHysteresis = 0.5f;
+		// Experimental: reweight once at refresh entry, then grow real irradiance
+		// history at the field's steady decay. Requires its own noise calibration.
+		bool m_ProgressiveRefresh = false;
 	};
 
 	struct GIFieldReadinessSnapshot

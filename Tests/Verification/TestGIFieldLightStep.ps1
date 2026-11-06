@@ -8,6 +8,7 @@ param(
     [string[]]$Step = @('increase'),
     [switch]$QualifyReferences,
     [switch]$TransientAttribution,
+    [switch]$ProgressiveRefresh,
     [uint32[]]$TraceSeed = @(61052),
     [int[]]$PreEventSettleFrames = @(128),
     [ValidateRange(1,131072)][int]$ReferenceInitialSamples = 4096,
@@ -15,6 +16,7 @@ param(
     [ValidateSet(16,32)][int]$ReferenceMaximumDepth = 32,
     [ValidateRange(1,3600)][int]$ReferenceMaximumSeconds = 3600,
     [string]$ShaderCacheDirectory,
+    [string]$DerivedDataCacheDirectory,
     [string]$OutputDirectory,
     [string]$RunDirectory,
     [string]$Python = 'python',
@@ -52,6 +54,7 @@ if ($Configuration.Count -ne 1 -or $Configuration[0] -notin @('Debug','Develop',
 }
 if ($QualifyReferences -and 'gi' -notin $Tap) { throw 'Independent reference qualification requires a GI-only arm.' }
 if ($TransientAttribution) {
+    if ($ProgressiveRefresh) { throw 'The historical attribution oracle requires the unchanged fixed refresh filter.' }
     if ($QualifyReferences -or $Tap.Count -ne 1 -or $Tap[0] -cne 'gi' -or
         $Feedback.Count -ne 1 -or $Feedback[0] -cne 'off' -or
         @($Step | Where-Object { $_ -cnotin @('small-increase','small-decrease') }).Count -or
@@ -62,9 +65,16 @@ if ($TransientAttribution) {
         @($PreEventSettleFrames | Select-Object -Unique).Count -ne $PreEventSettleFrames.Count) {
         throw 'Transient attribution requires small steps, GI-only, feedback-off, distinct trace seeds (not calibration seed 61051), and 128..512 settling frames; no reference qualification.'
     }
-} elseif ($TraceSeed.Count -ne 1 -or $TraceSeed[0] -ne 61052 -or
-          $PreEventSettleFrames.Count -ne 1 -or $PreEventSettleFrames[0] -ne 128) {
+} elseif (-not $ProgressiveRefresh -and ($TraceSeed.Count -ne 1 -or $TraceSeed[0] -ne 61052 -or
+          $PreEventSettleFrames.Count -ne 1 -or $PreEventSettleFrames[0] -ne 128)) {
     throw 'Seed/settling variations require explicit transient attribution mode.'
+}
+if ($ProgressiveRefresh -and (-not $TraceSeed.Count -or -not $PreEventSettleFrames.Count -or
+    @($TraceSeed | Where-Object { $_ -eq 61051 }).Count -or
+    @($PreEventSettleFrames | Where-Object { $_ -lt 128 -or $_ -gt 512 }).Count -or
+    @($TraceSeed | Select-Object -Unique).Count -ne $TraceSeed.Count -or
+    @($PreEventSettleFrames | Select-Object -Unique).Count -ne $PreEventSettleFrames.Count)) {
+    throw 'Progressive refresh requires distinct trace seeds (not calibration seed 61051) and 128..512 settling frames.'
 }
 if (-not $OutputDirectory -and -not $RunDirectory) { $OutputDirectory = "$root/Build/Validation/GIFieldLightStep" }
 $output = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory `
@@ -120,6 +130,11 @@ try {
                     Copy-Item -LiteralPath "$ShaderCacheDirectory/$backend/$name" -Destination "$state/$name" -Recurse
                 }
             }
+            if ($DerivedDataCacheDirectory) {
+                $null = New-Item -ItemType Directory -Path $state -Force
+                Copy-Item -LiteralPath "$DerivedDataCacheDirectory/$backend/DerivedDataCache" `
+                    -Destination "$state/DerivedDataCache" -Recurse
+            }
             $start = Invoke-VerificationSession start $session @{Configuration=$Configuration[0];Rhi=$backend;
                 Lab='gglab.lab.gi_reference';WindowSize='320x200';NoDevTools=$true;Validation='standard';
                 StateRoot=$state;StartTimeoutSeconds=$TimeoutSeconds}
@@ -137,13 +152,18 @@ try {
                 $stepId = $recipe.id
                 foreach ($tapMode in $Tap) {
                     $caseName = "$stepId-$feedbackMode-$tapMode"
-                    if ($TransientAttribution) { $caseName += "-s$($arm.seed)-p$($arm.settle)" }
+                    if ($TransientAttribution -or $ProgressiveRefresh) { $caseName += "-s$($arm.seed)-p$($arm.settle)" }
                     $directory = "$output/$backend/$caseName"
                     $null = New-Item -ItemType Directory -Path $directory -Force
                     $case = @{backend=$backend;configuration=$Configuration[0];feedback=($feedbackMode -eq 'on');tap=$tapMode;
                         fixture=4;environment=3;view='F4_Floor';frameCount=360;eventFrame=30;
                         step=$stepId;oldLux=$recipe.oldLux;newLux=$recipe.newLux;
                         directory="$backend/$caseName"}
+                    if ($ProgressiveRefresh) {
+                        $case.progressiveRefresh = $true
+                        $case.traceSeed = $arm.seed
+                        $case.preEventSettleFrames = $arm.settle
+                    }
                     if ($TransientAttribution) {
                         $case.transientAttribution = $true
                         $case.traceSeed = $arm.seed
@@ -155,7 +175,7 @@ try {
                     Write-VerificationJson "$directory/old-lighting.json" (Set-Inputs @{sun_step_lux=$case.oldLux})
                     Write-VerificationJson "$directory/inputs.json" (Set-Inputs @{fixture=4;environment=3;lighting_step_experiment=$true;
                         albedo=0;secondary_albedo=0;ev100=10;field_enabled=$true;field_feedback=$case.feedback;
-                        field_sampling=$true;field_readiness=$true;receiver_diagnostics=$true;
+                        field_sampling=$true;field_readiness=$true;field_progressive_refresh=[bool]$ProgressiveRefresh;receiver_diagnostics=$true;
                         field_irradiance_width=0;probe_enabled=$true;accumulate=$true;seed=61051;
                         field_refresh_noise=0.0;field_steady_noise=0.0})
                     $noise = Wait-VerificationCondition -Poll { Invoke-VerificationSession status $session @{ExpectedRunIdentity=$run} } `
@@ -261,7 +281,7 @@ try {
         observedResponseTargetsPassed=$validation.observedResponseTargetsPassed;engineeringOnly=[bool]$TransientAttribution;
         responseQualityQualified=$validation.responseQualityQualified;referenceStatus=$validation.referenceStatus;
         referenceCorrelatedReadinessQualified=$validation.referenceCorrelatedReadinessQualified;
-        wholeG3Qualified=$false;directory=$output}
+        wholeG3Qualified=$false;progressiveRefresh=[bool]$ProgressiveRefresh;directory=$output}
 } catch { $result = @{ok=$false;status='failed';experimentOnly=$true;responseQualityQualified=$false;
     wholeG3Qualified=$false;directory=$output;error=$_.Exception.Message} }
 Write-VerificationJson "$output/result.json" $result

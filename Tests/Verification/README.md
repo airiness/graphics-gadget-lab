@@ -161,6 +161,15 @@ analysis requires a fresh `--output`; raw inputs and failures remain preserved.
 Engineering completion, arithmetic contracts and response quality retain separate
 verdicts. Full F7, G3 and production qualification require their own gates.
 
+`-ProgressiveRefresh` selects the default-off `field_progressive_refresh` experiment:
+one fast entry update, followed by real irradiance-history growth at steady decay.
+The runner recalibrates noise and checks completed epoch coefficients; distance
+history and thresholds retain their existing rules. It supports seed/wait repeats
+without the historical fixed-filter attribution oracle. Passing this experiment
+does not adopt a production default or complete G3.
+`-DerivedDataCacheDirectory` optionally seeds `<root>/<rhi>/DerivedDataCache` into
+isolated state for warm-start checks; those runs do not qualify cold startup.
+
 ## Standalone measurements
 
 | Entry point | Measurement |

@@ -814,7 +814,14 @@ namespace gglab
 		const bool feedback = progress->m_Feedback.m_Enabled;
 		const bool initialized = progress->m_StorageInitialized;
 		const auto readiness = GetReadiness();
-		const float irradianceDecay = readiness.m_Enabled && readiness.m_Refreshing ?
+		// The entry update retains the existing rapid reweighting. Later progressive
+		// updates grow actual sample mass instead of exposing every new noisy pair.
+		// Derive entry from submitted progress so discarded recordings cannot age it.
+		const bool firstRefreshUpdate = progress->m_Diagnostics.m_SubmittedUpdates ==
+			progress->m_ReadinessEpoch;
+		const bool fastRefresh = readiness.m_Refreshing &&
+			(!progress->m_ReadinessSettings.m_ProgressiveRefresh || firstRefreshUpdate);
+		const float irradianceDecay = readiness.m_Enabled && fastRefresh ?
 			progress->m_ReadinessSettings.m_RefreshHysteresis : profile.m_Hysteresis;
 		const bool refreshDistance = readiness.m_Refreshing && progress->m_RefreshDistance;
 		const float distanceDecay = readiness.m_Enabled && refreshDistance ?

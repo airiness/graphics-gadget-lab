@@ -717,6 +717,24 @@ namespace gglab
 			context.Check(history.Next(0.25f, false).m_Hysteresis == 0.25f &&
 				history.Next(0.0f, false).m_Hysteresis == 0,
 				"A smaller nominal decay caps retained mass and zero decay uses only the current sample");
+
+			// A progressive refresh uses the existing fast entry, then accumulates
+			// real samples at steady decay while the readiness phase is still refresh.
+			auto progressive = history.Next(0.5f, true);
+			double oldLighting = progressive.m_Hysteresis;
+			for (uint32_t update = 1; update < 45; ++update)
+			{
+				progressive = progressive.Next(0.998f, true);
+				oldLighting *= progressive.m_Hysteresis;
+			}
+			context.Check(progressive.m_Weight > 40 && oldLighting < 0.025,
+				"Progressive refresh grows real sample mass while removing old single-bounce lighting within 45 updates");
+			const auto steady = progressive.Next(0.998f, false);
+			context.Check(steady.m_Weight > progressive.m_Weight &&
+				steady.m_Hysteresis - progressive.m_Hysteresis < 0.001f,
+				"Progressive refresh enters steady integration without a second short-history handoff");
+			context.Check(progressive.Next(0.5f, true).m_Weight == 2,
+				"A superseding lighting refresh reweights growing history even before the previous refresh is Ready");
 		}
 
 		void RunGIFieldTests(SelfTestContext& context) noexcept
