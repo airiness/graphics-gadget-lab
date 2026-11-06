@@ -219,10 +219,14 @@ def observation_targets(record, case, index):
 
 def validate_sampling_policy(case):
     sampling, progressive = case.get("progressiveSampling", False), case.get("progressiveRefresh", False)
-    require(type(sampling) is bool and type(progressive) is bool, "Invalid sampling/history policy type")
+    rapid = case.get("rapidFeedbackRefresh", False)
+    require(type(sampling) is bool and type(progressive) is bool and type(rapid) is bool,
+            "Invalid sampling/history policy type")
+    require(not rapid or (sampling and not progressive and case["feedback"] is True),
+            "Rapid feedback refresh requires explicit sampling/feedback and excludes progressive refresh")
     if sampling:
-        require(progressive and type(case["feedback"]) is bool,
-                "Progressive sampling requires explicit progressive history and feedback policy")
+        require((progressive or rapid) and type(case["feedback"]) is bool,
+                "Progressive sampling requires an explicit refresh study and feedback policy")
         require(not case["feedback"] or (case["tap"] == "gi" and not transient_case(case)),
                 "Progressive sampling feedback-on requires GI-only response without attribution")
 
@@ -240,10 +244,10 @@ def validate_case(root, case, qualify_references=False):
             "Historical attribution requires fixed refresh integration")
     require(not case.get("progressiveAttribution") or (progressive and not case.get("transientAttribution")),
             "Progressive attribution requires its explicit integration policy")
-    if progressive:
+    if progressive or case.get("rapidFeedbackRefresh"):
         require(isinstance(case["traceSeed"], int) and 0 <= case["traceSeed"] <= 0xffffffff and
                 case["traceSeed"] != 61051 and 128 <= case["preEventSettleFrames"] <= 512,
-                "Invalid progressive-refresh replay inputs")
+                "Invalid refresh-study replay inputs")
     if engineering:
         require(not qualify_references and case["tap"] == "gi" and not case["feedback"] and
                 case["step"] in ("small-increase", "small-decrease") and
@@ -330,7 +334,7 @@ def validate_case(root, case, qualify_references=False):
                 frame["parameters"]["lighting"]["active"]["generation"] == expected_generation and
                 frame["sceneInputs"]["sun"]["toaIlluminanceLux"] == (case["oldLux"] if index < t0 else case["newLux"]),
                 "Field and actual sun do not follow the built frame's published lighting generation")
-        if engineering or progressive:
+        if engineering or progressive or case.get("rapidFeedbackRefresh"):
             require(p["seed"] == case["traceSeed"] and settled_endpoint(initial),
                     "Trace seed changed or old endpoint lacks steady Ready plus 120")
         phase = measurement_phase(field)
@@ -341,6 +345,9 @@ def validate_case(root, case, qualify_references=False):
             if progressive and field["completedUpdates"] > 0:
                 require(abs(field["hysteresis"]-progressive_hysteresis(field["completedUpdates"])) < 1e-6,
                         "Progressive integration does not match the completed epoch's actual sample mass")
+            if case.get("rapidFeedbackRefresh") and phase == "refresh" and field["completedUpdates"] > 0:
+                require(abs(field["hysteresis"]-.5) < 1e-6,
+                        "Rapid feedback refresh did not retain its existing fast coefficient")
             if field["state"] == "Ready":
                 ready_frames.append(index)
                 if phase == "refresh":
@@ -586,7 +593,17 @@ def self_test():
             raise AssertionError("Implicit, mistyped or out-of-scope progressive feedback response accepted")
         except ValueError:
             pass
-    print(json.dumps(dict(status="passed", checks=69)))
+    rapid = dict(candidate, progressiveRefresh=False, rapidFeedbackRefresh=True)
+    validate_sampling_policy(rapid)
+    for case in (dict(rapid, progressiveRefresh=True), dict(rapid, progressiveSampling=False),
+                 dict(rapid, feedback=False), dict(rapid, tap="final"),
+                 dict(rapid, transientAttribution=True), dict(rapid, rapidFeedbackRefresh=1)):
+        try:
+            validate_sampling_policy(case)
+            raise AssertionError("Implicit or out-of-scope rapid feedback policy accepted")
+        except ValueError:
+            pass
+    print(json.dumps(dict(status="passed", checks=76)))
 
 
 if __name__ == "__main__":

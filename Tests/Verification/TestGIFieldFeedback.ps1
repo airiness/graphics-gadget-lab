@@ -6,6 +6,7 @@ param(
     [string[]]$CaseId = @('plane','sealed','sunroom','unsupported','coverage','black'),
     [switch]$ProgressiveRefresh,
     [switch]$ProgressiveSampling,
+    [switch]$RapidFeedbackRefresh,
     [string]$ShaderCacheDirectory,
     [string]$ReferenceDirectory,
     [string]$OutputDirectory,
@@ -31,13 +32,17 @@ $cases = @(
 if ($Configuration.Count -ne 1 -or $Configuration[0] -notin @('Debug','Develop','Release') -or
     -not $Rhi.Count -or @($Rhi | Where-Object { $_ -notin @('dx12','vulkan') }).Count -or
     -not $CaseId.Count -or @($CaseId | Where-Object { $_ -notin $cases.id }).Count) { throw 'Invalid feedback configuration.' }
-if ($ProgressiveSampling -and -not $ProgressiveRefresh) {
-    throw 'Progressive sampling feedback study requires explicit progressive refresh.'
+if ($RapidFeedbackRefresh -and (-not $ProgressiveSampling -or $ProgressiveRefresh)) {
+    throw 'Rapid feedback refresh requires progressive sampling and excludes progressive refresh.'
+}
+if ($ProgressiveSampling -and -not ($ProgressiveRefresh -or $RapidFeedbackRefresh)) {
+    throw 'Progressive sampling feedback study requires explicit progressive or rapid feedback refresh.'
 }
 $cases = @($cases | Where-Object { $_.id -in $CaseId })
 foreach ($case in $cases) {
     if ($ProgressiveRefresh) { $case.progressiveRefresh = $true }
     if ($ProgressiveSampling) { $case.progressiveSampling = $true }
+    if ($RapidFeedbackRefresh) { $case.rapidFeedbackRefresh = $true }
 }
 if (-not $OutputDirectory -and -not $RunDirectory) { $OutputDirectory = "$root/Build/Validation/GIFieldFeedback" }
 $output = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory `
@@ -184,10 +189,12 @@ try {
             }
         } finally {
             if ($start -and $start.ownership -eq 'created') {
-                $stop = Invoke-VerificationSession stop $session @{ExpectedRunIdentity=$start.runIdentity} -AllowFailure
-                Write-VerificationJson "$output/$backend/stop.json" $stop
-                Copy-Item -LiteralPath $start.outputLog -Destination "$output/$backend/output.log"
-                if (-not $stop.ok -or $stop.exitCode -ne 0) { throw 'Feedback shutdown failed.' }
+                try {
+                    $null = Stop-VerificationSession $session -StartedSession $start `
+                        -ReceiptPath "$output/$backend/stop.json" -RequireCleanExit -ForceOwnedProcess
+                } finally {
+                    Copy-Item -LiteralPath $start.outputLog -Destination "$output/$backend/output.log"
+                }
                 if ([IO.File]::ReadAllText($start.outputLog).Replace([string][char]0,'') -match
                     '\[error\]|\[critical\]|Validation Error|VUID-|Assertion failed') { throw 'Feedback native validation failed.' }
             }
@@ -207,7 +214,8 @@ try {
     Assert-VerificationIdentity $binaries (Get-VerificationBinaryIdentity $root $Configuration[0]) `
         'Feedback binaries changed during artifact/oracle validation.' -Depth 2
     Write-VerificationJson "$output/result.json" @{ok=$true;directory=$output;wholeG3Qualified=$false;
-        progressiveRefresh=[bool]$ProgressiveRefresh;progressiveSampling=[bool]$ProgressiveSampling}
+        progressiveRefresh=[bool]$ProgressiveRefresh;progressiveSampling=[bool]$ProgressiveSampling;
+        rapidFeedbackRefresh=[bool]$RapidFeedbackRefresh}
 } catch {
     Write-VerificationJson "$output/result.json" @{ok=$false;directory=$output;error=$_.Exception.Message;wholeG3Qualified=$false}
     throw

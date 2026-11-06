@@ -101,12 +101,15 @@ Baseline accuracy, chromaticity and temporal RMS are separate verdicts. Optional
 windows without replacing the primary Ready-plus-120 gate. Feedback-on accuracy
 requires a matching sample- and depth-qualified run supplied through
 `TestGIFieldFeedback.ps1 -ReferenceDirectory`; D=1 is insufficient.
-For the opt-in contiguous-sequence experiment, its static runner requires explicit
-`-ProgressiveRefresh -ProgressiveSampling`. It records both policies, reconstructs
-F1 hit directions accordingly and requires a source/binary-matched fresh F4
-reference. Defaults retain the legacy policy. Feedback-off captures are settled
-toggle controls, not complete paired single-bounce baseline qualifications. This
-static admission does not relax the light-step runner's feedback-off restriction.
+For the opt-in contiguous-sequence experiment, its static runner requires
+`-ProgressiveSampling` with explicit `-ProgressiveRefresh` or `-RapidFeedbackRefresh`.
+The latter is a separately admitted comparison using the existing fast refresh
+until Ready/Unconverged, not progressive history or a new product coefficient.
+It records the selected policies, reconstructs F1 hit directions accordingly and
+requires a source/binary-matched fresh F4 reference. Defaults retain the legacy
+policy. Feedback-off captures are settled toggle controls, not complete paired
+single-bounce baseline qualifications. Static and lighting-response qualification
+remain separate; neither admits combined-policy Final or attribution.
 
 Baseline, feedback and lighting-step runners accept `-ShaderCacheDirectory` with
 matching `<root>/<rhi>/ShaderCache` and `ShaderArtifacts` seeds. They copy artifacts
@@ -182,10 +185,15 @@ without the historical fixed-filter attribution oracle. Passing this experiment
 does not adopt a production default or complete G3.
 `-ProgressiveSampling` additionally selects default-off `field_progressive_sampling`:
 contiguous 2D Sobol blocks mapped onto the sphere with fixed per-probe/seed rotations.
-It requires explicit progressive refresh and one selected feedback arm. Feedback-on
-currently admits GI-only response without either attribution mode; Final with this
-combined policy remains outside that admission. History coefficients, ray budget,
-response/reference gates and independent reference sampling stay unchanged.
+It requires explicit progressive refresh and one selected feedback arm, except for
+the separately selected `-RapidFeedbackRefresh -Feedback on -Tap gi` comparison.
+Rapid feedback refresh excludes `-ProgressiveRefresh` and still requires explicit
+progressive sampling; unmarked sampling-without-refresh combinations reject.
+Both feedback-on studies admit GI-only response without either attribution mode;
+combined-policy Final remains excluded. The rapid-study metadata marker is not a
+new Lab parameter or GPU ABI. Actual refresh coefficients and submitted seed/wait
+inputs are checked. Existing coefficients, ray budget, response/reference gates
+and independent reference sampling stay unchanged.
 The sample index follows submitted global updates (modulo 2^32 rays), never a
 lighting epoch or CPU-completion snapshot. Sampling-policy mismatches reject joins.
 This is an experimental sequence, not production adoption or a variance certificate.

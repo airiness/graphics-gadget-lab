@@ -10,6 +10,7 @@ param(
     [switch]$TransientAttribution,
     [switch]$ProgressiveRefresh,
     [switch]$ProgressiveSampling,
+    [switch]$RapidFeedbackRefresh,
     [switch]$ProgressiveAttribution,
     [ValidateRange(1,29)][int]$AttributionStartFrame = 29,
     [uint32[]]$TraceSeed = @(61052),
@@ -56,8 +57,12 @@ if ($Configuration.Count -ne 1 -or $Configuration[0] -notin @('Debug','Develop',
     throw 'Invalid light-step configuration.'
 }
 if ($QualifyReferences -and 'gi' -notin $Tap) { throw 'Independent reference qualification requires a GI-only arm.' }
-if ($ProgressiveSampling -and (-not $ProgressiveRefresh -or $Feedback.Count -ne 1)) {
-    throw 'Progressive sampling requires explicit progressive refresh and one selected feedback arm.'
+if ($RapidFeedbackRefresh -and (-not $ProgressiveSampling -or $ProgressiveRefresh -or
+    $Feedback.Count -ne 1 -or $Feedback[0] -cne 'on')) {
+    throw 'Rapid feedback refresh requires progressive sampling, feedback-on only and no progressive refresh.'
+}
+if ($ProgressiveSampling -and ((-not $ProgressiveRefresh -and -not $RapidFeedbackRefresh) -or $Feedback.Count -ne 1)) {
+    throw 'Progressive sampling requires explicit progressive or rapid feedback refresh and one selected feedback arm.'
 }
 if ($ProgressiveSampling -and $Feedback[0] -ceq 'on' -and
     ($Tap.Count -ne 1 -or $Tap[0] -cne 'gi' -or $TransientAttribution -or $ProgressiveAttribution)) {
@@ -84,16 +89,16 @@ if ($attribution) {
         @($PreEventSettleFrames | Select-Object -Unique).Count -ne $PreEventSettleFrames.Count) {
         throw 'Attribution requires small steps, GI-only, feedback-off, distinct trace seeds (not calibration seed 61051), and 128..512 settling frames; no reference qualification.'
     }
-} elseif (-not $ProgressiveRefresh -and ($TraceSeed.Count -ne 1 -or $TraceSeed[0] -ne 61052 -or
+} elseif (-not ($ProgressiveRefresh -or $RapidFeedbackRefresh) -and ($TraceSeed.Count -ne 1 -or $TraceSeed[0] -ne 61052 -or
           $PreEventSettleFrames.Count -ne 1 -or $PreEventSettleFrames[0] -ne 128)) {
     throw 'Seed/settling variations require explicit transient attribution mode.'
 }
-if ($ProgressiveRefresh -and (-not $TraceSeed.Count -or -not $PreEventSettleFrames.Count -or
+if (($ProgressiveRefresh -or $RapidFeedbackRefresh) -and (-not $TraceSeed.Count -or -not $PreEventSettleFrames.Count -or
     @($TraceSeed | Where-Object { $_ -eq 61051 }).Count -or
     @($PreEventSettleFrames | Where-Object { $_ -lt 128 -or $_ -gt 512 }).Count -or
     @($TraceSeed | Select-Object -Unique).Count -ne $TraceSeed.Count -or
     @($PreEventSettleFrames | Select-Object -Unique).Count -ne $PreEventSettleFrames.Count)) {
-    throw 'Progressive refresh requires distinct trace seeds (not calibration seed 61051) and 128..512 settling frames.'
+    throw 'Refresh studies require distinct trace seeds (not calibration seed 61051) and 128..512 settling frames.'
 }
 if (-not $OutputDirectory -and -not $RunDirectory) { $OutputDirectory = "$root/Build/Validation/GIFieldLightStep" }
 $output = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory `
@@ -171,19 +176,20 @@ try {
                 $stepId = $recipe.id
                 foreach ($tapMode in $Tap) {
                     $caseName = "$stepId-$feedbackMode-$tapMode"
-                    if ($attribution -or $ProgressiveRefresh) { $caseName += "-s$($arm.seed)-p$($arm.settle)" }
+                    if ($attribution -or $ProgressiveRefresh -or $RapidFeedbackRefresh) { $caseName += "-s$($arm.seed)-p$($arm.settle)" }
                     $directory = "$output/$backend/$caseName"
                     $null = New-Item -ItemType Directory -Path $directory -Force
                     $case = @{backend=$backend;configuration=$Configuration[0];feedback=($feedbackMode -eq 'on');tap=$tapMode;
                         fixture=4;environment=3;view='F4_Floor';frameCount=360;eventFrame=30;
                         step=$stepId;oldLux=$recipe.oldLux;newLux=$recipe.newLux;
                         directory="$backend/$caseName"}
-                    if ($ProgressiveRefresh) {
-                        $case.progressiveRefresh = $true
+                    if ($ProgressiveRefresh -or $RapidFeedbackRefresh) {
+                        $case.progressiveRefresh = [bool]$ProgressiveRefresh
                         $case.traceSeed = $arm.seed
                         $case.preEventSettleFrames = $arm.settle
                     }
                     if ($ProgressiveSampling) { $case.progressiveSampling = $true }
+                    if ($RapidFeedbackRefresh) { $case.rapidFeedbackRefresh = $true }
                     if ($TransientAttribution) {
                         $case.transientAttribution = $true
                         $case.traceSeed = $arm.seed
@@ -268,7 +274,7 @@ try {
         finally {
             if ($start) {
                 try { $null = Stop-VerificationSession $session -StartedSession $start `
-                    -ReceiptPath "$output/$backend/stop.json" -RequireCleanExit }
+                    -ReceiptPath "$output/$backend/stop.json" -RequireCleanExit -ForceOwnedProcess }
                 catch { if ($null -eq $failure) { throw }; [Console]::Error.WriteLine($_.Exception.Message) }
                 Copy-Item -LiteralPath $start.outputLog -Destination "$output/$backend/output.log"
             }
@@ -307,7 +313,7 @@ try {
         responseQualityQualified=$validation.responseQualityQualified;referenceStatus=$validation.referenceStatus;
         referenceCorrelatedReadinessQualified=$validation.referenceCorrelatedReadinessQualified;
         wholeG3Qualified=$false;progressiveRefresh=[bool]$ProgressiveRefresh;
-        progressiveSampling=[bool]$ProgressiveSampling;directory=$output}
+        progressiveSampling=[bool]$ProgressiveSampling;rapidFeedbackRefresh=[bool]$RapidFeedbackRefresh;directory=$output}
 } catch { $result = @{ok=$false;status='failed';experimentOnly=$true;responseQualityQualified=$false;
     wholeG3Qualified=$false;directory=$output;error=$_.Exception.Message} }
 Write-VerificationJson "$output/result.json" $result

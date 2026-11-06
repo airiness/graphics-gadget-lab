@@ -161,8 +161,12 @@ def check_policy(case, p):
         expected, observed = case.get(key, False), p.get(parameter, False)
         require(type(expected) is bool and type(observed) is bool and expected == observed,
                 "Feedback sampling/history policy differs from the declared case")
-    require(not case.get("progressiveSampling") or case.get("progressiveRefresh"),
-            "Progressive sampling feedback study requires progressive refresh")
+    rapid = case.get("rapidFeedbackRefresh", False)
+    require(type(rapid) is bool and (not rapid or
+            (case.get("progressiveSampling") and not case.get("progressiveRefresh"))),
+            "Rapid feedback refresh requires progressive sampling without progressive refresh")
+    require(not case.get("progressiveSampling") or case.get("progressiveRefresh") or rapid,
+            "Progressive sampling feedback study requires an explicit refresh policy")
 
 
 def check_frame(frame, case, enabled):
@@ -430,7 +434,19 @@ def self_test():
             raise AssertionError("Mismatched feedback/reference cohort was accepted")
         except ValueError:
             pass
-    print(json.dumps(dict(ok=True, checks=27)))
+    rapid = dict(progressiveSampling=True, rapidFeedbackRefresh=True)
+    rapid_frame = dict(field_progressive_refresh=False, field_progressive_sampling=True)
+    check_policy(rapid, rapid_frame)
+    for case, p in ((dict(rapid, progressiveRefresh=True), dict(rapid_frame, field_progressive_refresh=True)),
+                    (dict(rapid, progressiveSampling=False), dict(rapid_frame, field_progressive_sampling=False)),
+                    (dict(rapid, rapidFeedbackRefresh=1), rapid_frame),
+                    (rapid, dict(rapid_frame, field_progressive_refresh=True))):
+        try:
+            check_policy(case, p)
+            raise AssertionError("Invalid rapid feedback policy accepted")
+        except ValueError:
+            pass
+    print(json.dumps(dict(ok=True, checks=32)))
 
 
 if __name__ == "__main__":
