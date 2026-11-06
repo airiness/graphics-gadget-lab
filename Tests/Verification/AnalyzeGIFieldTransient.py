@@ -17,11 +17,11 @@ import numpy as np
 
 from ValidateGIFieldFeedback import hash32, quaternion, rotate
 from ValidateGIFieldLightStep import (EVENT_FRAME, FLOOR, HOLD, LUMA, load, read_group,
-    require, invariant_inputs, observation_targets, validate_case)
+    require, invariant_inputs, observation_targets, progressive_hysteresis, transient_case, validate_case)
 from ValidateGIFieldLightStepReference import roi_masks
 from ValidateGIFieldReadiness import records
 from ValidateGIFieldSampling import bilinear, oracle
-from ValidateGIProbeUpdate import directions, octahedral
+from ValidateGIProbeUpdate import bordered, directions, octahedral
 
 # Owning F4 descriptor in GIReferenceLabSession.cpp, not a fitted diagnostic bias.
 VIEW_BIAS = .15
@@ -151,28 +151,62 @@ def trace_error(actual, expected):
                            actual=float(actual[index]), expected=float(expected[index])))
 
 
-def trace_check(g, arrays, update, seed, selected):
-    """Check query-contributing probes, only in the proven constant-0.5 refresh interval."""
+def integrated_probe(g, rays, update, seed, probe):
+    """FP64 quadrature of exported rays, independent of atlas blend/history."""
+    counts = np.asarray(g["summary"]["counts"])
+    interior = g["summary"]["irradianceInteriorWidth"]
+    require(1 <= update <= 0xffffffff and 0 <= seed <= 0xffffffff and
+            0 <= probe < counts.prod(), "Invalid trace sampling identity")
+    x, y, z = int(probe % counts[0]), int(probe//(counts[0]*counts[2])), int((probe//counts[0]) % counts[2])
+    direction = rotate(rotate(directions(rays.shape[1]), quaternion(hash32(int(probe) ^ hash32(update-1)))),
+                       quaternion(seed ^ (update-1)))
+    weight = np.maximum(octahedral(interior).reshape(-1, 3) @ direction.T, 0)
+    integrated = (weight @ rays[probe, :, :3])/np.maximum(weight.sum(axis=1)[:, None], 1e-20)
+    target = (y-g["atlasSlices"][0], slice(z*(interior+2)+1, z*(interior+2)+1+interior),
+              slice(x*(interior+2)+1, x*(interior+2)+1+interior))
+    return target, integrated
+
+
+def trace_receiver(g, arrays, update, seed, current):
+    """Reconstruct every required receiver from all contributing probes' rays."""
+    counts = np.asarray(g["summary"]["counts"])
+    interior = g["summary"]["irradianceInteriorWidth"]
+    rays = np.ascontiguousarray(arrays["Rays"]).view("<f4").reshape(int(counts.prod()), -1, 4)
+    require(np.isfinite(rays).all() and rays.shape[1] == 256, "Unexpected/nonfinite tracing recipe")
+    require(np.allclose(current["weights"].sum(axis=1), 1, rtol=0, atol=1e-12),
+            "A required receiver has no normalized probe support")
+    selected = np.unique(current["probes"][current["weights"] > 0])
+    atlas = np.zeros_like(arrays["Irradiance"], dtype=float)
+    for probe in selected:
+        target, integrated = integrated_probe(g, rays, update, seed, probe)
+        require(0 <= target[0] < len(atlas), "A contributing probe is outside exported layers")
+        tile = bordered(integrated.reshape(interior, interior, 3))
+        atlas[target[0], target[1].start-1:target[1].stop+1,
+              target[2].start-1:target[2].stop+1, :3] = tile
+    # Keep the real GPU distance/classification weights and the same octahedral
+    # seams. Axis-aligned receiver normals sample both interior and border texels.
+    reconstructed = lookup(g, atlas, arrays["Distance"], arrays["Classification"], g["atlasSlices"])
+    require(np.array_equal(current["weights"], reconstructed["weights"]),
+            "Ray reconstruction changed normalized query weights")
+    return reconstructed["energy"], len(selected)
+
+
+def trace_check(g, arrays, update, seed, selected, hysteresis=.5):
+    """Check selected probes with the coefficient of this actual GPU update."""
+    require(0 <= hysteresis < 1, "Invalid observed integration coefficient")
     summary = g["summary"]
     counts = np.asarray(summary["counts"])
     interior = summary["irradianceInteriorWidth"]
     rays = np.ascontiguousarray(arrays["Rays"]).view("<f4").reshape(int(counts.prod()), -1, 4)
     require(np.isfinite(rays).all() and rays.shape[1] == 256, "Unexpected/nonfinite tracing recipe")
-    normals = octahedral(interior).reshape(-1, 3)
-    base = directions(rays.shape[1])
     old, new = arrays["Previous"], arrays["Irradiance"]
     maximum, absolute, checked, worst = 0., 0., 0, None
     raw_means = []
     for probe in selected:
-        x, y, z = int(probe % counts[0]), int(probe//(counts[0]*counts[2])), int((probe//counts[0]) % counts[2])
-        direction = rotate(rotate(base, quaternion(hash32(int(probe) ^ hash32(update-1)))), quaternion(seed ^ (update-1)))
-        weight = np.maximum(normals @ direction.T, 0)
-        integrated = (weight @ rays[probe, :, :3])/np.maximum(weight.sum(axis=1)[:, None], 1e-20)
-        target = (y-g["atlasSlices"][0], slice(z*(interior+2)+1, z*(interior+2)+1+interior),
-                  slice(x*(interior+2)+1, x*(interior+2)+1+interior))
+        target, integrated = integrated_probe(g, rays, update, seed, probe)
         previous = old[target][..., :3].reshape(-1, 3).astype(float)
         actual = new[target][..., :3].reshape(-1, 3).astype(float)
-        expected = blend_expected(previous, integrated, .5)
+        expected = blend_expected(previous, integrated, hysteresis)
         error = trace_error(actual, expected)
         if error["maximumRelativeError"] > maximum:
             maximum = error["maximumRelativeError"]
@@ -188,7 +222,23 @@ def trace_check(g, arrays, update, seed, selected):
     # budget is unchanged; any failure keeps the analysis exit status nonzero.
     return dict(maximumRelativeError=maximum, maximumAbsoluteError=absolute, worst=worst,
                 arithmeticPassed=maximum <= .005, budget=.005, normalizationFloor=FLOOR,
-                texels=checked, probes=raw_means, hysteresis=.5)
+                texels=checked, probes=raw_means, hysteresis=hysteresis)
+
+
+def integration_hysteresis(case, field, global_update):
+    require(field["refreshing"], "Trace attribution requires an active refresh")
+    if not case.get("progressiveAttribution"):
+        require(field["hysteresis"] == .5, "Unproven historical refresh coefficient")
+        return .5
+    require(case.get("progressiveRefresh") and not case.get("transientAttribution"),
+            "Progressive attribution policy is missing or mixed")
+    epoch_update = global_update-field["summary"]["field"]["epochOriginUpdate"]
+    require(epoch_update >= 1 and epoch_update > field["completedUpdates"],
+            "GPU integration update is not paired with the completed CPU snapshot")
+    if field["completedUpdates"]:
+        require(abs(field["hysteresis"]-progressive_hysteresis(field["completedUpdates"])) < 1e-6,
+                "Completed progressive coefficient does not match actual history")
+    return progressive_hysteresis(epoch_update)
 
 
 def details(path, g, case):
@@ -250,7 +300,7 @@ def analyze_case(root, case):
     result["peaks"] = peaks
     result["attributionStatus"] = "PopulationOnlyNoQueryOrTraceExports"
     result["actualFirstConsumedUpdate"] = result["globalUpdates"][result["t0"]]
-    if case.get("transientAttribution"):
+    if transient_case(case):
         g = geometry(directory/"mask")
         require(case["atlasSlices"] == g["atlasSlices"], "Changed cage layer plan")
         require(invariant_inputs(g["frame"]) == invariant_inputs(read_group(by_frame[0])["frame"]),
@@ -262,7 +312,7 @@ def analyze_case(root, case):
         maximum_closure = closure["energyRelativeError"]
         maximum_trace = 0.
         previous_atlas = None
-        for i in range(29, 81):
+        for i in range(case.get("attributionStartFrame", 29), 81):
             record, arrays, current, closure = details(by_frame[i], g, case)
             maximum_closure = max(maximum_closure, closure["energyRelativeError"])
             require(np.array_equal(baseline_arrays["Classification"], arrays["Classification"]), "Static classification changed")
@@ -284,17 +334,30 @@ def analyze_case(root, case):
                     dominantProbes=[dict(probe=int(unique[j]), deltaE=float(by_probe[j])) for j in top])
             if result["t0"] <= i < result["firstFieldReady"]:
                 field = record["frame"]["readiness"]["giField"]
-                require(field["refreshing"] and field["hysteresis"] == .5, "Unproven refresh integration coefficient")
+                hysteresis = integration_hysteresis(case, field, result["globalUpdates"][i])
                 ids = np.unique(current["probes"][current["weights"] > 0])
                 influence = np.array([current["weights"][current["probes"] == p].sum() for p in ids])
                 selected = ids[np.argsort(influence)[-16:]]
-                row["traceBlend"] = trace_check(g, arrays, result["globalUpdates"][i], case["traceSeed"], selected)
+                row["traceBlend"] = trace_check(g, arrays, result["globalUpdates"][i], case["traceSeed"], selected, hysteresis)
                 previous = lookup(g, arrays["Previous"], arrays["Distance"], arrays["Classification"], case["atlasSlices"])
                 # A derived inversion, not an independent transport reference. For fixed
-                # weights the linear query commutes with the proven 0.5 atlas blend.
-                raw = (current["energy"]-.5*previous["energy"])/.5
+                # weights the linear query commutes with the paired atlas blend.
+                require(np.array_equal(current["weights"], previous["weights"]),
+                        "Pre/post blend lookups use different normalized weights")
+                raw = (current["energy"]-hysteresis*previous["energy"])/(1-hysteresis)
                 for roi, mask in g["masks"].items():
                     row["rois"][roi]["derivedIntegratedE"] = float((raw[mask] @ LUMA).mean())
+                    reference = baseline["energy"][mask]
+                    history = hysteresis*(previous["energy"][mask]-reference)
+                    sample = (1-hysteresis)*(raw[mask]-reference)
+                    observed = current["energy"][mask]-reference
+                    require(np.allclose(history+sample, observed, rtol=1e-10, atol=1e-8),
+                            "Derived history/sample contributions did not close")
+                    row["rois"][roi].update(
+                        historyDeltaE=float((history @ LUMA).mean()),
+                        derivedSampleDeltaE=float((sample @ LUMA).mean()),
+                        selectedProbeWeightFraction=float(np.where(np.isin(current["probes"][mask], selected),
+                            current["weights"][mask], 0).sum()/mask.sum()))
                 row["traceBlend"]["coverage"] = "16 highest total normalized-weight probes across required ROI union"
                 maximum_trace = max(maximum_trace, row["traceBlend"]["maximumRelativeError"])
             rows.append(row)
@@ -419,7 +482,48 @@ def self_test():
             "The retained near-black arithmetic failure was turned into a pass")
     require(trace_error(np.array([[.002, 0., 0.]]), np.array([[.002, 0., 0.]]))["arithmeticPassed"],
             "Matching trace arithmetic failed")
-    print(json.dumps(dict(status="passed", checks=17)))
+    progressive = dict(progressiveRefresh=True, progressiveAttribution=True)
+    field = dict(refreshing=True, completedUpdates=5, hysteresis=progressive_hysteresis(5),
+                 summary=dict(field=dict(epochOriginUpdate=100)))
+    require(integration_hysteresis(progressive, field, 106) == progressive_hysteresis(6) and
+            integration_hysteresis(progressive, field, 106) != field["hysteresis"],
+            "Progressive attribution used the lagged completed coefficient for the GPU update")
+    require(integration_hysteresis({}, dict(refreshing=True, hysteresis=.5), 0) == .5,
+            "Historical fixed refresh attribution changed")
+    require(integration_hysteresis(progressive,
+            dict(field, completedUpdates=3, hysteresis=progressive_hysteresis(3)), 106) == progressive_hysteresis(6),
+            "GPU attribution incorrectly assumes exactly one completed-readback frame of lag")
+    for recipe, snapshot, update in ((dict(progressive, transientAttribution=True), field, 106),
+            (dict(progressiveAttribution=True), field, 106), (progressive, field, 105),
+            (progressive, dict(field, hysteresis=.5), 106)):
+        try:
+            integration_hysteresis(recipe, snapshot, update)
+            raise AssertionError("Mixed, stale or unproven progressive coefficient accepted")
+        except ValueError:
+            pass
+    one = dict(summary=dict(counts=[1, 1, 1], irradianceInteriorWidth=6), atlasSlices=[0, 1])
+    rays = np.full((1, 256, 4), 5, dtype=np.float32)
+    previous = np.ones((1, 8, 8, 4), dtype=np.float32)
+    blended = np.full_like(previous, 2)  # Three retained samples at 1, one current sample at 5.
+    payload = dict(Rays=rays, Previous=previous, Irradiance=blended)
+    require(trace_check(one, payload, 8, 61052, [0], .75)["arithmeticPassed"],
+            "Trace closure ignored a nonconstant history coefficient")
+    require(not trace_check(one, payload, 8, 61052, [0])["arithmeticPassed"],
+            "The fixed-filter oracle accepted a progressive blend")
+    # Uniform radiance must reconstruct all receivers without using previous or
+    # blended irradiance. Exercise the full multi-probe query, not a top-N subset.
+    payload = dict(Rays=np.full((27, 256, 4), 5, dtype=np.float32),
+                   Irradiance=irradiance, Distance=distance, Classification=classes)
+    current = lookup(g, irradiance, distance, classes, g["atlasSlices"])
+    reconstructed, covered = trace_receiver(g, payload, 8, 61052, current)
+    require(covered == len(np.unique(current["probes"][current["weights"] > 0])) and
+            np.allclose(reconstructed, 5*np.pi), "All-corner ray receiver reconstruction failed")
+    try:
+        trace_receiver(g, payload, 8, 61052, empty)
+        raise AssertionError("A receiver without probe support acquired a ray reference")
+    except ValueError:
+        pass
+    print(json.dumps(dict(status="passed", checks=28)))
 
 
 if __name__ == "__main__":

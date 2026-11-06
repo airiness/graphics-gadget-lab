@@ -174,6 +174,40 @@ The runner recalibrates noise and checks completed epoch coefficients; distance
 history and thresholds retain their existing rules. It supports seed/wait repeats
 without the historical fixed-filter attribution oracle. Passing this experiment
 does not adopt a production default or complete G3.
+Pair it with `-ProgressiveAttribution` for the bounded eight-payload engineering
+exports. This mode derives each Trace/Blend coefficient from the actual GPU epoch
+update, retains arithmetic/response failures, and excludes independent references,
+feedback-on and Final. History/current-sample splits are labeled derived inversions.
+Use `-AttributionStartFrame 1` only with this explicit mode to include pre-event
+rays when matching an earlier GPU sampling phase. The default starts at frame 29;
+all modes stop the continuous export window at 80 and also observe frame 359.
+Frame 0 retains its image slot. Earlier exports do not lock the sampling phase.
+
+[CompareGIFieldTransient.py](CompareGIFieldTransient.py) joins an uninstrumented
+progressive case to compatible attribution replays by exact GPU update and trace
+seed, never by wait minimum or sequence frame. It independently integrates rays
+for every contributing cage probe, including octahedral borders, and verifies
+receiver Blend closure before comparing historical sample inversions. Product
+source/binary cohorts, effective inputs, receiver positions and fixed observed
+query weights must match. Use `--observed-case <directory>` to select one explicit
+compatible arm when a collection also contains differently calibrated inputs;
+this does not relax input checks. Frozen feedback-off Physical Sky illumination scaling
+is a conditional engineering attribution, not a historical Trace/Blend observation
+or independent transport reference. Reports retain the original response failure
+and list missing samples before the peak; incomplete matches cannot establish a
+complete historical replay. A fully matched window additionally replays the scalar
+receiver signal from one measured pre-event value and the independently integrated
+rays, without reusing subsequent historical receiver values as history. This still
+assumes fixed historical query weights, not a directly observed historical atlas.
+Inputs are sealed; analysis code is sealed and copied into a fresh output directory.
+
+```powershell
+& $python Tests/Verification/CompareGIFieldTransient.py `
+    --historical-root Build/GP/Matrix --root Build/GPA/Before `
+    --case vulkan/small-increase-off-gi-s81052-p145 `
+    --output Build/Validation/LightStep/MatchedUpdates
+```
+
 `-DerivedDataCacheDirectory` optionally seeds `<root>/<rhi>/DerivedDataCache` into
 isolated state for warm-start checks; those runs do not qualify cold startup.
 

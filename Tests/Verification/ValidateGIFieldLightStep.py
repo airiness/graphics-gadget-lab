@@ -194,8 +194,12 @@ def progressive_hysteresis(update):
     return 1-1/weight
 
 
+def transient_case(case):
+    return bool(case.get("transientAttribution") or case.get("progressiveAttribution"))
+
+
 def transient_frame(case, index):
-    return bool(case.get("transientAttribution") and (29 <= index <= 80 or index == 359))
+    return transient_case(case) and (case.get("attributionStartFrame", 29) <= index <= 80 or index == 359)
 
 
 def observation_targets(record, case, index):
@@ -215,9 +219,16 @@ def observation_targets(record, case, index):
 
 def validate_case(root, case, qualify_references=False):
     step_recipe(case)
-    engineering = case.get("transientAttribution", False)
+    engineering = transient_case(case)
     progressive = case.get("progressiveRefresh", False)
-    require(not (engineering and progressive), "Historical attribution requires fixed refresh integration")
+    if "attributionStartFrame" in case:
+        start = case["attributionStartFrame"]
+        require(type(start) is int and 1 <= start <= 29 and case.get("progressiveAttribution"),
+                "Earlier bounded exports require explicit progressive attribution")
+    require(not (case.get("transientAttribution") and progressive),
+            "Historical attribution requires fixed refresh integration")
+    require(not case.get("progressiveAttribution") or (progressive and not case.get("transientAttribution")),
+            "Progressive attribution requires its explicit integration policy")
     if progressive:
         require(isinstance(case["traceSeed"], int) and 0 <= case["traceSeed"] <= 0xffffffff and
                 case["traceSeed"] != 61051 and 128 <= case["preEventSettleFrames"] <= 512,
@@ -414,6 +425,18 @@ def self_test():
     require(progressive_hysteresis(1) == .5 and .66 < progressive_hysteresis(2) < .67 and
             .97 < progressive_hysteresis(45) < .98,
             "Progressive refresh fabricated steady history or retained the two-sample filter")
+    require(transient_case(dict(progressiveRefresh=True, progressiveAttribution=True)) and
+            transient_frame(dict(progressiveAttribution=True), 29) and
+            not transient_frame(dict(progressiveAttribution=True), 81),
+            "Progressive engineering exports escaped their explicit bounded window")
+    for flags in (dict(transientAttribution=True, progressiveRefresh=True),
+                  dict(progressiveAttribution=True),
+                  dict(progressiveAttribution=True, progressiveRefresh=True, transientAttribution=True)):
+        try:
+            validate_case(Path('.'), dict(step='small-increase', oldLux=10000, newLux=12000, **flags))
+            raise AssertionError("Unproven or mixed integration attribution policy accepted")
+        except ValueError:
+            pass
     for name, recipe in LIGHT_STEPS.items():
         case = dict(step=name, oldLux=recipe["oldLux"], newLux=recipe["newLux"])
         step_recipe(case)
@@ -526,7 +549,20 @@ def self_test():
     require(result["responseQualityQualified"] and not result["referenceCorrelatedReadinessQualified"] and
             not result["rois"]["floor"]["firstRefreshReady"]["passed"] and
             result["rois"]["floor"]["firstSteadyReady"]["passed"], "Two Ready times were conflated with endpoint accuracy")
-    print(json.dumps(dict(status="passed", checks=50)))
+    early = dict(progressiveAttribution=True, attributionStartFrame=1)
+    require(transient_frame(early, 1) and transient_frame(early, 28) and
+            not transient_frame(early, 0) and not transient_frame(early, 81),
+            "Earlier engineering window overlaps the image slot or escapes its bound")
+    for flags in (dict(attributionStartFrame=1),
+                  dict(progressiveAttribution=True, attributionStartFrame=0),
+                  dict(progressiveAttribution=True, attributionStartFrame=30),
+                  dict(progressiveAttribution=True, attributionStartFrame=True)):
+        try:
+            validate_case(Path('.'), dict(step='small-increase', oldLux=10000, newLux=12000, **flags))
+            raise AssertionError("Unbounded or implicit early attribution window accepted")
+        except ValueError:
+            pass
+    print(json.dumps(dict(status="passed", checks=59)))
 
 
 if __name__ == "__main__":
