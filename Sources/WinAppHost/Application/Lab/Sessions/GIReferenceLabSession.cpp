@@ -54,6 +54,7 @@ namespace gglab
 		const LabParameterId FieldReadinessId("gi_reference.field_readiness");
 		const LabParameterId FieldFeedbackId("gi_reference.field_feedback");
 		const LabParameterId FieldProgressiveRefreshId("gi_reference.field_progressive_refresh");
+		const LabParameterId FieldProgressiveSamplingId("gi_reference.field_progressive_sampling");
 		const LabParameterId FieldRefreshNoiseId("gi_reference.field_refresh_noise");
 		const LabParameterId FieldSteadyNoiseId("gi_reference.field_steady_noise");
 		const LabParameterId ProbeEnabledId("gi_reference.probe_enabled");
@@ -381,6 +382,10 @@ namespace gglab
 			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = false }));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldProgressiveRefreshId,
 			.m_Name = "Progressive irradiance refresh (experimental)",
+			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
+			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = false }));
+		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldProgressiveSamplingId,
+			.m_Name = "Progressive directional sampling (experimental)",
 			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
 			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = false }));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldSamplingId, .m_Name = "Compose field diffuse irradiance",
@@ -1018,6 +1023,7 @@ namespace gglab
 				GIFieldCreateInfo info{ .m_RayScene = m_RayScene };
 				info.m_EnableReceiverSampling = GetParameters().Get(FieldSamplingId, true);
 				info.m_EnableFeedback = GetParameters().Get(FieldFeedbackId, false);
+				info.m_ProgressiveSampling = GetParameters().Get(FieldProgressiveSamplingId, false);
 				info.m_Readiness.m_Enabled = GetParameters().Get(FieldReadinessId, true);
 				info.m_Readiness.m_ProgressiveRefresh = GetParameters().Get(FieldProgressiveRefreshId, false);
 				info.m_Readiness.m_NoiseSigma = GetParameters().Get(FieldRefreshNoiseId, 0.0f);

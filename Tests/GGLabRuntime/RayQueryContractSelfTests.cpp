@@ -218,6 +218,39 @@ namespace gglab
 			context.Check(gi_shader::GIUniformOpenInterval(0) > 0 &&
 				gi_shader::GIUniformOpenInterval(UINT32_MAX) < 1,
 				"The open-interval conversion excludes both rounded FP32 endpoints");
+			const std::array sobolPrefix
+			{
+				std::array{ 0x00000000u, 0x00000000u },
+				std::array{ 0x80000000u, 0x80000000u },
+				std::array{ 0xc0000000u, 0x40000000u },
+				std::array{ 0x40000000u, 0xc0000000u },
+				std::array{ 0x60000000u, 0x60000000u },
+				std::array{ 0xe0000000u, 0xe0000000u },
+				std::array{ 0xa0000000u, 0x20000000u },
+				std::array{ 0x20000000u, 0xa0000000u },
+			};
+			for (uint32_t index = 0; index < sobolPrefix.size(); ++index)
+			{
+				context.Check(gi_shader::GIProgressiveSampleBits(index, 0) == sobolPrefix[index][0] &&
+					gi_shader::GIProgressiveSampleBits(index, 1) == sobolPrefix[index][1],
+					"Progressive sampling pins both independent Sobol coordinate prefixes");
+			}
+			for (const uint32_t block : { 0u, 1u, 529u, 0x00ffffffu })
+			{
+				std::array<uint32_t, 256> cells{};
+				for (uint32_t ray = 0; ray < 256; ++ray)
+				{
+					const uint32_t index = block * 256 + ray;
+					const uint32_t x = gi_shader::GIProgressiveSampleBits(index, 0) >> 28;
+					const uint32_t y = gi_shader::GIProgressiveSampleBits(index, 1) >> 28;
+					++cells[x + 16 * y];
+				}
+				context.Check(std::all_of(cells.begin(), cells.end(),
+					[](uint32_t visits) { return visits == 1; }),
+					"Every aligned 256-ray block stratifies all 16x16 cells, including high indices");
+			}
+			context.Check(!GIFieldCreateInfo{}.m_ProgressiveSampling,
+				"Progressive sampling remains an opt-in immutable field choice");
 			context.Check(GIQueryRowsPerDispatch(1024, 64, 2) == 64 &&
 				GIQueryRowsPerDispatch(1024, 0, 512) == 8192 &&
 				GIQueryRowsPerDispatch(1u << 23, 4096, 512) == 8,

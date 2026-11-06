@@ -13,7 +13,7 @@ import numpy as np
 
 from AnalyzeGIFieldTransient import receipt, save, trace_error
 from ValidateGIFieldBaseline import parameters
-from ValidateGIFieldFeedback import hash32, quaternion, rotate
+from ValidateGIFieldFeedback import field_directions, hash32, quaternion, rotate
 from ValidateGIFieldLightStep import field_update, load, read_group, require
 from ValidateGIProbeUpdate import directions, octahedral
 
@@ -64,6 +64,9 @@ def integrate(weight, rays):
 
 
 def reconstructed(w, seed, update, rotation=None):
+    if w['flags'] & 4:
+        require(w['flags'] & 1, 'Progressive sampling requires a field witness')
+        return field_directions(w['rays'], update, seed, w['probe'], True, w['rotate'], rotation)
     base = directions(w['rays'])
     index = update-1
     if w['flags'] & 1:
@@ -140,7 +143,7 @@ def compare_reconstruction(w, seed, rays, previous, actual, update, replay=False
     return dict(comparisons=comparisons,
                 maximumDirectionAbsoluteDifference=float(abs(ideal-observed_direction).max()),
                 maximumNormalAbsoluteDifference=float(abs(normals-w['normal']).max()),
-                uploadedRotationDifference=(rotation-quaternion(seed ^ (update-1))).tolist())
+                uploadedRotationDifference=(rotation-quaternion(seed ^ ((update-1) if not w['flags'] & 4 else 0))).tolist())
 
 
 def validate_case(root, case, historical_point=None, historical_root=None):
@@ -169,6 +172,8 @@ def validate_case(root, case, historical_point=None, historical_root=None):
             w['replay'] == (case['replayUpdate'] or w['update']), 'Stale/mixed integration witness')
     require(frame['temporal']['renderExtent'] == frame['temporal']['displayExtent'] == [320, 200] and
             frame['temporal']['status'] == 'disabled', 'Integration recipe requires Native/TAA-off')
+    require(bool(w['flags'] & 4) == case.get('progressiveSampling', False) ==
+            parameters(frame).get('field_progressive_sampling', False), 'Sampling policy/witness mismatch')
     require(np.array_equal(w['counts'], summary['counts']) and w['side'] == summary['irradianceInteriorWidth'] and
             w['probe'] == coordinate[0]+w['counts'][0]*(coordinate[2]+w['counts'][2]*coordinate[1]) and
             parameters(frame)['seed'] == case['seed'], 'Different sampling recipe/probe')
@@ -185,6 +190,13 @@ def validate_case(root, case, historical_point=None, historical_root=None):
                   live=compare_reconstruction(w, case['seed'], w['ray'], w['previous'], w['blended'], w['update']),
                   currentReplayDirectionBitwiseEqual=None if w['replay'] != w['update'] else
                       bool(np.array_equal(w['direction'], w['replayDirection'])))
+    if case.get('progressiveSampling'):
+        replay_error = float(abs(reconstructed(w, case['seed'], w['replay'])-w['replayDirection']).max())
+        result['samplingDirectionTolerance'] = 2e-6
+        result['maximumReplayDirectionAbsoluteDifference'] = replay_error
+        result['samplingReconstructionPassed'] = bool(result['live']['maximumDirectionAbsoluteDifference'] <= 2e-6 and
+                                                      replay_error <= 2e-6)
+        result['contractsPassed'] &= result['samplingReconstructionPassed']
     if historical_point and case['replayUpdate']:
         point = load(historical_point)
         require(w['probe'] in point['selected'] and point['case']['traceSeed'] == case['seed'] and
@@ -272,6 +284,16 @@ class Tests(unittest.TestCase):
         f[7, :side*side, 3] = 1
         f[8, :side*side] = weights.sum(axis=1)[:, None]
         return raw
+
+    def test_progressive_direction_replay(self):
+        w = dict(rays=256, probe=1445, flags=5, rotate=True)
+        live = reconstructed(w, 61052, 530)
+        self.assertTrue(np.array_equal(live, field_directions(256, 530, 61052, 1445, True)))
+        self.assertFalse(np.array_equal(live, reconstructed(w, 61052, 529)))
+        self.assertFalse(np.array_equal(live, reconstructed(dict(w, flags=1), 61052, 530)))
+        frozen = dict(w, rotate=False)
+        self.assertTrue(np.array_equal(reconstructed(frozen, 61052, 530), reconstructed(frozen, 61052, 1)))
+        self.assertLess(float(abs(np.linalg.norm(live, axis=1)-1).max()), 1e-6)
 
     def test_decode_and_conditional_arithmetic(self):
         self.assertTrue(arithmetic(decode(self.witness()))['contractsPassed'])

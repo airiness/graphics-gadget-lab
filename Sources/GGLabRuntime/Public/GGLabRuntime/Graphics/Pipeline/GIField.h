@@ -43,6 +43,8 @@ namespace gglab
 		bool m_EnableReceiverSampling = true;
 		// Immutable transport choice; replace the field when switching feedback.
 		bool m_EnableFeedback = false;
+		// Experimental contiguous Sobol blocks with fixed rotations; replace to switch.
+		bool m_ProgressiveSampling = false;
 		GIFieldReadinessSettings m_Readiness;
 		// Analytic fixtures may supply incident constant radiance; geometry is still traced.
 		bool m_ConstantEnvironment = false;

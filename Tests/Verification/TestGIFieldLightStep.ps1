@@ -9,6 +9,7 @@ param(
     [switch]$QualifyReferences,
     [switch]$TransientAttribution,
     [switch]$ProgressiveRefresh,
+    [switch]$ProgressiveSampling,
     [switch]$ProgressiveAttribution,
     [ValidateRange(1,29)][int]$AttributionStartFrame = 29,
     [uint32[]]$TraceSeed = @(61052),
@@ -55,6 +56,9 @@ if ($Configuration.Count -ne 1 -or $Configuration[0] -notin @('Debug','Develop',
     throw 'Invalid light-step configuration.'
 }
 if ($QualifyReferences -and 'gi' -notin $Tap) { throw 'Independent reference qualification requires a GI-only arm.' }
+if ($ProgressiveSampling -and (-not $ProgressiveRefresh -or $Feedback.Count -ne 1 -or $Feedback[0] -cne 'off')) {
+    throw 'Progressive sampling requires explicit progressive refresh and feedback-off only.'
+}
 $attribution = $TransientAttribution -or $ProgressiveAttribution
 if ($AttributionStartFrame -ne 29 -and -not $ProgressiveAttribution) {
     throw 'Earlier attribution exports require explicit ProgressiveAttribution mode.'
@@ -175,6 +179,7 @@ try {
                         $case.traceSeed = $arm.seed
                         $case.preEventSettleFrames = $arm.settle
                     }
+                    if ($ProgressiveSampling) { $case.progressiveSampling = $true }
                     if ($TransientAttribution) {
                         $case.transientAttribution = $true
                         $case.traceSeed = $arm.seed
@@ -190,7 +195,8 @@ try {
                     Write-VerificationJson "$directory/old-lighting.json" (Set-Inputs @{sun_step_lux=$case.oldLux})
                     Write-VerificationJson "$directory/inputs.json" (Set-Inputs @{fixture=4;environment=3;lighting_step_experiment=$true;
                         albedo=0;secondary_albedo=0;ev100=10;field_enabled=$true;field_feedback=$case.feedback;
-                        field_sampling=$true;field_readiness=$true;field_progressive_refresh=[bool]$ProgressiveRefresh;receiver_diagnostics=$true;
+                        field_sampling=$true;field_readiness=$true;field_progressive_refresh=[bool]$ProgressiveRefresh;
+                        field_progressive_sampling=[bool]$ProgressiveSampling;receiver_diagnostics=$true;
                         field_irradiance_width=0;probe_enabled=$true;accumulate=$true;seed=61051;
                         field_refresh_noise=0.0;field_steady_noise=0.0})
                     $noise = Wait-VerificationCondition -Poll { Invoke-VerificationSession status $session @{ExpectedRunIdentity=$run} } `
@@ -296,7 +302,8 @@ try {
         observedResponseTargetsPassed=$validation.observedResponseTargetsPassed;engineeringOnly=[bool]$attribution;
         responseQualityQualified=$validation.responseQualityQualified;referenceStatus=$validation.referenceStatus;
         referenceCorrelatedReadinessQualified=$validation.referenceCorrelatedReadinessQualified;
-        wholeG3Qualified=$false;progressiveRefresh=[bool]$ProgressiveRefresh;directory=$output}
+        wholeG3Qualified=$false;progressiveRefresh=[bool]$ProgressiveRefresh;
+        progressiveSampling=[bool]$ProgressiveSampling;directory=$output}
 } catch { $result = @{ok=$false;status='failed';experimentOnly=$true;responseQualityQualified=$false;
     wholeG3Qualified=$false;directory=$output;error=$_.Exception.Message} }
 Write-VerificationJson "$output/result.json" $result

@@ -371,6 +371,7 @@ namespace gglab
 	{
 		std::shared_ptr<RayScene> m_Scene;
 		bool m_Field = false;
+		bool m_ProgressiveSampling = false;
 		GIProbeUpdateProfile m_Profile;
 		std::shared_ptr<Resources> m_Resources;
 		std::shared_ptr<Progress> m_Progress = std::make_shared<Progress>();
@@ -396,12 +397,14 @@ namespace gglab
 	};
 
 	GIProbeUpdateWorkload::GIProbeUpdateWorkload(std::shared_ptr<RayScene> scene,
-		GIProbeUpdateProfile profile, bool field, GIFieldReadinessSettings readiness, bool feedback) noexcept :
+		GIProbeUpdateProfile profile, bool field, GIFieldReadinessSettings readiness, bool feedback,
+		bool progressiveSampling) noexcept :
 		m_State(std::make_unique<State>())
 	{
 		m_State->m_Scene = std::move(scene);
 		m_State->m_Profile = profile;
 		m_State->m_Field = field;
+		m_State->m_ProgressiveSampling = field && progressiveSampling;
 		readiness.m_Enabled = field && readiness.m_Enabled;
 		m_State->m_Progress->m_ReadinessSettings = readiness;
 		m_State->m_Progress->m_Feedback.m_Enabled = field && feedback;
@@ -812,6 +815,7 @@ namespace gglab
 		const auto progress = state.m_Progress;
 		const auto profile = state.m_Profile;
 		const bool feedback = progress->m_Feedback.m_Enabled;
+		const bool rotateUpdates = profile.m_RotateDirections && !state.m_ProgressiveSampling;
 		const bool initialized = progress->m_StorageInitialized;
 		const auto readiness = GetReadiness();
 		// The entry update retains the existing rapid reweighting. Later progressive
@@ -1049,9 +1053,10 @@ namespace gglab
 							.m_ConstantRadiance = profile.m_ConstantRadiance, .m_MaximumDistance = profile.m_MaximumDistance,
 							.m_SceneCounts = { scene.m_InstanceCount, scene.m_GeometryCount, scene.m_MaterialCount },
 							.m_ConstantEnvironment = profile.m_ConstantEnvironment ? 1u : 0u,
-							.m_FieldFlags = (state.m_Field ? 1u : 0u) | (feedback ? 2u : 0u),
+							.m_FieldFlags = (state.m_Field ? 1u : 0u) | (feedback ? 2u : 0u) |
+								(state.m_ProgressiveSampling ? 4u : 0u),
 							.m_TraverseScene = profile.m_TraverseScene ? 1u : 0u,
-							.m_Rotation = Rotation(profile.m_Seed ^ (profile.m_RotateDirections ? update : 0u)),
+							.m_Rotation = Rotation(profile.m_Seed ^ (rotateUpdates ? update : 0u)),
 							.m_Hysteresis = updateHysteresis, .m_RotateDirections = profile.m_RotateDirections ? 1u : 0u,
 							.m_TraversalOnly = profile.m_TraversalOnly ? 1u : 0u,
 							.m_IrradianceInteriorWidth = profile.m_IrradianceInteriorWidth,
@@ -1066,7 +1071,7 @@ namespace gglab
 								UINT32_MAX,
 							.m_InspectionReplayIndex = replayIndex,
 							.m_InspectionReplayRotation = inspect ?
-								Rotation(profile.m_Seed ^ (profile.m_RotateDirections ? replayIndex : 0u)) :
+								Rotation(profile.m_Seed ^ (rotateUpdates ? replayIndex : 0u)) :
 								std::array<float, 4>{} };
 						builder.SideEffect();
 					},

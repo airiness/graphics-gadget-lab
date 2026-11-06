@@ -8,6 +8,7 @@ param(
     [string]$Python = 'python',
     [string]$ShaderCacheDirectory,
     [switch]$IntegrationDiagnostics,
+    [switch]$ProgressiveSampling,
     [string]$HistoricalPoint,
     [string]$HistoricalRoot,
     [int]$TimeoutSeconds = 600
@@ -20,6 +21,9 @@ $Configuration = @($Configuration | ForEach-Object { $_ -split ',' })
 $Rhi = @($Rhi | ForEach-Object { $_ -split ',' })
 if ($Configuration.Count -ne 1 -or -not $Rhi.Count -or @($Rhi | Where-Object { $_ -notin @('dx12','vulkan') }).Count) {
     throw 'Probe inspection requires one configuration and explicit valid backends.'
+}
+if ($ProgressiveSampling -and (-not $IntegrationDiagnostics -or $HistoricalPoint -or $HistoricalRoot)) {
+    throw 'Progressive sampling inspection requires integration diagnostics and excludes historical Fibonacci replay.'
 }
 if (-not $OutputDirectory -and -not $RunDirectory) { $OutputDirectory = "$root/Build/Validation/GIProbeInspection" }
 $output = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory -RunId ([Guid]::NewGuid().ToString('N').Substring(0,8))
@@ -34,6 +38,7 @@ function Set-Field($Session, $Run, $Fixture, [bool]$Readiness = $true, [uint32]$
         @{id='gi_reference.field_enabled';type='bool';value=$true},
         @{id='gi_reference.field_sampling';type='bool';value=$true},
         @{id='gi_reference.field_readiness';type='bool';value=$Readiness},
+        @{id='gi_reference.field_progressive_sampling';type='bool';value=[bool]$ProgressiveSampling},
         @{id='gi_reference.probe_enabled';type='bool';value=$true},
         @{id='gi_reference.seed';type='uint';value=$Seed}
     )
@@ -131,7 +136,8 @@ try {
                     if ($capture.status -ne 'completed' -or $capture.publication -ne 'Published') {
                         throw 'Integration witness did not publish.'
                     }
-                    $integrationCases.Add(@{directory=$directory;backend=$backend;seed=61052;replayUpdate=$replay})
+                    $integrationCases.Add(@{directory=$directory;backend=$backend;seed=61052;replayUpdate=$replay;
+                        progressiveSampling=[bool]$ProgressiveSampling})
                 }
             }
         } finally {

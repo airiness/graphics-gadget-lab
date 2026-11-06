@@ -13,7 +13,7 @@ import numpy as np
 from ValidateGIFieldBaseline import (camera_inputs, scene_inputs, parameters, temporal_metrics,
                                     validate_readiness, digest)
 from ValidateGIFieldSampling import oracle
-from ValidateGIProbeUpdate import directions
+from ValidateGIProbeUpdate import directions, progressive_directions
 from ValidateGIReferenceConvergence import file_receipts
 from ValidateGIReferenceTransport import read_case, transport_masks
 
@@ -108,6 +108,17 @@ def quaternion(seed):
 
 def rotate(ray, q):
     return ray+2*np.cross(q[:3], np.cross(q[:3], ray)+q[3]*ray)
+
+
+def field_directions(rays, update, seed, probe, progressive=False, rotating=True, rotation=None):
+    index = update-1
+    base = progressive_directions(rays, index if rotating else 0) if progressive else directions(rays)
+    probe_phase = hash32(index) if rotating and not progressive else 0
+    base = rotate(base, quaternion(hash32(probe ^ probe_phase)))
+    if rotating:
+        common = quaternion(seed ^ (index if not progressive else 0)) if rotation is None else rotation
+        base = rotate(base, common)
+    return base
 
 
 def plane_equation(arrays, update, seed):

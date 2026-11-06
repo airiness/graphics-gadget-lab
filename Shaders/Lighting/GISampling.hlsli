@@ -34,6 +34,25 @@ float GIRandom(inout uint state)
 	return GIUniformOpenInterval(state);
 }
 
+// Two-dimensional Sobol digital net in Gray-code order. Keep integer construction
+// shared with CPU contracts; fixed rotations preserve contiguous-block stratification.
+static uint GIProgressiveSampleBits(uint index, uint dimension)
+{
+	uint gray = index ^ (index >> 1);
+	uint direction = 0x80000000u;
+	uint result = 0;
+	while (gray != 0)
+	{
+		if ((gray & 1u) != 0)
+		{
+			result ^= direction;
+		}
+		gray >>= 1;
+		direction = dimension == 0 ? direction >> 1 : direction ^ (direction >> 1);
+	}
+	return result;
+}
+
 #if defined(__cplusplus)
 }
 #endif

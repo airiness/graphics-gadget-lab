@@ -159,7 +159,7 @@ namespace gglab
 		ResolvedRenderPipeline m_ReceiverMarkerPipeline;
 		State(GIFieldCreateInfo info) noexcept :
 			m_Info(std::move(info)), m_Workload(m_Info.m_RayScene, UpdateProfile(m_Info), true,
-				m_Info.m_Readiness, m_Info.m_EnableFeedback) {}
+				m_Info.m_Readiness, m_Info.m_EnableFeedback, m_Info.m_ProgressiveSampling) {}
 	};
 
 	GIField::GIField(GIFieldCreateInfo info) noexcept :

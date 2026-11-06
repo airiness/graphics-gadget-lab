@@ -221,6 +221,8 @@ def validate_case(root, case, qualify_references=False):
     step_recipe(case)
     engineering = transient_case(case)
     progressive = case.get("progressiveRefresh", False)
+    require(not case.get("progressiveSampling") or (progressive and not case["feedback"]),
+            "Progressive sampling requires progressive history and feedback off")
     if "attributionStartFrame" in case:
         start = case["attributionStartFrame"]
         require(type(start) is int and 1 <= start <= 29 and case.get("progressiveAttribution"),
@@ -294,6 +296,7 @@ def validate_case(root, case, qualify_references=False):
                 p["fixture"] == 4 and p["environment"] == 3 and p.get("lighting_step_experiment") and p["field_enabled"] and p["field_sampling"] and
                 p["field_readiness"] and p["field_feedback"] == case["feedback"] and
                 p.get("field_progressive_refresh", False) == progressive and
+                p.get("field_progressive_sampling", False) == case.get("progressiveSampling", False) and
                 p["receiver_diagnostics"] == (case["tap"] == "gi"), "Wrong experiment composition")
         require(frame["parameters"]["frameSerial"] == parameter_frames[index]["parameters"]["frameSerial"] ==
                 frame["frame"]["serial"] and frame["parameters"] == parameter_frames[index]["parameters"],

@@ -34,7 +34,7 @@ cbuffer Parameters : register(b2)
 	uint ClassificationIndex;
 	uint TransmittanceIndex;
 	uint AtmosphereSampler;
-	uint FieldFlags; // 1: full-volume field, 2: previous-field feedback.
+	uint FieldFlags; // 1: full-volume field, 2: previous-field feedback, 4: progressive sampling.
 	uint TraverseScene;
 	float4 Rotation;
 	float Hysteresis;
@@ -85,8 +85,19 @@ uint3 ProbeCoordinate(uint probe)
 	return uint3(probe % GridSize.x, (probe / GridSize.x) % GridSize.z,
 		probe / (GridSize.x * GridSize.z));
 }
-float3 ProbeDirection(uint probe, uint ray, uint directionUpdate, float4 commonRotation)
+float3 ProbeBaseDirection(uint ray, uint directionUpdate)
 {
+	if ((FieldFlags & 4u) != 0)
+	{
+		// The 32-bit sample index wraps after 2^32 rays, not at a lighting epoch.
+		const uint index = (RotateDirections != 0 ? directionUpdate : 0) * RaysPerProbe + ray;
+		const float u = GIUniformOpenInterval(GIProgressiveSampleBits(index, 0));
+		const float v = GIUniformOpenInterval(GIProgressiveSampleBits(index, 1));
+		const float z = 1.0 - 2.0 * u;
+		precise float angle = (v - 0.5) * TWO_PI;
+		const float radius = sqrt(max(0.0, 1.0 - z * z));
+		return float3(radius * cos(angle), radius * sin(angle), z);
+	}
 	const float z = 1.0 - 2.0 * ((float)(ray) + 0.5) / (float)(RaysPerProbe);
 	// Bound sin/cos arguments: large-angle error is amplified at grazing texels.
 	// Trace and both integration kernels must use the same phase.
@@ -94,13 +105,20 @@ float3 ProbeDirection(uint probe, uint ray, uint directionUpdate, float4 commonR
 	precise float phase = frac(turns + 0.5) - 0.5;
 	precise float angle = phase * TWO_PI;
 	const float radius = sqrt(max(0.0, 1.0 - z * z));
-	float3 direction = float3(radius * cos(angle), radius * sin(angle), z);
+	return float3(radius * cos(angle), radius * sin(angle), z);
+}
+float3 ProbeDirection(uint probe, uint ray, uint directionUpdate, float4 commonRotation)
+{
+	float3 direction = ProbeBaseDirection(ray, directionUpdate);
 	if ((FieldFlags & 1u) != 0)
 	{
 		// A common rotation correlates every cage corner's narrow-emitter error.
 		// Decorrelate both probes and updates: nearby CPU seeds otherwise permute
-		// overlapping histories. The experiment keeps its common directions.
-		const uint update = RotateDirections != 0 ? GIHash(directionUpdate) : 0;
+		// overlapping histories. The ordinary probe experiment keeps common directions.
+		// Progressive blocks keep both rotations fixed across submitted updates.
+		const uint update = RotateDirections != 0 && (FieldFlags & 4u) == 0 ?
+			GIHash(directionUpdate) :
+			0;
 		uint state = GIHash(probe ^ update);
 		const float u = GIRandom(state);
 		const float v = TWO_PI * GIRandom(state);

@@ -15,13 +15,13 @@ from pathlib import Path
 
 import numpy as np
 
-from ValidateGIFieldFeedback import hash32, quaternion, rotate
+from ValidateGIFieldFeedback import field_directions
 from ValidateGIFieldLightStep import (EVENT_FRAME, FLOOR, HOLD, LUMA, load, read_group,
     require, invariant_inputs, observation_targets, progressive_hysteresis, transient_case, validate_case)
 from ValidateGIFieldLightStepReference import roi_masks
 from ValidateGIFieldReadiness import records
 from ValidateGIFieldSampling import bilinear, oracle
-from ValidateGIProbeUpdate import bordered, directions, octahedral
+from ValidateGIProbeUpdate import bordered, octahedral
 
 # Owning F4 descriptor in GIReferenceLabSession.cpp, not a fitted diagnostic bias.
 VIEW_BIAS = .15
@@ -151,15 +151,14 @@ def trace_error(actual, expected):
                            actual=float(actual[index]), expected=float(expected[index])))
 
 
-def integrated_probe(g, rays, update, seed, probe):
+def integrated_probe(g, rays, update, seed, probe, progressive=False):
     """FP64 quadrature of exported rays, independent of atlas blend/history."""
     counts = np.asarray(g["summary"]["counts"])
     interior = g["summary"]["irradianceInteriorWidth"]
     require(1 <= update <= 0xffffffff and 0 <= seed <= 0xffffffff and
             0 <= probe < counts.prod(), "Invalid trace sampling identity")
     x, y, z = int(probe % counts[0]), int(probe//(counts[0]*counts[2])), int((probe//counts[0]) % counts[2])
-    direction = rotate(rotate(directions(rays.shape[1]), quaternion(hash32(int(probe) ^ hash32(update-1)))),
-                       quaternion(seed ^ (update-1)))
+    direction = field_directions(rays.shape[1], update, seed, int(probe), progressive)
     weight = np.maximum(octahedral(interior).reshape(-1, 3) @ direction.T, 0)
     integrated = (weight @ rays[probe, :, :3])/np.maximum(weight.sum(axis=1)[:, None], 1e-20)
     target = (y-g["atlasSlices"][0], slice(z*(interior+2)+1, z*(interior+2)+1+interior),
@@ -167,7 +166,7 @@ def integrated_probe(g, rays, update, seed, probe):
     return target, integrated
 
 
-def trace_receiver(g, arrays, update, seed, current):
+def trace_receiver(g, arrays, update, seed, current, progressive=False):
     """Reconstruct every required receiver from all contributing probes' rays."""
     counts = np.asarray(g["summary"]["counts"])
     interior = g["summary"]["irradianceInteriorWidth"]
@@ -178,7 +177,7 @@ def trace_receiver(g, arrays, update, seed, current):
     selected = np.unique(current["probes"][current["weights"] > 0])
     atlas = np.zeros_like(arrays["Irradiance"], dtype=float)
     for probe in selected:
-        target, integrated = integrated_probe(g, rays, update, seed, probe)
+        target, integrated = integrated_probe(g, rays, update, seed, probe, progressive)
         require(0 <= target[0] < len(atlas), "A contributing probe is outside exported layers")
         tile = bordered(integrated.reshape(interior, interior, 3))
         atlas[target[0], target[1].start-1:target[1].stop+1,
@@ -191,7 +190,7 @@ def trace_receiver(g, arrays, update, seed, current):
     return reconstructed["energy"], len(selected)
 
 
-def trace_check(g, arrays, update, seed, selected, hysteresis=.5):
+def trace_check(g, arrays, update, seed, selected, hysteresis=.5, progressive=False):
     """Check selected probes with the coefficient of this actual GPU update."""
     require(0 <= hysteresis < 1, "Invalid observed integration coefficient")
     summary = g["summary"]
@@ -203,7 +202,7 @@ def trace_check(g, arrays, update, seed, selected, hysteresis=.5):
     maximum, absolute, checked, worst = 0., 0., 0, None
     raw_means = []
     for probe in selected:
-        target, integrated = integrated_probe(g, rays, update, seed, probe)
+        target, integrated = integrated_probe(g, rays, update, seed, probe, progressive)
         previous = old[target][..., :3].reshape(-1, 3).astype(float)
         actual = new[target][..., :3].reshape(-1, 3).astype(float)
         expected = blend_expected(previous, integrated, hysteresis)
@@ -338,7 +337,8 @@ def analyze_case(root, case):
                 ids = np.unique(current["probes"][current["weights"] > 0])
                 influence = np.array([current["weights"][current["probes"] == p].sum() for p in ids])
                 selected = ids[np.argsort(influence)[-16:]]
-                row["traceBlend"] = trace_check(g, arrays, result["globalUpdates"][i], case["traceSeed"], selected, hysteresis)
+                row["traceBlend"] = trace_check(g, arrays, result["globalUpdates"][i], case["traceSeed"], selected,
+                                                hysteresis, case.get("progressiveSampling", False))
                 previous = lookup(g, arrays["Previous"], arrays["Distance"], arrays["Classification"], case["atlasSlices"])
                 # A derived inversion, not an independent transport reference. For fixed
                 # weights the linear query commutes with the paired atlas blend.

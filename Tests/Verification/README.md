@@ -174,7 +174,15 @@ The runner recalibrates noise and checks completed epoch coefficients; distance
 history and thresholds retain their existing rules. It supports seed/wait repeats
 without the historical fixed-filter attribution oracle. Passing this experiment
 does not adopt a production default or complete G3.
-Pair it with `-ProgressiveAttribution` for the bounded eight-payload engineering
+`-ProgressiveSampling` additionally selects default-off `field_progressive_sampling`:
+contiguous 2D Sobol blocks mapped onto the sphere with fixed per-probe/seed rotations.
+It requires explicit progressive refresh and feedback off. History coefficients,
+ray budget, response/reference gates and independent reference sampling stay unchanged.
+The sample index follows submitted global updates (modulo 2^32 rays), never a
+lighting epoch or CPU-completion snapshot. Sampling-policy mismatches reject joins.
+This is an experimental sequence, not production adoption or a variance certificate.
+
+Pair progressive refresh with `-ProgressiveAttribution` for the bounded eight-payload engineering
 exports. This mode derives each Trace/Blend coefficient from the actual GPU epoch
 update, retains arithmetic/response failures, and excludes independent references,
 feedback-on and Final. History/current-sample splits are labeled derived inversions.

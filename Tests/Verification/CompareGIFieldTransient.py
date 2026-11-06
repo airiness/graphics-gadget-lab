@@ -31,7 +31,8 @@ def compatible(historical, observed):
             "feedback", "step", "oldLux", "newLux", "traceSeed", "progressiveRefresh")
     return (all(k in historical and k in observed and historical[k] == observed[k] for k in keys) and
             historical["progressiveRefresh"] and not historical["feedback"] and
-            historical["tap"] == "gi" and observed.get("progressiveAttribution", False))
+            historical["tap"] == "gi" and observed.get("progressiveAttribution", False) and
+            historical.get("progressiveSampling", False) == observed.get("progressiveSampling", False))
 
 
 def matched_sample(historical_update, observed_update, previous, actual, endpoint,
@@ -127,7 +128,8 @@ def compare(historical_root, observed_root, case_name, output, observed_case_nam
             require(np.array_equal(current["weights"], baseline["weights"]) and
                     np.array_equal(current["support"], baseline["support"]),
                     "Observed query weights/support changed; scalar historical inversion is unproven")
-            raw, probes = trace_receiver(g, arrays, update, case["traceSeed"], current)
+            raw, probes = trace_receiver(g, arrays, update, case["traceSeed"], current,
+                                        case.get("progressiveSampling", False))
             previous = lookup(g, arrays["Previous"], arrays["Distance"], arrays["Classification"], g["atlasSlices"])
             field = record["frame"]["readiness"]["giField"]
             epoch_update = update-field["summary"]["field"]["epochOriginUpdate"]
@@ -213,7 +215,7 @@ def self_test():
     observed = dict(case, progressiveAttribution=True, preEventSettleFrames=128)
     require(compatible(case, observed), "Wait minima were incorrectly treated as sample identities")
     for changed in (dict(traceSeed=81053), dict(backend="dx12"), dict(feedback=True),
-                    dict(progressiveAttribution=False), dict(configuration="Release")):
+                    dict(progressiveAttribution=False), dict(configuration="Release"), dict(progressiveSampling=True)):
         require(not compatible(case, dict(observed, **changed)), "Different sample cohort accepted")
     scaled = matched_sample(530, 530, 90, 92, 91, .75, 98/1.2, 10000, 12000)
     require(scaled["arithmeticPassed"] and scaled["predictedHistoricalE"] == 92 and
@@ -245,7 +247,7 @@ def self_test():
             raise AssertionError("An incomplete or nonfinite replay acquired a peak")
         except ValueError:
             pass
-    print(json.dumps(dict(status="passed", checks=17)))
+    print(json.dumps(dict(status="passed", checks=18)))
 
 
 if __name__ == "__main__":

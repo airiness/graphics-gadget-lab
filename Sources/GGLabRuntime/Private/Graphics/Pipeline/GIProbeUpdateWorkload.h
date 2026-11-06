@@ -28,7 +28,8 @@ namespace gglab
 	public:
 		static constexpr size_t ProgramCount = 8;
 		GIProbeUpdateWorkload(std::shared_ptr<RayScene> scene, GIProbeUpdateProfile profile,
-			bool field = false, GIFieldReadinessSettings readiness = {}, bool feedback = false) noexcept;
+			bool field = false, GIFieldReadinessSettings readiness = {}, bool feedback = false,
+			bool progressiveSampling = false) noexcept;
 		~GIProbeUpdateWorkload();
 		[[nodiscard]] std::shared_ptr<RayScene> GetRayScene() const noexcept;
 		[[nodiscard]] GIProbeUpdateDiagnostics GetDiagnostics(bool allocations = false) const noexcept;

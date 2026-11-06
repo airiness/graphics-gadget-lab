@@ -34,6 +34,29 @@ def directions(rays):
     return np.stack((radius*np.cos(angle), radius*np.sin(angle), z), axis=-1)
 
 
+def progressive_points(count, first=0):
+    """Independent digital-matrix oracle; indices and outputs retain uint32 wrap."""
+    index = (np.arange(count, dtype=np.uint64)+first).astype(np.uint32)
+    gray = index ^ (index >> 1)
+    bits = np.zeros((count, 2), dtype=np.uint32)
+    # Dimension 2's direction numbers use the primitive polynomial x+1.
+    second = 0x80000000
+    for column in range(32):
+        selected = ((gray >> column) & 1).astype(bool)
+        bits[selected, 0] ^= np.uint32(0x80000000 >> column)
+        bits[selected, 1] ^= np.uint32(second)
+        second ^= second >> 1
+    return ((bits >> 9).astype(np.float32)+np.float32(.5))/np.float32(8388608)
+
+
+def progressive_directions(rays, update):
+    points = progressive_points(rays, update*rays)
+    z = (np.float32(1)-np.float32(2)*points[:, 0]).astype(float)
+    angle = ((points[:, 1]-np.float32(.5))*np.float32(2*np.pi)).astype(float)
+    radius = np.sqrt(np.maximum(1-z*z, 0))
+    return np.stack((radius*np.cos(angle), radius*np.sin(angle), z), axis=-1)
+
+
 def rotated_directions(rays, update):
     seed = 61051 ^ update
     def random():
@@ -330,6 +353,23 @@ def self_test():
     axis_intersections = np.divide(np.array([1.,1.,1.]),np.array([0.,0.,1.]),
                                    out=np.full(3,np.inf),where=np.array([False,False,True]))
     require(axis_intersections.min() == 1, "Parallel slab axes cannot become negative infinity")
+    expected = np.array([[0, 0], [4, 4], [6, 2], [2, 6], [3, 3], [7, 7], [5, 1], [1, 5]])
+    require(np.array_equal((progressive_points(8)*8).astype(int), expected), "Sobol prefix changed")
+    for count in (64, 128, 192, 256):
+        for update in (0, 1, 529, 0xffffffff):
+            points = progressive_points(count, update*count)
+            require(((points > 0) & (points < 1)).all(), "Progressive endpoints are not open")
+            ray = progressive_directions(count, update)
+            require(np.max(abs(np.linalg.norm(ray, axis=1)-1)) < 1e-12, "Progressive directions are not unit")
+        combined = progressive_points(4*count, 529*count)
+        require(np.array_equal(combined, np.concatenate([progressive_points(count, u*count)
+                                                        for u in range(529, 533)])), "Update blocks overlap or skip samples")
+    for exponent in range(1, 13):
+        count = 1 << exponent
+        for split in range(exponent+1):
+            shape = np.array([1 << split, 1 << (exponent-split)])
+            cells = (progressive_points(count, 7*count)*shape).astype(int)
+            require(len(np.unique(cells, axis=0)) == count, "An aligned dyadic block lost exact stratification")
     ray = directions(256)
     require(np.max(abs(np.linalg.norm(ray, axis=1)-1)) < 1e-12, "Unit directions")
     c = np.maximum(octahedral(6).reshape(-1, 3) @ ray.T, 0)
