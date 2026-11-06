@@ -101,6 +101,12 @@ Baseline accuracy, chromaticity and temporal RMS are separate verdicts. Optional
 windows without replacing the primary Ready-plus-120 gate. Feedback-on accuracy
 requires a matching sample- and depth-qualified run supplied through
 `TestGIFieldFeedback.ps1 -ReferenceDirectory`; D=1 is insufficient.
+For the opt-in contiguous-sequence experiment, its static runner requires explicit
+`-ProgressiveRefresh -ProgressiveSampling`. It records both policies, reconstructs
+F1 hit directions accordingly and requires a source/binary-matched fresh F4
+reference. Defaults retain the legacy policy. Feedback-off captures are settled
+toggle controls, not complete paired single-bounce baseline qualifications. This
+static admission does not relax the light-step runner's feedback-off restriction.
 
 Baseline, feedback and lighting-step runners accept `-ShaderCacheDirectory` with
 matching `<root>/<rhi>/ShaderCache` and `ShaderArtifacts` seeds. They copy artifacts

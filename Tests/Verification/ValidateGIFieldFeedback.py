@@ -12,6 +12,7 @@ import numpy as np
 
 from ValidateGIFieldBaseline import (camera_inputs, scene_inputs, parameters, temporal_metrics,
                                     validate_readiness, digest)
+from ValidateGIFieldLightStep import reference_source_identity
 from ValidateGIFieldSampling import oracle
 from ValidateGIProbeUpdate import directions, progressive_directions
 from ValidateGIReferenceConvergence import file_receipts
@@ -121,20 +122,18 @@ def field_directions(rays, update, seed, probe, progressive=False, rotating=True
     return base
 
 
-def plane_equation(arrays, update, seed):
+def plane_equation(arrays, update, seed, progressive=False):
     rays = value(arrays, "GI.Field.Rays").reshape(-1, 256, 4)
     irradiance = value(arrays, "GI.Field.Irradiance", "GI.Field.TraceShade")
     distance = value(arrays, "GI.Field.Distance", "GI.Field.TraceShade")
     classes = value(arrays, "GI.Field.Classification", "GI.Field.TraceShade")
-    base = directions(256)
     maximum, checked = 0., 0
     # Well-inside-plane hits avoid geometric-edge/ray-distance conditioning while
     # still querying the independent FP64 eight-probe visibility/weight oracle.
     probes = [x+13*(z+13*y) for y in (7, 9, 11) for z in (4, 8) for x in (4, 8)]
     for probe in probes:
         origin = np.array([probe % 13, probe//(13*13), (probe//13) % 13])*.5-3
-        ray = rotate(base, quaternion(hash32(probe ^ hash32(update-1))))
-        ray = rotate(ray, quaternion(seed ^ (update-1)))
+        ray = field_directions(256, update, seed, probe, progressive)
         hit = origin+ray*rays[probe, :, 3, None]
         keep = (ray[:, 1] < -.15) & (rays[probe, :, 3] > 0) & (rays[probe, :, 3] < 1000) & \
                (np.abs(hit[:, 1]) < .002) & (np.abs(hit[:, [0, 2]]) < .9).all(axis=1)
@@ -156,8 +155,19 @@ def plane_equation(arrays, update, seed):
     return dict(samples=checked, maximumRelativeError=maximum)
 
 
+def check_policy(case, p):
+    for key, parameter in (("progressiveRefresh", "field_progressive_refresh"),
+                           ("progressiveSampling", "field_progressive_sampling")):
+        expected, observed = case.get(key, False), p.get(parameter, False)
+        require(type(expected) is bool and type(observed) is bool and expected == observed,
+                "Feedback sampling/history policy differs from the declared case")
+    require(not case.get("progressiveSampling") or case.get("progressiveRefresh"),
+            "Progressive sampling feedback study requires progressive refresh")
+
+
 def check_frame(frame, case, enabled):
     p = parameters(frame)
+    check_policy(case, p)
     f = frame["readiness"]["giField"]
     view_matches = frame["camera"]["referenceView"] == case["view"] or (
         (frame.get("sequence") or {}).get("cameraPath") == "GI_Static_"+case["view"])
@@ -183,7 +193,9 @@ def proof(directory, case):
     readiness = value(arrays, "GI.Field.Readiness")
     require(np.all(readiness[2::2, 3].view(np.uint32)+field["summary"]["field"]["epochOriginUpdate"] == update),
             "Feedback and readiness came from different GPU updates")
-    equation = plane_equation(arrays, update, p["seed"]) if case["id"] == "plane" else None
+    equation = None
+    if case["id"] == "plane":
+        equation = plane_equation(arrays, update, p["seed"], case.get("progressiveSampling", False))
     return dict(update=update, sourceUpdate=update-1, totals=totals, state=field["state"], equation=equation), frame
 
 
@@ -235,15 +247,22 @@ def timing(directory, filename="timing.json"):
                 passMedianMilliseconds={s["name"]: float(np.median(s["milliseconds"])) for s in scopes})
 
 
-def quality(samples, position, frame, case, backend, reference_root, binaries):
+def check_reference_cohort(recipe, source, binaries):
+    require(recipe["extent"] == [320, 200] and
+            recipe["binaries"] == {r["file"]: r["sha256"] for r in binaries} and
+            recipe["sourceIdentity"] == reference_source_identity(source),
+            "Feedback/reference source, binary or extent cohort differs")
+
+
+def quality(samples, position, frame, case, backend, reference_root, binaries, source):
     if case["id"] == "sunroom":
         if reference_root is None:
             return dict(qualified=False, reason="No depth-converged reference supplied")
         root = reference_root/backend
         report, state = load(root/"report.json"), load(root/"checkpoint.json")
         reference = report["results"]["F4_Floor"]
-        require(reference["status"] == "ReferenceConverged" and state["recipe"]["extent"] == [320, 200] and
-                state["recipe"]["binaries"] == {r["file"]: r["sha256"] for r in binaries}, "Unqualified/mismatched reference build")
+        require(reference["status"] == "ReferenceConverged", "Feedback reference is not sampling/depth qualified")
+        check_reference_cohort(state["recipe"], source, binaries)
         means, masks = [], None
         for candidate in reference["candidates"]:
             row = state["observations"][candidate]
@@ -253,6 +272,7 @@ def quality(samples, position, frame, case, backend, reference_root, binaries):
             covered = position[..., 3] == 1
             require(camera_inputs(frame) == camera_inputs(ref_frame) and scene_inputs(frame) == scene_inputs(ref_frame) and
                     frame["adapterDriverIdentity"] == ref_frame["adapterDriverIdentity"] and
+                    not parameters(ref_frame)["field_enabled"] and not parameters(ref_frame)["field_feedback"] and
                     np.array_equal(position[..., 3], reference_position[..., 3]) and
                     np.max(np.abs(position[covered, :3]-reference_position[covered, :3])) < 2e-4,
                     "Feedback/reference receivers or inputs differ")
@@ -291,6 +311,7 @@ def check_settle(receipt, generation, update):
 def validate(root, reference_root):
     rows = []
     binaries = load(root/"binaries.json")
+    source = load(root/"source-identity.json")
     for backend in load(root/"backends.json"):
         for case in load(root/"cases.json"):
             directory = root/backend/case["id"]
@@ -315,7 +336,7 @@ def validate(root, reference_root):
             if case["id"] == "coverage":
                 require(measured["totals"][3] > 0, "Outside-coverage feedback was not exercised")
             samples, position, sample_frame = static_window(directory, case)
-            q = quality(samples, position, sample_frame, case, backend, reference_root, binaries)
+            q = quality(samples, position, sample_frame, case, backend, reference_root, binaries, source)
             rows.append(dict(backend=backend, case=case["id"], feedback=measured, warmup=warm,
                              quality=q, onTiming=timing(directory), offTiming=timing(directory, "off-timing.json")))
     cross = []
@@ -381,7 +402,35 @@ def self_test():
             raise AssertionError("Uncompleted feedback data was accepted")
         except ValueError:
             pass
-    print(json.dumps(dict(ok=True, checks=15)))
+    candidate = dict(progressiveRefresh=True, progressiveSampling=True)
+    check_policy({}, {})
+    check_policy(candidate, dict(field_progressive_refresh=True, field_progressive_sampling=True))
+    for case, p in ((candidate, {}), ({}, dict(field_progressive_sampling=True)),
+                    (dict(progressiveSampling=True), dict(field_progressive_sampling=True)),
+                    (candidate, dict(field_progressive_refresh=True, field_progressive_sampling=1))):
+        try:
+            check_policy(case, p)
+            raise AssertionError("Mismatched or implicit feedback policy was accepted")
+        except ValueError:
+            pass
+    old = rotate(rotate(directions(256), quaternion(hash32(1445 ^ hash32(529)))), quaternion(61052 ^ 529))
+    require(np.array_equal(field_directions(256, 530, 61052, 1445), old),
+            "Legacy feedback directions changed")
+    require(not np.array_equal(field_directions(256, 530, 61052, 1445, True), old),
+            "Progressive oracle reused legacy directions")
+    source = [dict(path="Shaders/Passes/Test.hlsl", sha256="a"*64)]
+    binaries = [dict(file="test.exe", sha256="b"*64)]
+    recipe = dict(extent=[320, 200], binaries={"test.exe": "b"*64},
+                  sourceIdentity=reference_source_identity(source))
+    check_reference_cohort(recipe, source, binaries)
+    for changed in (dict(recipe, sourceIdentity="c"*64), dict(recipe, binaries={"test.exe": "c"*64}),
+                    dict(recipe, extent=[640, 400])):
+        try:
+            check_reference_cohort(changed, source, binaries)
+            raise AssertionError("Mismatched feedback/reference cohort was accepted")
+        except ValueError:
+            pass
+    print(json.dumps(dict(ok=True, checks=27)))
 
 
 if __name__ == "__main__":

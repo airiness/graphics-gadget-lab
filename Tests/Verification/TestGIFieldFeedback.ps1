@@ -4,6 +4,8 @@ param(
     [string[]]$Configuration = @('Develop'),
     [string[]]$Rhi = @('dx12','vulkan'),
     [string[]]$CaseId = @('plane','sealed','sunroom','unsupported','coverage','black'),
+    [switch]$ProgressiveRefresh,
+    [switch]$ProgressiveSampling,
     [string]$ShaderCacheDirectory,
     [string]$ReferenceDirectory,
     [string]$OutputDirectory,
@@ -29,7 +31,14 @@ $cases = @(
 if ($Configuration.Count -ne 1 -or $Configuration[0] -notin @('Debug','Develop','Release') -or
     -not $Rhi.Count -or @($Rhi | Where-Object { $_ -notin @('dx12','vulkan') }).Count -or
     -not $CaseId.Count -or @($CaseId | Where-Object { $_ -notin $cases.id }).Count) { throw 'Invalid feedback configuration.' }
+if ($ProgressiveSampling -and -not $ProgressiveRefresh) {
+    throw 'Progressive sampling feedback study requires explicit progressive refresh.'
+}
 $cases = @($cases | Where-Object { $_.id -in $CaseId })
+foreach ($case in $cases) {
+    if ($ProgressiveRefresh) { $case.progressiveRefresh = $true }
+    if ($ProgressiveSampling) { $case.progressiveSampling = $true }
+}
 if (-not $OutputDirectory -and -not $RunDirectory) { $OutputDirectory = "$root/Build/Validation/GIFieldFeedback" }
 $output = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory `
     -RunId ([Guid]::NewGuid().ToString('N').Substring(0,8))
@@ -123,6 +132,7 @@ try {
                 Write-VerificationJson "$directory/case.json" $case
                 $off = Set-Inputs $session $run @{fixture=$case.fixture;environment=0;albedo=0;secondary_albedo=0;ev100=10;
                     field_enabled=$true;field_feedback=$false;field_sampling=$true;field_readiness=$true;
+                    field_progressive_refresh=[bool]$ProgressiveRefresh;field_progressive_sampling=[bool]$ProgressiveSampling;
                     receiver_diagnostics=$true;field_irradiance_width=0;probe_enabled=$true;accumulate=$true;
                     depth=1;seed=61051;field_refresh_noise=0.0;field_steady_noise=0.0}
                 Write-VerificationJson "$directory/off-effect.json" $off
@@ -196,7 +206,8 @@ try {
     Assert-VerificationIdentity $source (Source-Identity) 'Feedback sources changed during artifact/oracle validation.'
     Assert-VerificationIdentity $binaries (Get-VerificationBinaryIdentity $root $Configuration[0]) `
         'Feedback binaries changed during artifact/oracle validation.' -Depth 2
-    Write-VerificationJson "$output/result.json" @{ok=$true;directory=$output;wholeG3Qualified=$false}
+    Write-VerificationJson "$output/result.json" @{ok=$true;directory=$output;wholeG3Qualified=$false;
+        progressiveRefresh=[bool]$ProgressiveRefresh;progressiveSampling=[bool]$ProgressiveSampling}
 } catch {
     Write-VerificationJson "$output/result.json" @{ok=$false;directory=$output;error=$_.Exception.Message;wholeG3Qualified=$false}
     throw
