@@ -50,6 +50,13 @@ source/binary seals and native logs. Stop every session the run creates.
 For ad hoc captures and session controls, follow
 [gglab-frame-capture](../../.agents/skills/gglab-frame-capture/SKILL.md).
 
+`startup-readiness` repeats hidden GI Reference Lab startup, Ready, capture and
+normal exit on both RHIs. Each warm run uses only caches from its paired cold run;
+optional `TestStartupReadiness.ps1 -ShaderCacheDirectory` seeds shader artifacts
+and explicitly excludes shader-cold qualification. Failures after ownership is
+confirmed retain a thread/context minidump before shutdown; forced cleanup stays
+failed. `process-diagnostics` checks dump integrity and noninterference without a GPU.
+
 ### TAA comparison
 
 `taa-comparison` uses [Invoke-TaaComparison.ps1](../../Scripts/Verification/Invoke-TaaComparison.ps1)

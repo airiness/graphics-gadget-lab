@@ -28,6 +28,7 @@ $catalog = @(
         @{ path = 'Scripts/Verification/ValidateGIInputs.py'; arguments = @('--self-test') },
         @{ path = 'Scripts/Verification/ValidateGIInputs.py'; arguments = @() }) },
     @{ name = 'verification-support'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/TestVerificationSupport.ps1' }) },
+    @{ name = 'process-diagnostics'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/TestProcessDiagnostics.ps1' }) },
     @{ name = 'source-normalization'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/TestSourceNormalization.ps1' }) },
     @{ name = 'shader-project-ownership'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/TestShaderProjectOwnership.ps1' }) },
     @{ name = 'nonfinite-sites'; group = 'contracts'; steps = @(
@@ -99,6 +100,7 @@ $catalog = @(
     @{ name = 'session-parameters'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestSessionParameters.ps1' }) },
     @{ name = 'capture-jobs'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestCaptureJobs.ps1' }) },
     @{ name = 'session-lifecycle'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestSessionLifecycle.ps1' }) },
+    @{ name = 'startup-readiness'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestStartupReadiness.ps1' }) },
     @{ name = 'capture-on-ready'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestCaptureOnReady.ps1' }) },
     @{ name = 'pass-profile-identity'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestPassProfileIdentity.ps1' }) },
     @{ name = 'graph-allocation-facts'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGraphAllocationFacts.ps1' }) },
@@ -162,7 +164,7 @@ try {
                     if ($item.group -eq 'gpu') {
                         $leafDirectory = if ($item.steps.Count -gt 1) { "run-$($steps.Count + 1)" } else { 'run' }
                         $parameters = @{ RunDirectory = (Join-Path $directory $leafDirectory); Configuration = $config; Rhi = $Rhi }
-                        if ($item.name -in @('taa-comparison', 'session-lifecycle', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-probe-inspection', 'gi-receiver-inspection', 'gi-probe-visualization', 'gi-probe-depth', 'gi-probe-temporal', 'gi-probe-selection', 'gi-probe-change', 'gi-probe-picking', 'gi-probe-viewer', 'gi-field-readiness', 'gi-field-sampling', 'gi-field-baseline', 'gi-field-feedback', 'gi-field-light-step', 'gi-invalid-updates', 'gi-receiver-cache')) { $parameters.Python = $Python }
+                        if ($item.name -in @('taa-comparison', 'session-lifecycle', 'startup-readiness', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-probe-inspection', 'gi-receiver-inspection', 'gi-probe-visualization', 'gi-probe-depth', 'gi-probe-temporal', 'gi-probe-selection', 'gi-probe-change', 'gi-probe-picking', 'gi-probe-viewer', 'gi-field-readiness', 'gi-field-sampling', 'gi-field-baseline', 'gi-field-feedback', 'gi-field-light-step', 'gi-invalid-updates', 'gi-receiver-cache')) { $parameters.Python = $Python }
                     }
                     $execution = Invoke-VerificationScript $path $parameters
                     $text = $execution.output + $execution.error

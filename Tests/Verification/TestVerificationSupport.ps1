@@ -92,7 +92,7 @@ try {
             'exited-during-query', 'cleanup-failure')) {
             $Session = "startup-$scenario"
             $state = @{ scenario=$scenario;commands=@();queryHadHandle=$false;result=$null;exitCode=$null
-                process=[pscustomobject]@{ Id=4242;HasExited=$false;handleRetained=$false;killed=$false
+                process=[pscustomobject]@{ Id=4242;StartTime=[datetime]'2026-01-01';HasExited=$false;handleRetained=$false;killed=$false
                     cleanupFails=($scenario -eq 'cleanup-failure') }
                 status=[pscustomobject]@{ ok=$true;session=[pscustomobject]@{id=$Session;pid=4242}
                     environment=[pscustomobject]@{process=[pscustomobject]@{runIdentity=('a'*32)}} } }
@@ -124,6 +124,7 @@ try {
                 $saved = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
                 Check ($state.exitCode -eq 0 -and $state.result.ok -and -not $state.process.killed -and
                     $state.result.ownership -eq 'created' -and $state.result.pid -eq 4242 -and
+                    $saved.processStartedAtUtc -ceq $state.process.StartTime.ToUniversalTime().ToString('o') -and
                     $state.result.runIdentity -eq ('a'*32) -and $saved.runIdentity -eq ('a'*32)) `
                     'startup-matching-live-process-confirms-created-ownership'
             } else {
@@ -506,6 +507,7 @@ $pythonIdentity = if ($Python) { & $Python --version } else { '' }
         'session-parameters' = 'TestSessionParameters.ps1'
         'capture-jobs' = 'TestCaptureJobs.ps1'
         'session-lifecycle' = 'TestSessionLifecycle.ps1'
+        'startup-readiness' = 'TestStartupReadiness.ps1'
         'capture-on-ready' = 'TestCaptureOnReady.ps1'
         'pass-profile-identity' = 'TestPassProfileIdentity.ps1'
         'graph-allocation-facts' = 'TestGraphAllocationFacts.ps1'
@@ -515,7 +517,7 @@ $pythonIdentity = if ($Python) { & $Python --version } else { '' }
         'temporal-aa-counters' = 'TestTemporalAACounters.ps1'
     }
     $contractSuites = @(
-        'coastal-assets', 'gi-inputs', 'verification-support', 'source-normalization', 'shader-project-ownership',
+        'coastal-assets', 'gi-inputs', 'verification-support', 'process-diagnostics', 'source-normalization', 'shader-project-ownership',
         'nonfinite-sites', 'render-graph-schema',
         'resource-export-schema', 'nonfinite-coverage-schema', 'capture-comparison', 'taa-comparison-workflow',
         'capture-bundle-schema', 'gpu-timing-schema', 'parameter-frames-schema', 'gi-reference-contracts',
@@ -543,7 +545,7 @@ $pythonIdentity = if ($Python) { & $Python --version } else { '' }
     }
     Check (($gpuResult.suites | Where-Object name -eq 'taa-comparison').steps[0].receipt.python -eq
         $runnerPython) 'runner-forwards-selected-python-to-taa-workflow'
-    foreach ($suite in @('session-lifecycle', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-probe-inspection', 'gi-receiver-inspection', 'gi-probe-visualization', 'gi-probe-depth', 'gi-probe-temporal', 'gi-probe-selection', 'gi-probe-change', 'gi-probe-picking', 'gi-probe-viewer', 'gi-field-readiness', 'gi-field-sampling', 'gi-field-baseline', 'gi-field-feedback', 'gi-field-light-step', 'gi-invalid-updates', 'gi-receiver-cache')) {
+    foreach ($suite in @('session-lifecycle', 'startup-readiness', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-probe-inspection', 'gi-receiver-inspection', 'gi-probe-visualization', 'gi-probe-depth', 'gi-probe-temporal', 'gi-probe-selection', 'gi-probe-change', 'gi-probe-picking', 'gi-probe-viewer', 'gi-field-readiness', 'gi-field-sampling', 'gi-field-baseline', 'gi-field-feedback', 'gi-field-light-step', 'gi-invalid-updates', 'gi-receiver-cache')) {
         $suiteSteps = ($gpuResult.suites | Where-Object name -eq $suite).steps
         for ($index = 0; $index -lt $suiteSteps.Count; ++$index) {
             $leafResult = $suiteSteps[$index].receipt

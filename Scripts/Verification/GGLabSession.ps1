@@ -630,6 +630,7 @@ switch ($Command) {
         }
         $record = @{
             session = $Session; pid = $process.Id; rhi = $Rhi; arguments = $arguments
+            processStartedAtUtc = $process.StartTime.ToUniversalTime().ToString('o')
             startedAt = (Get-Date).ToString('o'); outputLog = $outputLog
             directory = $sessionDirectory; runIdentity = $runIdentity
             ownership = 'created'; lifetime = $SessionLifetime
