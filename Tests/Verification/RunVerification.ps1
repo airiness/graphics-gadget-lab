@@ -81,6 +81,8 @@ $catalog = @(
         @{ path = 'Tests/Verification/ValidateGIFieldLightStepReference.py'; arguments = @('--self-test') },
         @{ path = 'Tests/Verification/AnalyzeGIFieldTransient.py'; arguments = @('--self-test') },
         @{ path = 'Tests/Verification/CompareGIFieldTransient.py'; arguments = @('--self-test') }) },
+    @{ name = 'gi-field-camera-independence'; group = 'gpu'; configurations = @('Develop'); steps = @(@{ path = 'Tests/Verification/TestGIFieldCameraIndependence.ps1' }) },
+    @{ name = 'gi-field-camera-independence-contracts'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/ValidateGIFieldCameraIndependence.py'; arguments = @('--self-test') }) },
     @{ name = 'gi-invalid-updates'; group = 'gpu'; configurations = @('Debug', 'Develop'); steps = @(@{ path = 'Tests/Verification/TestGIInvalidUpdates.ps1' }) },
     @{ name = 'gi-probe-update'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIProbeUpdate.ps1' }) },
     @{ name = 'gi-specular-visibility'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGISpecularVisibility.ps1' }) },
@@ -165,7 +167,7 @@ try {
                     if ($item.group -eq 'gpu') {
                         $leafDirectory = if ($item.steps.Count -gt 1) { "run-$($steps.Count + 1)" } else { 'run' }
                         $parameters = @{ RunDirectory = (Join-Path $directory $leafDirectory); Configuration = $config; Rhi = $Rhi }
-                        if ($item.name -in @('taa-comparison', 'session-lifecycle', 'startup-readiness', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-probe-inspection', 'gi-receiver-inspection', 'gi-probe-visualization', 'gi-probe-depth', 'gi-probe-temporal', 'gi-probe-selection', 'gi-probe-change', 'gi-probe-picking', 'gi-probe-viewer', 'gi-field-readiness', 'gi-field-sampling', 'gi-field-baseline', 'gi-field-feedback', 'gi-field-light-step', 'gi-invalid-updates', 'gi-receiver-cache')) { $parameters.Python = $Python }
+                        if ($item.name -in @('taa-comparison', 'session-lifecycle', 'startup-readiness', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-probe-inspection', 'gi-receiver-inspection', 'gi-probe-visualization', 'gi-probe-depth', 'gi-probe-temporal', 'gi-probe-selection', 'gi-probe-change', 'gi-probe-picking', 'gi-probe-viewer', 'gi-field-readiness', 'gi-field-sampling', 'gi-field-baseline', 'gi-field-feedback', 'gi-field-light-step', 'gi-field-camera-independence', 'gi-invalid-updates', 'gi-receiver-cache')) { $parameters.Python = $Python }
                     }
                     $execution = Invoke-VerificationScript $path $parameters
                     $text = $execution.output + $execution.error

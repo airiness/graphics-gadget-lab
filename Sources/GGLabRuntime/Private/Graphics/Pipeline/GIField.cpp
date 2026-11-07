@@ -16,10 +16,12 @@
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
+#include <algorithm>
 #include <atomic>
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <format>
 #include <utility>
 
 namespace gglab
@@ -86,6 +88,98 @@ namespace gglab
 			uint32_t m_CameraPadding = 0;
 		};
 		static_assert(sizeof(LookupParameters) == 96 && offsetof(LookupParameters, m_Camera) == 80);
+		const RenderPassInfo ReceiverListPassInfo{ .m_TypeName = "GI.Field.ReceiverList",
+			.m_DisplayName = "Listed world-space receiver queries", .m_CategoryName = "Global Illumination",
+			.m_Category = RenderPassCategory::Debug, .m_Type = RenderPassType::Compute };
+		// Matches Passes/PassGIReceiverList.hlsl. Every array row is one float4; the
+		// fourth component of each sample row is unused padding.
+		struct ReceiverListParameters
+		{
+			GIFieldSamplingParameters m_Field;
+			uint32_t m_SampleCount = 0;
+			uint32_t m_ViewerCount = 0;
+			uint32_t m_Output = 0;
+			uint32_t m_Padding = 0;
+			std::array<std::array<float, 4>, GIReceiverListLimits::MaximumViewers> m_Viewers{};
+			std::array<std::array<float, 4>, GIReceiverListLimits::MaximumSamples> m_Positions{};
+			std::array<std::array<float, 4>, GIReceiverListLimits::MaximumSamples> m_ShadingNormals{};
+			std::array<std::array<float, 4>, GIReceiverListLimits::MaximumSamples> m_VertexNormals{};
+		};
+		static_assert(sizeof(ReceiverListParameters) == 3200 &&
+			offsetof(ReceiverListParameters, m_SampleCount) == 48 &&
+			offsetof(ReceiverListParameters, m_Viewers) == 64 &&
+			offsetof(ReceiverListParameters, m_Positions) == 128 &&
+			offsetof(ReceiverListParameters, m_ShadingNormals) == 1152 &&
+			offsetof(ReceiverListParameters, m_VertexNormals) == 2176);
+		// Rows 0-2 hold the sample inputs; each viewer adds its position, irradiance
+		// and query rows. The width is the sample count.
+		constexpr uint32_t GIReceiverListInputRows = 3;
+		constexpr uint32_t GIReceiverListViewerRows = 3;
+
+		bool ValidUnitVector(const std::array<float, 3>& value) noexcept
+		{
+			const double length = std::sqrt(double(value[0]) * value[0] + double(value[1]) * value[1] +
+				double(value[2]) * value[2]);
+			return std::isfinite(length) && std::abs(length - 1.0) <= 1e-3;
+		}
+
+		bool ValidReceiverList(const GIReceiverListQuery& list) noexcept
+		{
+			if (list.m_Samples.empty() || list.m_Samples.size() > GIReceiverListLimits::MaximumSamples ||
+				list.m_Viewers.empty() || list.m_Viewers.size() > GIReceiverListLimits::MaximumViewers)
+			{
+				return false;
+			}
+			for (const auto& viewer : list.m_Viewers)
+			{
+				if (!std::ranges::all_of(viewer, [](float value) { return std::isfinite(value); }))
+				{
+					return false;
+				}
+			}
+			for (const auto& sample : list.m_Samples)
+			{
+				if (!std::ranges::all_of(sample.m_Position, [](float value) { return std::isfinite(value); }) ||
+					!ValidUnitVector(sample.m_ShadingNormal) || !ValidUnitVector(sample.m_VertexNormal))
+				{
+					return false;
+				}
+				for (const auto& viewer : list.m_Viewers)
+				{
+					// A viewer at the receiver has no view direction to bias along.
+					const double dx = double(viewer[0]) - sample.m_Position[0];
+					const double dy = double(viewer[1]) - sample.m_Position[1];
+					const double dz = double(viewer[2]) - sample.m_Position[2];
+					if (dx * dx + dy * dy + dz * dz < 1e-6)
+					{
+						return false;
+					}
+				}
+			}
+			return true;
+		}
+
+		ReceiverListParameters MakeReceiverListParameters(const GIReceiverListQuery& list) noexcept
+		{
+			ReceiverListParameters result;
+			result.m_SampleCount = static_cast<uint32_t>(list.m_Samples.size());
+			result.m_ViewerCount = static_cast<uint32_t>(list.m_Viewers.size());
+			for (size_t index = 0; index < list.m_Viewers.size(); ++index)
+			{
+				const auto& viewer = list.m_Viewers[index];
+				result.m_Viewers[index] = { viewer[0], viewer[1], viewer[2], 0 };
+			}
+			for (size_t index = 0; index < list.m_Samples.size(); ++index)
+			{
+				const auto& sample = list.m_Samples[index];
+				result.m_Positions[index] = { sample.m_Position[0], sample.m_Position[1], sample.m_Position[2], 0 };
+				result.m_ShadingNormals[index] = {
+					sample.m_ShadingNormal[0], sample.m_ShadingNormal[1], sample.m_ShadingNormal[2], 0 };
+				result.m_VertexNormals[index] = {
+					sample.m_VertexNormal[0], sample.m_VertexNormal[1], sample.m_VertexNormal[2], 0 };
+			}
+			return result;
+		}
 
 		bool ValidProfileIdentity(const GIFieldProfileIdentity& identity) noexcept
 		{
@@ -143,7 +237,7 @@ namespace gglab
 			result.m_Seed = info.m_Seed;
 			result.m_MaximumDistance = info.m_MaximumDistance;
 			result.m_Hysteresis = info.m_Hysteresis;
-			result.m_MaximumUpdates = 0;
+			result.m_MaximumUpdates = info.m_UpdateLimit;
 			result.m_ConstantEnvironment = info.m_ConstantEnvironment;
 			result.m_ConstantRadiance = info.m_ConstantRadiance;
 			return result;
@@ -159,7 +253,8 @@ namespace gglab
 			!std::isfinite(3 * info.m_Readiness.m_NoiseSigma) ||
 			!std::isfinite(3 * info.m_Readiness.m_SteadyNoiseSigma) || info.m_Readiness.m_SteadyNoiseSigma < 0 ||
 			!std::isfinite(info.m_Readiness.m_RefreshHysteresis) ||
-			info.m_Readiness.m_RefreshHysteresis < 0 || info.m_Readiness.m_RefreshHysteresis >= 1)
+			info.m_Readiness.m_RefreshHysteresis < 0 || info.m_Readiness.m_RefreshHysteresis >= 1 ||
+			(info.m_ReceiverList && !ValidReceiverList(*info.m_ReceiverList)))
 		{
 			return false;
 		}
@@ -205,10 +300,25 @@ namespace gglab
 		ResolvedRenderPipeline m_ReceiverInspectionPipeline;
 		GraphicsPipelineSlot m_ReceiverMarkerSlot;
 		ResolvedRenderPipeline m_ReceiverMarkerPipeline;
+		ComputePipelineSlot m_ReceiverListSlot;
+		ResolvedRenderPipeline m_ReceiverListPipeline;
+		ReceiverListParameters m_ReceiverListParameters;
 		State(GIFieldCreateInfo info) noexcept :
 			m_Info(std::move(info)), m_Profile(std::make_shared<GIFieldProfileReceipt>(ProfileReceipt(m_Info))),
 			m_Workload(m_Info.m_RayScene, UpdateProfile(m_Info), true,
-				m_Info.m_Readiness, m_Info.m_EnableFeedback, m_Info.m_ProgressiveSampling) {}
+				m_Info.m_Readiness, m_Info.m_EnableFeedback, m_Info.m_ProgressiveSampling)
+		{
+			if (m_Info.m_ReceiverList && ValidReceiverList(*m_Info.m_ReceiverList))
+			{
+				m_ReceiverListParameters = MakeReceiverListParameters(*m_Info.m_ReceiverList);
+			}
+		}
+
+		[[nodiscard]] bool IsUpdateHeld() const noexcept
+		{
+			return m_Info.m_UpdateLimit != 0 &&
+				m_Workload.GetDiagnostics().m_SubmittedUpdates >= m_Info.m_UpdateLimit;
+		}
 	};
 
 	GIField::GIField(GIFieldCreateInfo info) noexcept :
@@ -222,6 +332,7 @@ namespace gglab
 		summary->m_Minimum = m_State->m_Info.m_Volume.m_Minimum;
 		summary->m_Spacing = m_State->m_Info.m_Volume.m_Spacing;
 		summary->m_IrradianceInteriorWidth = m_State->m_Info.m_IrradianceInteriorWidth;
+		summary->m_UpdateLimit = m_State->m_Info.m_UpdateLimit;
 		summary->m_Readiness = m_State->m_Workload.GetReadiness();
 		m_State->m_Summary = std::move(summary);
 	}
@@ -296,6 +407,8 @@ namespace gglab
 				summary->m_Spacing = state.m_Info.m_Volume.m_Spacing;
 				summary->m_IrradianceInteriorWidth = state.m_Info.m_IrradianceInteriorWidth;
 				summary->m_SubmittedUpdates = diagnostics.m_SubmittedUpdates;
+				summary->m_UpdateLimit = state.m_Info.m_UpdateLimit;
+				summary->m_UpdateHeld = state.IsUpdateHeld();
 				summary->m_Readiness = state.m_Workload.GetReadiness();
 				summary->m_Invalid = diagnostics.m_Failed || state.m_Update->IsInvalid();
 				auto change = state.m_Workload.GetChangeObservation();
@@ -326,7 +439,8 @@ namespace gglab
 				}
 				if (summary->m_Visualization.m_Available)
 				{
-					const uint64_t update = summary->m_SubmittedUpdates + (summary->m_Invalid ? 0 : 1);
+					const uint64_t update = summary->m_SubmittedUpdates +
+						(summary->m_Invalid || summary->m_UpdateHeld ? 0 : 1);
 					summary->m_Visualization.m_Observation = GIObservationStamp{
 						.m_Field = summary->m_Field, .m_Kind = GIObservationKind::ProbeVisualization,
 						.m_ProducingFrame = m_FrameSerial, .m_FieldUpdate = update,
@@ -392,12 +506,17 @@ namespace gglab
 		{
 			return result;
 		}
-		if (state.m_Info.m_EnableReceiverSampling && state.m_Workload.GetDiagnostics().m_Failed)
+		const auto diagnostics = state.m_Workload.GetDiagnostics();
+		if (state.m_Info.m_EnableReceiverSampling && diagnostics.m_Failed)
 		{
 			// Update-only inspection retains raw error evidence. Production shading
 			// cannot resume from a numerically invalid in-place field generation.
 			return RenderFrameValidationResult::ContractFailure(
-				"GI field numerical failure; replace the field through the safe pipeline path");
+				"GI field numerical failure; replace the field through the safe pipeline path",
+				std::format("{}; generation={}, error={}, probe={}, update={}, element={}",
+					diagnostics.m_Reason, state.m_Generation, uint32_t(diagnostics.m_UpdateStatus.m_Error),
+					diagnostics.m_UpdateStatus.m_Probe, diagnostics.m_UpdateStatus.m_Update,
+					diagnostics.m_UpdateStatus.m_Element));
 		}
 		if (!state.m_LookupLayout.IsValid())
 		{
@@ -444,9 +563,22 @@ namespace gglab
 		markers.m_DepthPreset = DepthPreset::DepthDisabled;
 		state.m_ReceiverMarkerPipeline = state.m_LookupLayout.Resolve(*services.m_PipelineResolver,
 			state.m_ReceiverMarkerSlot, markers, ReceiverMarkersPassInfo);
+		if (state.m_Info.m_ReceiverList)
+		{
+			state.m_ReceiverListPipeline = state.m_LookupLayout.Resolve(*services.m_PipelineResolver,
+				state.m_ReceiverListSlot, ComputePipelineRecipe{
+					.m_BindingLayout = state.m_LookupLayout.GetNativeLayout(),
+					.m_CSId = services.m_ShaderPrograms->LoadProgram(shader_programs::GIReceiverListCompute) },
+				ReceiverListPassInfo);
+		}
 		if (!state.m_LookupPipeline.IsValid())
 		{
 			return RenderFrameValidationResult::ContractFailure("Field lookup pipeline unavailable");
+		}
+		if (state.m_Info.m_ReceiverList && !state.m_ReceiverListPipeline.IsValid())
+		{
+			// A declared receiver list is measurement evidence; never omit it silently.
+			return RenderFrameValidationResult::ContractFailure("Field receiver-list pipeline unavailable");
 		}
 		const auto revision = state.m_Info.m_RayScene->GetDiagnostics().m_Revision;
 		const auto lighting = frame.m_RenderScene.m_WorldLightingGeneration;
@@ -558,6 +690,55 @@ namespace gglab
 				}
 			});
 		GGLAB_UNUSED(services);
+	}
+
+	void GIField::AddReceiverListQuery(RenderGraph& graph, const RenderFrameContext& frame) noexcept
+	{
+		auto& state = *m_State;
+		const auto* field = graph.GetBlackboard().TryGet<RGGIFieldResources>();
+		if (!field || !state.m_UpdatePrepared || !state.m_Info.m_ReceiverList ||
+			!state.m_ReceiverListPipeline.IsValid())
+		{
+			return;
+		}
+		const uint32_t samples = state.m_ReceiverListParameters.m_SampleCount;
+		const uint32_t viewers = state.m_ReceiverListParameters.m_ViewerCount;
+		struct PassData
+		{
+			GIFieldSamplingViews m_Field;
+			RGTextureViewId m_Output;
+		};
+		graph.AddPass<PassData>(ReceiverListPassInfo.m_TypeName.c_str(), RGPassEncoderType::Compute,
+			[=](RenderGraph::RGBuilder& builder, PassData& data)
+			{
+				data.m_Field.Declare(builder, *field, RHIStage::ComputeShader);
+				auto output = builder.CreateTexture("GI.Field.ReceiverList", {
+					.m_Format = RHIFormat::R32G32B32A32Float,
+					.m_Extent = { samples, GIReceiverListInputRows + GIReceiverListViewerRows * viewers, 1 } });
+				builder.WriteInPlace(output, RGTextureAccess::StorageWrite, RHIStage::ComputeShader);
+				data.m_Output = builder.CreateView<RHITextureViewType::UnorderedAccess>(output);
+				// A graph-owned diagnostic target, not a persistent external resource.
+				builder.SideEffect();
+			},
+			[this, &frame](RGExecuteContext& execute, PassData& data)
+			{
+				auto& state = *m_State;
+				auto* commands = execute.GetDirectComputeCommandContext();
+				ScopedConstantBindings<RHIComputeCommandContext> constants(*commands,
+					state.m_LookupLayout, state.m_LookupScene);
+				if (!constants.SetPipeline(state.m_ReceiverListPipeline) ||
+					!constants.Bind(state.m_LookupScene, frame.m_FrameConstants.m_SceneSnapshot))
+				{
+					return;
+				}
+				auto parameters = state.m_ReceiverListParameters;
+				parameters.m_Field = data.m_Field.Resolve(execute);
+				parameters.m_Output = execute.GetViewDescriptor(data.m_Output).m_Index;
+				if (commands->SetConstantBufferData(static_cast<uint32_t>(CommonRSRootParamIndex::PassCB), parameters))
+				{
+					commands->Dispatch((parameters.m_SampleCount + 63) / 64, parameters.m_ViewerCount, 1);
+				}
+			});
 	}
 
 	void GIField::SetProbeInspection(std::optional<GIProbeInspectionRequest> request) noexcept
@@ -737,7 +918,7 @@ namespace gglab
 			return;
 		}
 		const auto& summary = *m_State->m_Summary;
-		const uint64_t update = summary.m_SubmittedUpdates + (summary.m_Invalid ? 0 : 1);
+		const uint64_t update = summary.m_SubmittedUpdates + (summary.m_Invalid || summary.m_UpdateHeld ? 0 : 1);
 		m_State->m_Visualization.AddPasses(graph, frame, {
 			.m_Field = summary.m_Field, .m_Kind = GIObservationKind::ProbeVisualization,
 			.m_ProducingFrame = frame.m_FrameSerial, .m_FieldUpdate = update,

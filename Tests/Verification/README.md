@@ -80,6 +80,7 @@ fixtures, resource meanings and reference qualification. Select the relevant sui
 | `gi-field-baseline` | Feedback-off D=1 reference accuracy and 120 consecutive Ready-plus-120 observations |
 | `gi-field-feedback` | Previous-field transport, safe toggles, support accounting and age-one consumption |
 | `gi-field-light-step` | Published-lighting response; see below |
+| `gi-field-camera-independence` | F6 held pose-specific fields, per-view lookups and the frozen receiver list; see below |
 | `gi-invalid-updates` | Numerical failure and production-consumer rejection |
 | `gi-probe-inspection`, `gi-receiver-inspection` | Bounded numeric observations and receiver contributions |
 | `gi-probe-selection` | Generation-bound highlights and budget isolation |
@@ -114,6 +115,35 @@ remain separate; neither admits combined-policy Final or attribution.
 Baseline, feedback and lighting-step runners accept `-ShaderCacheDirectory` with
 matching `<root>/<rhi>/ShaderCache` and `ShaderArtifacts` seeds. They copy artifacts
 into isolated state and preserve normal identity validation.
+
+### F6 camera independence
+
+[TestGIFieldCameraIndependence.ps1](TestGIFieldCameraIndependence.ps1) runs Develop
+F6 on frozen F4 with feedback, progressive sampling and progressive refresh off.
+For each `-Readiness` arm (default `off,on`), one field per pose restarts from
+identical inputs. The diagnostic `field_update_limit` (default 3072) holds it, so
+every later frame samples the last update. The pose takes effect at a recorded
+early update. At the held update, both poses export their raster lookup group and
+`GI.Field.ReceiverList`. This compute query evaluates the frozen 9x7 floor lattice
+from both pose positions on one field state, so only the view direction differs.
+`-RefreshNoise`/`-SteadyNoise` pass calibrated readiness inputs; zero is the
+uncalibrated minimum.
+
+[ValidateGIFieldCameraIndependence.py](ValidateGIFieldCameraIndependence.py)
+requires the following contracts:
+
+- The hold at the declared update.
+- One field generation across the camera switch.
+- Each view, raster and listed, against the FP64 lookup oracle (2e-3 scaled E).
+- Each listed sample's cross-view difference against the oracle-predicted
+  view-bias difference.
+- Visibility from primary identities.
+- Each pose's D=1 reference confirming the analytic floor oracle within 1%.
+
+It reports, without gating, world-field atlas and query differences between the
+pose-specific runs, along with energy and chromaticity against the shared analytic
+reference (lattice) and each pose's matched D=1 reference (raster). Per-quantity
+tolerances belong to the acceptance plan. Passing does not qualify F6.
 
 ### Integration numerical inspection
 

@@ -637,6 +637,7 @@ namespace gglab
 		if (m_GIField)
 		{
 			m_GIField->AddProbeInspection(rg, context);
+			m_GIField->AddReceiverListQuery(rg, context);
 			m_GIField->ExportResources(rg);
 		}
 

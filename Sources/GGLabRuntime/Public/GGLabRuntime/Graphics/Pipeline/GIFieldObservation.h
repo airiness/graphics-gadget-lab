@@ -265,6 +265,10 @@ namespace gglab
 		float m_Spacing = 0;
 		uint32_t m_IrradianceInteriorWidth = 0;
 		uint64_t m_SubmittedUpdates = 0;
+		// Diagnostic hold, zero when unlimited. A held frame records no update: its
+		// consumers observe update m_SubmittedUpdates instead of the next one.
+		uint32_t m_UpdateLimit = 0;
+		bool m_UpdateHeld = false;
 		GIFieldReadinessSnapshot m_Readiness;
 		std::optional<GIObservationStamp> m_CompletedMeasurement;
 		bool m_Initialized = false;
@@ -275,6 +279,13 @@ namespace gglab
 		GIReceiverViewSnapshot m_ReceiverView;
 		GIProbeVisualizationSnapshot m_Visualization;
 	};
+
+	// One-based update whose contents this frame's GPU consumers observe: the update
+	// the frame records, or the last recorded one while updates are held or invalid.
+	[[nodiscard]] inline uint64_t GetGIFieldFrameUpdate(const GIFieldSummary& summary) noexcept
+	{
+		return summary.m_SubmittedUpdates + (summary.m_UpdateHeld || summary.m_Invalid ? 0 : 1);
+	}
 
 	[[nodiscard]] inline bool MatchesGIProbeSelection(const GIProbeSelection& selection,
 		uint64_t generation, const std::array<uint32_t, 3>& counts) noexcept

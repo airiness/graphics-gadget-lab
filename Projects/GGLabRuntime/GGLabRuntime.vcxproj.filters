@@ -2677,6 +2677,9 @@
     <FxCompile Include="..\..\Shaders\Passes\PassGIReceiverInspection.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>
+    <FxCompile Include="..\..\Shaders\Passes\PassGIReceiverList.hlsl">
+      <Filter>Shaders\Passes</Filter>
+    </FxCompile>
     <FxCompile Include="..\..\Shaders\Passes\PassGIReceiverMarkers.hlsl">
       <Filter>Shaders\Passes</Filter>
     </FxCompile>

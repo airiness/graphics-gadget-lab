@@ -58,6 +58,7 @@ namespace gglab
 		const LabParameterId FieldProgressiveSamplingId("gi_reference.field_progressive_sampling");
 		const LabParameterId FieldRefreshNoiseId("gi_reference.field_refresh_noise");
 		const LabParameterId FieldSteadyNoiseId("gi_reference.field_steady_noise");
+		const LabParameterId FieldUpdateLimitId("gi_reference.field_update_limit");
 		const LabParameterId ProbeEnabledId("gi_reference.probe_enabled");
 		const LabParameterId ProbeRaysId("gi_reference.probe_rays");
 		const LabParameterId ProbeDivisorId("gi_reference.probe_divisor");
@@ -97,6 +98,13 @@ namespace gglab
 		constexpr uint32_t CostPathFrameCount = 360;
 		constexpr float ProbeTranslationStep = 0.1f;
 		constexpr uint32_t MaximumProbeTranslationStep = 2;
+		// Frozen F6 fixture inputs: two poses framing one floor patch, and its 9x7
+		// receiver lattice ordered by Z, then X.
+		constexpr Vector3 F6PoseWestPosition{ -0.5f, 1.6f, 1.4f };
+		constexpr Vector3 F6PoseEastPosition{ 0.5f, 1.6f, 1.4f };
+		constexpr Vector3 F6PoseTarget{ 0, 0.4f, -0.7f };
+		constexpr uint32_t F6LatticeColumns = 9;
+		constexpr uint32_t F6LatticeRows = 7;
 		struct FixtureTexture
 		{
 			const char* m_File;
@@ -211,6 +219,26 @@ namespace gglab
 			return { .m_Id = id, .m_Name = id, .m_Purpose = "Frozen GI fixture receiver measurement",
 				.m_Position = position, .m_Target = target, .m_VerticalFovDegrees = fov,
 				.m_FarPlane = 100.0f, .m_ManualEV100 = exposure };
+		}
+
+		// Queried from both F6 poses on one field state, so only the view direction differs.
+		GIReceiverListQuery MakeF6ReceiverList() noexcept
+		{
+			GIReceiverListQuery list;
+			for (uint32_t row = 0; row < F6LatticeRows; ++row)
+			{
+				for (uint32_t column = 0; column < F6LatticeColumns; ++column)
+				{
+					list.m_Samples.push_back({
+						.m_Position = { float(-0.4 + 0.1 * column), 0.0f, float(-1.1 + 0.1 * row) },
+						.m_ShadingNormal = { 0, 1, 0 }, .m_VertexNormal = { 0, 1, 0 } });
+				}
+			}
+			for (const auto& pose : { F6PoseWestPosition, F6PoseEastPosition })
+			{
+				list.m_Viewers.push_back({ pose.m_X, pose.m_Y, pose.m_Z });
+			}
+			return list;
 		}
 	}
 
@@ -375,6 +403,10 @@ namespace gglab
 				.m_Type = LabParameterType::Float, .m_Impact = LabChangeImpact::RestartSession,
 				.m_DefaultValue = 0.0f, .m_MinValue = LabValue(0.0f), .m_MaxValue = LabValue(1000000.0f) }));
 		}
+		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldUpdateLimitId, .m_Name = "Hold after full updates (0 unlimited)",
+			.m_Group = "GI field", .m_Type = LabParameterType::UInt,
+			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = uint32_t(0),
+			.m_MinValue = LabValue(uint32_t(0)), .m_MaxValue = LabValue(GIProbeUpdateLimits::MaximumUpdateCount) }));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldReadinessId, .m_Name = "Observe field readiness and refresh",
 			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
 			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = true }));
@@ -685,8 +717,8 @@ namespace gglab
 					View("F4_East", { 0, 1.6f, 0 }, { 2, 2, 0 }, 90, exposure),
 					// F6 reuses this construction. Both poses frame one floor patch; the
 					// sunlit right jamb lies outside both, each coloured wall outside one.
-					View("F6_PoseWest", { -0.5f, 1.6f, 1.4f }, { 0, 0.4f, -0.7f }, 45, exposure),
-					View("F6_PoseEast", { 0.5f, 1.6f, 1.4f }, { 0, 0.4f, -0.7f }, 45, exposure),
+					View("F6_PoseWest", F6PoseWestPosition, F6PoseTarget, 45, exposure),
+					View("F6_PoseEast", F6PoseEastPosition, F6PoseTarget, 45, exposure),
 				};
 			}
 			else
@@ -1055,6 +1087,7 @@ namespace gglab
 				info.m_Readiness.m_SteadyNoiseSigma = GetParameters().Get(FieldSteadyNoiseId, 0.0f);
 				info.m_RaysPerProbe = GetParameters().Get(ProbeRaysId, uint32_t(256));
 				info.m_Seed = GetParameters().Get(SeedId, GIObservationLimits::DefaultSeed);
+				info.m_UpdateLimit = GetParameters().Get(FieldUpdateLimitId, uint32_t(0));
 				if (IsCoastalGIFixture(fixture))
 				{
 					info.m_Volume = CoastalSceneGIFieldVolume;
@@ -1106,6 +1139,10 @@ namespace gglab
 						// The narrow sunlit jamb needs a longer static integration window.
 						info.m_Hysteresis = 0.998f;
 						info.m_ViewBias = 0.15f;
+						if (GetParameters().Get(ReceiverDiagnosticsId, true))
+						{
+							info.m_ReceiverList = MakeF6ReceiverList();
+						}
 					}
 					else
 					{

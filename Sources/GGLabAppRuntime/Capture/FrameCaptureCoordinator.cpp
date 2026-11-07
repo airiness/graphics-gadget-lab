@@ -1532,7 +1532,7 @@ namespace gglab
 		{
 			const auto& summary = *state.m_Readiness.m_GIField->m_Summary;
 			metadata.m_GIProbeInspectionRequest = plan.m_GIProbeInspection;
-			const uint64_t update = summary.m_SubmittedUpdates + 1;
+			const uint64_t update = GetGIFieldFrameUpdate(summary);
 			metadata.m_GIProbeObservation = GIObservationStamp{ .m_Field = summary.m_Field,
 				.m_Kind = GIObservationKind::ProbeAtlas, .m_ProducingFrame = state.m_FrameSerial,
 				.m_FieldUpdate = update, .m_ReadinessUpdate = update - summary.m_Field.m_EpochOriginUpdate };
@@ -1546,7 +1546,7 @@ namespace gglab
 		if (plan.m_GIProbePicking)
 		{
 			const auto& summary = *state.m_Readiness.m_GIField->m_Summary;
-			const uint64_t update = summary.m_SubmittedUpdates + 1;
+			const uint64_t update = GetGIFieldFrameUpdate(summary);
 			metadata.m_GIProbePickingRequest = plan.m_GIProbePicking;
 			metadata.m_GIProbePickingObservation = GIObservationStamp{ .m_Field = summary.m_Field,
 				.m_Kind = GIObservationKind::ProbePicking, .m_ProducingFrame = state.m_FrameSerial,
@@ -1558,7 +1558,7 @@ namespace gglab
 		if (plan.m_GIReceiverInspection)
 		{
 			const auto& summary = *state.m_Readiness.m_GIField->m_Summary;
-			const uint64_t update = summary.m_SubmittedUpdates + 1;
+			const uint64_t update = GetGIFieldFrameUpdate(summary);
 			metadata.m_GIReceiverInspectionRequest = plan.m_GIReceiverInspection;
 			metadata.m_GIReceiverObservation = GIObservationStamp{ .m_Field = summary.m_Field,
 				.m_Kind = GIObservationKind::ReceiverContribution, .m_ProducingFrame = state.m_FrameSerial,

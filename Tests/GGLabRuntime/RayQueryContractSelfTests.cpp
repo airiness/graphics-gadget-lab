@@ -1077,6 +1077,52 @@ namespace gglab
 				context.Check(!ValidateGIFieldCreateInfo(biased),
 					"Nonfinite or unbounded viewer offsets reject before allocation");
 			}
+			{
+				auto held = info;
+				held.m_UpdateLimit = GIProbeUpdateLimits::MaximumUpdateCount;
+				context.Check(ValidateGIFieldCreateInfo(held), "A diagnostic hold may name any bounded update");
+				held.m_UpdateLimit = GIProbeUpdateLimits::MaximumUpdateCount + 1;
+				context.Check(!ValidateGIFieldCreateInfo(held), "A diagnostic hold beyond the update range rejects");
+				GIReceiverListQuery list;
+				list.m_Samples.push_back({ .m_Position = { 0, 0, 0 },
+					.m_ShadingNormal = { 0, 1, 0 }, .m_VertexNormal = { 0, 1, 0 } });
+				list.m_Viewers = { { 0, 1, 1 }, { 1, 1, 1 } };
+				auto listed = info;
+				listed.m_ReceiverList = list;
+				context.Check(ValidateGIFieldCreateInfo(listed), "A bounded receiver list with distinct viewers is valid");
+				const auto rejects = [&](auto change, const char* message)
+					{
+						auto invalidList = list;
+						change(invalidList);
+						auto descriptor = info;
+						descriptor.m_ReceiverList = std::move(invalidList);
+						context.Check(!ValidateGIFieldCreateInfo(descriptor), message);
+					};
+				rejects([](GIReceiverListQuery& value) { value.m_Samples.clear(); },
+					"A receiver list needs at least one sample");
+				rejects([](GIReceiverListQuery& value) { value.m_Viewers.clear(); },
+					"A receiver list needs at least one viewer");
+				rejects([](GIReceiverListQuery& value)
+					{
+						value.m_Samples.resize(GIReceiverListLimits::MaximumSamples + 1, value.m_Samples.front());
+					}, "A receiver list cannot exceed its constant-buffer sample capacity");
+				rejects([](GIReceiverListQuery& value)
+					{
+						value.m_Viewers.resize(GIReceiverListLimits::MaximumViewers + 1, { 0, 2, 2 });
+					}, "A receiver list cannot exceed its viewer capacity");
+				rejects([](GIReceiverListQuery& value) { value.m_Samples[0].m_ShadingNormal = { 0, 2, 0 }; },
+					"Receiver shading normals must be unit length");
+				rejects([](GIReceiverListQuery& value)
+					{
+						value.m_Samples[0].m_VertexNormal = { 0, std::numeric_limits<float>::quiet_NaN(), 0 };
+					}, "Receiver vertex normals must be finite unit vectors");
+				rejects([](GIReceiverListQuery& value)
+					{
+						value.m_Samples[0].m_Position[0] = std::numeric_limits<float>::infinity();
+					}, "Receiver positions must be finite");
+				rejects([](GIReceiverListQuery& value) { value.m_Viewers[1] = { 0, 0, 0 }; },
+					"A viewer at a receiver has no view direction");
+			}
 			for (uint32_t count : { 0u, 1u, 129u })
 			{
 				auto invalid = info;

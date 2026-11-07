@@ -1907,8 +1907,8 @@ namespace gglab
 			"Coordinate conformance selection contributes seven stable shader demands");
 		checkSelectedDemand("gglab.lab.ray_query", 54,
 			"Ray-query selection contributes query, preview and pipeline-identity artifacts without changing raster startup demand");
-		checkSelectedDemand("gglab.lab.gi_reference", 72,
-			"GI diagnostics include probe picking and integration inspection alongside receiver/reference shaders");
+		checkSelectedDemand("gglab.lab.gi_reference", 73,
+			"GI diagnostics include probe picking, integration inspection and the receiver list alongside receiver/reference shaders");
 		for (const auto& lab : desktop.m_Labs)
 		{
 			if (lab.m_Descriptor.m_Id == LabId("gglab.lab.gi_reference"))
@@ -1923,6 +1923,9 @@ namespace gglab
 				context.Check(std::ranges::find(lab.m_ShaderPrograms,
 					shader_programs::GIProbeIntegrationInspectionCompute) != lab.m_ShaderPrograms.end(),
 					"GI diagnostics explicitly demand the opt-in integration-inspection compute program");
+				context.Check(std::ranges::find(lab.m_ShaderPrograms, shader_programs::GIReceiverListCompute) !=
+					lab.m_ShaderPrograms.end(),
+					"GI diagnostics explicitly demand the world-space receiver-list compute program");
 			}
 		}
 		checkSelectedDemand("gglab.lab.coastal_ray_scene", 55,

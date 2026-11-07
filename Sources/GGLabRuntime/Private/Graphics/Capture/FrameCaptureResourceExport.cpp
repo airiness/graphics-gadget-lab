@@ -138,6 +138,11 @@ namespace gglab
 				return ResourceExportSemantics{ .m_Role = "gi-field-query", .m_Units = "weight / coverage / support enum",
 					.m_Space = "opaque raster receiver", .m_Description = "RGBA: raw cage weight sum, smooth volume-face coverage, support (1 Valid, 2 LowConfidence, 3 NoValidSupport, 4 OutsideCoverage), compatible opaque marker. Marker -1 with support 0 is a field contract failure, not a support state. Confidence never scales irradiance. Background is all zero; static full updates have no aged contributing probes." };
 			}
+			if (name == "GI.Field.ReceiverList")
+			{
+				return ResourceExportSemantics{ .m_Role = "gi-field-query", .m_Units = "metres / unit normal / scene-referred RGB irradiance / query enums",
+					.m_Space = "listed world-space receivers", .m_Description = "One column per listed sample. Rows 0-2: world position (A 1), shading normal and vertex normal used by the query. Then three rows per viewer v: viewer position (A v); normalized field E=pi*M RGB with compatible marker A (1, or -1 invalid field); raw cage weight sum, smooth coverage, support (1 Valid, 2 LowConfidence, 3 NoValidSupport, 4 OutsideCoverage) and the marker. Each viewer applies the raster lookup's view bias from its own position; nothing else differs between viewers." };
+			}
 			if (name == "GI.ProbeUpdate.State" || name == "GI.Field.State")
 			{
 				return ResourceExportSemantics{ .m_Role = name.starts_with("GI.Field.") ? "gi-field" : "gi-probe-update", .m_Units = "scene-linear radiance / metres / fractions as described",

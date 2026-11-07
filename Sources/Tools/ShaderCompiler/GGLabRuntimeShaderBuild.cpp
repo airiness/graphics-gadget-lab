@@ -182,6 +182,7 @@ namespace gglab
 			ShaderProgramBuildRecord{ &GIFieldLookupCompute, L"Passes/PassGIFieldLookup.hlsl", L"CSMain" },
 			ShaderProgramBuildRecord{ &GIProbeInspectionCompute, L"Passes/PassGIProbeInspection.hlsl", L"CSMain" },
 			ShaderProgramBuildRecord{ &GIReceiverInspectionCompute, L"Passes/PassGIReceiverInspection.hlsl", L"CSMain" },
+			ShaderProgramBuildRecord{ &GIReceiverListCompute, L"Passes/PassGIReceiverList.hlsl", L"CSMain" },
 			ShaderProgramBuildRecord{ &GIReceiverMarkersVertex, L"Passes/PassGIReceiverMarkers.hlsl", L"VSMain" },
 			ShaderProgramBuildRecord{ &GIReceiverMarkersPixel, L"Passes/PassGIReceiverMarkers.hlsl", L"PSMain" },
 			ShaderProgramBuildRecord{ &GIProbeVisualizationCompute, L"Passes/PassGIProbeVisualization.hlsl", L"CSMain" },

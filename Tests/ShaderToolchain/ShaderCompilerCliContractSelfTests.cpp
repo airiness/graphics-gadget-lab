@@ -1411,7 +1411,7 @@ namespace gglab
 			const std::filesystem::path& sourceRoot,
 			const std::filesystem::path& tempRoot) noexcept
 		{
-			constexpr size_t ExpectedRuntimeProgramCount = 181;
+			constexpr size_t ExpectedRuntimeProgramCount = 183;
 			const std::string expectedProgramCountField = std::format("\"programCount\":{}", ExpectedRuntimeProgramCount);
 			const CliRunResult missingRequiredOption = RunCli({ L"build-runtime", L"--result-format", L"json", });
 			const CliRunResult unknownOption = RunCli({ L"build-runtime", L"--bogus", L"--result-format", L"json", });
@@ -1515,6 +1515,7 @@ namespace gglab
 				shader_programs::GIProbeInspectionCompute,
 				shader_programs::GIProbeIntegrationInspectionCompute,
 				shader_programs::GIReceiverInspectionCompute,
+				shader_programs::GIReceiverListCompute,
 				shader_programs::GIReceiverMarkersVertex,
 				shader_programs::GIReceiverMarkersPixel,
 				shader_programs::GIProbeVisualizationCompute,
@@ -1542,6 +1543,7 @@ namespace gglab
 				nonfinite::CounterVariant(shader_programs::GIProbeInspectionCompute),
 				nonfinite::CounterVariant(shader_programs::GIProbeIntegrationInspectionCompute),
 				nonfinite::CounterVariant(shader_programs::GIReceiverInspectionCompute),
+				nonfinite::CounterVariant(shader_programs::GIReceiverListCompute),
 				nonfinite::CounterVariant(shader_programs::GIReceiverMarkersPixel),
 			};
 			for (const ShaderProgramRef& programRef : requiredPrograms)

@@ -23,6 +23,28 @@ namespace gglab
 	class RayScene;
 	struct RaySceneGraphResources;
 
+	struct GIReceiverListLimits
+	{
+		static constexpr uint32_t MaximumSamples = 64;
+		static constexpr uint32_t MaximumViewers = 4;
+	};
+
+	struct GIReceiverListSample
+	{
+		std::array<float, 3> m_Position{};
+		std::array<float, 3> m_ShadingNormal{};
+		std::array<float, 3> m_VertexNormal{};
+	};
+
+	// Diagnostic world-space receivers. Every sample is queried from every viewer
+	// position exactly as an opaque raster receiver seen by a camera there, so only the
+	// view direction differs between viewers. Results export as GI.Field.ReceiverList.
+	struct GIReceiverListQuery
+	{
+		std::vector<GIReceiverListSample> m_Samples;
+		std::vector<std::array<float, 3>> m_Viewers;
+	};
+
 	struct GIFieldCreateInfo
 	{
 		std::shared_ptr<RayScene> m_RayScene;
@@ -44,6 +66,10 @@ namespace gglab
 		// Analytic fixtures may supply incident constant radiance; geometry is still traced.
 		bool m_ConstantEnvironment = false;
 		std::array<float, 3> m_ConstantRadiance{ 1, 1, 1 };
+		// Diagnostic hold; zero is unlimited. After this many full updates the field
+		// records none, and later frames sample the contents of the last update.
+		uint32_t m_UpdateLimit = 0;
+		std::optional<GIReceiverListQuery> m_ReceiverList;
 	};
 
 	struct GIFieldAllocationSnapshot
@@ -109,6 +135,8 @@ namespace gglab
 		// Optional diagnostics consume the recipe's existing private receiver records.
 		void AddReceiverDiagnostics(RenderGraph& graph, const RenderFrameContext& frame,
 			const RenderServices& services) noexcept;
+		// Queries the descriptor's receiver list, if any, against this frame's field.
+		void AddReceiverListQuery(RenderGraph& graph, const RenderFrameContext& frame) noexcept;
 		// Close graph access only after all opaque/diagnostic consumers declare reads.
 		void ExportResources(RenderGraph& graph) noexcept;
 

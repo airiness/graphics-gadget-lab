@@ -2153,6 +2153,21 @@ namespace gglab
 			summary->m_Spacing = 2;
 			summary->m_SubmittedUpdates = 82;
 			summary->m_InspectionAvailable = true;
+			{
+				auto held = *summary;
+				context.Check(GetGIFieldFrameUpdate(held) == 83, "An updating frame observes the update it records");
+				held.m_UpdateLimit = 82;
+				held.m_UpdateHeld = true;
+				const auto json = nlohmann::json::parse(SerializeGIFieldSummary(held));
+				context.Check(GetGIFieldFrameUpdate(held) == 82 && json["frameUpdate"] == 82 &&
+					json["updateHeld"] == true && json["updateLimit"] == 82,
+					"A held frame observes and publishes the last recorded update, not a new one");
+				held.m_UpdateHeld = false;
+				held.m_Invalid = true;
+				const auto invalid = nlohmann::json::parse(SerializeGIFieldSummary(held));
+				context.Check(GetGIFieldFrameUpdate(held) == 82 && invalid["frameUpdate"] == 82,
+					"An invalid field cannot attribute consumers to an update it will not record");
+			}
 			auto state = MakeFrameState(false);
 			state.m_Readiness.m_GIField = GIFieldCaptureState{ .m_Generation = 73, .m_Summary = summary };
 			const uint64_t first = jobs.Admit(plan(1));

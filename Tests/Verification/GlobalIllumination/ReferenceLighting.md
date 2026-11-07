@@ -104,6 +104,8 @@ component S and total E over seeds 61051/61052: it is met only when
 |S(61051) - S(61052)| <= S/3 and S > 0.1 E for both poses on both RHIs. Otherwise
 `lighting-results.json` reports SignalPrerequisiteNotMet, which is neither a pass
 nor a validation failure. `-CaseSet F6Signal` collects only these observations.
+Camera-independence measurements on held fields use
+[TestGIFieldCameraIndependence.ps1](../TestGIFieldCameraIndependence.ps1).
 
 ## Gates and reproduction
 
