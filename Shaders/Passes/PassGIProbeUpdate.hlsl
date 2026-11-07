@@ -316,6 +316,12 @@ bool IsUpdateBlocked(uint thread, bool publishField = false)
 		RWTexture2DArray<uint> classification = ResourceDescriptorHeap[NonUniformResourceIndex(ClassificationIndex)];
 		InterlockedOr(classification[uint3(0, 0, 0)], GIProbeFieldInvalidBit);
 	}
+	if (publishField)
+	{
+		// Reconverge the thread-zero publisher before a caller starts another
+		// group-shared phase; every lane must reach the cached-ray preload together.
+		GroupMemoryBarrierWithGroupSync();
+	}
 	return UpdateBlocked != GIUpdateErrorNone;
 }
 
