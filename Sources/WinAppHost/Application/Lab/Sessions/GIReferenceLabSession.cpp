@@ -424,6 +424,8 @@ namespace gglab
 		m_AuthoredSunDirection = Vector3::Forward;
 		const auto fixture = ReadFixture(GetParameters());
 		const bool coastal = IsCoastalGIFixture(fixture);
+		const bool sunlitRoom = fixture == GIReferenceFixture::SunlitColoredRoom ||
+			fixture == GIReferenceFixture::ParallelRooms;
 		const float exposure = static_cast<float>(GetParameters().Get(ExposureId, int32_t(10)));
 		Color albedo = Color::White;
 		if (fixture == GIReferenceFixture::ThickWallRoom || fixture == GIReferenceFixture::ThinWallRoom ||
@@ -431,7 +433,7 @@ namespace gglab
 		{
 			albedo = Color(0.5f, 0.5f, 0.5f, 1.0f);
 		}
-		else if (fixture == GIReferenceFixture::SunlitColoredRoom)
+		else if (sunlitRoom)
 		{
 			albedo = Color(0.8f, 0.8f, 0.8f, 1.0f);
 		}
@@ -614,6 +616,22 @@ namespace gglab
 			}
 			views.push_back(View("Contract_Sun", { 0, 1.5f, -3 }, { 0, 0, 0 }, 45, exposure));
 		}
+		else if (fixture == GIReferenceFixture::ParallelRooms)
+		{
+			for (const auto& solid : GIReferenceParallelRoomSolids)
+			{
+				const Vector3 minimum(solid.m_Minimum[0], solid.m_Minimum[1], solid.m_Minimum[2]);
+				const Vector3 maximum(solid.m_Maximum[0], solid.m_Maximum[1], solid.m_Maximum[2]);
+				primitiveInfo.m_Transform.m_Position = (minimum + maximum) * 0.5f;
+				primitiveInfo.m_Transform.m_Scale = (maximum - minimum) * 0.5f;
+				GGLAB_UNUSED(primitive::Cube::Create(primitiveInfo));
+			}
+			m_Assets.TrackModel(ProceduralCubeModelID, "Frozen parallel-room shell", 1.0f);
+			views = {
+				View("F5_Doorway", { 2.5f, 1.6f, -1.4f }, { 0, 1.2f, 0 }, 60, exposure),
+				View("F5_Floor", { 2.5f, 3.2f, -1.4f }, { 2, 0, 0 }, 90, exposure),
+			};
+		}
 		else
 		{
 			// Frozen specification v1; disjoint solid interiors, shared boundaries.
@@ -681,7 +699,7 @@ namespace gglab
 		}
 		const bool contract = IsGIContractFixture(fixture);
 		const auto environment = ResolveEnvironment(GetParameters(), fixture);
-		if (fixture == GIReferenceFixture::SunlitColoredRoom ||
+		if (sunlitRoom ||
 			fixture == GIReferenceFixture::SunTransport ||
 			fixture == GIReferenceFixture::OffCameraSunBlocker ||
 			fixture == GIReferenceFixture::CoupledDiffusePlanes ||
@@ -691,7 +709,7 @@ namespace gglab
 			const auto light = registry.create();
 			Vector3 direction = coastal ?
 				CoastalSceneLightingProfiles.front().m_Inputs.m_SunDirection :
-				fixture == GIReferenceFixture::SunlitColoredRoom ? Vector3(0.2f, -1, -1) : Vector3(0, -1, 1);
+				sunlitRoom ? Vector3(0.2f, -1, -1) : Vector3(0, -1, 1);
 			direction.Normalize();
 			m_SunEntity = light;
 			m_AuthoredSunDirection = direction;
@@ -703,7 +721,7 @@ namespace gglab
 			registry.emplace<components::TransformComponent>(light, transform);
 			components::LightComponent sun;
 			sun.m_WorldSun = WorldSunSettings{
-				.m_PerpendicularIlluminanceLux = fixture == GIReferenceFixture::SunlitColoredRoom ?
+				.m_PerpendicularIlluminanceLux = sunlitRoom ?
 					ResolveEnvironment(GetParameters(), fixture) == GIReferenceEnvironment::PhysicalSky ?
 						static_cast<float>(GetParameters().Get(SunStepId, int32_t(10000))) :
 						10000.0f :
@@ -795,7 +813,7 @@ namespace gglab
 		reference.m_ConstantEnvironment = environment == GIReferenceEnvironment::DirectConstant;
 		// The HDR importer decodes RGBE bin centres: (128 + 0.5) / 128.
 		// Match that exact constant in the independent direct-input contract.
-		const float radiance = fixture == GIReferenceFixture::SunlitColoredRoom ?
+		const float radiance = sunlitRoom ?
 			0.1f :
 			fixture == GIReferenceFixture::SunTransport || fixture == GIReferenceFixture::OffCameraSunBlocker ||
 			fixture == GIReferenceFixture::BlackField ?
@@ -987,6 +1005,8 @@ namespace gglab
 	void GIReferenceLabSession::RecreatePipeline() noexcept
 	{
 		const auto fixture = ReadFixture(GetParameters());
+		const bool sunlitRoom = fixture == GIReferenceFixture::SunlitColoredRoom ||
+			fixture == GIReferenceFixture::ParallelRooms;
 		if (!IsGIProbeFixture(fixture) && !GetParameters().Get(FieldEnabledId, false))
 		{
 			return;
@@ -1035,7 +1055,7 @@ namespace gglab
 					info.m_ConstantEnvironment = ResolveEnvironment(GetParameters(), fixture) ==
 						GIReferenceEnvironment::DirectConstant;
 					const float radiance = fixture == GIReferenceFixture::BlackField ? 0.0f :
-						fixture == GIReferenceFixture::SunlitColoredRoom ? 0.1f : 1.0f;
+						sunlitRoom ? 0.1f : 1.0f;
 					info.m_ConstantRadiance = { radiance, radiance, radiance };
 					if (fixture == GIReferenceFixture::ProbeFurnace || fixture == GIReferenceFixture::ProbeSlab)
 					{
@@ -1058,6 +1078,11 @@ namespace gglab
 						fixture == GIReferenceFixture::BlackField)
 					{
 						info.m_Volume = { .m_Counts = { 9, 9, 9 }, .m_Minimum = { -4, -2, -4 } };
+					}
+					else if (fixture == GIReferenceFixture::ParallelRooms)
+					{
+						info.m_Volume = { .m_Counts = { 11, 7, 7 },
+							.m_Minimum = { -5, -1, -3 }, .m_Spacing = 1.0f };
 					}
 					else if (fixture == GIReferenceFixture::SunlitColoredRoom)
 					{

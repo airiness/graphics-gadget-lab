@@ -31,6 +31,7 @@ namespace gglab
 		FieldCoverage = 17,
 		FieldUnsupportedCage = 18,
 		BlackField = 19,
+		ParallelRooms = 20,
 	};
 
 	struct GIReferenceFixtureDescription
@@ -60,6 +61,30 @@ namespace gglab
 		GIReferenceFixtureDescription{ GIReferenceFixture::FieldCoverage, "Contract: field coverage" },
 		GIReferenceFixtureDescription{ GIReferenceFixture::FieldUnsupportedCage, "Contract: unsupported field cage" },
 		GIReferenceFixtureDescription{ GIReferenceFixture::BlackField, "F10 black field" },
+		GIReferenceFixtureDescription{ GIReferenceFixture::ParallelRooms, "F5 parallel rooms with doorway" },
+	};
+
+	struct GIReferenceRoomSolid
+	{
+		std::array<float, 3> m_Minimum;
+		std::array<float, 3> m_Maximum;
+	};
+
+	// Frozen F5 v1: disjoint solid interiors with shared boundaries. The doorway
+	// stays open; a moving door belongs to the separate F7/G4 experiment.
+	inline constexpr std::array GIReferenceParallelRoomSolids
+	{
+		GIReferenceRoomSolid{ { -4.2f, -0.2f, -2.2f }, { 4.2f, 0, 2.2f } },
+		GIReferenceRoomSolid{ { -4.2f, 4, -2.2f }, { 4.2f, 4.2f, 2.2f } },
+		GIReferenceRoomSolid{ { -4.2f, 0, -2.2f }, { -4, 4, 2.2f } },
+		GIReferenceRoomSolid{ { 4, 0, -2.2f }, { 4.2f, 4, 2.2f } },
+		GIReferenceRoomSolid{ { -4, 0, -2.2f }, { 4, 4, -2 } },
+		GIReferenceRoomSolid{ { -4, 0, 2 }, { -3, 4, 2.2f } },
+		GIReferenceRoomSolid{ { -1, 0, 2 }, { 4, 4, 2.2f } },
+		GIReferenceRoomSolid{ { -3, 3, 2 }, { -1, 4, 2.2f } },
+		GIReferenceRoomSolid{ { -0.1f, 0, -2 }, { 0.1f, 4, -0.5f } },
+		GIReferenceRoomSolid{ { -0.1f, 0, 0.5f }, { 0.1f, 4, 2 } },
+		GIReferenceRoomSolid{ { -0.1f, 2.2f, -0.5f }, { 0.1f, 4, 0.5f } },
 	};
 
 	constexpr bool IsCoastalGIFixture(GIReferenceFixture fixture) noexcept
@@ -84,6 +109,7 @@ namespace gglab
 	constexpr bool UsesGIStaticCostPath(GIReferenceFixture fixture) noexcept
 	{
 		return fixture == GIReferenceFixture::SunlitColoredRoom ||
+			fixture == GIReferenceFixture::ParallelRooms ||
 			fixture == GIReferenceFixture::CoastalDiffuse ||
 			fixture == GIReferenceFixture::SmallSmoothReceiver || IsGIProbeFixture(fixture);
 	}
@@ -93,6 +119,7 @@ namespace gglab
 		return fixture == GIReferenceFixture::IsolatedPlane ||
 			fixture == GIReferenceFixture::ThickWallRoom ||
 			fixture == GIReferenceFixture::SunlitColoredRoom ||
+			fixture == GIReferenceFixture::ParallelRooms ||
 			fixture == GIReferenceFixture::FieldCoverage ||
 			fixture == GIReferenceFixture::FieldUnsupportedCage ||
 			fixture == GIReferenceFixture::BlackField;

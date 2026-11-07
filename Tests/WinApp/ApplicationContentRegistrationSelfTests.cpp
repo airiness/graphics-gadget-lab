@@ -45,6 +45,93 @@ namespace gglab
 {
 	namespace
 	{
+		void CheckGIParallelRooms(SelfTestContext& context) noexcept
+		{
+			for (size_t index = 0; index < GIReferenceParallelRoomSolids.size(); ++index)
+			{
+				const auto& solid = GIReferenceParallelRoomSolids[index];
+				for (size_t axis = 0; axis < 3; ++axis)
+				{
+					context.Check(solid.m_Minimum[axis] < solid.m_Maximum[axis],
+						"Frozen F5 solids have positive extent on every axis");
+				}
+				for (size_t other = 0; other < index; ++other)
+				{
+					const auto& previous = GIReferenceParallelRoomSolids[other];
+					bool overlap = true;
+					for (size_t axis = 0; axis < 3; ++axis)
+					{
+						overlap &= std::max(solid.m_Minimum[axis], previous.m_Minimum[axis]) <
+							std::min(solid.m_Maximum[axis], previous.m_Maximum[axis]);
+					}
+					context.Check(!overlap, "Frozen F5 boxes share boundaries, not solid interiors");
+				}
+			}
+			const auto blocked = [](const std::array<float, 3>& start,
+				const std::array<float, 3>& end) noexcept
+				{
+					for (const auto& solid : GIReferenceParallelRoomSolids)
+					{
+						float enter = 0.0f;
+						float leave = 1.0f;
+						bool intersects = true;
+						for (size_t axis = 0; axis < 3; ++axis)
+						{
+							const float direction = end[axis] - start[axis];
+							if (direction == 0.0f)
+							{
+								intersects &= start[axis] >= solid.m_Minimum[axis] &&
+									start[axis] <= solid.m_Maximum[axis];
+							}
+							else
+							{
+								const float a = (solid.m_Minimum[axis] - start[axis]) / direction;
+								const float b = (solid.m_Maximum[axis] - start[axis]) / direction;
+								enter = std::max(enter, std::min(a, b));
+								leave = std::min(leave, std::max(a, b));
+							}
+						}
+						if (intersects && enter <= leave)
+						{
+							return true;
+						}
+					}
+					return false;
+				};
+			struct RoomPath
+			{
+				std::array<float, 3> m_Start;
+				std::array<float, 3> m_End;
+				bool m_Blocked;
+			};
+			const std::array paths
+			{
+				RoomPath{ { -1, 1, 0 }, { 1, 1, 0 }, false },
+				RoomPath{ { -1, 1, -0.4999f }, { 1, 1, -0.4999f }, false },
+				RoomPath{ { -1, 1, 0.4999f }, { 1, 1, 0.4999f }, false },
+				RoomPath{ { -1, 1, -0.5001f }, { 1, 1, -0.5001f }, true },
+				RoomPath{ { -1, 1, 0.5001f }, { 1, 1, 0.5001f }, true },
+				RoomPath{ { -1, 2.1999f, 0 }, { 1, 2.1999f, 0 }, false },
+				RoomPath{ { -1, 2.2001f, 0 }, { 1, 2.2001f, 0 }, true },
+				RoomPath{ { -1, 3, 0 }, { 1, 3, 0 }, true },
+				RoomPath{ { -2, 1, 1 }, { -2, 1, 3 }, false },
+				RoomPath{ { -3.1f, 1, 1 }, { -3.1f, 1, 3 }, true },
+				RoomPath{ { -0.9f, 1, 1 }, { -0.9f, 1, 3 }, true },
+				RoomPath{ { -2, 3.1f, 1 }, { -2, 3.1f, 3 }, true },
+				RoomPath{ { 2, 1, 1 }, { 2, 1, 3 }, true },
+				RoomPath{ { 2, 0.5f, 0 }, { 2, -0.5f, 0 }, true },
+				RoomPath{ { 2, 3.5f, 0 }, { 2, 4.5f, 0 }, true },
+				RoomPath{ { -3.5f, 1, 0 }, { -4.5f, 1, 0 }, true },
+				RoomPath{ { 3.5f, 1, 0 }, { 4.5f, 1, 0 }, true },
+				RoomPath{ { 2, 1, -1.5f }, { 2, 1, -2.5f }, true },
+			};
+			for (const auto& path : paths)
+			{
+				context.Check(blocked(path.m_Start, path.m_End) == path.m_Blocked,
+					"Frozen F5 preserves its doorway, exterior opening, divider and closed shell");
+			}
+		}
+
 		std::vector<TextureAssetData> CheckImportedTextures(SelfTestContext& context, const ImportedModel& model) noexcept
 		{
 			std::vector<TextureAssetData> textures;
@@ -1659,7 +1746,12 @@ namespace gglab
 	void RunApplicationContentRegistrationSelfTests(SelfTestContext& context) noexcept
 	{
 		// Frozen IDs are an external verification protocol, not enum ordinal capabilities.
-		context.Check(GIReferenceFixtures.size() == 20, "All persisted GI fixtures remain registered");
+		context.Check(GIReferenceFixtures.size() == 21, "All persisted GI fixtures remain registered");
+		context.Check(static_cast<int32_t>(GIReferenceFixture::ParallelRooms) == 20 &&
+			GIReferenceFixtures[5].m_Id == GIReferenceFixture::SunTransport &&
+			GIReferenceFixtures[6].m_Id == GIReferenceFixture::OffCameraSunBlocker,
+			"Frozen F5 is additive and does not repurpose historical contract fixture IDs");
+		CheckGIParallelRooms(context);
 		for (size_t index = 0; index < GIReferenceFixtures.size(); ++index)
 		{
 			const auto fixture = GIReferenceFixtures[index].m_Id;
@@ -1667,10 +1759,11 @@ namespace gglab
 				IsCoastalGIFixture(fixture) == (index == 11 || index == 12 || index == 15) &&
 				IsGIProbeFixture(fixture) == (index == 14 || index == 15 || index == 16) &&
 				UsesGIPrimaryReceiverMaterials(fixture) == (index >= 10 && index <= 13) &&
-				UsesGIStaticCostPath(fixture) == (index == 4 || (index >= 12 && index <= 16)) &&
+				UsesGIStaticCostPath(fixture) ==
+					(index == 4 || index == 20 || (index >= 12 && index <= 16)) &&
 				UsesGIStaticObservationPaths(fixture) ==
-					(index == 1 || index == 2 || index == 4 || (index >= 17 && index <= 19)) &&
-				IsGIContractFixture(fixture) == (index >= 5 && index != 19),
+					(index == 1 || index == 2 || index == 4 || index == 20 || (index >= 17 && index <= 19)) &&
+				IsGIContractFixture(fixture) == (index >= 5 && index <= 18),
 				"Named fixture capabilities preserve frozen IDs without ordering-based dispatch");
 		}
 		const CameraReferenceView observationView{ .m_Id = "F4_Floor", .m_Name = "Floor",
