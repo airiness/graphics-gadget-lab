@@ -1,6 +1,7 @@
 <#
 .SYNOPSIS
-Checks bounded fixed-depth F1-F4 and independent sun/sky transport. Does not qualify DDGI or Final.
+Checks bounded fixed-depth F1-F4, the F6 D=1 off-screen signal prerequisite and independent sun/sky
+transport. Does not qualify DDGI, Final or F6 camera independence.
 #>
 [CmdletBinding()]
 param(
@@ -10,7 +11,7 @@ param(
     [string]$RunDirectory,
     [string]$Python = 'python',
     [string]$GIOffBaselineDirectory,
-    [ValidateSet('All', 'OneBounce', 'Transport')][string]$CaseSet = 'All',
+    [ValidateSet('All', 'OneBounce', 'Transport', 'F6Signal')][string]$CaseSet = 'All',
     [int]$TimeoutSeconds = 300
 )
 $ErrorActionPreference = 'Stop'
@@ -64,7 +65,7 @@ try {
                     OutputDirectory="$directory/warmup";TimeoutSeconds=$TimeoutSeconds }
                 Check ($warmup.status -eq 'completed' -and $warmup.publication -eq 'Published') "$backend-ready"
                 $observations = @()
-                if ($CaseSet -ne 'Transport') {
+                if ($CaseSet -in @('All', 'OneBounce')) {
                     foreach ($fixture in @(0,1)) {
                         $view = if ($fixture -eq 0) { 'F1_Sphere' } else { 'F1_Plane' }
                         $variants = @(
@@ -133,7 +134,19 @@ try {
                         }
                     }
                 }
-                if ($CaseSet -ne 'OneBounce') {
+                if ($CaseSet -in @('All', 'OneBounce', 'F6Signal')) {
+                    # F6 reuses the F4 construction. Its D=1 reference must carry an
+                    # off-screen signal before camera independence can be claimed.
+                    foreach ($pose in @('PoseWest','PoseEast')) {
+                        foreach ($variant in @('base','independent','double')) {
+                            $observations += @{directory="$backend/f6-$($pose.ToLower())-$variant";fixture=4;
+                                samples=$(if ($variant -eq 'double') {4096} else {2048});
+                                seed=$(if ($variant -eq 'independent') {61052} else {61051});
+                                albedo=0;ev100=10;view="F6_$pose";variant=$variant}
+                        }
+                    }
+                }
+                if ($CaseSet -in @('All', 'Transport')) {
                     foreach ($depth in @(1,2,3,4)) {
                         $observations += @{directory="$backend/transport-planes-d$depth";fixture=8;
                             depth=$depth;samples=4096;seed=61051;albedo=0;secondary_albedo=1;ev100=10;
@@ -233,7 +246,7 @@ try {
             Check-Python "$root/Scripts/Verification/$validator" $configDirectory `
                 "$configDirectory/$validator.result.json" "$config-$validator"
         }
-        if ($CaseSet -ne 'OneBounce' -and $config -in @('Debug','Develop')) {
+        if ($CaseSet -in @('All', 'Transport') -and $config -in @('Debug','Develop')) {
             $transactions = Invoke-VerificationScript "$PSScriptRoot/TestGIReferenceTransactions.ps1" @{
                 Configuration=$config;Rhi=$Rhi;Python=$Python;
                 RunDirectory="$configDirectory/transactions";TimeoutSeconds=$TimeoutSeconds}
@@ -242,7 +255,7 @@ try {
         }
         # The pinned GI-off pixels are qualified for Develop. Run the ordinary
         # composition in fresh processes, with no GI Lab or ray-scene activation.
-        if ($config -eq 'Develop' -and $CaseSet -ne 'Transport') {
+        if ($config -eq 'Develop' -and $CaseSet -in @('All', 'OneBounce')) {
             foreach ($backend in $Rhi) {
                 $offDirectory = Join-Path $configDirectory "gi-off-$backend"
                 $offSession = "gi-reference-off-$runId-$backend"

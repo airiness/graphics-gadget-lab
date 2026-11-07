@@ -96,6 +96,15 @@ back-wall and separate red/green-adjacent neutral-floor masks. Selectors interse
 snapshot instance/primitive identities with frozen world intervals. Every required
 mask must be nonempty and has a retained PNG overlay.
 
+F6 reuses frozen F4 through `F6_PoseWest` and `F6_PoseEast`. Its floor patch
+X [-0.4,0.4]/Z [-1.1,-0.5] uses the floor oracle. Primary identities certify that
+neither pose sees the front jambs or lintel and that each pose excludes one
+coloured wall. The D=1 off-screen signal prerequisite uses the patch-mean sun
+component S and total E over seeds 61051/61052: it is met only when
+|S(61051) - S(61052)| <= S/3 and S > 0.1 E for both poses on both RHIs. Otherwise
+`lighting-results.json` reports SignalPrerequisiteNotMet, which is neither a pass
+nor a validation failure. `-CaseSet F6Signal` collects only these observations.
+
 ## Gates and reproduction
 
 Compare unexposed linear RGB E and its Rec.709 luminance. CPU-oracle agreement,

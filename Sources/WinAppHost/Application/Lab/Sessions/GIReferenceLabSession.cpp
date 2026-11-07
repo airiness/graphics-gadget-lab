@@ -683,6 +683,10 @@ namespace gglab
 					View("F4_Back", { 0, 1.6f, 1.4f }, { 0, 1.6f, -1 }, 60, exposure),
 					View("F4_West", { 0, 1.6f, 0 }, { -2, 2, 0 }, 90, exposure),
 					View("F4_East", { 0, 1.6f, 0 }, { 2, 2, 0 }, 90, exposure),
+					// F6 reuses this construction. Both poses frame one floor patch; the
+					// sunlit right jamb lies outside both, each coloured wall outside one.
+					View("F6_PoseWest", { -0.5f, 1.6f, 1.4f }, { 0, 0.4f, -0.7f }, 45, exposure),
+					View("F6_PoseEast", { 0.5f, 1.6f, 1.4f }, { 0, 0.4f, -0.7f }, 45, exposure),
 				};
 			}
 			else

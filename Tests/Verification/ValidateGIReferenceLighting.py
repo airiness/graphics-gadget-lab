@@ -14,6 +14,14 @@ RELATIVE = 0.01
 DEFAULTS = dict(fixture=0, depth=1, samples=64, batch_samples=64, seed=61051, albedo=0, ev100=10,
                 environment=0, filter=0, intensity=1, yaw=0, sun_lux=10000,
                 secondary_albedo=0, atmosphere=False)
+# F6 reuses frozen F4. Its D=1 off-screen signal is the patch-mean sun component: the
+# reference must resolve it (seed-to-seed difference at most one third, as for gated
+# metrics), and it must exceed the 10% energy gate so that omitting it would fail.
+F6_VIEWS = ("F6_PoseWest", "F6_PoseEast")
+F6_EXCLUDED_WALL = {"F6_PoseWest": 2, "F6_PoseEast": 3}
+F6_OPENING_INSTANCES = (5, 6, 7)
+F6_SIGNAL_SAMPLING_FRACTION = 1/3
+F6_SIGNAL_ENERGY_GATE = 0.10
 
 
 def require(condition, message):
@@ -170,7 +178,31 @@ def masks(case, values, camera):
         instance, triangles = (2, [10, 11]) if case["view"] == "F4_West" else (3, [8, 9])
         return {"wall": covered & (identity[..., 0] == instance) & np.isin(identity[..., 1], triangles) &
                 (np.abs(z) <= 1.5) & (y >= 0.5) & (y <= 3.5)}
+    if case["view"] in F6_VIEWS:
+        return {"patch": covered & (identity[..., 0] == 0) & np.isin(identity[..., 1], [4, 5]) &
+                (np.abs(x) <= 0.4) & (z >= -1.1) & (z <= -0.5)}
     return {"overview": covered}
+
+
+def f6_signal_prerequisite(base, independent):
+    """Evaluate one F6 pose from two independent-seed D=1 patch observations."""
+    def luminance(observation, signal):
+        return float(np.asarray(observation[signal], dtype=float) @ LUMA)
+    sun = [luminance(base, "sun"), luminance(independent, "sun")]
+    total = [luminance(base, "mean"), luminance(independent, "mean")]
+    environment = [luminance(base, "environment"), luminance(independent, "environment")]
+    signal, energy = float(np.mean(sun)), float(np.mean(total))
+    difference = abs(sun[0]-sun[1])
+    resolved = signal > 0 and difference <= F6_SIGNAL_SAMPLING_FRACTION*signal
+    sensitive = energy > 0 and signal > F6_SIGNAL_ENERGY_GATE*energy
+    mean = (np.asarray(base["mean"], dtype=float)+np.asarray(independent["mean"], dtype=float))/2
+    chromaticity = mean[:2]/mean.sum() if mean.sum() > 0 else np.zeros(2)
+    return dict(sunLuminance=signal, seedDifference=difference, totalLuminance=energy,
+                environmentLuminance=float(np.mean(environment)),
+                sunFraction=signal/energy if energy > 0 else 0.0,
+                chromaticityOffset=(chromaticity-1/3).tolist(),
+                samplingResolved=bool(resolved), exceedsEnergyGate=bool(sensitive),
+                status="SignalPrerequisiteMet" if resolved and sensitive else "SignalPrerequisiteNotMet")
 
 
 def overlay(path, normal, mask):
@@ -266,6 +298,14 @@ def inspect(root, case):
                   sun=sun, atmosphere=inputs["atmosphere"], parameters=parameters, actualMip=float(mip),
                   irradianceSha256=hashlib.sha256(e.tobytes()).hexdigest(),
                   depth=1, depthConverged=False, comparisonStatus="ReferenceUnconverged", masks={})
+    if case["view"] in F6_VIEWS:
+        # Certify the off-screen claim from primary receiver identities: the
+        # front jambs/lintel lie behind both poses, and each pose excludes one wall.
+        identity = values["GI.Reference.Identity"][..., 0]
+        visible = {str(i): int(np.count_nonzero(covered & (identity == i))) for i in range(8)}
+        require(all(visible[str(i)] == 0 for i in F6_OPENING_INSTANCES), "F6 pose sees the sunlit opening")
+        require(visible[str(F6_EXCLUDED_WALL[case["view"]])] == 0, "F6 pose sees its excluded coloured wall")
+        result["visibleInstancePixels"] = visible
     for name, mask in masks(case, values, frame["camera"]).items():
         require(mask.sum() >= 32, f"Empty required mask: {case['directory']}/{name}")
         overlay(directory/f"mask-{name}.png", values["GI.Receiver.ShadingNormal"][..., :3], mask)
@@ -292,8 +332,8 @@ def inspect(root, case):
                 expected = np.pi*(1+rotated/3).mean(0)*case["intensity"]
             else:
                 expected = np.full(3, np.pi*1.00390625*(case["intensity"] if published else 1))
-        elif case["fixture"] == 4 and case["view"] in ("F4_Floor", "F4_Back"):
-            oracle_sun, oracle_sky = f4_oracle(position, case["view"] == "F4_Floor")
+        elif case["fixture"] == 4 and case["view"] in ("F4_Floor", "F4_Back") + F6_VIEWS:
+            oracle_sun, oracle_sky = f4_oracle(position, case["view"] != "F4_Back")
             require(relative_error(sun_mean, oracle_sun.mean(0)) < RELATIVE, f"F4 sun oracle: {name}")
             require(relative_error(sky_mean, oracle_sky.mean(0)) < RELATIVE, f"F4 sky oracle: {name}")
             expected = (oracle_sun+oracle_sky).mean(0)
@@ -362,7 +402,10 @@ def validate(root, cases):
             require(results[key]["irradianceSha256"] == results[baseline]["irradianceSha256"],
                     f"Submission partition changed the D=1 estimator: {key}")
     # Same-seed changes isolate each physical factor; primary receiver albedo cannot change E.
+    contract_families = ("sun-", "constant-", "gradient-", "physical-")
     for backend in sorted({c["directory"].split("/")[0] for c in cases}):
+        if not any(key.startswith(f"{backend}/{family}") for key in results for family in contract_families):
+            continue
         def roi(name):
             return np.asarray(results[f"{backend}/{name}"]["masks"]["floor"]["mean"])
         for variant, scale in (("intensity", [2, 2, 2]), ("red", [1, 0.0625, 0.0625]), ("receiver", [1, 1, 1])):
@@ -404,8 +447,28 @@ def validate(root, cases):
         base = results[f"{backend}/gradient-base"]["masks"]["sphere"]["environment"]
         doubled = results[f"{backend}/gradient-intensity"]["masks"]["sphere"]["environment"]
         require(relative_error(doubled, np.asarray(base)*2) < 1e-5, "Environment intensity applied incorrectly")
+    f6 = {}
+    for case in cases:
+        if case["view"] in F6_VIEWS and case.get("variant") == "base":
+            family = case["directory"].rsplit("-", 1)[0]
+            f6[family] = f6_signal_prerequisite(results[case["directory"]]["masks"]["patch"],
+                                                results[family+"-independent"]["masks"]["patch"])
+    for backend in sorted({key.split("/")[0] for key in f6}):
+        west, east = (results[f"{backend}/f6-{pose}-base"]["masks"]["patch"] for pose in ("posewest", "poseeast"))
+        # One world-space patch in two projections; reported only, not a field claim.
+        f6[f"{backend}/cross-pose"] = dict(referenceMeanDifference=relative_error(east["mean"], west["mean"]))
+    signal = None
+    if f6:
+        statuses = {value["status"] for value in f6.values() if "status" in value}
+        signal = dict(observations=f6, status="SignalPrerequisiteMet" if statuses == {"SignalPrerequisiteMet"}
+                      else "SignalPrerequisiteNotMet",
+                      rules=dict(signal="patch-mean D=1 sun-component luminance",
+                                 samplingFraction=F6_SIGNAL_SAMPLING_FRACTION,
+                                 energyGate=F6_SIGNAL_ENERGY_GATE,
+                                 seeds=[61051, 61052], notMet="neither a pass nor a failure"))
     report = dict(observations=results, sampling=convergence, crossRhi=comparisons,
                   componentSampling=component_convergence, crossRhiComponents=component_comparisons,
+                  f6Signal=signal,
                   rules=dict(relative=RELATIVE, absolute=ABSOLUTE, signal="linear unexposed RGB E and luminance",
                              crossRhi="ROI means; complex paths need not be bit-identical",
                              depth="D=1 only; no DDGI comparison qualification"))
@@ -437,7 +500,19 @@ def self_test():
         pass
     # An entering beam starts with |x|<=1, y<=3 and dx/d(-y)=0.2.
     require(1+3*0.2 < 2, "Frozen F4 beam must land before reaching a coloured wall")
-    return dict(status="passed", checks=8)
+    def patch(sun, sky):
+        return dict(sun=[sun]*3, environment=[sky]*3, mean=[sun+sky]*3)
+    require(f6_signal_prerequisite(patch(1.78, 0.016), patch(1.70, 0.016))["status"] ==
+            "SignalPrerequisiteMet", "Resolved F6 signal rejected")
+    require(f6_signal_prerequisite(patch(1e-4, 0.016), patch(1e-4, 0.016))["status"] ==
+            "SignalPrerequisiteNotMet", "Near-zero F6 signal accepted")
+    require(f6_signal_prerequisite(patch(1.0, 0.016), patch(0.5, 0.016))["status"] ==
+            "SignalPrerequisiteNotMet", "Unresolved F6 signal accepted")
+    floor = np.array([[[0, 0, 0, 1], [0.41, 0, -0.8, 1], [0, 0, -1.11, 1], [0.4, 0, -0.5, 1]]], dtype=float)
+    selected = masks({"fixture": 4, "view": "F6_PoseWest"}, {
+        "GI.Reference.Position": floor, "GI.Reference.Identity": np.array([[[0, 4, 1, 3]]*4], dtype=float)}, {})
+    require(selected["patch"].tolist() == [[False, False, False, True]], "F6 patch bounds differ")
+    return dict(status="passed", checks=12)
 
 
 if __name__ == "__main__":
