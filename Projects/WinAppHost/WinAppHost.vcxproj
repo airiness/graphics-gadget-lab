@@ -401,6 +401,7 @@
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Demo\DemoPlayground.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Demo\CoastalSceneCameraPaths.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Demo\CoastalSceneReferenceViews.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Demo\CoastalSceneGIFieldProfile.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Demo\CoastalSceneLightingProfiles.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Demo\StartDemo.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\NapaVoxel\NapaVoxelCommands.h" />

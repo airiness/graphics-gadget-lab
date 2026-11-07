@@ -13,6 +13,7 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIFieldObservation.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIFieldProfile.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIFieldReadiness.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
@@ -2438,6 +2439,46 @@ namespace gglab
 				changeJson["probeVisualization"]["mode"] == "change" &&
 				changeJson["probeVisualization"]["schemaVersion"] == 7,
 				"Change metadata shares the completed observation and preserves Excluded/null semantics");
+			context.Check(changeJson["profile"].is_null(),
+				"Absent profile receipts remain unavailable instead of inventing a qualified default");
+			auto profile = std::make_shared<GIFieldProfileReceipt>();
+			profile->m_Volume.m_Profile = { "gglab.gi.field.contract", 3 };
+			profile->m_RaysPerProbe = 192;
+			profile->m_Seed = 81052;
+			profile->m_IrradianceInteriorWidth = 14;
+			profile->m_MaximumDistance = 1000;
+			profile->m_Hysteresis = 0.9f;
+			profile->m_ViewBias = 0.15f;
+			profile->m_EnableFeedback = true;
+			profile->m_ProgressiveSampling = true;
+			profile->m_Readiness.m_NoiseSigma = 0.02f;
+			profile->m_Readiness.m_SteadyNoiseSigma = 0.03f;
+			profile->m_Readiness.m_ProgressiveRefresh = true;
+			profile->m_ConstantEnvironment = true;
+			profile->m_ConstantRadiance = { 1, 0.5f, 2 };
+			summary.m_Profile = profile;
+			const auto profileJson = nlohmann::json::parse(SerializeGIFieldSummary(summary))["profile"];
+			context.Check(profileJson["schemaVersion"] == 1 &&
+				profileJson["id"] == "gglab.gi.field.contract" && profileJson["revision"] == 3 &&
+				profileJson["counts"] == profile->m_Volume.m_Counts &&
+				profileJson["minimum"] == profile->m_Volume.m_Minimum && profileJson["spacing"] == 1 &&
+				profileJson["raysPerProbe"] == 192 && profileJson["seed"] == 81052 &&
+				profileJson["irradianceInteriorWidth"] == 14 && profileJson["maximumDistance"] == 1000 &&
+				profileJson["hysteresis"] == profile->m_Hysteresis &&
+				profileJson["viewBias"] == profile->m_ViewBias && !profileJson["receiverSampling"].get<bool>() &&
+				profileJson["feedback"] == true && profileJson["progressiveSampling"] == true &&
+				profileJson["constantEnvironment"] == true &&
+				profileJson["constantRadiance"] == profile->m_ConstantRadiance &&
+				profileJson["readiness"]["enabled"] == true &&
+				profileJson["readiness"]["noiseSigma"] == profile->m_Readiness.m_NoiseSigma &&
+				profileJson["readiness"]["steadyNoiseSigma"] == profile->m_Readiness.m_SteadyNoiseSigma &&
+				profileJson["readiness"]["refreshHysteresis"] == 0.5 &&
+				profileJson["readiness"]["progressiveRefresh"] == true,
+				"Versioned profile metadata retains base identity and every effective constructor input");
+			metadata.m_Readiness.m_GIField->m_Summary = std::make_shared<GIFieldSummary>(summary);
+			context.Check(nlohmann::json::parse(SerializeFrameCaptureMetadata(metadata))
+				["readiness"]["giField"]["summary"]["profile"] == profileJson,
+				"Frame metadata embeds the same retained profile receipt without relabeling it");
 
 			const std::string json = SerializeFrameCaptureMetadata(metadata);
 			context.Check(
@@ -6170,6 +6211,11 @@ namespace gglab
 	{
 		RunGIProbeInspectionTests(context);
 		RunGIInspectionCancellationTests(context);
+	}
+
+	void RunFrameCaptureMetadataSelfTests(SelfTestContext& context) noexcept
+	{
+		RunMetadataSerializationTests(context);
 	}
 
 	void RunFrameCaptureCoordinatorSelfTests(SelfTestContext& context) noexcept

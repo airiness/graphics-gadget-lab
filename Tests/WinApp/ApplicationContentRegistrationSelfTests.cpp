@@ -4,6 +4,7 @@
 #include "Application/Content/RuntimeAssetBundle.h"
 #include "Application/Demo/CoastalSceneCameraPaths.h"
 #include "Application/Demo/CoastalSceneReferenceViews.h"
+#include "Application/Demo/CoastalSceneGIFieldProfile.h"
 #include "Application/Lab/LightingContractReferenceViews.h"
 #include "Application/Lab/Sessions/GIReferenceLabFixture.h"
 #include "Application/Lab/Sessions/GIReferenceLabSession.h"
@@ -20,6 +21,8 @@
 #include "GGLabRuntime/Graphics/CameraReferenceView.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIField.h"
+#include "GGLabRuntime/Graphics/RayScene.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderProgramCatalog.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
@@ -32,6 +35,7 @@
 #include <filesystem>
 #include <initializer_list>
 #include <limits>
+#include <memory>
 #include <numbers>
 #include <optional>
 #include <string_view>
@@ -1752,9 +1756,32 @@ namespace gglab
 			GIReferenceFixtures[6].m_Id == GIReferenceFixture::OffCameraSunBlocker,
 			"Frozen F5 is additive and does not repurpose historical contract fixture IDs");
 		CheckGIParallelRooms(context);
+		context.Check(CoastalSceneGIFieldVolume.m_Counts == std::array{ 33u, 10u, 39u } &&
+			CoastalSceneGIFieldVolume.m_Minimum == std::array{ -17.25f, -1.5f, -23.25f } &&
+			CoastalSceneGIFieldVolume.m_Spacing == 1 &&
+			CoastalSceneGIFieldVolume.m_Profile.m_Id == CoastalSceneGIFieldProfileId &&
+			CoastalSceneGIFieldVolume.m_Profile.m_Revision == CoastalSceneGIFieldProfileRevision,
+			"Host-authored Coastal registration preserves frozen above-water coverage and capacities");
+		const auto profileScene = std::make_shared<RayScene>();
 		for (size_t index = 0; index < GIReferenceFixtures.size(); ++index)
 		{
-			const auto fixture = GIReferenceFixtures[index].m_Id;
+			const auto& description = GIReferenceFixtures[index];
+			const auto fixture = description.m_Id;
+			GIFieldCreateInfo profile{ .m_RayScene = profileScene };
+			profile.m_Volume.m_Profile = {
+				description.m_FieldProfileId, description.m_FieldProfileRevision };
+			bool distinct = true;
+			for (size_t other = 0; other < index; ++other)
+			{
+				const auto& previous = GIReferenceFixtures[other];
+				if (std::string_view(description.m_FieldProfileId) == previous.m_FieldProfileId)
+				{
+					distinct &= IsCoastalGIFixture(fixture) && IsCoastalGIFixture(previous.m_Id) &&
+						description.m_FieldProfileRevision == previous.m_FieldProfileRevision;
+				}
+			}
+			context.Check(ValidateGIFieldCreateInfo(profile) && distinct,
+				"Named field bases have valid identities; only the common Coastal preset is shared");
 			context.Check(static_cast<size_t>(fixture) == index &&
 				IsCoastalGIFixture(fixture) == (index == 11 || index == 12 || index == 15) &&
 				IsGIProbeFixture(fixture) == (index == 14 || index == 15 || index == 16) &&

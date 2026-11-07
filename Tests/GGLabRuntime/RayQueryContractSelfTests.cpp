@@ -11,6 +11,7 @@
 #include "GGLabRuntime/Graphics/Pipeline/LayoutContract.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIField.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIFieldProfile.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIProbePicking.h"
 #include "Graphics/Pipeline/GIFieldState.h"
 #include "GGLabRuntime/Graphics/RayScene.h"
@@ -983,7 +984,70 @@ namespace gglab
 			GIFieldCreateInfo info;
 			context.Check(!ValidateGIFieldCreateInfo(info), "A field cannot prepare without a scene owner");
 			info.m_RayScene = std::make_shared<RayScene>();
-			context.Check(ValidateGIFieldCreateInfo(info), "The Coastal full-update field profile is valid");
+			context.Check(!ValidateGIFieldCreateInfo(info),
+				"A scene owner does not substitute for a declared persistent profile identity");
+			info.m_Volume.m_Profile = { "gglab.gi.field.contract", 1 };
+			context.Check(ValidateGIFieldCreateInfo(info), "The declared full-update field profile is valid");
+			for (const char* name : { "", "single", ".gglab.profile", "gglab..profile",
+				"gglab.profile.", "GGLab.profile", "gglab.bad-name", "gglab.2bad", "gglab.profile/path" })
+			{
+				auto unnamed = info;
+				unnamed.m_Volume.m_Profile.m_Id = name;
+				context.Check(!ValidateGIFieldCreateInfo(unnamed),
+					"Missing or noncanonical profile identities reject before GPU preparation");
+			}
+			auto unversioned = info;
+			unversioned.m_Volume.m_Profile.m_Revision = 0;
+			context.Check(!ValidateGIFieldCreateInfo(unversioned), "Profile revisions must be positive");
+			unversioned = info;
+			unversioned.m_Volume.m_Profile.m_Id = "gglab." + std::string(129, 'a');
+			context.Check(!ValidateGIFieldCreateInfo(unversioned), "Profile names have bounded storage");
+			unversioned.m_Volume.m_Profile.m_Id = "other_host.field.uniform";
+			context.Check(ValidateGIFieldCreateInfo(unversioned),
+				"Runtime validates neutral identity syntax without depending on a Host preset registry");
+			std::shared_ptr<const GIFieldProfileReceipt> retainedProfile;
+			{
+				auto authored = info;
+				authored.m_Volume.m_Profile.m_Revision = 3;
+				authored.m_RaysPerProbe = 192;
+				authored.m_Seed = 81052;
+				authored.m_IrradianceInteriorWidth = 14;
+				authored.m_MaximumDistance = 1000;
+				authored.m_Hysteresis = 0.9f;
+				authored.m_ViewBias = 0.15f;
+				authored.m_EnableReceiverSampling = false;
+				authored.m_EnableFeedback = true;
+				authored.m_ProgressiveSampling = true;
+				authored.m_Readiness = { .m_Enabled = false, .m_NoiseSigma = 0.02f,
+					.m_SteadyNoiseSigma = 0.03f, .m_RefreshHysteresis = 0.4f,
+					.m_ProgressiveRefresh = true };
+				authored.m_ConstantEnvironment = true;
+				authored.m_ConstantRadiance = { 1, 0.5f, 2 };
+				GIField field(authored);
+				retainedProfile = field.GetCaptureState().m_Summary->m_Profile;
+				context.Check(retainedProfile && field.GetDiagnostics().m_Profile == retainedProfile &&
+					retainedProfile->m_Volume.m_Profile == authored.m_Volume.m_Profile &&
+					retainedProfile->m_Volume.m_Counts == authored.m_Volume.m_Counts &&
+					retainedProfile->m_Volume.m_Minimum == authored.m_Volume.m_Minimum &&
+					retainedProfile->m_Volume.m_Spacing == authored.m_Volume.m_Spacing &&
+					retainedProfile->m_RaysPerProbe == 192 && retainedProfile->m_Seed == 81052 &&
+					retainedProfile->m_IrradianceInteriorWidth == 14 &&
+					retainedProfile->m_MaximumDistance == 1000 && retainedProfile->m_Hysteresis == 0.9f &&
+					retainedProfile->m_ViewBias == 0.15f && !retainedProfile->m_EnableReceiverSampling &&
+					retainedProfile->m_EnableFeedback && retainedProfile->m_ProgressiveSampling &&
+					!retainedProfile->m_Readiness.m_Enabled &&
+					retainedProfile->m_Readiness.m_NoiseSigma == 0.02f &&
+					retainedProfile->m_Readiness.m_SteadyNoiseSigma == 0.03f &&
+					retainedProfile->m_Readiness.m_RefreshHysteresis == 0.4f &&
+					retainedProfile->m_Readiness.m_ProgressiveRefresh &&
+					retainedProfile->m_ConstantEnvironment &&
+					retainedProfile->m_ConstantRadiance == authored.m_ConstantRadiance,
+					"Diagnostics and capture share every immutable effective constructor input");
+				authored.m_Volume.m_Profile.m_Id.clear();
+			}
+			context.Check(retainedProfile && retainedProfile->m_Volume.m_Profile.m_Id ==
+				"gglab.gi.field.contract" && retainedProfile->m_Volume.m_Profile.m_Revision == 3,
+				"A retained receipt owns its name and inputs after caller and field destruction");
 			for (uint32_t width : { 6u, 14u, 30u })
 			{
 				auto angular = info;

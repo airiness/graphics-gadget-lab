@@ -3,6 +3,7 @@
 #include "Capture/RequiredFrameState.h"
 #include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
 #include "GGLabFoundation/Hash/Sha256.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIFieldProfile.h"
 
 #include <cmath>
 #include <array>
@@ -13,6 +14,7 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 #include <variant>
 
 #include <nlohmann/json.hpp>
@@ -792,9 +794,39 @@ namespace gglab
 
 	std::string SerializeGIFieldSummary(const GIFieldSummary& summary) noexcept
 	{
+		nlohmann::json profile = nullptr;
+		if (summary.m_Profile)
+		{
+			const auto& value = *summary.m_Profile;
+			profile = {
+				{ "schemaVersion", GIFieldProfileReceipt::SchemaVersion },
+				{ "id", value.m_Volume.m_Profile.m_Id },
+				{ "revision", value.m_Volume.m_Profile.m_Revision },
+				{ "counts", value.m_Volume.m_Counts },
+				{ "minimum", value.m_Volume.m_Minimum },
+				{ "spacing", value.m_Volume.m_Spacing },
+				{ "irradianceInteriorWidth", value.m_IrradianceInteriorWidth },
+				{ "raysPerProbe", value.m_RaysPerProbe },
+				{ "seed", value.m_Seed },
+				{ "maximumDistance", value.m_MaximumDistance },
+				{ "hysteresis", value.m_Hysteresis },
+				{ "viewBias", value.m_ViewBias },
+				{ "receiverSampling", value.m_EnableReceiverSampling },
+				{ "feedback", value.m_EnableFeedback },
+				{ "progressiveSampling", value.m_ProgressiveSampling },
+				{ "constantEnvironment", value.m_ConstantEnvironment },
+				{ "constantRadiance", value.m_ConstantRadiance },
+				{ "readiness", {
+					{ "enabled", value.m_Readiness.m_Enabled },
+					{ "noiseSigma", value.m_Readiness.m_NoiseSigma },
+					{ "steadyNoiseSigma", value.m_Readiness.m_SteadyNoiseSigma },
+					{ "refreshHysteresis", value.m_Readiness.m_RefreshHysteresis },
+					{ "progressiveRefresh", value.m_Readiness.m_ProgressiveRefresh } } } };
+		}
 		return nlohmann::json{
 			{ "schemaVersion", 1 },
 			{ "field", GIIdentityJson(summary.m_Field) },
+			{ "profile", std::move(profile) },
 			{ "counts", summary.m_Counts },
 			{ "minimum", summary.m_Minimum },
 			{ "spacing", summary.m_Spacing },

@@ -1,4 +1,5 @@
 #include "GGLabRuntime/Graphics/Pipeline/GIField.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIFieldProfile.h"
 #include "GGLabRuntime/Graphics/RayScene.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
 #include "Graphics/Pipeline/GIFieldState.h"
@@ -86,6 +87,51 @@ namespace gglab
 		};
 		static_assert(sizeof(LookupParameters) == 96 && offsetof(LookupParameters, m_Camera) == 80);
 
+		bool ValidProfileIdentity(const GIFieldProfileIdentity& identity) noexcept
+		{
+			if (identity.m_Revision == 0 || identity.m_Id.empty() || identity.m_Id.size() > 128)
+			{
+				return false;
+			}
+			bool segmentStart = true;
+			bool dotted = false;
+			for (char character : identity.m_Id)
+			{
+				if (character == '.')
+				{
+					if (segmentStart)
+					{
+						return false;
+					}
+					segmentStart = true;
+					dotted = true;
+				}
+				else
+				{
+					const bool lower = character >= 'a' && character <= 'z';
+					if ((!lower && segmentStart) || (!lower && character != '_' &&
+						(character < '0' || character > '9')))
+					{
+						return false;
+					}
+					segmentStart = false;
+				}
+			}
+			return dotted && !segmentStart;
+		}
+
+		GIFieldProfileReceipt ProfileReceipt(const GIFieldCreateInfo& info) noexcept
+		{
+			return { .m_Volume = info.m_Volume,
+				.m_IrradianceInteriorWidth = info.m_IrradianceInteriorWidth,
+				.m_RaysPerProbe = info.m_RaysPerProbe, .m_Seed = info.m_Seed,
+				.m_MaximumDistance = info.m_MaximumDistance, .m_Hysteresis = info.m_Hysteresis,
+				.m_ViewBias = info.m_ViewBias, .m_EnableReceiverSampling = info.m_EnableReceiverSampling,
+				.m_EnableFeedback = info.m_EnableFeedback, .m_ProgressiveSampling = info.m_ProgressiveSampling,
+				.m_Readiness = info.m_Readiness, .m_ConstantEnvironment = info.m_ConstantEnvironment,
+				.m_ConstantRadiance = info.m_ConstantRadiance };
+		}
+
 		GIProbeUpdateProfile UpdateProfile(const GIFieldCreateInfo& info) noexcept
 		{
 			GIProbeUpdateProfile result;
@@ -106,7 +152,8 @@ namespace gglab
 
 	bool ValidateGIFieldCreateInfo(const GIFieldCreateInfo& info) noexcept
 	{
-		if (!info.m_RayScene || !ValidateGIProbeUpdateProfile(UpdateProfile(info)) ||
+		if (!info.m_RayScene || !ValidProfileIdentity(info.m_Volume.m_Profile) ||
+			!ValidateGIProbeUpdateProfile(UpdateProfile(info)) ||
 			!std::isfinite(info.m_ViewBias) || info.m_ViewBias < 0 || info.m_ViewBias > 1 ||
 			!std::isfinite(info.m_Readiness.m_NoiseSigma) || info.m_Readiness.m_NoiseSigma < 0 ||
 			!std::isfinite(3 * info.m_Readiness.m_NoiseSigma) ||
@@ -132,6 +179,7 @@ namespace gglab
 	struct GIField::State
 	{
 		GIFieldCreateInfo m_Info;
+		std::shared_ptr<const GIFieldProfileReceipt> m_Profile;
 		GIProbeVisualization m_Visualization;
 		GIProbeUpdateWorkload m_Workload;
 		std::shared_ptr<GIFieldUpdateState> m_Update = std::make_shared<GIFieldUpdateState>();
@@ -158,7 +206,8 @@ namespace gglab
 		GraphicsPipelineSlot m_ReceiverMarkerSlot;
 		ResolvedRenderPipeline m_ReceiverMarkerPipeline;
 		State(GIFieldCreateInfo info) noexcept :
-			m_Info(std::move(info)), m_Workload(m_Info.m_RayScene, UpdateProfile(m_Info), true,
+			m_Info(std::move(info)), m_Profile(std::make_shared<GIFieldProfileReceipt>(ProfileReceipt(m_Info))),
+			m_Workload(m_Info.m_RayScene, UpdateProfile(m_Info), true,
 				m_Info.m_Readiness, m_Info.m_EnableFeedback, m_Info.m_ProgressiveSampling) {}
 	};
 
@@ -168,6 +217,7 @@ namespace gglab
 		auto summary = std::make_shared<GIFieldSummary>();
 		summary->m_Field.m_Generation = m_State->m_Generation;
 		summary->m_Field.m_RefreshEpoch = 1;
+		summary->m_Profile = m_State->m_Profile;
 		summary->m_Counts = m_State->m_Info.m_Volume.m_Counts;
 		summary->m_Minimum = m_State->m_Info.m_Volume.m_Minimum;
 		summary->m_Spacing = m_State->m_Info.m_Volume.m_Spacing;
@@ -192,6 +242,7 @@ namespace gglab
 			.m_FieldLogicalBytes = update.m_FieldLogicalBytes,
 			.m_RayCapacityBytes = update.m_RayCapacityBytes,
 			.m_ProbeCount = update.m_ProbeCount,
+			.m_Profile = state.m_Profile,
 			.m_StatusReadbackSlots = update.m_StatusReadbackSlots,
 			.m_UpdateStatus = update.m_UpdateStatus,
 			.m_Readiness = state.m_Workload.GetReadiness(),
@@ -239,6 +290,7 @@ namespace gglab
 				summary->m_Field = { state.m_Generation, state.m_SceneRevision,
 					state.m_LightingGeneration, state.m_EnvironmentGeneration,
 					state.m_Workload.GetRefreshEpoch(), state.m_Workload.GetEpochOriginUpdate() };
+				summary->m_Profile = state.m_Profile;
 				summary->m_Counts = state.m_Info.m_Volume.m_Counts;
 				summary->m_Minimum = state.m_Info.m_Volume.m_Minimum;
 				summary->m_Spacing = state.m_Info.m_Volume.m_Spacing;

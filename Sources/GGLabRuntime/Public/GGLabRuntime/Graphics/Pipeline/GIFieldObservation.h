@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Graphics/Pipeline/GIFieldReadiness.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIFieldProfile.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIProbeVisualization.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 
@@ -258,6 +259,7 @@ namespace gglab
 	{
 		std::shared_ptr<const GIFieldChangeObservation> m_ChangeObservation;
 		GIFieldIdentity m_Field;
+		std::shared_ptr<const GIFieldProfileReceipt> m_Profile;
 		std::array<uint32_t, 3> m_Counts{};
 		std::array<float, 3> m_Minimum{};
 		float m_Spacing = 0;

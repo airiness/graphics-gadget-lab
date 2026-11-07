@@ -794,6 +794,11 @@ int main(int argumentCount, char* arguments[])
 		return 2;
 	}
 	gglab::ConsoleSelfTestReporter reporter;
+	if (selected == "frame-capture-metadata")
+	{
+		return gglab::RunSelfTestSuite({ .m_Id = selected,
+			.m_Run = &gglab::RunFrameCaptureMetadataSelfTests }, reporter) ? 0 : 1;
+	}
 	if (selected == "gi-field-lighting-refresh")
 	{
 		return gglab::RunSelfTestSuite({ .m_Id = selected,

@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIObservationLimits.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIFieldProfile.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIUpdateStatus.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIFieldReadiness.h"
@@ -13,6 +14,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -20,13 +22,6 @@ namespace gglab
 {
 	class RayScene;
 	struct RaySceneGraphResources;
-
-	struct GIFieldVolumeDescriptor
-	{
-		std::array<uint32_t, 3> m_Counts{ 33, 10, 39 };
-		std::array<float, 3> m_Minimum{ -17.25f, -1.5f, -23.25f };
-		float m_Spacing = 1;
-	};
 
 	struct GIFieldCreateInfo
 	{
@@ -69,6 +64,7 @@ namespace gglab
 		uint64_t m_FieldLogicalBytes = 0;
 		uint64_t m_RayCapacityBytes = 0;
 		uint32_t m_ProbeCount = 0;
+		std::shared_ptr<const GIFieldProfileReceipt> m_Profile;
 		uint32_t m_StatusReadbackSlots = 0;
 		GIUpdateStatus m_UpdateStatus;
 		GIFieldReadinessSnapshot m_Readiness;

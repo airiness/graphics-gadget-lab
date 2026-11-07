@@ -1,4 +1,5 @@
 #pragma once
+#include "Application/Demo/CoastalSceneGIFieldProfile.h"
 
 #include <array>
 #include <cstdint>
@@ -38,30 +39,32 @@ namespace gglab
 	{
 		GIReferenceFixture m_Id;
 		const char* m_Name;
+		const char* m_FieldProfileId;
+		uint32_t m_FieldProfileRevision = 1;
 	};
 	inline constexpr std::array GIReferenceFixtures
 	{
-		GIReferenceFixtureDescription{ GIReferenceFixture::IsolatedSphere, "F1 isolated sphere" },
-		GIReferenceFixtureDescription{ GIReferenceFixture::IsolatedPlane, "F1 isolated plane" },
-		GIReferenceFixtureDescription{ GIReferenceFixture::ThickWallRoom, "F2 sealed thick-wall room" },
-		GIReferenceFixtureDescription{ GIReferenceFixture::ThinWallRoom, "F3 sealed thin-wall room" },
-		GIReferenceFixtureDescription{ GIReferenceFixture::SunlitColoredRoom, "F4 sunlit coloured room" },
-		GIReferenceFixtureDescription{ GIReferenceFixture::SunTransport, "Contract: sun transport" },
-		GIReferenceFixtureDescription{ GIReferenceFixture::OffCameraSunBlocker, "Contract: off-camera sun blocker" },
-		GIReferenceFixtureDescription{ GIReferenceFixture::PublishedEnvironment, "Contract: published environment sphere" },
-		GIReferenceFixtureDescription{ GIReferenceFixture::CoupledDiffusePlanes, "Contract: coupled diffuse planes" },
-		GIReferenceFixtureDescription{ GIReferenceFixture::HitMaterial, "Contract: reduced hit material and snapshots" },
-		GIReferenceFixtureDescription{ GIReferenceFixture::SpecularVisibility, "Contract: GGX environment visibility" },
-		GIReferenceFixtureDescription{ GIReferenceFixture::CoastalSpecularVisibility, "Coastal: GGX visibility diagnostics" },
-		GIReferenceFixtureDescription{ GIReferenceFixture::CoastalDiffuse, "Coastal: diffuse reference" },
-		GIReferenceFixtureDescription{ GIReferenceFixture::SmallSmoothReceiver, "Contract: small smooth receiver" },
-		GIReferenceFixtureDescription{ GIReferenceFixture::ProbeFurnace, "Contract: probe furnace" },
-		GIReferenceFixtureDescription{ GIReferenceFixture::CoastalProbeCost, "Coastal: probe update cost" },
-		GIReferenceFixtureDescription{ GIReferenceFixture::ProbeSlab, "Contract: probe slab" },
-		GIReferenceFixtureDescription{ GIReferenceFixture::FieldCoverage, "Contract: field coverage" },
-		GIReferenceFixtureDescription{ GIReferenceFixture::FieldUnsupportedCage, "Contract: unsupported field cage" },
-		GIReferenceFixtureDescription{ GIReferenceFixture::BlackField, "F10 black field" },
-		GIReferenceFixtureDescription{ GIReferenceFixture::ParallelRooms, "F5 parallel rooms with doorway" },
+		GIReferenceFixtureDescription{ GIReferenceFixture::IsolatedSphere, "F1 isolated sphere", "gglab.gi.field.isolated_sphere" },
+		GIReferenceFixtureDescription{ GIReferenceFixture::IsolatedPlane, "F1 isolated plane", "gglab.gi.field.isolated_plane" },
+		GIReferenceFixtureDescription{ GIReferenceFixture::ThickWallRoom, "F2 sealed thick-wall room", "gglab.gi.field.thick_wall_room" },
+		GIReferenceFixtureDescription{ GIReferenceFixture::ThinWallRoom, "F3 sealed thin-wall room", "gglab.gi.field.thin_wall_room" },
+		GIReferenceFixtureDescription{ GIReferenceFixture::SunlitColoredRoom, "F4 sunlit coloured room", "gglab.gi.field.sunlit_room.precision" },
+		GIReferenceFixtureDescription{ GIReferenceFixture::SunTransport, "Contract: sun transport", "gglab.gi.field.sun_transport" },
+		GIReferenceFixtureDescription{ GIReferenceFixture::OffCameraSunBlocker, "Contract: off-camera sun blocker", "gglab.gi.field.off_camera_sun_blocker" },
+		GIReferenceFixtureDescription{ GIReferenceFixture::PublishedEnvironment, "Contract: published environment sphere", "gglab.gi.field.published_environment" },
+		GIReferenceFixtureDescription{ GIReferenceFixture::CoupledDiffusePlanes, "Contract: coupled diffuse planes", "gglab.gi.field.coupled_diffuse_planes" },
+		GIReferenceFixtureDescription{ GIReferenceFixture::HitMaterial, "Contract: reduced hit material and snapshots", "gglab.gi.field.hit_material" },
+		GIReferenceFixtureDescription{ GIReferenceFixture::SpecularVisibility, "Contract: GGX environment visibility", "gglab.gi.field.specular_receiver" },
+		GIReferenceFixtureDescription{ GIReferenceFixture::CoastalSpecularVisibility, "Coastal: GGX visibility diagnostics", CoastalSceneGIFieldProfileId, CoastalSceneGIFieldProfileRevision },
+		GIReferenceFixtureDescription{ GIReferenceFixture::CoastalDiffuse, "Coastal: diffuse reference", CoastalSceneGIFieldProfileId, CoastalSceneGIFieldProfileRevision },
+		GIReferenceFixtureDescription{ GIReferenceFixture::SmallSmoothReceiver, "Contract: small smooth receiver", "gglab.gi.field.small_smooth_receiver" },
+		GIReferenceFixtureDescription{ GIReferenceFixture::ProbeFurnace, "Contract: probe furnace", "gglab.gi.field.probe_furnace" },
+		GIReferenceFixtureDescription{ GIReferenceFixture::CoastalProbeCost, "Coastal: probe update cost", CoastalSceneGIFieldProfileId, CoastalSceneGIFieldProfileRevision },
+		GIReferenceFixtureDescription{ GIReferenceFixture::ProbeSlab, "Contract: probe slab", "gglab.gi.field.probe_slab" },
+		GIReferenceFixtureDescription{ GIReferenceFixture::FieldCoverage, "Contract: field coverage", "gglab.gi.field.coverage_cage" },
+		GIReferenceFixtureDescription{ GIReferenceFixture::FieldUnsupportedCage, "Contract: unsupported field cage", "gglab.gi.field.unsupported_cage" },
+		GIReferenceFixtureDescription{ GIReferenceFixture::BlackField, "F10 black field", "gglab.gi.field.black_room" },
+		GIReferenceFixtureDescription{ GIReferenceFixture::ParallelRooms, "F5 parallel rooms with doorway", "gglab.gi.field.parallel_rooms" },
 	};
 
 	struct GIReferenceRoomSolid

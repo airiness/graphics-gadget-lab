@@ -4,6 +4,7 @@
 #include "Lab/LabParameter.h"
 #include "Application/Content/RuntimeAssetBundle.h"
 #include "Application/Demo/CoastalSceneReferenceViews.h"
+#include "Application/Demo/CoastalSceneGIFieldProfile.h"
 #include "Application/Demo/CoastalSceneLightingProfiles.h"
 #include "GGLabRuntime/Core/Math/Quaternion.h"
 #include "GGLabRuntime/Core/Math/Transform.h"
@@ -1050,7 +1051,11 @@ namespace gglab
 				info.m_Readiness.m_SteadyNoiseSigma = GetParameters().Get(FieldSteadyNoiseId, 0.0f);
 				info.m_RaysPerProbe = GetParameters().Get(ProbeRaysId, uint32_t(256));
 				info.m_Seed = GetParameters().Get(SeedId, GIObservationLimits::DefaultSeed);
-				if (!IsCoastalGIFixture(fixture))
+				if (IsCoastalGIFixture(fixture))
+				{
+					info.m_Volume = CoastalSceneGIFieldVolume;
+				}
+				else
 				{
 					info.m_ConstantEnvironment = ResolveEnvironment(GetParameters(), fixture) ==
 						GIReferenceEnvironment::DirectConstant;
@@ -1101,6 +1106,15 @@ namespace gglab
 					else
 					{
 						info.m_Volume = { .m_Counts = { 7, 7, 7 }, .m_Minimum = { -3, -1, -3 } };
+					}
+				}
+				for (const auto& description : GIReferenceFixtures)
+				{
+					if (description.m_Id == fixture)
+					{
+						info.m_Volume.m_Profile = {
+							description.m_FieldProfileId, description.m_FieldProfileRevision };
+						break;
 					}
 				}
 				const auto width = GetParameters().Get(FieldIrradianceWidthId, int32_t(0));
