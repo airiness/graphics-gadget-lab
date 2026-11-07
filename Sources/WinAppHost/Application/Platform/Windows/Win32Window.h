@@ -57,6 +57,7 @@ namespace gglab
 		[[nodiscard]] void* GetNativeHandle() const noexcept override { return m_Hwnd; }
 		[[nodiscard]] uint32_t GetWidth() const noexcept override { return m_Width; }
 		[[nodiscard]] uint32_t GetHeight() const noexcept override { return m_Height; }
+		[[nodiscard]] float GetDpiScale() const noexcept override;
 
 	private:
 		struct MessageHandlerEntry

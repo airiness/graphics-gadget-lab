@@ -13,6 +13,8 @@
 #include <format>
 #include <iterator>
 #include <limits>
+#include <span>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <variant>
@@ -303,11 +305,81 @@ namespace gglab
 		{
 			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::InvalidPlan };
 		}
+		if (plan.m_GIProbeInspection)
+		{
+			bool compactTarget = false;
+			bool integrationTarget = false;
+			for (const auto& product : plan.m_RequiredProducts)
+			{
+				if (const auto* resource = std::get_if<ResourceCaptureProduct>(&product))
+				{
+					for (const auto& target : resource->m_Targets)
+					{
+						if (target.m_Position == RGObservationPosition::Final && target.m_Mip == 0 &&
+							target.m_FirstSlice == 0 && (!target.m_SliceCount || *target.m_SliceCount == 1))
+						{
+							compactTarget |= target.m_Resource == "GI.Field.ProbeInspection";
+							integrationTarget |= target.m_Resource == "GI.Field.IntegrationInspection";
+						}
+					}
+				}
+			}
+			if (!compactTarget || (plan.m_GIProbeInspection->m_IntegrationReplayUpdate && !integrationTarget) ||
+				plan.m_GIProbeInspection->m_ExpectedGeneration == 0 || plan.m_Sequence)
+			{
+				return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::InvalidPlan };
+			}
+		}
+		if (plan.m_GIReceiverInspection)
+		{
+			bool compactTarget = false;
+			for (const auto& product : plan.m_RequiredProducts)
+			{
+				if (const auto* resource = std::get_if<ResourceCaptureProduct>(&product))
+				{
+					compactTarget = std::ranges::any_of(resource->m_Targets, [](const auto& target)
+						{
+							return target.m_Resource == "GI.Field.ReceiverInspection" &&
+								target.m_Position == RGObservationPosition::Final && target.m_Mip == 0 &&
+								target.m_FirstSlice == 0 && (!target.m_SliceCount || *target.m_SliceCount == 1);
+						});
+				}
+			}
+			const auto& request = *plan.m_GIReceiverInspection;
+			if (!compactTarget || request.m_ExpectedGeneration == 0 || request.m_ExpectedViewRevision == 0 ||
+				(request.m_ExpectedRefreshEpoch && *request.m_ExpectedRefreshEpoch == 0) || plan.m_Sequence)
+			{
+				return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::InvalidPlan };
+			}
+		}
 		if (plan.m_FrameSelectionTimeout && (!plan.m_RequiredFrameState ||
 			*plan.m_FrameSelectionTimeout < std::chrono::milliseconds(1) ||
 			*plan.m_FrameSelectionTimeout > MaxFrameSelectionTimeout))
 		{
 			return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::InvalidPlan };
+		}
+		if (plan.m_GIProbePicking)
+		{
+			bool idTarget = false;
+			bool depthTarget = false;
+			for (const auto& product : plan.m_RequiredProducts)
+			{
+				if (const auto* resource = std::get_if<ResourceCaptureProduct>(&product))
+				{
+					for (const auto& target : resource->m_Targets)
+					{
+						const bool finalPixel = target.m_Position == RGObservationPosition::Final && target.m_Mip == 0 &&
+							target.m_FirstSlice == 0 && (!target.m_SliceCount || *target.m_SliceCount == 1);
+						idTarget |= finalPixel && target.m_Resource == "GI.Probes.PickID";
+						depthTarget |= finalPixel && target.m_Resource == "GI.Probes.PickDepth";
+					}
+				}
+			}
+			if (!idTarget || !depthTarget || plan.m_Sequence || plan.m_RequiredContentId.empty() ||
+				!IsGIProbePickingRequestValid(*plan.m_GIProbePicking))
+			{
+				return { CaptureAdmissionStatus::Rejected, CaptureAdmissionReason::InvalidPlan };
+			}
 		}
 		// Sequence frames are bound to a camera path, not to a required display state.
 		// Only a predicate plan pays for validation; others admit without allocating.
@@ -769,6 +841,9 @@ namespace gglab
 
 	void FrameCaptureCoordinator::BeginFrame(FrameCaptureFrameState state) noexcept
 	{
+		m_FrameGIProbeInspection.reset();
+		m_FrameGIReceiverInspection.reset();
+		m_FrameGIProbePicking.reset();
 		ExpireFrameSelections();
 		const bool ready = state.m_Readiness.IsReady();
 		const bool historyRestarted =
@@ -815,12 +890,18 @@ namespace gglab
 				{
 					continue;
 				}
+				if (plan.m_GIProbePicking && !MatchesRequiredContent(job, state))
+				{
+					FailPlan(job, "Picking content changed before issue.", "GIProbePickingContentMismatch");
+					continue;
+				}
 				if (!readinessFailure.empty() && plan.m_Timing == FrameCaptureTiming::AfterReady &&
 					MatchesRequiredContent(job, state))
 				{
 					FailPlan(job, readinessFailure);
 				}
-				else if (IsDue(job, state) && !FailRequiredFrameStateMismatch(job, state))
+				else if (IsDue(job, state) && !FailRequiredFrameStateMismatch(job, state) &&
+					SelectGIProbeInspection(job, state) && SelectGIReceiverInspection(job, state) && SelectGIProbePicking(job, state))
 				{
 					const auto tap = entry.GetDiagnosticTap();
 					if (entry.GetSource() == FrameCaptureSource::Diagnostic && tap &&
@@ -858,13 +939,19 @@ namespace gglab
 				continue;
 			}
 			visited.push_back(&job);
+			if (plan.m_GIProbePicking && !MatchesRequiredContent(job, state))
+			{
+				FailPlan(job, "Picking content changed before issue.", "GIProbePickingContentMismatch");
+				continue;
+			}
 			if (!readinessFailure.empty() && plan.m_Timing == FrameCaptureTiming::AfterReady &&
 				MatchesRequiredContent(job, state))
 			{
 				FailPlan(job, readinessFailure);
 				continue;
 			}
-			if (!IsDue(job, state) || FailRequiredFrameStateMismatch(job, state))
+			if (!IsDue(job, state) || FailRequiredFrameStateMismatch(job, state) ||
+				!SelectGIProbeInspection(job, state) || !SelectGIReceiverInspection(job, state) || !SelectGIProbePicking(job, state))
 			{
 				continue;
 			}
@@ -1267,6 +1354,109 @@ namespace gglab
 		return true;
 	}
 
+	std::optional<GIProbeInspectionRequest> FrameCaptureCoordinator::GetFrameGIProbeInspection() const noexcept
+	{
+		return m_FrameGIProbeInspection;
+	}
+
+	bool FrameCaptureCoordinator::SelectGIProbeInspection(CaptureJob& job,
+		const FrameCaptureFrameState& state) noexcept
+	{
+		const auto& request = job.m_Plan.m_GIProbeInspection;
+		if (!request)
+		{
+			return true;
+		}
+		const auto summary = state.m_Readiness.m_GIField ? state.m_Readiness.m_GIField->m_Summary : nullptr;
+		if (!summary || !MatchesGIProbeInspection(*request, *summary))
+		{
+			FailPlan(job, "GI probe coordinate or required field identity mismatch.", "GIProbeIdentityMismatch");
+			return false;
+		}
+		if (!summary->m_InspectionAvailable || summary->m_Invalid)
+		{
+			FailPlan(job, "GI probe data is unavailable on the selected frame.", "GIProbeUnavailable");
+			return false;
+		}
+		if (m_FrameGIProbeInspection && m_FrameGIProbeInspection != request)
+		{
+			return false;
+		}
+		return true;
+	}
+
+	std::optional<GIReceiverInspectionRequest> FrameCaptureCoordinator::GetFrameGIReceiverInspection() const noexcept
+	{
+		return m_FrameGIReceiverInspection;
+	}
+
+	bool FrameCaptureCoordinator::SelectGIReceiverInspection(CaptureJob& job,
+		const FrameCaptureFrameState& state) noexcept
+	{
+		const auto& request = job.m_Plan.m_GIReceiverInspection;
+		if (!request)
+		{
+			return true;
+		}
+		const auto summary = state.m_Readiness.m_GIField ? state.m_Readiness.m_GIField->m_Summary : nullptr;
+		if (!summary || !MatchesGIReceiverInspection(*request, *summary))
+		{
+			FailPlan(job, "GI receiver field/view identity or pixel mismatch.", "GIReceiverIdentityMismatch");
+			return false;
+		}
+		if (!summary->m_ReceiverView.m_Supported)
+		{
+			FailPlan(job, "Receiver inspection requires existing Native, unjittered receivers with TAA off.",
+				"GIReceiverViewUnsupported");
+			return false;
+		}
+		if (!summary->m_ReceiverInspectionAvailable || summary->m_Invalid)
+		{
+			FailPlan(job, "GI receiver data is unavailable on the selected frame.", "GIReceiverUnavailable");
+			return false;
+		}
+		if (request->m_Markers && !summary->m_ReceiverMarkersAvailable)
+		{
+			FailPlan(job, "GI receiver markers are unavailable on the selected frame.", "GIReceiverMarkersUnavailable");
+			return false;
+		}
+		return !m_FrameGIReceiverInspection || m_FrameGIReceiverInspection == request;
+	}
+
+	std::optional<GIProbePickingRequest> FrameCaptureCoordinator::GetFrameGIProbePicking() const noexcept
+	{
+		return m_FrameGIProbePicking;
+	}
+
+	bool FrameCaptureCoordinator::SelectGIProbePicking(CaptureJob& job, const FrameCaptureFrameState& state) noexcept
+	{
+		const auto& request = job.m_Plan.m_GIProbePicking;
+		if (!request)
+		{
+			return true;
+		}
+		const auto summary = state.m_Readiness.m_GIField ? state.m_Readiness.m_GIField->m_Summary : nullptr;
+		GIProbePickingBinding binding = GIProbePickingBinding::Unavailable;
+		if (request->m_SourceFrame >= state.m_FrameSerial)
+		{
+			binding = GIProbePickingBinding::InvalidSource;
+		}
+		else if (summary)
+		{
+			const auto extent = summary->m_Visualization.m_View.m_DisplayExtent;
+			const GIProbePickMapping mapping{ .m_GuiExtent = { float(extent[0]), float(extent[1]) },
+				.m_DpiScale = state.m_DisplayDpiScale };
+			binding = CheckGIProbePickingBinding(*request, *summary, mapping);
+		}
+		if (binding != GIProbePickingBinding::Matching)
+		{
+			FailPlan(job, "Picking source no longer matches the execution frame.",
+				std::string("GIProbePicking") + std::string(GetGIProbePickingBindingName(binding)));
+			return false;
+		}
+		return !m_FrameGIProbePicking || m_FrameGIProbePicking == request;
+	}
+
 	void FrameCaptureCoordinator::Issue(ProductDelivery& entry,
 		const FrameCaptureFrameState& state, bool preAdmitted) noexcept
 	{
@@ -1338,7 +1528,43 @@ namespace gglab
 		metadata.m_TotalTime = state.m_TotalTime;
 		metadata.m_DevelopmentTools = state.m_DevelopmentTools;
 		metadata.m_Readiness = state.m_Readiness;
+		if (plan.m_GIProbeInspection)
+		{
+			const auto& summary = *state.m_Readiness.m_GIField->m_Summary;
+			metadata.m_GIProbeInspectionRequest = plan.m_GIProbeInspection;
+			const uint64_t update = GetGIFieldFrameUpdate(summary);
+			metadata.m_GIProbeObservation = GIObservationStamp{ .m_Field = summary.m_Field,
+				.m_Kind = GIObservationKind::ProbeAtlas, .m_ProducingFrame = state.m_FrameSerial,
+				.m_FieldUpdate = update, .m_ReadinessUpdate = update - summary.m_Field.m_EpochOriginUpdate };
+			for (size_t axis = 0; axis < 3; ++axis)
+			{
+				metadata.m_GIProbePosition[axis] = summary.m_Minimum[axis] + summary.m_Spacing *
+					float(plan.m_GIProbeInspection->m_Coordinate[axis]);
+			}
+		}
 		metadata.m_Temporal = state.m_Temporal;
+		if (plan.m_GIProbePicking)
+		{
+			const auto& summary = *state.m_Readiness.m_GIField->m_Summary;
+			const uint64_t update = GetGIFieldFrameUpdate(summary);
+			metadata.m_GIProbePickingRequest = plan.m_GIProbePicking;
+			metadata.m_GIProbePickingObservation = GIObservationStamp{ .m_Field = summary.m_Field,
+				.m_Kind = GIObservationKind::ProbePicking, .m_ProducingFrame = state.m_FrameSerial,
+				.m_FieldUpdate = update, .m_ReadinessUpdate = update - summary.m_Field.m_EpochOriginUpdate };
+			metadata.m_GIProbePickingView = summary.m_Visualization.m_View;
+			metadata.m_GIProbePickingCounts = summary.m_Counts;
+			metadata.m_GIProbePickingDpiScale = state.m_DisplayDpiScale;
+		}
+		if (plan.m_GIReceiverInspection)
+		{
+			const auto& summary = *state.m_Readiness.m_GIField->m_Summary;
+			const uint64_t update = GetGIFieldFrameUpdate(summary);
+			metadata.m_GIReceiverInspectionRequest = plan.m_GIReceiverInspection;
+			metadata.m_GIReceiverObservation = GIObservationStamp{ .m_Field = summary.m_Field,
+				.m_Kind = GIObservationKind::ReceiverContribution, .m_ProducingFrame = state.m_FrameSerial,
+				.m_FieldUpdate = update, .m_ReadinessUpdate = update - summary.m_Field.m_EpochOriginUpdate };
+			metadata.m_GIReceiverView = summary.m_ReceiverView;
+		}
 		if (!state.m_HostViewProjection.empty())
 		{
 			metadata.m_Control = FrameCaptureControlState{
@@ -1371,6 +1597,18 @@ namespace gglab
 		{
 			FailPlan(job, "Frame capture request capacity is exhausted.");
 			return;
+		}
+		if (plan.m_GIProbeInspection)
+		{
+			m_FrameGIProbeInspection = plan.m_GIProbeInspection;
+		}
+		if (plan.m_GIReceiverInspection)
+		{
+			m_FrameGIReceiverInspection = plan.m_GIReceiverInspection;
+		}
+		if (plan.m_GIProbePicking)
+		{
+			m_FrameGIProbePicking = plan.m_GIProbePicking;
 		}
 		if (!job.m_Attempt)
 		{
@@ -1550,6 +1788,47 @@ namespace gglab
 		metadata.m_GraphExportActive = result.m_GraphExportActive || bool(result.m_Graph);
 		metadata.m_ResourceExportActive = result.m_ResourceExportActive;
 		metadata.m_NonFiniteScanActive = result.m_NonFiniteScanActive;
+		if (metadata.m_GIProbePickingRequest && result.m_Resources)
+		{
+			std::span<const std::byte> ids;
+			std::span<const std::byte> depths;
+			for (const auto& array : result.m_Resources->m_Arrays)
+			{
+				if (array.m_Address.m_Resource == "GI.Probes.PickID")
+				{
+					ids = std::as_bytes(std::span(array.m_Data));
+				}
+				else if (array.m_Address.m_Resource == "GI.Probes.PickDepth")
+				{
+					depths = std::as_bytes(std::span(array.m_Data));
+				}
+			}
+			metadata.m_GIProbePicking = DecodeGIProbePicking(*metadata.m_GIProbePickingRequest,
+				*metadata.m_GIProbePickingObservation, *metadata.m_GIProbePickingView,
+				metadata.m_GIProbePickingCounts, ids, depths);
+		}
+		if (metadata.m_GIReceiverInspectionRequest && result.m_Resources)
+		{
+			for (const auto& array : result.m_Resources->m_Arrays)
+			{
+				if (array.m_Address.m_Resource == "GI.Field.ReceiverInspection")
+				{
+					metadata.m_GIReceiverInspection = DecodeGIReceiverInspection(*metadata.m_GIReceiverInspectionRequest,
+						*metadata.m_GIReceiverObservation, *metadata.m_GIReceiverView, array.m_Data);
+				}
+			}
+		}
+		if (metadata.m_GIProbeInspectionRequest && result.m_Resources)
+		{
+			for (const auto& array : result.m_Resources->m_Arrays)
+			{
+				if (array.m_Address.m_Resource == "GI.Field.ProbeInspection")
+				{
+					metadata.m_GIProbeInspection = DecodeGIProbeInspection(*metadata.m_GIProbeInspectionRequest,
+						*metadata.m_GIProbeObservation, metadata.m_GIProbePosition, array.m_Data);
+				}
+			}
+		}
 		if (result.m_Image)
 		{
 			const FrameCaptureImage& image = *result.m_Image;

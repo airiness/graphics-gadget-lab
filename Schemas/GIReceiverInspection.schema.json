@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gglab.gi-receiver-inspection",
+  "title": "GGLab receiver contribution inspection v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "request", "observation", "view", "validity", "cageEvaluated", "support", "compatible", "position", "biasedPosition", "vertexNormal", "shadingNormal", "viewDirection", "coverage", "totalWeight", "normalizationReason", "irradianceE", "ordinaryIrradianceE", "ordinaryWeight", "fieldProfile", "units", "payloadBytes", "markerMode", "corners"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "request": {
+      "type": "object", "additionalProperties": false,
+      "required": ["pixel", "expectedGeneration", "expectedViewRevision", "expectedViewId", "expectedRefreshEpoch", "markers"],
+      "properties": {
+        "pixel": {"$ref": "#/$defs/pixel"},
+        "expectedGeneration": {"type": "integer", "minimum": 1},
+        "expectedViewRevision": {"type": "integer", "minimum": 1},
+        "expectedViewId": {"type": "integer", "minimum": 0},
+        "expectedRefreshEpoch": {"type": ["integer", "null"], "minimum": 1},
+        "markers": {"type": "boolean"}
+      }
+    },
+    "observation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["field", "kind", "producingFrame", "fieldUpdate", "readinessUpdate"],
+      "properties": {
+        "field": {
+          "type": "object", "additionalProperties": false,
+          "required": ["generation", "sceneRevision", "lightingGeneration", "environmentGeneration", "refreshEpoch", "epochOriginUpdate"],
+          "properties": {
+            "generation": {"type": "integer", "minimum": 1},
+            "sceneRevision": {"type": "integer", "minimum": 0},
+            "lightingGeneration": {"type": "integer", "minimum": 0},
+            "environmentGeneration": {"type": "integer", "minimum": 0},
+            "refreshEpoch": {"type": "integer", "minimum": 1},
+            "epochOriginUpdate": {"type": "integer", "minimum": 0}
+          }
+        },
+        "kind": {"const": "receiver-contribution"},
+        "producingFrame": {"type": "integer", "minimum": 1},
+        "fieldUpdate": {"type": "integer", "minimum": 1},
+        "readinessUpdate": {"type": "integer", "minimum": 1}
+      }
+    },
+    "view": {
+      "type": "object", "additionalProperties": false,
+      "required": ["revision", "viewId", "renderExtent", "displayExtent", "cameraPosition", "view", "projection", "viewProjection", "matrixConvention", "clipDepthRange", "pixelConvention", "jitterPixels", "nearFar", "reversedDepth", "receiversAvailable", "temporalAA", "supported", "receiverAttachmentLogicalBytes", "lookupDiagnosticLogicalBytes"],
+      "properties": {
+        "revision": {"type": "integer", "minimum": 1},
+        "viewId": {"type": "integer", "minimum": 0},
+        "renderExtent": {"$ref": "#/$defs/pixel"},
+        "displayExtent": {"$ref": "#/$defs/pixel"},
+        "cameraPosition": {"$ref": "#/$defs/vector"},
+        "view": {"$ref": "#/$defs/matrix"},
+        "projection": {"$ref": "#/$defs/matrix"},
+        "viewProjection": {"$ref": "#/$defs/matrix"},
+        "matrixConvention": {"const": "row-major-row-vector"},
+        "clipDepthRange": {"const": [0, 1]},
+        "pixelConvention": {"const": "top-left-integer-center"},
+        "jitterPixels": {"const": [0, 0]},
+        "nearFar": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number"}},
+        "reversedDepth": {"type": "boolean"},
+        "receiversAvailable": {"const": true},
+        "temporalAA": {"const": false},
+        "supported": {"const": true},
+        "receiverAttachmentLogicalBytes": {"type": "integer", "minimum": 0},
+        "lookupDiagnosticLogicalBytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "validity": {"enum": ["Valid", "Background", "FieldUnavailable", "Incompatible", "OutsideCoverage", "NoValidSupport", "InvalidNumerics", "MalformedPayload"]},
+    "cageEvaluated": {"type": "boolean"},
+    "support": {"type": "integer", "minimum": 0},
+    "compatible": {"type": "boolean"},
+    "position": {"$ref": "#/$defs/optionalVector"},
+    "biasedPosition": {"$ref": "#/$defs/optionalVector"},
+    "vertexNormal": {"$ref": "#/$defs/optionalVector"},
+    "shadingNormal": {"$ref": "#/$defs/optionalVector"},
+    "viewDirection": {"$ref": "#/$defs/optionalVector"},
+    "coverage": {"$ref": "#/$defs/number"},
+    "totalWeight": {"$ref": "#/$defs/number"},
+    "normalizationReason": {"enum": [null, "NoPositiveTotalWeight"]},
+    "irradianceE": {"$ref": "#/$defs/optionalVector"},
+    "ordinaryIrradianceE": {"$ref": "#/$defs/optionalVector"},
+    "ordinaryWeight": {"$ref": "#/$defs/number"},
+    "fieldProfile": {
+      "type": "object", "additionalProperties": false,
+      "required": ["counts", "spacing", "irradianceInteriorWidth", "normalBias", "viewBias"],
+      "properties": {
+        "counts": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "integer", "minimum": 0}},
+        "spacing": {"type": "number"},
+        "irradianceInteriorWidth": {"enum": [0, 6, 14, 30]},
+        "normalBias": {"type": "number"},
+        "viewBias": {"type": "number"}
+      }
+    },
+    "units": {"const": {"position": "world-units", "distance": "world-units", "variance": "world-units-squared", "irradiance": "scene-referred-irradiance-E", "weights": "dimensionless"}},
+    "payloadBytes": {"const": 1168},
+    "markerMode": {"enum": ["gpu-xray", "off"]},
+    "corners": {"type": "array", "maxItems": 8, "items": {"$ref": "#/$defs/corner"}}
+  },
+  "allOf": [{"if": {"properties": {"cageEvaluated": {"const": true}}}, "then": {"properties": {"corners": {"minItems": 8}}}, "else": {"properties": {"corners": {"maxItems": 0}}}}],
+  "$defs": {
+    "pixel": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "integer", "minimum": 0, "maximum": 4294967295}},
+    "matrix": {"type": "array", "minItems": 16, "maxItems": 16, "items": {"type": "number"}},
+    "number": {"type": ["number", "null"]},
+    "vector": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": ["number", "null"]}},
+    "optionalVector": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/vector"}]},
+    "corner": {
+      "type": "object", "additionalProperties": false,
+      "required": ["coordinate", "classification", "worldPosition", "reason", "samplingEvaluated", "trilinearFactors", "trilinearWeight", "backfaceFactor", "atlasM", "meanDistance", "variance", "usedVariance", "receiverDistance", "visibility", "preVisibilityWeight", "preCrushWeight", "rawWeight", "normalizedWeight", "contributionE"],
+      "properties": {
+        "coordinate": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "integer", "minimum": 0}},
+        "classification": {"type": "integer", "minimum": 0},
+        "worldPosition": {"$ref": "#/$defs/vector"},
+        "reason": {"enum": ["NotEvaluated", "NotActive", "ZeroTrilinearWeight", "ZeroWeight", "Contributing"]},
+        "samplingEvaluated": {"type": "boolean"},
+        "trilinearFactors": {"$ref": "#/$defs/vector"},
+        "trilinearWeight": {"$ref": "#/$defs/number"},
+        "backfaceFactor": {"$ref": "#/$defs/number"},
+        "atlasM": {"$ref": "#/$defs/optionalVector"},
+        "meanDistance": {"$ref": "#/$defs/number"},
+        "variance": {"$ref": "#/$defs/number"},
+        "usedVariance": {"$ref": "#/$defs/number"},
+        "receiverDistance": {"$ref": "#/$defs/number"},
+        "visibility": {"$ref": "#/$defs/number"},
+        "preVisibilityWeight": {"$ref": "#/$defs/number"},
+        "preCrushWeight": {"$ref": "#/$defs/number"},
+        "rawWeight": {"$ref": "#/$defs/number"},
+        "normalizedWeight": {"$ref": "#/$defs/number"},
+        "contributionE": {"$ref": "#/$defs/optionalVector"}
+      }
+    }
+  }
+}

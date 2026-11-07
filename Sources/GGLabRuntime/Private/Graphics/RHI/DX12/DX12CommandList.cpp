@@ -10,6 +10,7 @@
 #include "Graphics/RHI/DX12/DX12Resource.h"
 #include "Graphics/RHI/DX12/DX12HResult.h"
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -74,14 +75,19 @@ namespace gglab
 	void DX12CommandList::SetDescriptorHeaps(
 		std::span<const DX12DescriptorHeap*> descriptorHeaps) const noexcept
 	{
-		std::vector<ID3D12DescriptorHeap*> heaps(descriptorHeaps.size());
+		GGLAB_ASSERT(descriptorHeaps.size() <= 2);
+		if (descriptorHeaps.size() > 2)
+		{
+			return;
+		}
+		std::array<ID3D12DescriptorHeap*, 2> heaps{};
 		for (int32_t index = 0; index < static_cast<int32_t>(descriptorHeaps.size()); ++index)
 		{
 			GGLAB_ASSERT_NOT_NULL(descriptorHeaps[index]);
 			heaps.at(index) = descriptorHeaps[index]->Get();
 		}
 		m_D3D12GraphicsCommandList->SetDescriptorHeaps(
-			static_cast<UINT>(heaps.size()), heaps.data());
+			static_cast<UINT>(descriptorHeaps.size()), heaps.data());
 	}
 
 	void DX12CommandList::SetViewport(

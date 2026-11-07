@@ -1,5 +1,8 @@
 #pragma once
 
+#include "GGLabRuntime/Graphics/Pipeline/GIFieldReadiness.h"
+
+#include <optional>
 #include <algorithm>
 #include <cstdint>
 #include <string>
@@ -48,6 +51,7 @@ namespace gglab
 	struct FrameCaptureReadiness
 	{
 		std::vector<FrameCaptureGate> m_Gates;
+		std::optional<GIFieldCaptureState> m_GIField;
 
 		void Add(std::string name, FrameCaptureGateState state, std::string detail = {},
 			std::string effectDomain = {}, uint64_t effectGeneration = 0)

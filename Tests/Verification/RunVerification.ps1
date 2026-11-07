@@ -24,7 +24,13 @@ $catalog = @(
     @{ name = 'coastal-assets'; group = 'contracts'; steps = @(
         @{ path = 'Scripts/Verification/ValidateAssetBundle.py'; arguments = @('--self-test') },
         @{ path = 'Scripts/Verification/ValidateAssetBundle.py'; arguments = @() }) },
+    @{ name = 'gi-inputs'; group = 'contracts'; steps = @(
+        @{ path = 'Scripts/Verification/ValidateGIInputs.py'; arguments = @('--self-test') },
+        @{ path = 'Scripts/Verification/ValidateGIInputs.py'; arguments = @() }) },
     @{ name = 'verification-support'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/TestVerificationSupport.ps1' }) },
+    @{ name = 'process-diagnostics'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/TestProcessDiagnostics.ps1' }) },
+    @{ name = 'source-normalization'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/TestSourceNormalization.ps1' }) },
+    @{ name = 'shader-project-ownership'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/TestShaderProjectOwnership.ps1' }) },
     @{ name = 'nonfinite-sites'; group = 'contracts'; steps = @(
         @{ path = 'Scripts/GenerateNonFiniteSites.py'; arguments = @('--check') },
         @{ path = 'Scripts/ValidateNonFiniteSites.py'; arguments = @('--self-test') },
@@ -37,6 +43,55 @@ $catalog = @(
     @{ name = 'capture-bundle-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateCaptureBundles.py'; arguments = @('--self-test') }) },
     @{ name = 'gpu-timing-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateGpuTiming.py'; arguments = @('--self-test') }) },
     @{ name = 'parameter-frames-schema'; group = 'contracts'; steps = @(@{ path = 'Scripts/Verification/ValidateParameterFrames.py'; arguments = @('--self-test') }) },
+    @{ name = 'gi-reference-contracts'; group = 'contracts'; steps = @(
+        @{ path = 'Tests/Verification/ValidateGIReference.py'; arguments = @('--self-test') },
+        @{ path = 'Tests/Verification/ValidateGIReferenceLighting.py'; arguments = @('--self-test') },
+        @{ path = 'Tests/Verification/ValidateGIReferenceTransport.py'; arguments = @('--self-test') },
+        @{ path = 'Tests/Verification/ValidateGIReferenceConvergence.py'; arguments = @('--self-test') },
+        @{ path = 'Tests/Verification/ValidateGIReferenceMaterials.py'; arguments = @('--self-test') },
+        @{ path = 'Tests/Verification/GlobalIllumination/GenerateReferenceEnvironments.py'; arguments = @('--check') }) },
+    @{ name = 'gi-specular-visibility-contracts'; group = 'contracts'; steps = @(
+        @{ path = 'Tests/Verification/ValidateGISpecularVisibility.py'; arguments = @('--self-test') }) },
+    @{ name = 'gi-probe-update-contracts'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/ValidateGIProbeUpdate.py'; arguments = @('--self-test') }) },
+    @{ name = 'gi-probe-viewer-contracts'; group = 'contracts'; steps = @(
+        @{ path = 'Tests/Verification/TestGIProbeViewerWarmup.ps1' },
+        @{ path = 'Tests/Verification/ValidateGIProbeViewer.py'; arguments = @('--self-test') }) },
+    @{ name = 'gi-field'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIField.ps1' }) },
+    @{ name = 'gi-probe-integration-contracts'; group = 'contracts'; steps = @(
+        @{ path = 'Tests/Verification/ValidateGIProbeIntegration.py'; arguments = @('--self-test') }) },
+    @{ name = 'gi-probe-inspection'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIProbeInspection.ps1' }) },
+    @{ name = 'gi-probe-visualization'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIProbeVisualization.ps1' }) },
+    @{ name = 'gi-probe-depth'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIProbeDepth.ps1' }) },
+    @{ name = 'gi-probe-temporal'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIProbeTemporal.ps1' }) },
+    @{ name = 'gi-probe-selection'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIProbeSelection.ps1' }) },
+    @{ name = 'gi-probe-change'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIProbeChange.ps1' }) },
+    @{ name = 'gi-probe-picking'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIProbePicking.ps1' }, @{ path = 'Tests/Verification/TestGIProbePickingDepth.ps1' }) },
+    @{ name = 'gi-probe-viewer'; group = 'gpu'; configurations = @('Develop'); steps = @(@{ path = 'Tests/Verification/TestGIProbeViewer.ps1' }) },
+    @{ name = 'gi-receiver-inspection'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIReceiverInspection.ps1' }) },
+    @{ name = 'gi-field-readiness'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIFieldReadiness.ps1' }) },
+    @{ name = 'gi-field-sampling'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIFieldSampling.ps1' }) },
+    @{ name = 'gi-field-sampling-contracts'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/ValidateGIFieldSampling.py'; arguments = @('--self-test') }) },
+    @{ name = 'gi-field-baseline'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIFieldBaseline.ps1' }) },
+    @{ name = 'gi-field-baseline-contracts'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/ValidateGIFieldBaseline.py'; arguments = @('--self-test') }) },
+    @{ name = 'gi-field-feedback'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIFieldFeedback.ps1' }) },
+    @{ name = 'gi-field-feedback-contracts'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/ValidateGIFieldFeedback.py'; arguments = @('--self-test') }) },
+    @{ name = 'gi-field-light-step'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIFieldLightStep.ps1' }) },
+    @{ name = 'gi-field-light-step-contracts'; group = 'contracts'; steps = @(
+        @{ path = 'Tests/Verification/ValidateGIFieldLightStep.py'; arguments = @('--self-test') },
+        @{ path = 'Tests/Verification/ValidateGIFieldLightStepReference.py'; arguments = @('--self-test') },
+        @{ path = 'Tests/Verification/AnalyzeGIFieldTransient.py'; arguments = @('--self-test') },
+        @{ path = 'Tests/Verification/CompareGIFieldTransient.py'; arguments = @('--self-test') }) },
+    @{ name = 'gi-field-camera-independence'; group = 'gpu'; configurations = @('Develop'); steps = @(@{ path = 'Tests/Verification/TestGIFieldCameraIndependence.ps1' }) },
+    @{ name = 'gi-field-camera-independence-contracts'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/ValidateGIFieldCameraIndependence.py'; arguments = @('--self-test') }) },
+    @{ name = 'gi-invalid-updates'; group = 'gpu'; configurations = @('Debug', 'Develop'); steps = @(@{ path = 'Tests/Verification/TestGIInvalidUpdates.ps1' }) },
+    @{ name = 'gi-probe-update'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIProbeUpdate.ps1' }) },
+    @{ name = 'gi-specular-visibility'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGISpecularVisibility.ps1' }) },
+    @{ name = 'gi-reference'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIReference.ps1' }) },
+    @{ name = 'gi-reference-materials'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIReferenceMaterials.ps1' }) },
+    @{ name = 'gi-receiver-cache'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIReceiverCache.ps1' }) },
+    @{ name = 'gi-reference-tiling'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIReferenceTiling.ps1' }) },
+    @{ name = 'gi-reference-convergence'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIReferenceConvergence.ps1' }) },
+    @{ name = 'coastal-ray-scene'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestCoastalRayScene.ps1' }) },
     @{ name = 'lighting-profiles'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestLightingProfiles.ps1' }) },
     @{ name = 'sequence-parameter-events'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestSequenceParameterEvents.ps1' }) },
     @{ name = 'sequence-deferred-events'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestDeferredSequenceEvents.ps1' }) },
@@ -48,6 +103,7 @@ $catalog = @(
     @{ name = 'session-parameters'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestSessionParameters.ps1' }) },
     @{ name = 'capture-jobs'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestCaptureJobs.ps1' }) },
     @{ name = 'session-lifecycle'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestSessionLifecycle.ps1' }) },
+    @{ name = 'startup-readiness'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestStartupReadiness.ps1' }) },
     @{ name = 'capture-on-ready'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestCaptureOnReady.ps1' }) },
     @{ name = 'pass-profile-identity'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestPassProfileIdentity.ps1' }) },
     @{ name = 'graph-allocation-facts'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGraphAllocationFacts.ps1' }) },
@@ -109,8 +165,9 @@ try {
                 if ($path.EndsWith('.ps1')) {
                     $parameters = @{ OutputDirectory = $directory }
                     if ($item.group -eq 'gpu') {
-                        $parameters = @{ RunDirectory = (Join-Path $directory 'run'); Configuration = $config; Rhi = $Rhi }
-                        if ($item.name -in @('taa-comparison', 'session-lifecycle')) { $parameters.Python = $Python }
+                        $leafDirectory = if ($item.steps.Count -gt 1) { "run-$($steps.Count + 1)" } else { 'run' }
+                        $parameters = @{ RunDirectory = (Join-Path $directory $leafDirectory); Configuration = $config; Rhi = $Rhi }
+                        if ($item.name -in @('taa-comparison', 'session-lifecycle', 'startup-readiness', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-probe-inspection', 'gi-receiver-inspection', 'gi-probe-visualization', 'gi-probe-depth', 'gi-probe-temporal', 'gi-probe-selection', 'gi-probe-change', 'gi-probe-picking', 'gi-probe-viewer', 'gi-field-readiness', 'gi-field-sampling', 'gi-field-baseline', 'gi-field-feedback', 'gi-field-light-step', 'gi-field-camera-independence', 'gi-invalid-updates', 'gi-receiver-cache')) { $parameters.Python = $Python }
                     }
                     $execution = Invoke-VerificationScript $path $parameters
                     $text = $execution.output + $execution.error

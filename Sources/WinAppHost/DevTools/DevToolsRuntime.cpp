@@ -11,7 +11,8 @@ namespace gglab
 {
 	uint32_t ViewRenderSettingsOverrides::GetActiveCount() const noexcept
 	{
-		return static_cast<uint32_t>(m_TemporalAA.m_IsActive) +
+		return static_cast<uint32_t>(m_GIProbes.m_Enabled) +
+			static_cast<uint32_t>(m_TemporalAA.m_IsActive) +
 			static_cast<uint32_t>(m_GTAO.m_IsActive) +
 			static_cast<uint32_t>(m_Bloom.m_IsActive) +
 			static_cast<uint32_t>(m_ScenePreExposure.has_value());
@@ -27,6 +28,7 @@ namespace gglab
 	{
 		const auto& overrides = m_ViewRenderSettingsOverrides;
 		return {
+			.m_GIProbes = overrides.m_GIProbes.m_Enabled ? std::optional(overrides.m_GIProbes) : std::nullopt,
 			.m_TemporalAA = overrides.m_TemporalAA.m_IsActive ?
 				std::optional(overrides.m_TemporalAA.m_Settings) :
 				std::nullopt,

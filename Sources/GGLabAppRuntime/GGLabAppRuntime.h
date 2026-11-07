@@ -11,6 +11,9 @@
 #include "Parameters/ParameterBatch.h"
 #include "Parameters/ParameterRequest.h"
 #include "Parameters/ViewControlActions.h"
+#include "Capture/GIProbeInspectionControl.h"
+#include "Capture/GIReceiverInspectionControl.h"
+#include "Capture/GIProbePickingControl.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/RenderServices.h"
 #include "GGLabRuntime/Graphics/RenderServicesView.h"
@@ -144,6 +147,7 @@ namespace gglab
 
 	struct AppRuntimeTickInfo
 	{
+		float m_WindowDpiScale = 1;
 		ApplicationToolingIntegrationBase* m_ApplicationTooling = nullptr;
 		// Optional current-content adapter borrowed only for this frame's Lab snapshot.
 		const LabRuntimeLocatorBase* m_LabRuntimeLocator = nullptr;
@@ -186,6 +190,7 @@ namespace gglab
 		[[nodiscard]] AppRuntimeServiceInitializeResult InitializeServices(
 			AppRuntimeServiceCreateInfo createInfo) noexcept;
 		[[nodiscard]] AppRuntimeTickResult Tick(AppRuntimeTickInfo tickInfo = {}) noexcept;
+		[[nodiscard]] std::string GetGIProbePickingSourceJson() const noexcept;
 		void HandleHostEvent(const AppHostEvent& event) noexcept;
 		void Shutdown(AppRuntimeShutdownInfo shutdownInfo = {}) noexcept;
 
@@ -261,6 +266,9 @@ namespace gglab
 		// do not reserve execution. Cancellation and result consumption survive Shutdown.
 		[[nodiscard]] uint64_t StartFrameSequence(FrameSequenceRequest request, std::string& error) noexcept;
 		[[nodiscard]] FrameSequenceCancelVerdict CancelFrameSequence() noexcept;
+		// One session-owned selection overrides the GUI selection until explicitly cleared.
+		// Values are validated again by Runtime against the field used to build the frame.
+		[[nodiscard]] bool SelectGIProbe(std::optional<GIProbeSelection> selection, std::string& error) noexcept;
 		void EnableParameterControl() noexcept;
 		// Read-only preflight before a transport enables descriptors for type checks.
 		// Submission repeats admission and then validates the complete typed batch.
@@ -318,6 +326,7 @@ namespace gglab
 		void CheckOwnerThread() const noexcept;
 
 		ApplicationToolingFrameSettings m_ToolingFrameSettings;
+		std::optional<GIProbeSelection> m_SessionGIProbeSelection;
 		AppRuntimeConfig m_Config{};
 		RuntimePaths m_Paths{};
 		AppRuntimeHostServices m_HostServices{};
@@ -345,6 +354,9 @@ namespace gglab
 		std::unique_ptr<FrameSequenceCoordinator> m_FrameSequence;
 		std::unique_ptr<SessionParameterControl> m_ParameterControl;
 		ToolingViewControl m_ToolingViewControl;
+		ToolingGIProbeInspection m_ToolingGIProbeInspection;
+		ToolingGIReceiverInspection m_ToolingGIReceiverInspection;
+		ToolingGIProbePicking m_ToolingGIProbePicking;
 		// Frozen after content update; shared by parameters and this frame's planning.
 		uint64_t m_ActiveContentIdentity = 0;
 		// Results already routed to the sequence, awaiting host publication.

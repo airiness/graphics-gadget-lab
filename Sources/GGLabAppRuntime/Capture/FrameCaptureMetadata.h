@@ -1,4 +1,7 @@
 #pragma once
+#include "GGLabRuntime/Graphics/Pipeline/GIFieldObservation.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIReceiverObservation.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIProbePicking.h"
 #include "Capture/FrameCaptureReadiness.h"
 #include "Parameters/HostViewParameters.h"
 #include "Parameters/ParameterFrameState.h"
@@ -204,6 +207,20 @@ namespace gglab
 		std::shared_ptr<const ParameterFrameState> m_Parameters;
 		// Absent when the frame state carried no control evidence.
 		std::optional<FrameCaptureControlState> m_Control;
+		std::optional<GIProbeInspectionRequest> m_GIProbeInspectionRequest;
+		std::optional<GIObservationStamp> m_GIProbeObservation;
+		std::array<float, 3> m_GIProbePosition{};
+		std::shared_ptr<const GIProbeInspectionResult> m_GIProbeInspection;
+		std::optional<GIReceiverInspectionRequest> m_GIReceiverInspectionRequest;
+		std::optional<GIObservationStamp> m_GIReceiverObservation;
+		std::optional<GIReceiverViewSnapshot> m_GIReceiverView;
+		std::shared_ptr<const GIReceiverInspectionResult> m_GIReceiverInspection;
+		std::optional<GIProbePickingRequest> m_GIProbePickingRequest;
+		std::optional<GIObservationStamp> m_GIProbePickingObservation;
+		std::optional<GIProbeVisualizationViewSnapshot> m_GIProbePickingView;
+		std::array<uint32_t, 3> m_GIProbePickingCounts{};
+		float m_GIProbePickingDpiScale = 1;
+		std::shared_ptr<const GIProbePickingResult> m_GIProbePicking;
 	};
 
 	// UTF-8 path text for capture UI, logs and failures; never uses the system code page.
@@ -212,6 +229,12 @@ namespace gglab
 	// Serializes the metadata as schema-versioned UTF-8 JSON.
 	[[nodiscard]] std::string SerializeFrameCaptureMetadata(
 		const FrameCaptureMetadata& metadata) noexcept;
+	[[nodiscard]] std::string SerializeGIFieldSummary(const GIFieldSummary& summary) noexcept;
+	[[nodiscard]] std::string SerializeGIProbeInspection(const GIProbeInspectionResult& result) noexcept;
+	[[nodiscard]] std::string SerializeGIReceiverInspection(const GIReceiverInspectionResult& result) noexcept;
+	[[nodiscard]] std::string SerializeGIProbePicking(const GIProbePickingResult& result) noexcept;
+	[[nodiscard]] std::string SerializeGIProbePickingSource(const GIFieldSummary& summary,
+		float dpiScale, std::string_view contentId) noexcept;
 	[[nodiscard]] std::string SerializeNonFiniteWatchCoverage(const NonFiniteWatchCoverage& coverage) noexcept;
 	[[nodiscard]] std::string SerializeParameterFrameState(const ParameterFrameState& frame) noexcept;
 }

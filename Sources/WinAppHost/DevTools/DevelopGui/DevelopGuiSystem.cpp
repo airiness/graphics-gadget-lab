@@ -8,6 +8,7 @@
 #include "GGLabRuntime/Graphics/RenderContexts.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RenderGraph.h"
 #include "GGLabRuntime/Graphics/RenderPass/IBLGraphResources.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPass/ShadowGraphResources.h"
 #include "GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h"
 
@@ -187,6 +188,17 @@ namespace gglab
 					iblRes && iblRes->m_BrdfLut.IsValid())
 				{
 					data.m_BrdfLut = builder.Read(iblRes->m_BrdfLut, RGTextureAccess::Sample);
+				}
+				if (const auto* previews = blackboard.TryGet<RGPostProcessPreviewResources>(
+					PostProcessPreviewResourcesName))
+				{
+					for (const auto texture : previews->m_Textures)
+					{
+						if (texture.IsValid())
+						{
+							GGLAB_UNUSED(builder.Read(texture, RGTextureAccess::Sample));
+						}
+					}
 				}
 
 				if (const auto* iblPreviewRes =

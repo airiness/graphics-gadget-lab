@@ -316,11 +316,10 @@ $projectSpecifications = @(
         Name = "WinApp"
         ProjectPath = "Projects\WinApp\WinApp.vcxproj"
         FiltersPath = "Projects\WinApp\WinApp.vcxproj.filters"
-        ItemTypes = @("ClCompile", "ClInclude", "FxCompile", "None")
+        ItemTypes = @("ClCompile", "ClInclude", "None")
         IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
         Mappings = @(
             [pscustomobject]@{ Root = "Sources\WinApp"; FilterPrefix = "" }
-            [pscustomobject]@{ Root = "Shaders"; FilterPrefix = "Shaders" }
             [pscustomobject]@{ Root = "Projects\WinApp\packages.config"; FilterPrefix = "" }
         )
     }
@@ -328,10 +327,11 @@ $projectSpecifications = @(
         Name = "WinAppHost"
         ProjectPath = "Projects\WinAppHost\WinAppHost.vcxproj"
         FiltersPath = "Projects\WinAppHost\WinAppHost.vcxproj.filters"
-        ItemTypes = @("ClCompile", "ClInclude")
+        ItemTypes = @("ClCompile", "ClInclude", "FxCompile", "None")
         IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
         Mappings = @(
             [pscustomobject]@{ Root = "Sources\WinAppHost"; FilterPrefix = "" }
+            [pscustomobject]@{ Root = "Shaders"; FilterPrefix = "Shaders" }
             [pscustomobject]@{ Root = "Externals\Vender\imgui"; FilterPrefix = "ThirdParty\ImGui" }
         )
     }
@@ -419,10 +419,11 @@ $projectSpecifications = @(
         Name = "ShaderRuntimeIntegrationTests"
         ProjectPath = "Projects\ShaderRuntimeIntegrationTests\ShaderRuntimeIntegrationTests.vcxproj"
         FiltersPath = "Projects\ShaderRuntimeIntegrationTests\ShaderRuntimeIntegrationTests.vcxproj.filters"
-        ItemTypes = @("ClCompile", "ClInclude")
+        ItemTypes = @("ClCompile", "ClInclude", "FxCompile", "None")
         IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
         Mappings = @(
             [pscustomobject]@{ Root = "Tests\ShaderRuntimeIntegration"; FilterPrefix = "" }
+            [pscustomobject]@{ Root = "Shaders"; FilterPrefix = "Shaders" }
         )
     }
     [pscustomobject]@{
@@ -439,10 +440,11 @@ $projectSpecifications = @(
         Name = "GGLabRuntime"
         ProjectPath = "Projects\GGLabRuntime\GGLabRuntime.vcxproj"
         FiltersPath = "Projects\GGLabRuntime\GGLabRuntime.vcxproj.filters"
-        ItemTypes = @("ClCompile", "ClInclude")
+        ItemTypes = @("ClCompile", "ClInclude", "FxCompile", "None")
         IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
         Mappings = @(
             [pscustomobject]@{ Root = "Sources\GGLabRuntime"; FilterPrefix = "" }
+            [pscustomobject]@{ Root = "Shaders"; FilterPrefix = "Shaders" }
             [pscustomobject]@{
                 Root = "Externals\Vender\D3D12MemoryAllocator"
                 FilterPrefix = "ThirdParty\D3D12MemoryAllocator"
@@ -467,20 +469,22 @@ $projectSpecifications = @(
         Name = "ShaderArtifactRuntime"
         ProjectPath = "Projects\ShaderArtifactRuntime\ShaderArtifactRuntime.vcxproj"
         FiltersPath = "Projects\ShaderArtifactRuntime\ShaderArtifactRuntime.vcxproj.filters"
-        ItemTypes = @("ClCompile", "ClInclude")
+        ItemTypes = @("ClCompile", "ClInclude", "None")
         IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
         Mappings = @(
             [pscustomobject]@{ Root = "Sources\ShaderArtifactRuntime"; FilterPrefix = "" }
+            [pscustomobject]@{ Root = "Shaders"; FilterPrefix = "Shaders" }
         )
     }
     [pscustomobject]@{
         Name = "ShaderCompiler"
         ProjectPath = "Projects\ShaderCompiler\ShaderCompiler.vcxproj"
         FiltersPath = "Projects\ShaderCompiler\ShaderCompiler.vcxproj.filters"
-        ItemTypes = @("ClCompile", "ClInclude")
+        ItemTypes = @("ClCompile", "ClInclude", "None")
         IgnoredItemTypes = @("ProjectConfiguration", "ProjectReference")
         Mappings = @(
             [pscustomobject]@{ Root = "Sources\Tools\ShaderCompiler"; FilterPrefix = "" }
+            [pscustomobject]@{ Root = "Shaders"; FilterPrefix = "Shaders" }
         )
     }
     [pscustomobject]@{

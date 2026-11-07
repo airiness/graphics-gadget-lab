@@ -60,6 +60,7 @@ namespace gglab
 		}
 
 		outSnapshot.m_Available = true;
+		outSnapshot.m_RayQueryCapabilities = device.GetRayQueryCapabilities();
 		outSnapshot.m_DeviceName = device.GetAdapterName();
 		DXGI_ADAPTER_DESC1 adapterDesc{};
 		if (SUCCEEDED(adapter->GetDesc1(&adapterDesc)))

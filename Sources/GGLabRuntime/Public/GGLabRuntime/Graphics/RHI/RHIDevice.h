@@ -1,4 +1,5 @@
 #pragma once
+#include "GGLabRuntime/Graphics/RHI/RHIAccelerationStructure.h"
 #include "GGLabRuntime/Graphics/RHI/RHIBuffer.h"
 #include "GGLabRuntime/Graphics/RHI/RHIUpload.h"
 #include "GGLabRuntime/Graphics/RHI/RHICommandContext.h"
@@ -11,6 +12,7 @@
 
 #include <atomic>
 #include <memory>
+#include <optional>
 #include <string_view>
 
 namespace gglab
@@ -32,6 +34,10 @@ namespace gglab
 	public:
 		virtual ~RHIDevice() = default;
 		[[nodiscard]] virtual bool SupportsPixelStorageAtomics() const noexcept { return false; }
+		[[nodiscard]] virtual RHIRayQueryCapabilities GetRayQueryCapabilities() const noexcept
+		{
+			return {};
+		}
 
 		virtual RHIBackendType GetBackendType() const noexcept = 0;
 		// Stable across process launches and changes when the adapter or driver
@@ -57,6 +63,11 @@ namespace gglab
 
 		virtual void DestroyTexture(RHITextureHandle texture) noexcept = 0;
 		virtual void DestroyBuffer(RHIBufferHandle buffer) noexcept = 0;
+		[[nodiscard]] virtual std::optional<RHIASBuildSizes> QueryAccelerationStructureBuildSizes(
+			const RHIASBuildInputs&) noexcept { return std::nullopt; }
+		[[nodiscard]] virtual RHIAccelerationStructureHandle CreateAccelerationStructure(
+			const RHIAccelerationStructureDesc&) noexcept { return {}; }
+		virtual void DestroyAccelerationStructure(RHIAccelerationStructureHandle) noexcept {}
 		virtual void DestroyTextureView(RHITextureViewHandle view) noexcept = 0;
 		virtual void DestroyBufferView(RHIBufferViewHandle view) noexcept = 0;
 		virtual void DestroySampler(RHISamplerHandle sampler) noexcept = 0;
@@ -86,6 +97,13 @@ namespace gglab
 
 		virtual bool IsAlive(RHITextureHandle texture) const noexcept = 0;
 		virtual bool IsAlive(RHIBufferHandle buffer) const noexcept = 0;
+		// Resource extent and capabilities, not allocator/heap padding or a binding range.
+		// Owner-thread query; stale/unsupported handles return nullopt. Debug labels are omitted.
+		[[nodiscard]] virtual std::optional<RHIBufferDesc> QueryBufferDescription(
+			RHIBufferHandle) const noexcept { return std::nullopt; }
+		[[nodiscard]] virtual bool IsAlive(RHIAccelerationStructureHandle) const noexcept { return false; }
+		[[nodiscard]] virtual RHIAllocationFacts QueryAccelerationStructureAllocationFacts(
+			RHIAccelerationStructureHandle) const noexcept { return {}; }
 		virtual bool IsAlive(RHISamplerHandle sampler) const noexcept = 0;
 		// Allocator facts of a live resource; callers read them while the handle is valid. A
 		// device without allocator queries reports Unsupported rather than estimated values.

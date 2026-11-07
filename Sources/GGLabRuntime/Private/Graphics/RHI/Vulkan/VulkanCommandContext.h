@@ -27,6 +27,11 @@ namespace gglab
 			VulkanGpuProfiler* gpuProfiler = nullptr) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(VulkanGraphicsCommandContext);
 		~VulkanGraphicsCommandContext() override = default;
+		void TrackAccelerationStructureUse(RHIAccelerationStructureHandle handle) noexcept override;
+		bool BuildAccelerationStructure(RHIAccelerationStructureHandle destination,
+			const RHIASBuildInputs& inputs, const RHIASBufferRange& scratch) noexcept override;
+		void AccelerationStructureBarrier(RHIAccelerationStructureHandle handle,
+			RHIResourceState before, RHIResourceState after) noexcept override;
 
 		[[nodiscard]] bool BeginEncoding(
 			VkCommandBuffer commandBuffer, uint32_t frameSlotIndex) noexcept;
@@ -142,6 +147,13 @@ namespace gglab
 		explicit VulkanComputeCommandContext(VulkanGraphicsCommandContext& graphicsContext) noexcept;
 		GGLAB_DELETE_COPYABLE_MOVABLE(VulkanComputeCommandContext);
 		~VulkanComputeCommandContext() override;
+		void TrackAccelerationStructureUse(RHIAccelerationStructureHandle handle) noexcept override;
+		bool BuildAccelerationStructure(RHIAccelerationStructureHandle destination,
+			const RHIASBuildInputs& inputs, const RHIASBufferRange& scratch) noexcept override;
+		void AccelerationStructureBarrier(RHIAccelerationStructureHandle handle,
+			RHIResourceState before, RHIResourceState after) noexcept override;
+		bool SetAccelerationStructure(uint32_t parameterIndex,
+			RHIAccelerationStructureHandle handle) noexcept override;
 		// The submission owner's recording scope for the frame's upload writer.
 		void BeginRecordingScope(RHIUploadWriter& writer) noexcept { BindUploadWriter(&writer); }
 		void EndRecordingScope() noexcept { BindUploadWriter(nullptr); }

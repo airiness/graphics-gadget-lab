@@ -3,6 +3,9 @@
 import argparse
 import copy
 import json
+import ValidateGIProbeInspection as probes
+import ValidateGIReceiverInspection as receivers
+import ValidateGIProbePicking as picking
 import struct
 import tempfile
 import zlib
@@ -37,6 +40,20 @@ def local_file(root, name):
 	if not path.is_file() or path.resolve().parent != root.resolve():
 		raise ValueError(f"Missing or external bundle file: {name}")
 	return path
+
+
+def validate_field_profile(frame, profile_validator=None):
+	"""Legacy frames may lack a receipt; a present one must be complete and consistent."""
+	field = frame.get("readiness", {}).get("giField") or {}
+	summary = field.get("summary") or {}
+	profile = summary.get("profile")
+	if profile is None:
+		return
+	json.dumps(profile, allow_nan=False)
+	(profile_validator or validator("GIFieldProfile.schema.json")).validate(profile)
+	for name in ("counts", "minimum", "spacing", "irradianceInteriorWidth"):
+		if profile[name] != summary.get(name):
+			raise ValueError(f"Field profile receipt disagrees with its summary: {name}")
 
 
 def validate(path, bundle_validator=None):
@@ -74,6 +91,7 @@ def validate(path, bundle_validator=None):
 			raise ValueError("Failed required coverage cannot complete a bundle")
 	all_files = set()
 	graph_files = {product["metadata"] for product in products if product["source"] == "graph"}
+	product_frames = []
 	for product in products:
 		files = product["files"]
 		if product["metadata"] not in files or path.name in files or all_files.intersection(files):
@@ -122,6 +140,11 @@ def validate(path, bundle_validator=None):
 			if set(files) != {product["metadata"], *(target["array"] for target in metadata["targets"])}:
 				raise ValueError("Resource files disagree with the array inventory")
 			frame = metadata["frame"]
+		product_frames.append((source, frame))
+		validate_field_profile(frame)
+		probes.validate(frame, validator("GIProbeInspection.schema.json"))
+		receivers.validate(frame, validator("GIReceiverInspection.schema.json"))
+		picking.validate(frame)
 		if source in ("graph", "resource-export"):
 			if product["diagnosticTap"] is not None:
 				raise ValueError("Numerical/graph products cannot name an image tap")
@@ -138,6 +161,8 @@ def validate(path, bundle_validator=None):
 			parameters.validate_frame(frame["parameters"], frame["frame"]["serial"])
 		if frame.get("control") != document["provenance"].get("control"):
 			raise ValueError("Required products disagree on Host view control evidence")
+	receivers.validate_pairing(product_frames)
+	picking.validate_pairing(product_frames)
 	if document["provenance"].get("control") is not None:
 		validate_control(document["provenance"], document["runIdentity"])
 	return document
@@ -409,6 +434,75 @@ def self_test(bundle_validator):
 				raise AssertionError(f"Bundle accepted a mismatched required file: {key}")
 			(root / name).write_text(json.dumps(original), encoding="utf-8")
 			rejections += 1
+		# Receiver results anchor every paired product, including image-only sidecars.
+		field = dict(generation=1, sceneRevision=0, lightingGeneration=0, environmentGeneration=0,
+			refreshEpoch=1, epochOriginUpdate=0)
+		matrix = [float(index % 5 == 0) for index in range(16)]
+		view = dict(revision=1, viewId=0, renderExtent=[1, 1], displayExtent=[1, 1],
+			cameraPosition=[0, 0, 0], view=matrix, projection=matrix, viewProjection=matrix,
+			matrixConvention="row-major-row-vector", clipDepthRange=[0, 1], pixelConvention="top-left-integer-center",
+			jitterPixels=[0, 0], nearFar=[0.1, 100], reversedDepth=True, receiversAvailable=True,
+			temporalAA=False, supported=True, receiverAttachmentLogicalBytes=144, lookupDiagnosticLogicalBytes=32)
+		stamp = dict(field=field, kind="receiver-contribution", producingFrame=1, fieldUpdate=1, readinessUpdate=1)
+		receiver_observation = dict(stamp=stamp, view=view)
+		inspection = dict(schemaVersion=1, request=dict(pixel=[0, 0], expectedGeneration=1,
+			expectedViewRevision=1, expectedViewId=0, expectedRefreshEpoch=1, markers=True),
+			observation=stamp, view=view, validity="Background", cageEvaluated=False, support=0, compatible=False,
+			position=None, biasedPosition=None, vertexNormal=None, shadingNormal=None, viewDirection=None,
+			coverage=None, totalWeight=None, normalizationReason="NoPositiveTotalWeight", irradianceE=None,
+			ordinaryIrradianceE=None, ordinaryWeight=None, corners=[], payloadBytes=1168, markerMode="gpu-xray",
+			fieldProfile=dict(counts=[2, 2, 2], spacing=1, irradianceInteriorWidth=6, normalBias=0.1, viewBias=0.3),
+			units=dict(position="world-units", distance="world-units", variance="world-units-squared",
+				irradiance="scene-referred-irradiance-E", weights="dimensionless"))
+		readiness = dict(giField=dict(summary=dict(field=field, receiverView=view, submittedUpdates=0)))
+		paired = copy.deepcopy(multi)
+		paired["provenance"]["readiness"] = readiness
+		paired_image = dict(image, source="composited", readiness=readiness, giReceiverObservation=receiver_observation)
+		paired["products"][0]["source"] = "composited"
+		paired_frame = dict(owned_frame, readiness=readiness, giReceiverObservation=receiver_observation)
+		paired_records = {"image.json": paired_image, "paired.graph.json": dict(graph, frame=paired_frame),
+			"group.resource-export.json": dict(resource, frame=dict(paired_frame, giReceiverInspection=inspection))}
+		def write_paired():
+			for name, record in paired_records.items():
+				(root / name).write_text(json.dumps(record), encoding="utf-8")
+		write_paired()
+		check(paired)
+		# The product order must not decide which observation is authoritative.
+		reordered = copy.deepcopy(paired)
+		reordered["products"].reverse()
+		for index, item in enumerate(reordered["products"]):
+			item["index"] = index
+		check(reordered)
+		for name, record in paired_records.items():
+			for change in ("missing", "producingFrame", "revision"):
+				# JSON breaks fixture aliases so only the receiver observation is changed.
+				invalid = json.loads(json.dumps(record))
+				observed_frame = invalid if name == "image.json" else invalid["frame"]
+				if change == "missing":
+					del observed_frame["giReceiverObservation"]
+				elif change == "producingFrame":
+					observed_frame["giReceiverObservation"]["stamp"][change] += 1
+				else:
+					observed_frame["giReceiverObservation"]["view"][change] += 1
+				(root / name).write_text(json.dumps(invalid), encoding="utf-8")
+				try:
+					check(paired)
+				except (ValueError, KeyError, ValidationError):
+					pass
+				else:
+					raise AssertionError(f"Bundle accepted missing/mismatched receiver pairing: {name}/{change}")
+				write_paired()
+				rejections += 1
+		try:
+			check(dict(paired, products=[paired["products"][0]]))
+		except ValueError:
+			pass
+		else:
+			raise AssertionError("Bundle accepted an orphan receiver image without its inspection resource")
+		rejections += 1
+		for name, record in (("image.json", image), ("paired.graph.json", graph), ("group.resource-export.json", resource)):
+			(root / name).write_text(json.dumps(record), encoding="utf-8")
+		check(multi)
 		# Published control evidence must agree across products and satisfy its own predicate.
 		temporal = dict(consumers=[dict(name="temporal-aa", requested=False, status="disabled",
 			disableReason="not-requested", services=[]), dict(name="reference", requested=False,
@@ -466,6 +560,32 @@ def self_test(bundle_validator):
 		not_applicable = dict(watch, mode="fail", production="NotApplicable", firstAnomalyFrameSerial=None, reason="None")
 		(root / "image.json").write_text(json.dumps(dict(image, watch=not_applicable)), encoding="utf-8")
 		check(dict(watched, watch=not_applicable))
+	profile = dict(schemaVersion=1, id="gglab.gi.field.contract", revision=1,
+		counts=[5, 5, 5], minimum=[-1, -1, -1], spacing=0.5, irradianceInteriorWidth=6,
+		raysPerProbe=256, seed=61052, maximumDistance=30000, hysteresis=0.97, viewBias=0.3,
+		receiverSampling=True, feedback=False, progressiveSampling=False,
+		constantEnvironment=True, constantRadiance=[1, 1, 1],
+		readiness=dict(enabled=True, noiseSigma=0, steadyNoiseSigma=0,
+			refreshHysteresis=0.5, progressiveRefresh=False))
+	summary = {name: profile[name] for name in ("counts", "minimum", "spacing", "irradianceInteriorWidth")}
+	profile_frame = dict(readiness=dict(giField=dict(summary=dict(summary, profile=profile))))
+	validate_field_profile(profile_frame)
+	validate_field_profile({})
+	validate_field_profile(dict(readiness=dict(giField=dict(summary=dict(profile=None)))))
+	for changes in (dict(id=""), dict(id="gglab.profile\n"), dict(revision=0),
+		dict(counts=[6, 5, 5]), dict(minimum=[0, 0, 0]), dict(spacing=1),
+		dict(irradianceInteriorWidth=14), dict(raysPerProbe=255),
+		dict(hysteresis=float("nan")), dict(maximumDistance=float("inf")),
+		dict(qualityCertified=True)):
+		invalid = copy.deepcopy(profile_frame)
+		invalid["readiness"]["giField"]["summary"]["profile"].update(changes)
+		try:
+			validate_field_profile(invalid)
+		except (ValueError, ValidationError):
+			pass
+		else:
+			raise AssertionError(f"Accepted invalid/inconsistent field profile: {changes}")
+		rejections += 1
 	print(f"Capture bundle self-test passed ({rejections} rejection cases)")
 
 

@@ -10,6 +10,7 @@
 #include "GGLabTestCore/SelfTest.h"
 #include "DevelopmentShaderPaths.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
+#include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
 #include "ShaderArtifactRuntime/ShaderArtifactStore.h"
 #include "ShaderArtifactRuntime/ShaderLooseArtifactIO.h"
 #include "Targets/DX12ShaderTarget.h"
@@ -1410,7 +1411,7 @@ namespace gglab
 			const std::filesystem::path& sourceRoot,
 			const std::filesystem::path& tempRoot) noexcept
 		{
-			constexpr size_t ExpectedRuntimeProgramCount = 127;
+			constexpr size_t ExpectedRuntimeProgramCount = 183;
 			const std::string expectedProgramCountField = std::format("\"programCount\":{}", ExpectedRuntimeProgramCount);
 			const CliRunResult missingRequiredOption = RunCli({ L"build-runtime", L"--result-format", L"json", });
 			const CliRunResult unknownOption = RunCli({ L"build-runtime", L"--bogus", L"--result-format", L"json", });
@@ -1502,6 +1503,48 @@ namespace gglab
 				shader_programs::TemporalAADisplayDepthPixel,
 				shader_programs::GTAOTemporalCompute,
 				shader_programs::GTAOTemporalDiagnosticsCompute,
+				shader_programs::RaySceneSunVisibilityCompute,
+				shader_programs::RaySceneHitMaterialCompute,
+				shader_programs::GIReceiverPixel,
+				shader_programs::GIReceiverPositionPixel,
+				shader_programs::GIReferenceCompute,
+				shader_programs::GISpecularVisibilityCompute,
+				shader_programs::GIProbeClassifyCompute,
+				shader_programs::GIFieldReadinessFloorCompute,
+				shader_programs::GIFieldLookupCompute,
+				shader_programs::GIProbeInspectionCompute,
+				shader_programs::GIProbeIntegrationInspectionCompute,
+				shader_programs::GIReceiverInspectionCompute,
+				shader_programs::GIReceiverListCompute,
+				shader_programs::GIReceiverMarkersVertex,
+				shader_programs::GIReceiverMarkersPixel,
+				shader_programs::GIProbeVisualizationCompute,
+				shader_programs::GIProbeVisualizationVertex,
+				shader_programs::GIProbeVisualizationPixel,
+				shader_programs::GIProbePickingPixel,
+				shader_programs::GIProbeDepthConformanceVertex,
+				shader_programs::GIProbeDepthConformancePixel,
+				shader_programs::GIProbeDepthConformanceScene,
+				nonfinite::CounterVariant(shader_programs::GIProbeDepthConformancePixel),
+				nonfinite::CounterVariant(shader_programs::GIProbeDepthConformanceScene),
+				nonfinite::CounterVariant(shader_programs::GIProbeVisualizationCompute),
+				nonfinite::CounterVariant(shader_programs::GIProbeVisualizationPixel),
+				nonfinite::CounterVariant(shader_programs::GIProbePickingPixel),
+				nonfinite::CounterVariant(shader_programs::RaySceneProbeCompute),
+				nonfinite::CounterVariant(shader_programs::RaySceneSunVisibilityCompute),
+				nonfinite::CounterVariant(shader_programs::RaySceneHitMaterialCompute),
+				nonfinite::CounterVariant(shader_programs::GIReceiverPixel),
+				nonfinite::CounterVariant(shader_programs::GIReceiverPositionPixel),
+				nonfinite::CounterVariant(shader_programs::GIReferenceCompute),
+				nonfinite::CounterVariant(shader_programs::GISpecularVisibilityCompute),
+				nonfinite::CounterVariant(shader_programs::GIProbeClassifyCompute),
+				nonfinite::CounterVariant(shader_programs::GIFieldReadinessFloorCompute),
+				nonfinite::CounterVariant(shader_programs::GIFieldLookupCompute),
+				nonfinite::CounterVariant(shader_programs::GIProbeInspectionCompute),
+				nonfinite::CounterVariant(shader_programs::GIProbeIntegrationInspectionCompute),
+				nonfinite::CounterVariant(shader_programs::GIReceiverInspectionCompute),
+				nonfinite::CounterVariant(shader_programs::GIReceiverListCompute),
+				nonfinite::CounterVariant(shader_programs::GIReceiverMarkersPixel),
 			};
 			for (const ShaderProgramRef& programRef : requiredPrograms)
 			{

@@ -17,12 +17,14 @@
 
 namespace gglab
 {
+	class DX12AccelerationStructureManager;
 	class DX12QueueSystem;
 	class DX12DescriptorManager;
 	class DX12DescriptorFreeListAllocator;
 	class DX12FencePoint;
 	class DX12Resource;
 	class DX12DescriptorCache;
+	class DX12CommandList;
 	struct DX12DescriptorView;
 	struct RHITextureViewKey;
 	class DX12Device : public RHIDevice
@@ -35,6 +37,7 @@ namespace gglab
 			bool m_MeshShaderSupported = false;
 			bool m_TearingSupported = false;
 			bool m_EnhancedBarriers = false;
+			RHIRayQueryCapabilities m_RayQueryCapabilities{};
 			RHIShaderWaveCapabilities m_ShaderWaveCapabilities{};
 			D3D_FEATURE_LEVEL m_MaxFeatureLevel = D3D_FEATURE_LEVEL_12_0;
 			D3D_SHADER_MODEL m_HighestShaderModel = D3D_SHADER_MODEL_6_0;
@@ -53,6 +56,10 @@ namespace gglab
 		~DX12Device();
 
 		void Initialize(const CreateInfo& createInfo = {}) noexcept;
+		[[nodiscard]] RHIRayQueryCapabilities GetRayQueryCapabilities() const noexcept override
+		{
+			return m_FeatureSupport.m_RayQueryCapabilities;
+		}
 		void Finalize() noexcept;
 
 		ID3D12Device10* Get() const noexcept { return m_D3D12Device.Get(); }
@@ -102,6 +109,15 @@ namespace gglab
 
 		void DestroyTexture(RHITextureHandle texture) noexcept override;
 		void DestroyBuffer(RHIBufferHandle buffer) noexcept override;
+		[[nodiscard]] std::optional<RHIASBuildSizes> QueryAccelerationStructureBuildSizes(
+			const RHIASBuildInputs& inputs) noexcept override;
+		[[nodiscard]] RHIAccelerationStructureHandle CreateAccelerationStructure(
+			const RHIAccelerationStructureDesc& desc) noexcept override;
+		void DestroyAccelerationStructure(RHIAccelerationStructureHandle handle) noexcept override;
+		DX12AccelerationStructureManager& GetAccelerationStructureManager() noexcept;
+		bool IsAlive(RHIAccelerationStructureHandle handle) const noexcept override;
+		RHIAllocationFacts QueryAccelerationStructureAllocationFacts(
+			RHIAccelerationStructureHandle handle) const noexcept override;
 		void DestroyTextureView(RHITextureViewHandle view) noexcept override;
 		void DestroyBufferView(RHIBufferViewHandle view) noexcept override;
 		void DestroySampler(RHISamplerHandle sampler) noexcept override;
@@ -133,6 +149,7 @@ namespace gglab
 
 		bool IsAlive(RHITextureHandle texture) const noexcept override;
 		bool IsAlive(RHIBufferHandle buffer) const noexcept override;
+		std::optional<RHIBufferDesc> QueryBufferDescription(RHIBufferHandle buffer) const noexcept override;
 		bool IsAlive(RHISamplerHandle sampler) const noexcept override;
 		RHIAllocationFacts QueryTextureAllocationFacts(
 			RHITextureHandle texture) const noexcept override;
@@ -149,6 +166,7 @@ namespace gglab
 			RHITextureViewKey& key) const noexcept;
 		D3D12_GPU_DESCRIPTOR_HANDLE ResolveShaderVisibleDescriptor(
 			RHIDescriptorHeapType heapType, uint32_t descriptorIndex) const noexcept;
+		void BindGlobalDescriptorHeaps(DX12CommandList& commandList) const noexcept;
 
 		DX12Texture* ResolveTexture(RHITextureHandle texture) noexcept;
 		const DX12Texture* ResolveTexture(RHITextureHandle texture) const noexcept;
@@ -194,6 +212,7 @@ namespace gglab
 		RHIDeviceIdentity m_DeviceIdentity;
 
 		DX12ResourceManager m_ResourceManager;
+		std::unique_ptr<DX12AccelerationStructureManager> m_AccelerationStructures;
 		DX12QueueSystem* m_QueueSystem = nullptr;
 		DX12DescriptorManager* m_DescriptorManager = nullptr;
 		std::unique_ptr<DX12DescriptorCache> m_DescriptorCache;

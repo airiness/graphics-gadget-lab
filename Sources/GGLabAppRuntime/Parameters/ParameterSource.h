@@ -15,6 +15,7 @@
 namespace gglab
 {
 	struct RenderView;
+	struct RenderScene;
 
 	struct ParameterSourceFrame
 	{
@@ -22,6 +23,8 @@ namespace gglab
 		const RenderView* m_View = nullptr;
 		uint64_t m_LightingGeneration = 0;
 		uint64_t m_ContentIdentity = 0;
+		const RenderScene* m_Scene = nullptr;
+		uint64_t m_FrameSerial = 0;
 	};
 
 	// The coordinator retains only the observation boundary, not domain policy.

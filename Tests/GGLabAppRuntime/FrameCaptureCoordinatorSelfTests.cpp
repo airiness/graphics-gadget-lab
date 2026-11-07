@@ -12,6 +12,9 @@
 #include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIFieldObservation.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIFieldProfile.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIFieldReadiness.h"
 #include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
@@ -2020,6 +2023,397 @@ namespace gglab
 			}
 		}
 
+		void RunGIProbePickingTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("probe-picking");
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(), .m_WriteOnCallingThread = true });
+			CaptureTestJobs jobs(coordinator, context);
+			auto summary = std::make_shared<GIFieldSummary>();
+			summary->m_Field = { .m_Generation = 73, .m_SceneRevision = 9 };
+			summary->m_Counts = { 4, 4, 4 };
+			auto& display = summary->m_Visualization;
+			display.m_SettingsRevision = 2;
+			display.m_Settings.m_Enabled = true;
+			display.m_Available = display.m_PickingAvailable = true;
+			display.m_View = { .m_Revision = 3, .m_RenderExtent = { 64, 32 },
+				.m_DisplayExtent = { 64, 32 }, .m_ProjectionSupported = true, .m_Valid = true };
+			GIProbePickingRequest request{ .m_Token = 1, .m_SourceFrame = 16, .m_SettingsRevision = 2,
+				.m_Field = summary->m_Field, .m_View = display.m_View, .m_Settings = display.m_Settings,
+				.m_Mapping = { .m_GuiExtent = { 64, 32 } }, .m_Pixel = { 32, 16 } };
+			const auto plan = [&request]()
+				{
+					CapturePlan result;
+					result.m_RequiredContentId = "gglab.lab.test";
+					result.m_GIProbePicking = request;
+					result.m_RequiredProducts = { ResourceCaptureProduct{ {
+						{ .m_Resource = "GI.Probes.PickID" }, { .m_Resource = "GI.Probes.PickDepth" } } } };
+					return result;
+				};
+			for (uint32_t change = 0; change < 4; ++change)
+			{
+				auto invalid = plan();
+				if (change == 0)
+				{
+					invalid.m_RequiredContentId.clear();
+				}
+				if (change == 1)
+				{
+					invalid.m_GIProbePicking->m_Token = 0;
+				}
+				if (change == 2)
+				{
+					std::get<ResourceCaptureProduct>(invalid.m_RequiredProducts[0]).m_Targets.pop_back();
+				}
+				if (change == 3)
+				{
+					invalid.m_GIProbePicking->m_Pixel[0] = 64;
+				}
+				context.Check(coordinator.CheckJobAdmission(invalid).m_Reason == CaptureAdmissionReason::InvalidPlan,
+					"Malformed or incomplete picking plans reject without issuing Runtime work");
+			}
+			auto state = MakeFrameState(false);
+			state.m_Readiness.m_GIField = GIFieldCaptureState{ .m_Generation = 73, .m_Summary = summary };
+			const auto first = jobs.Admit(plan());
+			++request.m_Token;
+			const auto deferred = jobs.Admit(plan());
+			coordinator.BeginFrame(state);
+			context.Check(control.m_Issued.size() == 1 && coordinator.GetFrameGIProbePicking()->m_Token == 1 &&
+				coordinator.GetJobSnapshot(deferred)->m_Stage == CaptureJobStage::Waiting,
+				"Only one distinct pick issues per frame; conflicting clicks wait in bounded existing jobs");
+			coordinator.OnFrameSubmitted();
+			control.Complete(control.m_Issued[0].m_Id);
+			coordinator.Update();
+			const auto completed = jobs.TakeResults();
+			context.Check(completed.size() == 1 && completed[0].m_JobId == first &&
+				completed[0].m_Products[0].m_Metadata->m_GIProbePicking->m_Validity == GIProbePickingValidity::MalformedPayload,
+				"Malformed completed transport remains explicit evidence instead of becoming NoHit");
+			++display.m_SettingsRevision;
+			++state.m_FrameSerial;
+			coordinator.BeginFrame(state);
+			const auto stale = jobs.TakeResults();
+			context.Check(stale.size() == 1 && stale[0].m_JobId == deferred &&
+				stale[0].m_FailureCode == "GIProbePickingSettingsMismatch" && control.m_Issued.size() == 1 &&
+				!coordinator.GetFrameGIProbePicking(), "Deferred picks revalidate bindings before any GPU request");
+			--display.m_SettingsRevision;
+			for (uint32_t change = 0; change < 4; ++change)
+			{
+				auto current = state;
+				if (change == 0)
+				{
+					current.m_LabId = "gglab.lab.other";
+				}
+				if (change == 1)
+				{
+					current.m_DisplayDpiScale = 1.25f;
+				}
+				if (change == 2)
+				{
+					++summary->m_Field.m_SceneRevision;
+				}
+				if (change == 3)
+				{
+					current.m_FrameSerial = request.m_SourceFrame;
+				}
+				const auto id = jobs.Admit(plan());
+				coordinator.BeginFrame(current);
+				const auto failed = jobs.TakeResults();
+				context.Check(failed.size() == 1 && failed[0].m_JobId == id &&
+					failed[0].m_Status == CaptureJobStatus::Failed && !failed[0].m_FailureCode.empty() &&
+					control.m_Issued.size() == 1, "Content, DPI, scene and future-frame mismatches issue no GPU work");
+				if (change == 2)
+				{
+					--summary->m_Field.m_SceneRevision;
+				}
+			}
+			coordinator.FinalizeAfterRenderHost();
+		}
+
+		void RunGIProbeInspectionTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("probe-inspection");
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(), .m_WriteOnCallingThread = true });
+			CaptureTestJobs jobs(coordinator, context);
+			const auto plan = [](uint32_t x, uint64_t generation = 73)
+				{
+					CapturePlan result;
+					result.m_RequiredProducts = { ResourceCaptureProduct{
+						{ { .m_Resource = "GI.Field.ProbeInspection" } } } };
+					result.m_GIProbeInspection = GIProbeInspectionRequest{
+						.m_Coordinate = { x, 0, 0 }, .m_ExpectedGeneration = generation,
+						.m_ExpectedRefreshEpoch = 2 };
+					return result;
+				};
+			auto summary = std::make_shared<GIFieldSummary>();
+			summary->m_Field = { .m_Generation = 73, .m_RefreshEpoch = 2, .m_EpochOriginUpdate = 80 };
+			summary->m_Counts = { 4, 4, 4 };
+			summary->m_Spacing = 2;
+			summary->m_SubmittedUpdates = 82;
+			summary->m_InspectionAvailable = true;
+			{
+				auto held = *summary;
+				context.Check(GetGIFieldFrameUpdate(held) == 83, "An updating frame observes the update it records");
+				held.m_UpdateLimit = 82;
+				held.m_UpdateHeld = true;
+				const auto json = nlohmann::json::parse(SerializeGIFieldSummary(held));
+				context.Check(GetGIFieldFrameUpdate(held) == 82 && json["frameUpdate"] == 82 &&
+					json["updateHeld"] == true && json["updateLimit"] == 82,
+					"A held frame observes and publishes the last recorded update, not a new one");
+				held.m_UpdateHeld = false;
+				held.m_Invalid = true;
+				const auto invalid = nlohmann::json::parse(SerializeGIFieldSummary(held));
+				context.Check(GetGIFieldFrameUpdate(held) == 82 && invalid["frameUpdate"] == 82,
+					"An invalid field cannot attribute consumers to an update it will not record");
+			}
+			auto state = MakeFrameState(false);
+			state.m_Readiness.m_GIField = GIFieldCaptureState{ .m_Generation = 73, .m_Summary = summary };
+			const uint64_t first = jobs.Admit(plan(1));
+			const uint64_t second = jobs.Admit(plan(2));
+			const uint64_t stale = jobs.Admit(plan(1, 72));
+			coordinator.BeginFrame(state);
+			context.Check(control.m_Issued.size() == 1 && coordinator.GetFrameGIProbeInspection() &&
+				coordinator.GetFrameGIProbeInspection()->m_Coordinate[0] == 1 &&
+				coordinator.GetJobSnapshot(second)->m_Stage == CaptureJobStage::Waiting,
+				"Next-frame inspection diagnoses non-Ready fields and defers conflicting coordinates before issue");
+			coordinator.OnFrameSubmitted();
+			const auto results = jobs.TakeResults();
+			context.Check(results.size() == 1 && results[0].m_JobId == stale &&
+				results[0].m_FailureCode == "GIProbeIdentityMismatch",
+				"A replacement field cannot silently satisfy an earlier generation's coordinate");
+			context.Check(coordinator.CancelJob(first) == CaptureCancelResult::Cancelled,
+				"Inspection cancellation uses the existing job delivery contract");
+			++state.m_FrameSerial;
+			coordinator.BeginFrame(state);
+			context.Check(coordinator.GetFrameGIProbeInspection() &&
+				coordinator.GetFrameGIProbeInspection()->m_Coordinate[0] == 2,
+				"A queued coordinate gets its own later producing frame");
+			coordinator.OnFrameSubmitted();
+			GGLAB_UNUSED(coordinator.CancelJob(second));
+			auto withoutResource = plan(0);
+			withoutResource.m_RequiredProducts = { ImageCaptureProduct{} };
+			context.Check(coordinator.CheckJobAdmission(withoutResource).m_Reason == CaptureAdmissionReason::InvalidPlan,
+				"A typed inspection cannot omit its required compact resource");
+			auto math = plan(0);
+			math.m_GIProbeInspection->m_IntegrationReplayUpdate = 563;
+			GIProbeInspectionResult witness;
+			const auto ordinaryJson = nlohmann::json::parse(SerializeGIProbeInspection(witness));
+			witness.m_Request = *math.m_GIProbeInspection;
+			const auto witnessJson = nlohmann::json::parse(SerializeGIProbeInspection(witness));
+			context.Check(ordinaryJson["schemaVersion"] == 1 &&
+				!ordinaryJson["request"].contains("integrationReplayUpdate") &&
+				witnessJson["schemaVersion"] == 2 && witnessJson["request"]["integrationReplayUpdate"] == 563,
+				"Only opt-in integration inspection publishes the extended v2 request schema");
+			context.Check(coordinator.CheckJobAdmission(math).m_Reason == CaptureAdmissionReason::InvalidPlan,
+				"An integration witness cannot omit its same-frame raw resource");
+			std::get<ResourceCaptureProduct>(math.m_RequiredProducts[0]).m_Targets.push_back(
+				{ .m_Resource = "GI.Field.IntegrationInspection" });
+			context.Check(coordinator.CheckJobAdmission(math).m_Status == CaptureAdmissionStatus::Accepted,
+				"A generation-bound integration witness uses ordinary inspection admission");
+			std::get<ResourceCaptureProduct>(math.m_RequiredProducts[0]).m_Targets.back().m_Mip = 1;
+			context.Check(coordinator.CheckJobAdmission(math).m_Reason == CaptureAdmissionReason::InvalidPlan,
+				"Integration witness subresource mismatches reject before GPU work");
+			const auto summaryJson = nlohmann::json::parse(SerializeGIFieldSummary(*summary));
+			context.Check(summaryJson["completedMeasurement"].is_null() &&
+				summaryJson["field"]["epochOriginUpdate"] == 80 &&
+				summaryJson["classificationCounts"].is_null(),
+				"A fresh epoch has no relabelled measurement or invented classification counts");
+		}
+
+		void RunGIReceiverInspectionTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("receiver-inspection");
+			FakeCaptureControl control;
+			FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+				.m_DefaultOutputDirectory = directory.GetPath(), .m_WriteOnCallingThread = true });
+			CaptureTestJobs jobs(coordinator, context);
+			const auto plan = [](uint32_t x, uint64_t viewRevision = 4)
+				{
+					CapturePlan result;
+					result.m_RequiredProducts = { ResourceCaptureProduct{ { { .m_Resource = "GI.Field.ReceiverInspection" } } } };
+					result.m_GIReceiverInspection = GIReceiverInspectionRequest{ .m_Pixel = { x, 10 },
+						.m_ExpectedGeneration = 73, .m_ExpectedViewRevision = viewRevision };
+					return result;
+				};
+			auto summary = std::make_shared<GIFieldSummary>();
+			summary->m_Field = { .m_Generation = 73, .m_RefreshEpoch = 2, .m_EpochOriginUpdate = 80 };
+			summary->m_Counts = { 4, 4, 4 };
+			summary->m_SubmittedUpdates = 82;
+			summary->m_InspectionAvailable = true;
+			summary->m_ReceiverView = { .m_Revision = 4, .m_RenderExtent = { 64, 32 }, .m_DisplayExtent = { 64, 32 },
+				.m_ReceiversAvailable = true, .m_Supported = true };
+			summary->m_ReceiverInspectionAvailable = true;
+			summary->m_ReceiverMarkersAvailable = true;
+			auto state = MakeFrameState(false);
+			state.m_Readiness.m_GIField = GIFieldCaptureState{ .m_Generation = 73, .m_Summary = summary };
+			const auto first = jobs.Admit(plan(10));
+			const auto second = jobs.Admit(plan(11));
+			const auto stale = jobs.Admit(plan(10, 3));
+			coordinator.BeginFrame(state);
+			context.Check(control.m_Issued.size() == 1 && coordinator.GetFrameGIReceiverInspection() &&
+				coordinator.GetFrameGIReceiverInspection()->m_Pixel[0] == 10 &&
+				coordinator.GetJobSnapshot(second)->m_Stage == CaptureJobStage::Waiting,
+				"Receiver queries share ordinary jobs and defer conflicting pixels before freezing a frame");
+			coordinator.OnFrameSubmitted();
+			const auto failures = jobs.TakeResults();
+			context.Check(failures.size() == 1 && failures[0].m_JobId == stale &&
+				failures[0].m_FailureCode == "GIReceiverIdentityMismatch", "Stale view bindings fail explicitly");
+			control.Complete(control.m_Issued.front().m_Id);
+			coordinator.Update();
+			const auto completed = jobs.TakeResults();
+			context.Check(completed.size() == 1 && completed[0].m_JobId == first && completed[0].m_Products[0].m_Metadata &&
+				completed[0].m_Products[0].m_Metadata->m_GIReceiverObservation->m_FieldUpdate == 83 &&
+				completed[0].m_Products[0].m_Metadata->m_GIReceiverObservation->m_ReadinessUpdate == 3 &&
+				completed[0].m_Products[0].m_Metadata->m_GIReceiverInspection->m_Validity == GIReceiverInspectionValidity::MalformedPayload,
+				"Fence-completed transport freezes field/view stamps and preserves malformed evidence as invalid");
+			GGLAB_UNUSED(coordinator.CancelJob(second));
+			GGLAB_UNUSED(jobs.TakeResults());
+			auto unsupported = std::make_shared<GIFieldSummary>(*summary);
+			unsupported->m_ReceiverView.m_Supported = false;
+			state.m_Readiness.m_GIField->m_Summary = unsupported;
+			const auto unsupportedId = jobs.Admit(plan(10));
+			++state.m_FrameSerial;
+			coordinator.BeginFrame(state);
+			const auto unavailable = jobs.TakeResults();
+			context.Check(unavailable.size() == 1 && unavailable[0].m_JobId == unsupportedId &&
+				unavailable[0].m_FailureCode == "GIReceiverViewUnsupported" && !coordinator.GetFrameGIReceiverInspection(),
+				"Unsupported receiver views reject without changing TAA, resolution or scheduling GPU work");
+			auto numericSummary = std::make_shared<GIFieldSummary>(*summary);
+			numericSummary->m_ReceiverMarkersAvailable = false;
+			state.m_Readiness.m_GIField->m_Summary = numericSummary;
+			const auto markerUnavailable = jobs.Admit(plan(10));
+			auto numericPlan = plan(10);
+			numericPlan.m_GIReceiverInspection->m_Markers = false;
+			const auto numeric = jobs.Admit(numericPlan);
+			const auto ordinary = jobs.Admit({ .m_RequiredProducts = { ResourceCaptureProduct{
+				{ { .m_Resource = "GI.Receiver.Position" } } } } });
+			const auto beforeIssue = control.m_Issued.size();
+			++state.m_FrameSerial;
+			coordinator.BeginFrame(state);
+			coordinator.OnFrameSubmitted();
+			const auto markerFailures = jobs.TakeResults();
+			context.Check(markerFailures.size() == 1 && markerFailures[0].m_JobId == markerUnavailable &&
+				markerFailures[0].m_Status == CaptureJobStatus::Failed &&
+				markerFailures[0].m_Publication == CaptureJobPublication::NotPublished &&
+				markerFailures[0].m_FailureCode == "GIReceiverMarkersUnavailable" &&
+				control.m_Issued.size() == beforeIssue + 2 && coordinator.GetFrameGIReceiverInspection() &&
+				!coordinator.GetFrameGIReceiverInspection()->m_Markers,
+				"Missing marker pipelines reject paired-marker requests before issue while numeric and ordinary captures proceed");
+			for (size_t index = beforeIssue; index < control.m_Issued.size(); ++index)
+			{
+				control.Complete(control.m_Issued[index].m_Id);
+			}
+			coordinator.Update();
+			const auto numericCompleted = jobs.TakeResults();
+			context.Check(numericCompleted.size() == 2 &&
+				std::ranges::all_of(numericCompleted, [=](const auto& result)
+				{
+					return (result.m_JobId == numeric || result.m_JobId == ordinary) &&
+						result.m_Status == CaptureJobStatus::Completed &&
+						result.m_Publication == CaptureJobPublication::Published;
+				}), "Numeric inspection and independent captures publish without the optional marker pipeline");
+			auto querySummary = std::make_shared<GIFieldSummary>(*numericSummary);
+			querySummary->m_ReceiverInspectionAvailable = false;
+			state.m_Readiness.m_GIField->m_Summary = querySummary;
+			const auto queryUnavailable = jobs.Admit(numericPlan);
+			++state.m_FrameSerial;
+			coordinator.BeginFrame(state);
+			const auto queryFailures = jobs.TakeResults();
+			context.Check(queryFailures.size() == 1 && queryFailures[0].m_JobId == queryUnavailable &&
+				queryFailures[0].m_FailureCode == "GIReceiverUnavailable" &&
+				control.m_Issued.size() == beforeIssue + 2 && !coordinator.GetFrameGIReceiverInspection(),
+				"Missing receiver query pipelines fail numeric inspection before scheduling GPU work");
+			const auto supportJson = nlohmann::json::parse(SerializeGIFieldSummary(*querySummary));
+			context.Check(supportJson["inspectionAvailable"] == true &&
+				supportJson["receiverInspectionAvailable"] == false && supportJson["receiverMarkersAvailable"] == false,
+				"Discovery distinguishes field data, receiver query and receiver marker availability");
+			GIReceiverInspectionResult zero;
+			zero.m_Validity = GIReceiverInspectionValidity::NoValidSupport;
+			zero.m_CageEvaluated = true;
+			zero.m_Corners[0].m_Reason = GIReceiverCornerReason::NotActive;
+			const auto json = nlohmann::json::parse(SerializeGIReceiverInspection(zero));
+			context.Check(json["corners"].size() == 8 && json["corners"][0]["normalizedWeight"].is_null() &&
+				json["corners"][0]["visibility"].is_null() && !json["normalizationReason"].is_null(),
+				"Zero total weight and excluded sampling remain unavailable rather than fabricated zeros");
+		}
+
+		void RunGIInspectionCancellationTests(SelfTestContext& context) noexcept
+		{
+			for (bool receiver : { false, true })
+			{
+				for (bool submitted : { false, true })
+				{
+					TemporaryDirectory directory("inspection-close");
+					FakeCaptureControl control;
+					FrameCaptureCoordinator coordinator({ .m_Capture = &control,
+						.m_DefaultOutputDirectory = directory.GetPath(), .m_WriteOnCallingThread = true });
+					CaptureTestJobs guiJobs(coordinator, context);
+					CaptureTestJobs sessionJobs(coordinator, context);
+					auto summary = std::make_shared<GIFieldSummary>();
+					summary->m_Field = { .m_Generation = 73, .m_RefreshEpoch = 2 };
+					summary->m_Counts = { 4, 4, 4 };
+					summary->m_InspectionAvailable = true;
+					summary->m_ReceiverInspectionAvailable = true;
+					summary->m_ReceiverMarkersAvailable = true;
+					summary->m_ReceiverView = { .m_Revision = 4, .m_RenderExtent = { 32, 32 },
+						.m_DisplayExtent = { 32, 32 }, .m_ReceiversAvailable = true, .m_Supported = true };
+					auto state = MakeFrameState(false);
+					state.m_Readiness.m_GIField = GIFieldCaptureState{ .m_Generation = 73, .m_Summary = summary };
+					CapturePlan plan;
+					if (receiver)
+					{
+						plan.m_RequiredProducts = { ResourceCaptureProduct{
+							{ { .m_Resource = "GI.Field.ReceiverInspection" } } } };
+						plan.m_GIReceiverInspection = GIReceiverInspectionRequest{ .m_Pixel = { 10, 10 },
+							.m_ExpectedGeneration = 73, .m_ExpectedViewRevision = 4 };
+					}
+					else
+					{
+						plan.m_RequiredProducts = { ResourceCaptureProduct{
+							{ { .m_Resource = "GI.Field.ProbeInspection" } } } };
+						plan.m_GIProbeInspection = GIProbeInspectionRequest{ .m_Coordinate = { 1, 0, 0 },
+							.m_ExpectedGeneration = 73 };
+					}
+					const auto gui = guiJobs.Admit(plan);
+					const auto session = sessionJobs.Admit(plan);
+					if (submitted)
+					{
+						coordinator.BeginFrame(state);
+						coordinator.OnFrameSubmitted();
+					}
+					context.Check(coordinator.CancelJob(gui) == CaptureCancelResult::Cancelled &&
+						coordinator.GetIntakeSnapshot().m_DrainingRuntimeRequests == (submitted ? 1u : 0u),
+						"Closing an inspection cancels its own receipt and retains only submitted work for drain");
+					const auto cancelled = guiJobs.TakeResults();
+					context.Check(cancelled.size() == 1 && cancelled[0].m_JobId == gui &&
+						cancelled[0].m_Status == CaptureJobStatus::Cancelled &&
+						cancelled[0].m_Publication == CaptureJobPublication::NotPublished && sessionJobs.TakeResults().empty(),
+						"GUI cancellation can be consumed independently while the session inspection remains active");
+					if (!submitted)
+					{
+						coordinator.BeginFrame(state);
+						coordinator.OnFrameSubmitted();
+					}
+					context.Check(control.m_Issued.size() == (submitted ? 2u : 1u),
+						"An inspection closed before issue schedules no GPU work and preserves the session request");
+					for (const auto& issued : control.m_Issued)
+					{
+						control.Complete(issued.m_Id);
+					}
+					coordinator.Update();
+					const auto completed = sessionJobs.TakeResults();
+					context.Check(completed.size() == 1 && completed[0].m_JobId == session &&
+						completed[0].m_Status == CaptureJobStatus::Completed &&
+						completed[0].m_Publication == CaptureJobPublication::Published && guiJobs.TakeResults().empty() &&
+						coordinator.GetIntakeSnapshot().m_DrainingRuntimeRequests == 0 &&
+						control.GetUnfinishedRequestCount() == 0,
+						"Late GPU completion drains without reviving the closed inspection or consuming the session result");
+				}
+			}
+		}
+
 		void RunMetadataSerializationTests(SelfTestContext& context) noexcept
 		{
 			FrameCaptureMetadata metadata{
@@ -2029,6 +2423,78 @@ namespace gglab
 				.m_TotalTime = std::numeric_limits<double>::infinity(),
 			};
 			metadata.m_Readiness.Add("ibl", FrameCaptureGateState::Pending, "Baking.");
+			metadata.m_Readiness.m_GIField = GIFieldCaptureState{
+				.m_Generation = 73, .m_SceneRevision = 19, .m_LightingGeneration = 11,
+				.m_EnvironmentGeneration = 7,
+				.m_Readiness = { .m_State = GIFieldReadinessState::Ready, .m_Enabled = true,
+					.m_Refreshing = false, .m_CompletedUpdates = 84, .m_ReadyUpdate = 54 } };
+			const auto fieldJson = nlohmann::json::parse(SerializeFrameCaptureMetadata(metadata));
+			context.Check(fieldJson["readiness"]["giField"]["schemaVersion"] == 1 &&
+				fieldJson["readiness"]["giField"]["generation"] == 73 &&
+				fieldJson["readiness"]["giField"]["completedUpdates"] == 84 &&
+				fieldJson["readiness"]["giField"]["state"] == "Ready",
+				"Field readiness and generation are serialized from the frozen frame snapshot");
+			auto measurement = std::make_shared<GIFieldReadinessMeasurement>();
+			measurement->m_Counts = { 4, 4, 4 };
+			measurement->m_BlockWidth = 4;
+			measurement->m_RequiredQuietUpdates = 30;
+			measurement->m_Blocks.push_back({});
+			auto change = std::make_shared<GIFieldChangeObservation>();
+			change->m_Observation = { .m_Field = { .m_Generation = 73, .m_RefreshEpoch = 2,
+				.m_EpochOriginUpdate = 80 }, .m_ProducingFrame = 113, .m_FieldUpdate = 85, .m_ReadinessUpdate = 5 };
+			change->m_Measurement = measurement;
+			GIFieldSummary summary{ .m_ChangeObservation = change };
+			summary.m_Visualization.m_ChangeObservation = change;
+			summary.m_Visualization.m_Settings.m_Mode = GIProbeVisualizationMode::Change;
+			const auto changeJson = nlohmann::json::parse(SerializeGIFieldSummary(summary));
+			context.Check(changeJson["changeObservation"] == changeJson["probeVisualization"]["changeObservation"] &&
+				changeJson["changeObservation"]["blocks"][0]["p95"].is_null() &&
+				changeJson["changeObservation"]["blocks"][0]["excluded"] == true &&
+				changeJson["changeObservation"]["observation"]["readinessUpdate"] == 5 &&
+				changeJson["probeVisualization"]["mode"] == "change" &&
+				changeJson["probeVisualization"]["schemaVersion"] == 7,
+				"Change metadata shares the completed observation and preserves Excluded/null semantics");
+			context.Check(changeJson["profile"].is_null(),
+				"Absent profile receipts remain unavailable instead of inventing a qualified default");
+			auto profile = std::make_shared<GIFieldProfileReceipt>();
+			profile->m_Volume.m_Profile = { "gglab.gi.field.contract", 3 };
+			profile->m_RaysPerProbe = 192;
+			profile->m_Seed = 81052;
+			profile->m_IrradianceInteriorWidth = 14;
+			profile->m_MaximumDistance = 1000;
+			profile->m_Hysteresis = 0.9f;
+			profile->m_ViewBias = 0.15f;
+			profile->m_EnableFeedback = true;
+			profile->m_ProgressiveSampling = true;
+			profile->m_Readiness.m_NoiseSigma = 0.02f;
+			profile->m_Readiness.m_SteadyNoiseSigma = 0.03f;
+			profile->m_Readiness.m_ProgressiveRefresh = true;
+			profile->m_ConstantEnvironment = true;
+			profile->m_ConstantRadiance = { 1, 0.5f, 2 };
+			summary.m_Profile = profile;
+			const auto profileJson = nlohmann::json::parse(SerializeGIFieldSummary(summary))["profile"];
+			context.Check(profileJson["schemaVersion"] == 1 &&
+				profileJson["id"] == "gglab.gi.field.contract" && profileJson["revision"] == 3 &&
+				profileJson["counts"] == profile->m_Volume.m_Counts &&
+				profileJson["minimum"] == profile->m_Volume.m_Minimum && profileJson["spacing"] == 1 &&
+				profileJson["raysPerProbe"] == 192 && profileJson["seed"] == 81052 &&
+				profileJson["irradianceInteriorWidth"] == 14 && profileJson["maximumDistance"] == 1000 &&
+				profileJson["hysteresis"] == profile->m_Hysteresis &&
+				profileJson["viewBias"] == profile->m_ViewBias && !profileJson["receiverSampling"].get<bool>() &&
+				profileJson["feedback"] == true && profileJson["progressiveSampling"] == true &&
+				profileJson["constantEnvironment"] == true &&
+				profileJson["constantRadiance"] == profile->m_ConstantRadiance &&
+				profileJson["readiness"]["enabled"] == true &&
+				profileJson["readiness"]["noiseSigma"] == profile->m_Readiness.m_NoiseSigma &&
+				profileJson["readiness"]["steadyNoiseSigma"] == profile->m_Readiness.m_SteadyNoiseSigma &&
+				profileJson["readiness"]["refreshHysteresis"] == 0.5 &&
+				profileJson["readiness"]["progressiveRefresh"] == true,
+				"Versioned profile metadata retains base identity and every effective constructor input");
+			metadata.m_Readiness.m_GIField->m_Summary = std::make_shared<GIFieldSummary>(summary);
+			context.Check(nlohmann::json::parse(SerializeFrameCaptureMetadata(metadata))
+				["readiness"]["giField"]["summary"]["profile"] == profileJson,
+				"Frame metadata embeds the same retained profile receipt without relabeling it");
+
 			const std::string json = SerializeFrameCaptureMetadata(metadata);
 			context.Check(
 				json.find("\"note\": \"line\\nbreak\\ttab\\\\slash\\u0001\"") != std::string::npos &&
@@ -2252,7 +2718,8 @@ namespace gglab
 					}
 					m_Capture.OnFrameSubmitted();
 					const FrameSequenceObservation observation = m_Sequence.WantsGpuTiming() ?
-						FrameSequenceObservation{ m_Capture.HasFrameGraphExports(m_RenderSerial), {} } :
+						FrameSequenceObservation{ m_Capture.HasFrameGraphExports(m_RenderSerial), {},
+							static_cast<double>(m_RenderSerial) * 0.125 } :
 						FrameSequenceObservation{};
 					const auto parameters = m_FreezeParameters ?
 						std::make_shared<ParameterFrameState>(ParameterFrameState{
@@ -2362,6 +2829,224 @@ namespace gglab
 				lastCapture->m_Metadata->m_Sequence->m_SequenceId == id,
 				"Sequence capture metadata names the sequence, path version and frame");
 			context.Check(!harness.Frame(), "A completed sequence no longer poses frames");
+		}
+
+		void RunGIFieldLightingRefreshTests(SelfTestContext& context) noexcept
+		{
+			TemporaryDirectory directory("sequence-gi-lighting-refresh");
+			const auto setMeasurement = [](GIFieldCaptureState& field, GIFieldSummary& summary,
+				bool refresh, uint64_t update)
+				{
+					field.m_Readiness.m_CompletedUpdates = update;
+					auto measurement = std::make_shared<GIFieldReadinessMeasurement>();
+					measurement->m_Readiness = field.m_Readiness;
+					measurement->m_RefreshMode = refresh;
+					auto change = std::make_shared<GIFieldChangeObservation>();
+					change->m_Observation = { .m_Field = summary.m_Field,
+						.m_ReadinessUpdate = update };
+					change->m_Measurement = measurement;
+					summary.m_ChangeObservation = change;
+					return change;
+				};
+			for (uint32_t variant = 0; variant < 28; ++variant)
+			{
+				SequenceHarness harness(directory.GetPath());
+				auto initial = MakeFrameState(true);
+				auto summary = std::make_shared<GIFieldSummary>();
+				summary->m_Field = { 3, 5, 7, 7, 1, 0 };
+				summary->m_Initialized = true;
+				initial.m_Readiness.m_GIField = GIFieldCaptureState{
+					.m_Generation = 3, .m_SceneRevision = 5, .m_LightingGeneration = 7,
+					.m_EnvironmentGeneration = 7,
+					.m_Readiness = { .m_State = GIFieldReadinessState::Ready, .m_Enabled = true },
+					.m_Summary = summary };
+				initial.m_Readiness.Add("gi-field", FrameCaptureGateState::Ready, {}, "gi-field", 3);
+				std::string error;
+				GGLAB_UNUSED(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test",
+					.m_Events = { { .m_Frame = 0,
+						.m_Values = { { LabParameterId("sun"), int32_t(20000) } } } } }, error));
+				const auto pose = harness.m_Sequence.PrepareFrame(&initial, harness.m_Paths, 42,
+					[](auto, auto&) { return true; });
+				harness.m_Sequence.OnPoseApplied(EvaluateCameraPath(harness.m_Paths.front(), 0));
+				ParameterBatchStatus batch{ .m_BatchId = 1, .m_Revision = 2,
+					.m_State = ParameterBatchState::Finished,
+					.m_Items = { { .m_Parameter = LabParameterId("sun"),
+						.m_DeclaredClass = ParameterEffectClass::Deferred,
+						.m_State = ParameterEffectState::Consumed,
+						.m_Identity = { .m_Revision = 2, .m_Domain = "lighting", .m_Generation = 8 },
+						.m_Requested = 100, .m_Applied = 100, .m_Published = 101,
+						.m_FirstConsumed = 101 } } };
+				auto current = initial;
+				auto changed = std::make_shared<GIFieldSummary>(*summary);
+				changed->m_Field = { 3, 5, 8, 8, 2, 50 };
+				auto& field = *current.m_Readiness.m_GIField;
+				field.m_Summary = changed;
+				field.m_LightingGeneration = 8;
+				field.m_EnvironmentGeneration = 8;
+				field.m_Readiness.m_State = GIFieldReadinessState::Settling;
+				current.m_Readiness.m_Gates.back().m_State = FrameCaptureGateState::Pending;
+				current.m_FrameSerial = 102;
+				FrameSequenceLightingState lighting{ 8, 8 };
+				switch (variant)
+				{
+				case 0:
+					break;
+				case 1:
+					lighting.m_RequestedGeneration = 9;
+					break;
+				case 2:
+					lighting.m_BuiltGeneration = 9;
+					break;
+				case 3:
+					changed->m_Field.m_Generation = 4;
+					break;
+				case 4:
+					changed->m_Field.m_SceneRevision = 6;
+					break;
+				case 5:
+					changed->m_Field.m_RefreshEpoch = 1;
+					break;
+				case 6:
+					changed->m_Invalid = true;
+					break;
+				case 7:
+					changed->m_Initialized = false;
+					break;
+				case 8:
+					field.m_LightingGeneration = 7;
+					break;
+				case 9:
+					field.m_Readiness.m_Failed = true;
+					break;
+				case 10:
+					field.m_Readiness.m_Refreshing = false;
+					break;
+				case 11:
+					batch.m_Items[0].m_Identity.m_Generation = 9;
+					break;
+				case 12:
+					batch.m_Items[0].m_Identity.m_Revision = 3;
+					break;
+				case 13:
+					batch.m_Items[0].m_State = ParameterEffectState::NoChange;
+					break;
+				case 14:
+					batch.m_Items[0].m_State = ParameterEffectState::Applied;
+					break;
+				case 15:
+					batch.m_Items[0].m_Identity.m_Domain = "unrelated";
+					break;
+				case 16:
+					current.m_Readiness.m_Gates.back().m_State = FrameCaptureGateState::Failed;
+					break;
+				case 17:
+					batch.m_State = ParameterBatchState::Applying;
+					batch.m_Items[0].m_State = ParameterEffectState::Published;
+					batch.m_Items[0].m_FirstConsumed.reset();
+					break;
+				case 18:
+				case 19:
+					break;
+				case 20:
+					current.m_Readiness.Add("environment", FrameCaptureGateState::Pending);
+					break;
+				case 26:
+					field.m_Readiness.m_Refreshing = false;
+					setMeasurement(field, *changed, false, 34);
+					break;
+				}
+				if (variant != 18)
+				{
+					harness.m_Sequence.OnParameterEventBatch(batch);
+				}
+				const bool accepted = harness.m_Sequence.BeginFrame(current, {}, lighting);
+				const bool expectRefresh = variant == 0 || variant == 17 || variant == 19 ||
+					(variant >= 21 && variant != 26);
+				context.Check(pose && accepted == expectRefresh,
+					"Only an owned published lighting generation covers its initialized, unchanged field refresh");
+				if (!expectRefresh)
+				{
+					continue;
+				}
+				context.Check(harness.m_Sequence.GetStatus()->m_SubmittedFrames == 0,
+					"Allowing a transition frame neither advances nor claims successful consumption");
+				harness.m_Sequence.OnFrameSubmitted(102);
+				if (variant >= 21)
+				{
+					for (uint32_t frame = 1; frame <= 5; ++frame)
+					{
+						GGLAB_UNUSED(harness.m_Sequence.PrepareFrame(&current, harness.m_Paths, 42));
+						harness.m_Sequence.OnPoseApplied(EvaluateCameraPath(harness.m_Paths.front(), frame));
+						const bool ready = variant == 25 ? frame == 5 : frame == 1 || frame == 3;
+						field.m_Readiness.m_State = ready ?
+							GIFieldReadinessState::Ready :
+							GIFieldReadinessState::Settling;
+						field.m_Readiness.m_Refreshing = variant == 25 && !ready;
+						current.m_Readiness.m_Gates.back().m_State = ready ?
+							FrameCaptureGateState::Ready : FrameCaptureGateState::Pending;
+						auto change = setMeasurement(field, *changed, frame == 1 || variant == 25, 32 + frame);
+						if (frame == 2)
+						{
+							if (variant == 22)
+							{
+								++change->m_Observation.m_Field.m_RefreshEpoch;
+							}
+							else if (variant == 23 || variant == 27)
+							{
+								setMeasurement(field, *changed, true, 34);
+								field.m_Readiness.m_Refreshing = variant == 27;
+							}
+							else if (variant == 24)
+							{
+								changed->m_ChangeObservation.reset();
+							}
+						}
+						current.m_FrameSerial = 102 + frame;
+						const bool allowed = harness.m_Sequence.BeginFrame(current, {}, lighting);
+						const uint32_t failureFrame = variant == 25 ? 5 : variant == 21 ? 4 : 2;
+						context.Check(allowed == (frame < failureFrame),
+							"Only the proven same-epoch refresh-to-steady handoff extends coverage until steady Ready");
+						if (!allowed)
+						{
+							break;
+						}
+						harness.m_Sequence.OnFrameSubmitted(current.m_FrameSerial);
+					}
+					continue;
+				}
+				if (variant == 19)
+				{
+					for (uint32_t frame = 1; frame < 6; ++frame)
+					{
+						GGLAB_UNUSED(harness.m_Sequence.PrepareFrame(&current, harness.m_Paths, 42));
+						harness.m_Sequence.OnPoseApplied(EvaluateCameraPath(harness.m_Paths.front(), frame));
+						current.m_FrameSerial = 102 + frame;
+						const bool allowed = harness.m_Sequence.BeginFrame(current, {}, lighting);
+						context.Check(allowed == (frame != 5),
+							"The final Pending refresh frame fails instead of publishing a completed range");
+						if (allowed)
+						{
+							harness.m_Sequence.OnFrameSubmitted(current.m_FrameSerial);
+						}
+					}
+					continue;
+				}
+				GGLAB_UNUSED(harness.m_Sequence.PrepareFrame(&current, harness.m_Paths, 42));
+				harness.m_Sequence.OnPoseApplied(EvaluateCameraPath(harness.m_Paths.front(), 1));
+				field.m_Readiness.m_State = GIFieldReadinessState::Ready;
+				current.m_Readiness.m_Gates.back().m_State = FrameCaptureGateState::Ready;
+				current.m_FrameSerial = 103;
+				context.Check(harness.m_Sequence.BeginFrame(current, {}, lighting),
+					"The matching field may finish refresh without skipping any transition frames");
+				harness.m_Sequence.OnFrameSubmitted(103);
+				GGLAB_UNUSED(harness.m_Sequence.PrepareFrame(&current, harness.m_Paths, 42));
+				harness.m_Sequence.OnPoseApplied(EvaluateCameraPath(harness.m_Paths.front(), 2));
+				field.m_Readiness.m_State = GIFieldReadinessState::Settling;
+				current.m_Readiness.m_Gates.back().m_State = FrameCaptureGateState::Pending;
+				context.Check(!harness.m_Sequence.BeginFrame(current, {}, lighting) &&
+					harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Failed,
+					"A consumed lighting receipt cannot excuse readiness loss after its refresh reaches Ready");
+			}
 		}
 
 		void RunFrameSequenceBackPressureTests(SelfTestContext& context) noexcept
@@ -3304,6 +3989,9 @@ namespace gglab
 				const auto product = nlohmann::json::parse(ReadText(status.m_TimingPublication->m_Files.front()));
 				const auto manifest = nlohmann::json::parse(ReadText(status.m_TimingPublication->m_Manifest));
 				context.Check(product["coverage"]["requestedSamples"] == 4 && product["coverage"]["recordedSamples"] == 4 &&
+					product["schemaVersion"] == 2 && manifest["products"][0]["schemaVersion"] == 2 &&
+					product["coverage"]["samples"][0]["cpuBuildRecordMilliseconds"] ==
+						static_cast<double>(serials[3]) * 0.125 &&
 					product["coverage"]["samples"][0]["sequenceFrame"] == 1 &&
 					product["coverage"]["samples"][0]["referenceSample"] == 1 &&
 					product["coverage"]["samples"][2]["firstFrame"] == true &&
@@ -3497,6 +4185,10 @@ namespace gglab
 					status.m_SubmittedFrames == 9 && status.m_GpuTiming->m_FrameMilliseconds.size() == 9 &&
 					status.m_GpuTiming->m_FrameMilliseconds.front() == static_cast<double>(firstSerial) &&
 					status.m_GpuTiming->m_FrameMilliseconds.back() == static_cast<double>(firstSerial + 8) &&
+					status.m_GpuTiming->m_Samples.front().m_Observation.m_CpuBuildRecordMilliseconds ==
+						static_cast<double>(firstSerial) * 0.125 &&
+					status.m_GpuTiming->m_Samples.back().m_Observation.m_CpuBuildRecordMilliseconds ==
+						static_cast<double>(firstSerial + 8) * 0.125 &&
 					status.m_GpuTiming->m_Scopes.front().m_Milliseconds.size() == 9,
 					std::format("Serial membership includes every sequence frame and its delayed tail (delay {})", delay));
 			}
@@ -5525,6 +6217,22 @@ namespace gglab
 		}
 	}
 
+	void RunGIFieldLightingRefreshSelfTests(SelfTestContext& context) noexcept
+	{
+		RunGIFieldLightingRefreshTests(context);
+	}
+
+	void RunGIProbeInspectionSelfTests(SelfTestContext& context) noexcept
+	{
+		RunGIProbeInspectionTests(context);
+		RunGIInspectionCancellationTests(context);
+	}
+
+	void RunFrameCaptureMetadataSelfTests(SelfTestContext& context) noexcept
+	{
+		RunMetadataSerializationTests(context);
+	}
+
 	void RunFrameCaptureCoordinatorSelfTests(SelfTestContext& context) noexcept
 	{
 		RunJobAdmissionTests(context);
@@ -5571,7 +6279,12 @@ namespace gglab
 		RunRenamePublicationTests(context);
 		RunPublicationShutdownTests(context);
 		RunMetadataSerializationTests(context);
+		RunGIProbeInspectionTests(context);
+		RunGIProbePickingTests(context);
+		RunGIReceiverInspectionTests(context);
+		RunGIInspectionCancellationTests(context);
 		RunFrameSequenceTests(context);
+		RunGIFieldLightingRefreshTests(context);
 		RunFrameSequenceBackPressureTests(context);
 		RunSequenceJobOwnershipTests(context);
 		RunDiagnosticCaptureTests(context);

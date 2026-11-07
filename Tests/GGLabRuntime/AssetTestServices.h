@@ -48,6 +48,13 @@ namespace gglab::asset_test
 		}
 		RHITextureHandle CreateTexture(const RHIOwnedTextureCreateInfo&, const RHIResourceDebugIdentityDesc&) noexcept override;
 		RHIBufferHandle CreateBuffer(const RHIBufferDesc& desc, const RHIResourceDebugIdentityDesc&) noexcept override;
+		// Logical liveness for compile-only AS imports; this never allocates or builds a native AS.
+		RHIAccelerationStructureHandle CreateAccelerationStructure(const RHIAccelerationStructureDesc&) noexcept override
+		{
+			const RHIAccelerationStructureHandle handle{ m_NextAccelerationStructureIndex++, 1 };
+			m_LiveAccelerationStructures.insert(handle);
+			return handle;
+		}
 		RHITextureViewHandle CreateTextureView(RHITextureHandle, const RHITextureViewDesc&) noexcept override
 		{
 			return { m_NextTextureViewIndex++, 1 };
@@ -62,6 +69,10 @@ namespace gglab::asset_test
 		}
 		void DestroyTexture(RHITextureHandle texture) noexcept override { m_LiveTextures.erase(texture); }
 		void DestroyBuffer(RHIBufferHandle buffer) noexcept override;
+		void DestroyAccelerationStructure(RHIAccelerationStructureHandle handle) noexcept override
+		{
+			m_LiveAccelerationStructures.erase(handle);
+		}
 		void DestroyTextureView(RHITextureViewHandle) noexcept override {}
 		void DestroyBufferView(RHIBufferViewHandle) noexcept override {}
 		void DestroySampler(RHISamplerHandle) noexcept override {}
@@ -79,6 +90,10 @@ namespace gglab::asset_test
 		bool IsUploadStorage(RHIBufferHandle) const noexcept override { return false; }
 		bool IsAlive(RHITextureHandle texture) const noexcept override { return m_LiveTextures.contains(texture); }
 		bool IsAlive(RHIBufferHandle buffer) const noexcept override { return m_LiveBuffers.contains(buffer); }
+		bool IsAlive(RHIAccelerationStructureHandle handle) const noexcept override
+		{
+			return m_LiveAccelerationStructures.contains(handle);
+		}
 		bool IsAlive(RHISamplerHandle sampler) const noexcept override { return sampler.IsValid(); }
 		RHIFenceQueryResult QueryFencePointImpl(const RHIFencePoint& fencePoint) const noexcept override;
 		void RecordTextureUse(RHITextureHandle, const RHIFencePoint&) noexcept override {}
@@ -102,10 +117,12 @@ namespace gglab::asset_test
 	private:
 		std::unordered_map<RHIBufferHandle, uint64_t> m_LiveBuffers;
 		std::unordered_set<RHITextureHandle> m_LiveTextures;
+		std::unordered_set<RHIAccelerationStructureHandle> m_LiveAccelerationStructures;
 		uint32_t m_NextTextureIndex = 0;
 		uint32_t m_NextTextureViewIndex = 0;
 		uint32_t m_NextSamplerIndex = 0;
 		uint32_t m_NextBufferIndex = 0;
+		uint32_t m_NextAccelerationStructureIndex = 0;
 		bool m_AllFencesCompleted = true;
 		std::optional<RHIFenceQueryResult> m_FenceQueryResult;
 	};

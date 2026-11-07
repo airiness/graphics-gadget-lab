@@ -33,7 +33,7 @@ namespace gglab
 	namespace
 	{
 		// Persisted in capture metadata and requested by name; never rename an entry.
-		constexpr std::array<std::pair<PostProcessDebugTap, std::string_view>, 20> DiagnosticTapNames
+		constexpr std::array<std::pair<PostProcessDebugTap, std::string_view>, 27> DiagnosticTapNames
 		{ {
 			{ PostProcessDebugTap::SceneDepthRaw, "scene-depth-raw" },
 			{ PostProcessDebugTap::SceneDepthLinearViewZ, "scene-depth-linear-view-z" },
@@ -55,6 +55,13 @@ namespace gglab
 			{ PostProcessDebugTap::TemporalClipDistance, "temporal-clip-distance" },
 			{ PostProcessDebugTap::TemporalHistoryRelaxation, "temporal-history-relaxation" },
 			{ PostProcessDebugTap::GTAOHistorySamples, "gtao-history-samples" },
+			{ PostProcessDebugTap::GIIrradiance, "gi-irradiance" },
+			{ PostProcessDebugTap::GILambertRadiance, "gi-lambert-radiance" },
+			{ PostProcessDebugTap::GISunIrradiance, "gi-sun-irradiance" },
+			{ PostProcessDebugTap::GIEnvironmentIrradiance, "gi-environment-irradiance" },
+			{ PostProcessDebugTap::GIBaseVisibility, "gi-base-visibility" },
+			{ PostProcessDebugTap::GICoatVisibility, "gi-coat-visibility" },
+			{ PostProcessDebugTap::GICombinedVisibility, "gi-combined-visibility" },
 		} };
 	}
 

@@ -66,6 +66,12 @@ namespace gglab
 	{
 		DX12BindingLayoutBuildResult dx12Desc{};
 		BuildDX12RootSignatureDesc(desc, dx12Desc);
+		if (!dx12Desc.IsValid())
+		{
+			GGLAB_LOG_GRAPHICS_ERROR("DX12 binding layout rejected: planning error {}.",
+				static_cast<uint32_t>(dx12Desc.m_Error));
+			return {};
+		}
 		return GetOrCreate(dx12Desc.m_Desc);
 	}
 

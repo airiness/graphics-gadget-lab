@@ -45,6 +45,8 @@ namespace gglab
 			case RGResourceType::RGBuffer:
 				return static_cast<const RGVirtualResource<RGBufferResource>*>(virtualResource)
 					->m_PhysicalAllocation.m_PoolSlot;
+			case RGResourceType::RGAccelerationStructure:
+				return InvalidTransientResourcePoolSlot;
 			}
 
 			GGLAB_UNREACHABLE("Unhandled RGResourceType.");
@@ -53,6 +55,14 @@ namespace gglab
 		static void SetBarrierPhysicalHandle(
 			const RGCompiledResource& resource, RGSnapshotBarrierInfo& info) noexcept
 		{
+			if (resource.m_ResourceType == RGResourceType::RGAccelerationStructure)
+			{
+				const auto handle = static_cast<const RGVirtualResource<RGAccelerationStructureResource>*>(resource.m_Resource)->m_ImportedHandle;
+				info.m_HasPhysicalHandle = handle.IsValid();
+				info.m_PhysicalHandleIndex = handle.Index();
+				info.m_PhysicalHandleGeneration = handle.Generation();
+				return;
+			}
 			if (resource.m_ResourceType == RGResourceType::RGTexture)
 			{
 				const auto* texture =
@@ -217,7 +227,13 @@ namespace gglab
 					resourceInfo.m_LastUserPassIndex =
 						compiledResource ? ToSnapshotPassIndex(compiledResource->m_LastUser) : -1;
 					resourceInfo.m_UsageBits = compiledResource ? compiledResource->m_UsageBits : 0;
-					if (virtualResource->m_ResourceType == RGResourceType::RGTexture)
+					if (virtualResource->m_ResourceType == RGResourceType::RGAccelerationStructure)
+					{
+						const auto* acceleration = static_cast<const RGVirtualResource<RGAccelerationStructureResource>*>(virtualResource);
+						resourceInfo.m_LogicalBytes = acceleration->m_Desc.m_SizeInBytes;
+						resourceInfo.m_AccelerationStructureType = acceleration->m_Desc.m_Type;
+					}
+					else if (virtualResource->m_ResourceType == RGResourceType::RGTexture)
 					{
 						const auto* texture =
 							static_cast<const RGVirtualResource<RGTextureResource>*>(

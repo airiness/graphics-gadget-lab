@@ -1,10 +1,12 @@
 #include "WinAppTestRunner.h"
 #include "ApplicationHostConfigurationSelfTests.h"
 #include "ApplicationContentRegistrationSelfTests.h"
+#include "CoastalRaySceneOracleSelfTests.h"
 #include "ApplicationControlSelfTests.h"
 #include "ApplicationInputSelfTests.h"
 #include "ApplicationLifecycleSelfTests.h"
 #include "DevToolsViewProfileSelfTests.h"
+#include "RenderGraphDiagnosticsSelfTests.h"
 #include "TemporalAALabDiagnosticsSelfTests.h"
 #include "TemporalAALabGpuTimingSelfTests.h"
 #include "FrameCaptureImageEncoderSelfTests.h"
@@ -36,10 +38,12 @@ namespace gglab
 		constexpr std::array RegisteredSuites
 		{
 			SelfTestSuiteDesc{ .m_Id = "app-content-registration", .m_Run = &RunApplicationContentRegistrationSelfTests, },
+			SelfTestSuiteDesc{ .m_Id = "coastal-ray-scene-oracle", .m_Run = &RunCoastalRaySceneOracleSelfTests, },
 			SelfTestSuiteDesc{ .m_Id = "app-input", .m_Run = &RunApplicationInputSelfTests, },
 			SelfTestSuiteDesc{ .m_Id = "app-host-configuration", .m_Run = &RunApplicationHostConfigurationSelfTests, },
 			SelfTestSuiteDesc{ .m_Id = "app-lifecycle", .m_Run = &RunApplicationLifecycleSelfTests, },
 			SelfTestSuiteDesc{ .m_Id = "app-devtools-view-profile", .m_Run = &RunDevToolsViewProfileSelfTests, },
+			SelfTestSuiteDesc{ .m_Id = "app-render-graph-diagnostics", .m_Run = &RunRenderGraphDiagnosticsSelfTests, },
 			SelfTestSuiteDesc{ .m_Id = "app-control", .m_Run = &RunApplicationControlSelfTests, },
 			SelfTestSuiteDesc{ .m_Id = "app-temporal-aa-lab-diagnostics", .m_Run = &RunTemporalAALabDiagnosticsSelfTests, },
 			SelfTestSuiteDesc{ .m_Id = "app-temporal-aa-lab-gpu-timing", .m_Run = &RunTemporalAALabGpuTimingSelfTests, },

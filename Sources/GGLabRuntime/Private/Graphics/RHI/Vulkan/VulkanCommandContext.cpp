@@ -1,4 +1,5 @@
 #include "Graphics/RHI/Vulkan/VulkanCommandContext.h"
+#include "Graphics/RHI/Vulkan/VulkanAccelerationStructureManager.h"
 #include "Graphics/RHI/Vulkan/VulkanShaderBindingABI.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Core/Log/LogMacros.h"
@@ -13,6 +14,88 @@
 
 namespace gglab
 {
+
+	void VulkanGraphicsCommandContext::TrackAccelerationStructureUse(RHIAccelerationStructureHandle handle) noexcept
+	{
+		GGLAB_UNUSED(m_Device->GetAccelerationStructureManager().Resolve(*this, handle));
+	}
+
+	void VulkanComputeCommandContext::TrackAccelerationStructureUse(RHIAccelerationStructureHandle handle) noexcept
+	{
+		GGLAB_UNUSED(m_GraphicsContext->m_Device->GetAccelerationStructureManager().Resolve(*this, handle));
+	}
+
+	bool VulkanGraphicsCommandContext::BuildAccelerationStructure(RHIAccelerationStructureHandle destination,
+		const RHIASBuildInputs& inputs, const RHIASBufferRange& scratch) noexcept
+	{
+		if (HasRecordingError() || IsRendering())
+		{
+			RejectRecording();
+			return false;
+		}
+		FlushBarriers();
+		auto& device = *m_Device;
+		return device.GetAccelerationStructureManager().Build(*this, m_CommandBuffer,
+			destination, inputs, scratch);
+	}
+
+	void VulkanGraphicsCommandContext::AccelerationStructureBarrier(RHIAccelerationStructureHandle handle,
+		RHIResourceState before, RHIResourceState after) noexcept
+	{
+		// Keep the build writer in the availability scope when a later reader changes stage.
+		before.m_Stages |= RHIStage::AccelerationStructureBuild;
+		before.m_Access |= RHIAccess::AccelerationStructureWrite;
+		FlushBarriers();
+		auto& device = *m_Device;
+		if (!m_CommandBuffer || !device.GetAccelerationStructureManager().Resolve(*this, handle))
+		{
+			RejectRecording();
+			return;
+		}
+		const VkMemoryBarrier2 barrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER_2, nullptr,
+			ToVulkanPipelineStages(before.m_Stages), ToVulkanAccessFlags(before.m_Access),
+			ToVulkanPipelineStages(after.m_Stages), ToVulkanAccessFlags(after.m_Access) };
+		VkDependencyInfo dependency{ VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
+		dependency.memoryBarrierCount = 1;
+		dependency.pMemoryBarriers = &barrier;
+		vkCmdPipelineBarrier2(m_CommandBuffer, &dependency);
+	}
+
+	bool VulkanComputeCommandContext::BuildAccelerationStructure(RHIAccelerationStructureHandle destination,
+		const RHIASBuildInputs& inputs, const RHIASBufferRange& scratch) noexcept
+	{
+		if (HasRecordingError() || m_GraphicsContext->IsRendering())
+		{
+			RejectRecording();
+			return false;
+		}
+		FlushBarriers();
+		auto& device = *m_GraphicsContext->m_Device;
+		return device.GetAccelerationStructureManager().Build(*this, m_GraphicsContext->m_CommandBuffer,
+			destination, inputs, scratch);
+	}
+
+	void VulkanComputeCommandContext::AccelerationStructureBarrier(RHIAccelerationStructureHandle handle,
+		RHIResourceState before, RHIResourceState after) noexcept
+	{
+		// Keep the build writer in the availability scope when a later reader changes stage.
+		before.m_Stages |= RHIStage::AccelerationStructureBuild;
+		before.m_Access |= RHIAccess::AccelerationStructureWrite;
+		FlushBarriers();
+		auto& device = *m_GraphicsContext->m_Device;
+		if (!m_GraphicsContext->m_CommandBuffer || !device.GetAccelerationStructureManager().Resolve(*this, handle))
+		{
+			RejectRecording();
+			return;
+		}
+		const VkMemoryBarrier2 barrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER_2, nullptr,
+			ToVulkanPipelineStages(before.m_Stages), ToVulkanAccessFlags(before.m_Access),
+			ToVulkanPipelineStages(after.m_Stages), ToVulkanAccessFlags(after.m_Access) };
+		VkDependencyInfo dependency{ VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
+		dependency.memoryBarrierCount = 1;
+		dependency.pMemoryBarriers = &barrier;
+		vkCmdPipelineBarrier2(m_GraphicsContext->m_CommandBuffer, &dependency);
+	}
 	namespace
 	{
 		[[nodiscard]] VkAttachmentLoadOp ToVulkanAttachmentLoadOp(RHIContentLoadOp op) noexcept
@@ -1195,6 +1278,29 @@ namespace gglab
 		{
 			Reject("SetDescriptorTable", "the descriptor heap type is not shader visible");
 		}
+	}
+
+	bool VulkanComputeCommandContext::SetAccelerationStructure(uint32_t parameterIndex,
+		RHIAccelerationStructureHandle handle) noexcept
+	{
+		const auto* slot = m_CurrentBindingLayout ? FindSet0Binding(*m_CurrentBindingLayout, parameterIndex) : nullptr;
+		if (!slot || slot->m_BindingType != RHIBindingType::AccelerationStructure ||
+			!m_GraphicsContext->m_CommandBuffer)
+		{
+			Reject("SetAccelerationStructure", "the active layout has no fixed TLAS parameter");
+			return false;
+		}
+		const auto native = m_GraphicsContext->m_Device->GetAccelerationStructureManager().Bind(*this, handle);
+		if (!native)
+		{
+			return false;
+		}
+		m_FixedBufferBindings[parameterIndex] = VulkanSet0BufferBinding{
+			.m_LogicalParameterIndex = parameterIndex,
+			.m_DescriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
+			.m_AccelerationStructure = native };
+		m_FixedDescriptorsDirty = true;
+		return true;
 	}
 
 	bool VulkanComputeCommandContext::SetConstantBuffer(

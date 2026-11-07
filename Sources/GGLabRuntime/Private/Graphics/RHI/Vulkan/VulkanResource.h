@@ -83,6 +83,7 @@ namespace gglab
 			VmaAllocationCreateInfo m_AllocationCreateInfo{};
 			RHIResourceState m_InitialState{};
 			RHIMemoryUsage m_MemoryUsage = RHIMemoryUsage::GpuOnly;
+			VkDeviceSize m_MinimumAlignment = 1;
 		};
 
 	public:

@@ -13,11 +13,11 @@ namespace gglab::nonfinite
 	inline constexpr uint32_t CounterMagic = 0x4e464354;
 	inline constexpr uint32_t HeaderBytes = 32;
 	inline constexpr uint32_t RecordBytes = 32;
-	inline constexpr uint32_t InventoryLow = 0x161b9549;
-	inline constexpr uint32_t InventoryHigh = 0xb01a2a20;
-	inline constexpr std::string_view VariantSuffix = ".nonfinite-counters.161b9549b01a2a20f354c08e36fbdfe7199a1d805b941cfbc0defa1220159356";
-	inline constexpr uint32_t SiteCount = 76;
-	inline constexpr uint32_t ProgramCount = 27;
+	inline constexpr uint32_t InventoryLow = 0xdf9805ae;
+	inline constexpr uint32_t InventoryHigh = 0x71e538fb;
+	inline constexpr std::string_view VariantSuffix = ".nonfinite-counters.df9805ae71e538fb537d51302b05caab02d13628a6a08ad6f58db52f39ee6b0a";
+	inline constexpr uint32_t SiteCount = 85;
+	inline constexpr uint32_t ProgramCount = 32;
 	// The frame injection block follows the site records: point + 1 (zero is none),
 	// IEEE bits, x, y, component, applied count and two reserved words.
 	inline constexpr uint32_t InjectionBytes = 32;
@@ -101,12 +101,24 @@ namespace gglab::nonfinite
 		Site{ "pass-temporal-aa.csmain.is-temporal-history-accumulation-valid", "report", "report" },
 		Site{ "pass-temporal-aa.csmain.sanitize-hdrcolor", "expected", "error" },
 		Site{ "pass-temporal-reference.csmain.isfinite", "report", "report" },
+		Site{ "gi-ray-scene.gitrace-hit.isfinite", "error", "report" },
+		Site{ "pass-gi-reference.gipathfinite.isfinite", "report", "report" },
+		Site{ "gi-specular-visibility.finite.isfinite", "report", "report" },
+		Site{ "gi-probe-update.trace.isfinite", "expected", "report" },
+		Site{ "gi-probe-update.storetexel.isfinite", "expected", "report" },
+		Site{ "gi-receiver-inspection.csmain.isfinite", "expected", "report" },
+		Site{ "gi-probe-visualization.psmain.isfinite", "report", "report" },
+		Site{ "gi-probe-visualization.psmain.acesfitted", "report", "report" },
+		Site{ "gi-probe-depth.giprobecomparabledepthbits.isfinite", "expected", "report" },
 	};
 	struct InjectionPoint { std::string_view m_Id; std::string_view m_Claim; };
-	inline constexpr std::array<InjectionPoint, 3> InjectionPoints{
+	inline constexpr std::array<InjectionPoint, 6> InjectionPoints{
 		InjectionPoint{ "pass-render-graph-compute-smoke.csnonfiniteprobe.probe", "boundary" },
 		InjectionPoint{ "pass-render-graph-compute-smoke.psmain.preview", "production" },
 		InjectionPoint{ "pass-temporal-aa.csmain.history", "production" },
+		InjectionPoint{ "pass-gi-reference.csmain.throughput", "production" },
+		InjectionPoint{ "pass-gi-probe-update.trace.sample", "production" },
+		InjectionPoint{ "pass-gi-probe-update.storetexel.history", "production" },
 	};
 	inline constexpr std::array<std::string_view, ProgramCount> Programs{
 		"gglab.shader.aerial-perspective",
@@ -120,6 +132,10 @@ namespace gglab::nonfinite
 		"gglab.shader.forward-pbr",
 		"gglab.shader.forward-plus-cull",
 		"gglab.shader.forward-plus-validation",
+		"gglab.shader.gi-field",
+		"gglab.shader.gi-probe-depth-conformance",
+		"gglab.shader.gi-probe-update",
+		"gglab.shader.gi-receiver",
 		"gglab.shader.gtao",
 		"gglab.shader.ibl-brdf-lut",
 		"gglab.shader.ibl-cubemap-preview",
@@ -131,6 +147,7 @@ namespace gglab::nonfinite
 		"gglab.shader.napa-voxel",
 		"gglab.shader.physical-sky-preview",
 		"gglab.shader.post-process-preview",
+		"gglab.shader.ray-scene",
 		"gglab.shader.render-graph-compute",
 		"gglab.shader.shadow-map-preview",
 		"gglab.shader.skybox",

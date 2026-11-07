@@ -235,6 +235,27 @@ namespace gglab
 #else
 			GGLAB_UNUSED(backend);
 #endif
+			if (pipeline.IsValid() && viewParameter)
+			{
+				// Recording past an unresolved root buffer would leave the draw reading an unset
+				// or stale descriptor, so both backends fail the recording and abort the frame.
+				const auto begin = rhi.BeginFrame();
+				context.Check(begin.IsReady(), "Invalid root buffer probe begins a frame");
+				if (begin.IsReady())
+				{
+					auto& frame = *begin.GetFrame();
+					auto& commands = frame.GetGraphicsContext();
+					commands.SetPipeline(pipeline);
+					const bool pipelineAccepted = !commands.HasRecordingError();
+					commands.SetReadOnlyBuffer(*viewParameter, RHIBufferHandle{});
+					const bool rejected = commands.HasRecordingError();
+					const auto end = rhi.EndFrame(frame);
+					rhi.WaitIdle();
+					context.Check(pipelineAccepted && rejected && end.IsFatal() &&
+						!end.IsCompletionUnknown(),
+						"An unresolved root buffer handle fails the recording and aborts the frame");
+				}
+			}
 		}
 
 		void RunGpuTests(SelfTestContext& context, RHIBackendType backend) noexcept

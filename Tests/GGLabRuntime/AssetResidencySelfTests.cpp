@@ -147,6 +147,21 @@ namespace gglab
 				return;
 			}
 
+			const auto leasesBefore = assets.GetOwnershipStatistics().m_LeaseCount;
+			{
+				auto borrowed = assets.CreateOwnerScope();
+				context.Check(!borrowed.RetainModel({}, request.m_Generation) &&
+					!borrowed.RetainModel(request.m_ModelId, 0) &&
+					!borrowed.RetainModel(request.m_ModelId, request.m_Generation + 1) &&
+					assets.GetOwnershipStatistics().m_LeaseCount == leasesBefore,
+					"Retaining an existing model rejects stale or invalid content without creating a lease");
+				context.Check(borrowed.RetainModel(request.m_ModelId, request.m_Generation) &&
+					assets.GetOwnershipStatistics().m_LeaseCount == leasesBefore + 1,
+					"A content-checked model lease can protect an existing procedural or imported model");
+			}
+			context.Check(assets.GetOwnershipStatistics().m_LeaseCount == leasesBefore,
+				"Releasing a borrowed model owner preserves the original owner's dependency interests");
+
 			// Loaded dependency graph, shared texture derived data and import artifact caching.
 			id.m_MeshId = model->m_MeshInstance.front().m_MeshId;
 			id.m_MaterialId = model->m_MeshInstance.front().m_MaterialId;

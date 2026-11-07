@@ -9,7 +9,9 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstring>
+#include <span>
 
 namespace gglab
 {
@@ -108,6 +110,13 @@ namespace gglab
 		for (uint32_t slotIndex = 0; slotIndex < desc.m_SlotCount; ++slotIndex)
 		{
 			const RHIBindingSlotDesc& slot = desc.m_Slots[slotIndex];
+			if (slot.m_Type == RHIBindingType::AccelerationStructure &&
+				(slot.m_Count != 1 || slot.m_Space != 0 || slot.m_SizeInBytes != 0 ||
+					slot.m_BufferBindingMode != RHIBufferBindingMode::Fixed))
+			{
+				plan.m_Error = VulkanBindingLayoutError::InvalidAccelerationStructureBinding;
+				return plan;
+			}
 			if (slot.m_Type == RHIBindingType::Unknown)
 			{
 				plan.m_Error = VulkanBindingLayoutError::UnknownBindingType;
@@ -309,9 +318,31 @@ namespace gglab
 	RHIBindingLayoutHandle VulkanPipelineSystem::CreateBindingLayout(
 		const RHIBindingLayoutDesc& desc) noexcept
 	{
+		if (desc.m_SlotCount > RHIBindingLayoutDesc::MaxSlots)
+		{
+			return {};
+		}
+		for (uint32_t index = 0; index < desc.m_SlotCount; ++index)
+		{
+			if (desc.m_Slots[index].m_Type == RHIBindingType::AccelerationStructure &&
+				!m_Device->GetRayQueryCapabilities().m_Enabled)
+			{
+				return {};
+			}
+		}
 		if (!m_Device->RequireOwnerThread("VulkanPipelineSystem::CreateBindingLayout"))
 		{
 			return {};
+		}
+		for (size_t index = 0; index < m_BindingLayouts.size(); ++index)
+		{
+			const auto& existing = m_BindingLayouts[index];
+			if (HaveSameRHIBindingSlots(std::span(existing.m_Slots).first(existing.m_SlotCount),
+				std::span(desc.m_Slots).first(desc.m_SlotCount)))
+			{
+				return { static_cast<RHIBindingLayoutHandle::IndexType>(index),
+					m_BindingLayoutGeneration };
+			}
 		}
 		auto layout = std::make_unique<VulkanBindingLayout>();
 		if (!layout->Create(m_Device, desc,

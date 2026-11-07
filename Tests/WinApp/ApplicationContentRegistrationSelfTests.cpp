@@ -4,7 +4,10 @@
 #include "Application/Content/RuntimeAssetBundle.h"
 #include "Application/Demo/CoastalSceneCameraPaths.h"
 #include "Application/Demo/CoastalSceneReferenceViews.h"
+#include "Application/Demo/CoastalSceneGIFieldProfile.h"
 #include "Application/Lab/LightingContractReferenceViews.h"
+#include "Application/Lab/Sessions/GIReferenceLabFixture.h"
+#include "Application/Lab/Sessions/GIReferenceLabSession.h"
 #include "Application/Lab/AtmosphereRangeReferenceViews.h"
 #include "GGLabFoundation/Platform/Win/Win32TaskWorkerLifecycle.h"
 #include "GGLabTestCore/SelfTest.h"
@@ -15,8 +18,11 @@
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/CameraController.h"
 #include "GGLabRuntime/Graphics/CameraPath.h"
+#include "GGLabRuntime/Graphics/CameraReferenceView.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIField.h"
+#include "GGLabRuntime/Graphics/RayScene.h"
 #include "GGLabRuntime/Graphics/Shader/ShaderProgramCatalog.h"
 #include "ShaderArtifactRuntime/GGLabShaderPrograms.h"
 
@@ -29,6 +35,7 @@
 #include <filesystem>
 #include <initializer_list>
 #include <limits>
+#include <memory>
 #include <numbers>
 #include <optional>
 #include <string_view>
@@ -42,6 +49,93 @@ namespace gglab
 {
 	namespace
 	{
+		void CheckGIParallelRooms(SelfTestContext& context) noexcept
+		{
+			for (size_t index = 0; index < GIReferenceParallelRoomSolids.size(); ++index)
+			{
+				const auto& solid = GIReferenceParallelRoomSolids[index];
+				for (size_t axis = 0; axis < 3; ++axis)
+				{
+					context.Check(solid.m_Minimum[axis] < solid.m_Maximum[axis],
+						"Frozen F5 solids have positive extent on every axis");
+				}
+				for (size_t other = 0; other < index; ++other)
+				{
+					const auto& previous = GIReferenceParallelRoomSolids[other];
+					bool overlap = true;
+					for (size_t axis = 0; axis < 3; ++axis)
+					{
+						overlap &= std::max(solid.m_Minimum[axis], previous.m_Minimum[axis]) <
+							std::min(solid.m_Maximum[axis], previous.m_Maximum[axis]);
+					}
+					context.Check(!overlap, "Frozen F5 boxes share boundaries, not solid interiors");
+				}
+			}
+			const auto blocked = [](const std::array<float, 3>& start,
+				const std::array<float, 3>& end) noexcept
+				{
+					for (const auto& solid : GIReferenceParallelRoomSolids)
+					{
+						float enter = 0.0f;
+						float leave = 1.0f;
+						bool intersects = true;
+						for (size_t axis = 0; axis < 3; ++axis)
+						{
+							const float direction = end[axis] - start[axis];
+							if (direction == 0.0f)
+							{
+								intersects &= start[axis] >= solid.m_Minimum[axis] &&
+									start[axis] <= solid.m_Maximum[axis];
+							}
+							else
+							{
+								const float a = (solid.m_Minimum[axis] - start[axis]) / direction;
+								const float b = (solid.m_Maximum[axis] - start[axis]) / direction;
+								enter = std::max(enter, std::min(a, b));
+								leave = std::min(leave, std::max(a, b));
+							}
+						}
+						if (intersects && enter <= leave)
+						{
+							return true;
+						}
+					}
+					return false;
+				};
+			struct RoomPath
+			{
+				std::array<float, 3> m_Start;
+				std::array<float, 3> m_End;
+				bool m_Blocked;
+			};
+			const std::array paths
+			{
+				RoomPath{ { -1, 1, 0 }, { 1, 1, 0 }, false },
+				RoomPath{ { -1, 1, -0.4999f }, { 1, 1, -0.4999f }, false },
+				RoomPath{ { -1, 1, 0.4999f }, { 1, 1, 0.4999f }, false },
+				RoomPath{ { -1, 1, -0.5001f }, { 1, 1, -0.5001f }, true },
+				RoomPath{ { -1, 1, 0.5001f }, { 1, 1, 0.5001f }, true },
+				RoomPath{ { -1, 2.1999f, 0 }, { 1, 2.1999f, 0 }, false },
+				RoomPath{ { -1, 2.2001f, 0 }, { 1, 2.2001f, 0 }, true },
+				RoomPath{ { -1, 3, 0 }, { 1, 3, 0 }, true },
+				RoomPath{ { -2, 1, 1 }, { -2, 1, 3 }, false },
+				RoomPath{ { -3.1f, 1, 1 }, { -3.1f, 1, 3 }, true },
+				RoomPath{ { -0.9f, 1, 1 }, { -0.9f, 1, 3 }, true },
+				RoomPath{ { -2, 3.1f, 1 }, { -2, 3.1f, 3 }, true },
+				RoomPath{ { 2, 1, 1 }, { 2, 1, 3 }, true },
+				RoomPath{ { 2, 0.5f, 0 }, { 2, -0.5f, 0 }, true },
+				RoomPath{ { 2, 3.5f, 0 }, { 2, 4.5f, 0 }, true },
+				RoomPath{ { -3.5f, 1, 0 }, { -4.5f, 1, 0 }, true },
+				RoomPath{ { 3.5f, 1, 0 }, { 4.5f, 1, 0 }, true },
+				RoomPath{ { 2, 1, -1.5f }, { 2, 1, -2.5f }, true },
+			};
+			for (const auto& path : paths)
+			{
+				context.Check(blocked(path.m_Start, path.m_End) == path.m_Blocked,
+					"Frozen F5 preserves its doorway, exterior opening, divider and closed shell");
+			}
+		}
+
 		std::vector<TextureAssetData> CheckImportedTextures(SelfTestContext& context, const ImportedModel& model) noexcept
 		{
 			std::vector<TextureAssetData> textures;
@@ -1655,15 +1749,110 @@ namespace gglab
 
 	void RunApplicationContentRegistrationSelfTests(SelfTestContext& context) noexcept
 	{
+		// Frozen IDs are an external verification protocol, not enum ordinal capabilities.
+		context.Check(GIReferenceFixtures.size() == 21, "All persisted GI fixtures remain registered");
+		context.Check(static_cast<int32_t>(GIReferenceFixture::ParallelRooms) == 20 &&
+			GIReferenceFixtures[5].m_Id == GIReferenceFixture::SunTransport &&
+			GIReferenceFixtures[6].m_Id == GIReferenceFixture::OffCameraSunBlocker,
+			"Frozen F5 is additive and does not repurpose historical contract fixture IDs");
+		CheckGIParallelRooms(context);
+		context.Check(CoastalSceneGIFieldVolume.m_Counts == std::array{ 33u, 10u, 39u } &&
+			CoastalSceneGIFieldVolume.m_Minimum == std::array{ -17.25f, -1.5f, -23.25f } &&
+			CoastalSceneGIFieldVolume.m_Spacing == 1 &&
+			CoastalSceneGIFieldVolume.m_Profile.m_Id == CoastalSceneGIFieldProfileId &&
+			CoastalSceneGIFieldVolume.m_Profile.m_Revision == CoastalSceneGIFieldProfileRevision,
+			"Host-authored Coastal registration preserves frozen above-water coverage and capacities");
+		const auto profileScene = std::make_shared<RayScene>();
+		for (size_t index = 0; index < GIReferenceFixtures.size(); ++index)
+		{
+			const auto& description = GIReferenceFixtures[index];
+			const auto fixture = description.m_Id;
+			GIFieldCreateInfo profile{ .m_RayScene = profileScene };
+			profile.m_Volume.m_Profile = {
+				description.m_FieldProfileId, description.m_FieldProfileRevision };
+			bool distinct = true;
+			for (size_t other = 0; other < index; ++other)
+			{
+				const auto& previous = GIReferenceFixtures[other];
+				if (std::string_view(description.m_FieldProfileId) == previous.m_FieldProfileId)
+				{
+					distinct &= IsCoastalGIFixture(fixture) && IsCoastalGIFixture(previous.m_Id) &&
+						description.m_FieldProfileRevision == previous.m_FieldProfileRevision;
+				}
+			}
+			context.Check(ValidateGIFieldCreateInfo(profile) && distinct,
+				"Named field bases have valid identities; only the common Coastal preset is shared");
+			context.Check(static_cast<size_t>(fixture) == index &&
+				IsCoastalGIFixture(fixture) == (index == 11 || index == 12 || index == 15) &&
+				IsGIProbeFixture(fixture) == (index == 14 || index == 15 || index == 16) &&
+				UsesGIPrimaryReceiverMaterials(fixture) == (index >= 10 && index <= 13) &&
+				UsesGIStaticCostPath(fixture) ==
+					(index == 4 || index == 20 || (index >= 12 && index <= 16)) &&
+				UsesGIStaticObservationPaths(fixture) ==
+					(index == 1 || index == 2 || index == 4 || index == 20 || (index >= 17 && index <= 19)) &&
+				IsGIContractFixture(fixture) == (index >= 5 && index <= 18),
+				"Named fixture capabilities preserve frozen IDs without ordering-based dispatch");
+		}
+		const CameraReferenceView observationView{ .m_Id = "F4_Floor", .m_Name = "Floor",
+			.m_ProfileVersion = 3, .m_Position = { 0, 1.6f, 1.4f }, .m_Target = { 0, 0, -0.5f },
+			.m_VerticalFovDegrees = 90, .m_NearPlane = 0.2f, .m_FarPlane = 100,
+			.m_ManualEV100 = 10, .m_ExposureCompensationEV = 1 };
+		const auto observationPath = MakeGIStaticObservationPath(observationView);
+		context.Check(IsCameraPathValid(observationPath) &&
+			observationPath.m_Id == "GI_Static_F4_Floor" && observationPath.m_Version == 3 &&
+			GetCameraPathFrameCount(observationPath) == 120 &&
+			observationPath.m_NearPlane == observationView.m_NearPlane &&
+			observationPath.m_FarPlane == observationView.m_FarPlane &&
+			observationPath.m_ManualEV100 == observationView.m_ManualEV100 &&
+			observationPath.m_ExposureCompensationEV == observationView.m_ExposureCompensationEV,
+			"Static GI observations preserve the reference projection, exposure and version");
+		for (uint32_t frame = 0; frame < GIStaticObservationFrameCount; ++frame)
+		{
+			const auto pose = EvaluateCameraPath(observationPath, frame);
+			context.Check(pose &&
+				(pose->m_Position - observationView.m_Position).LengthSquared() == 0.0f &&
+				(pose->m_Target - observationView.m_Target).LengthSquared() == 0.0f &&
+				pose->m_VerticalFovDegrees == observationView.m_VerticalFovDegrees &&
+				pose->m_Cut == (frame == 0),
+				"Every static GI sample keeps the authored receiver pose without repeated cuts");
+		}
+		context.Check(!EvaluateCameraPath(observationPath, GIStaticObservationFrameCount),
+			"Static GI observation paths have an exact bounded sample range");
+		const auto lightStepPath = MakeGILightStepObservationPath(observationView);
+		context.Check(IsCameraPathValid(lightStepPath) &&
+			lightStepPath.m_Id == "GI_LightStep_F4_Floor" &&
+			GetCameraPathFrameCount(lightStepPath) == GILightStepObservationFrameCount &&
+			lightStepPath.m_ManualEV100 == observationView.m_ManualEV100 &&
+			lightStepPath.m_ExposureCompensationEV == observationView.m_ExposureCompensationEV,
+			"The bounded light-step experiment has its own path without changing static qualification");
+		for (uint32_t frame = 0; frame < GILightStepObservationFrameCount; ++frame)
+		{
+			const auto pose = EvaluateCameraPath(lightStepPath, frame);
+			context.Check(pose &&
+				(pose->m_Position - observationView.m_Position).LengthSquared() == 0.0f &&
+				(pose->m_Target - observationView.m_Target).LengthSquared() == 0.0f &&
+				pose->m_Cut == (frame == 0),
+				"Light-step samples preserve pose and do not reset TAA at the lighting event");
+		}
+		constexpr std::array expectedTextures
+		{
+			-1, -1, 0, 0, 0, 0, 0, 0, 2, 3, 4, 5, 0, -1, -1, -1, -1, -1, -1, 0, -1, 6, -1,
+		};
+		for (size_t index = 0; index < expectedTextures.size(); ++index)
+		{
+			const auto texture = GetGIBaseColorTexture(static_cast<GIHitMaterialCase>(index));
+			context.Check((texture ? static_cast<int>(*texture) : -1) == expectedTextures[index],
+				"Material texture selection preserves UV, mip, ignored-input and replacement fixtures");
+		}
 		const ApplicationContentRegistration desktop = CreateDesktopApplicationContent();
 		const ApplicationContentSelection desktopSelection = ResolveApplicationContentSelection(desktop, DesktopLabHostDemoId, DesktopDefaultLabId);
 		context.Check(desktop.IsValid() && desktop.m_Demos.size() == 4 &&
-			desktop.m_Labs.size() == 16 && desktopSelection.Succeeded() &&
+			desktop.m_Labs.size() == 19 && desktopSelection.Succeeded() &&
 			std::ranges::any_of(desktop.m_Labs, [](const LabRegistration& lab) noexcept
 				{
 					return lab.m_Descriptor.m_Id == LabId("gglab.lab.temporal_aa");
 				}),
-			"Windows desktop composition includes four Demo entries and sixteen Labs");
+			"Windows desktop composition includes four Demo entries and nineteen Labs");
 		for (const std::string_view retiredLabId : {
 			"gglab.lab.task_system",
 				"gglab.lab.asset_publication",
@@ -1714,8 +1903,33 @@ namespace gglab
 		checkSelectedDemand("gglab.lab.render_graph_compute", 54,
 			"Render-graph compute selection contributes four stable shader demands");
 #endif
-		checkSelectedDemand("gglab.lab.coordinate_conformance", 54,
-			"Coordinate conformance selection contributes four stable shader demands");
+		checkSelectedDemand("gglab.lab.coordinate_conformance", 57,
+			"Coordinate conformance selection contributes seven stable shader demands");
+		checkSelectedDemand("gglab.lab.ray_query", 54,
+			"Ray-query selection contributes query, preview and pipeline-identity artifacts without changing raster startup demand");
+		checkSelectedDemand("gglab.lab.gi_reference", 73,
+			"GI diagnostics include probe picking, integration inspection and the receiver list alongside receiver/reference shaders");
+		for (const auto& lab : desktop.m_Labs)
+		{
+			if (lab.m_Descriptor.m_Id == LabId("gglab.lab.gi_reference"))
+			{
+				ShaderProgramDemandSet unique;
+				context.Check(unique.AddRange(lab.m_ShaderPrograms) &&
+					unique.GetPrograms().size() == lab.m_ShaderPrograms.size(),
+					"GI diagnostics declare each optional shader demand once before set deduplication");
+				context.Check(std::ranges::find(lab.m_ShaderPrograms, shader_programs::GIProbePickingPixel) !=
+					lab.m_ShaderPrograms.end(),
+					"GI diagnostics explicitly demand the asynchronous probe-picking pixel program");
+				context.Check(std::ranges::find(lab.m_ShaderPrograms,
+					shader_programs::GIProbeIntegrationInspectionCompute) != lab.m_ShaderPrograms.end(),
+					"GI diagnostics explicitly demand the opt-in integration-inspection compute program");
+				context.Check(std::ranges::find(lab.m_ShaderPrograms, shader_programs::GIReceiverListCompute) !=
+					lab.m_ShaderPrograms.end(),
+					"GI diagnostics explicitly demand the world-space receiver-list compute program");
+			}
+		}
+		checkSelectedDemand("gglab.lab.coastal_ray_scene", 55,
+			"Coastal ray-scene selection contributes its membership and sun-visibility programs to raster startup demand");
 		checkSelectedDemand("gglab.lab.napa_voxel", 52,
 			"Napa voxel selection contributes two stable shader demands");
 		checkSelectedDemand("gglab.lab.texture_contract", 50,

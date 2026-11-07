@@ -17,6 +17,9 @@ namespace gglab
 		IndirectArgument = 1u << 5,
 		CopySource = 1u << 6,
 		CopyDest = 1u << 7,
+		AccelerationStructureInput = 1u << 8,
+		AccelerationStructureStorage = 1u << 9,
+		AccelerationStructureScratch = 1u << 10,
 	};
 	GGLAB_ENUM_FLAGS(RHIBufferUsage);
 

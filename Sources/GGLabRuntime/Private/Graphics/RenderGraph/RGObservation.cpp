@@ -82,6 +82,10 @@ namespace gglab
 			return fail(RGObservationFailure::UnknownResource);
 		}
 		result.m_Type = compiled.m_ResourceType;
+		if (result.m_Type == RGResourceType::RGAccelerationStructure)
+		{
+			return fail(RGObservationFailure::UnsupportedResource);
+		}
 		result.m_Node = slot.m_ResourceNodeIndex;
 		RGPassNodeIndex addressedPass;
 		result.m_InsertionPosition = static_cast<uint32_t>(m_ExecutionPlan->GetExecutionOrder().size());

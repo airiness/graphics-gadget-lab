@@ -1,6 +1,7 @@
 #include "GGLabAppRuntime.h"
 #include "Parameters/SessionParameterControl.h"
 #include "Capture/FrameSequenceCoordinator.h"
+#include "Capture/FrameCaptureCoordinator.h"
 
 #include "Demo/DemoManager.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
@@ -70,6 +71,31 @@ namespace gglab
 		return m_ServicesInitialized &&
 			(m_LifecycleState == AppRuntimeLifecycleState::Running ||
 				m_LifecycleState == AppRuntimeLifecycleState::Suspended);
+	}
+
+	bool GGLabAppRuntime::SelectGIProbe(std::optional<GIProbeSelection> selection, std::string& error) noexcept
+	{
+		CheckOwnerThread();
+		error.clear();
+		if (!CanAcceptSessionCommands() || !m_FrameCapture)
+		{
+			error = "GIProbeSelectionUnavailable";
+			return false;
+		}
+		if (selection)
+		{
+			const auto* frame = m_FrameCapture->GetLastFrameState();
+			const auto summary = frame && frame->m_Readiness.m_GIField ?
+				frame->m_Readiness.m_GIField->m_Summary : nullptr;
+			if (!summary || summary->m_Invalid ||
+				!MatchesGIProbeSelection(*selection, summary->m_Field.m_Generation, summary->m_Counts))
+			{
+				error = "GIProbeSelectionIdentityMismatch";
+				return false;
+			}
+		}
+		m_SessionGIProbeSelection = selection;
+		return true;
 	}
 
 	uint64_t GGLabAppRuntime::StartFrameSequence(

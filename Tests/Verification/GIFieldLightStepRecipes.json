@@ -1,0 +1,9 @@
+{
+    "schemaVersion": 1,
+    "steps": [
+        { "id": "increase", "oldLux": 10000, "newLux": 20000 },
+        { "id": "decrease", "oldLux": 20000, "newLux": 10000 },
+        { "id": "small-increase", "oldLux": 10000, "newLux": 12000 },
+        { "id": "small-decrease", "oldLux": 12000, "newLux": 10000 }
+    ]
+}

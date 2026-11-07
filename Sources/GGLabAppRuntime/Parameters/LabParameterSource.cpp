@@ -1,5 +1,6 @@
 #include "Parameters/ParameterSourceAdapters.h"
 #include "Lab/LabRuntime.h"
+#include "Lab/LabSessionBase.h"
 
 #include <utility>
 
@@ -153,7 +154,7 @@ namespace gglab
 		if (GetParameterEffectClass(current->m_Desc) == ParameterEffectClass::Immediate)
 		{
 			const auto effective = m_Lab->GetActiveSession()->ReadImmediateParameterFrameValue(
-				value.m_Id, { frame.m_ViewSettings, frame.m_View });
+				value.m_Id, { frame.m_ViewSettings, frame.m_View, frame.m_Scene, frame.m_FrameSerial });
 			return effective && LabValuesEqual(*effective, value.m_Value);
 		}
 		return LabValuesEqual(current->m_Value, value.m_Value);

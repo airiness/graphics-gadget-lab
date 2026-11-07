@@ -110,8 +110,9 @@ namespace gglab
 				const uint64_t requested = uint64_t(range.at("frameCount")) *
 					std::max(uint64_t{ 1 }, range.at("referenceSamples").get<uint64_t>());
 				const auto& samples = parameters ? product.at("frames") : product.at("coverage").at("samples");
+				const uint32_t version = product.at("schemaVersion");
 				if (product.at("schema") != (parameters ? "gglab.parameter-frames" : "gglab.gpu-timing") ||
-					product.at("schemaVersion") != 1 || range.at("id") != input.m_SequenceId ||
+					(version != 1 && (parameters || version != 2)) || range.at("id") != input.m_SequenceId ||
 					requested == 0 || samples.size() != requested ||
 					(!parameters && (product.at("coverage").at("requestedSamples") != requested ||
 						product.at("coverage").at("recordedSamples") != requested ||
@@ -180,7 +181,7 @@ namespace gglab
 					{ "source", parameters ? "parameter-frames" : "gpu-timing" },
 					{ "diagnosticTap", nullptr },
 					{ "schema", product.at("schema") },
-					{ "schemaVersion", 1 } });
+					{ "schemaVersion", version } });
 				bundle.m_Content.m_Files.push_back({
 					.m_Suffix = parameters ? ".parameter-frames.json" : ".gpu-timing.json",
 					.m_Bytes = std::vector<uint8_t>(bytes.begin(), bytes.end()),

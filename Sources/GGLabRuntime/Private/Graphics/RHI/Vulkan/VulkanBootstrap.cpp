@@ -206,6 +206,7 @@ namespace gglab
 			deviceCreateInfo.m_PhysicalDevice = physicalDevice;
 			deviceCreateInfo.m_AdapterIdentity = &snapshot.m_Identity;
 			deviceCreateInfo.m_ProfileCapabilities = &snapshot.m_ProfileCapabilities;
+			deviceCreateInfo.m_RayQueryAvailability = &snapshot.m_RayQueryAvailability;
 			deviceCreateInfo.m_PortabilityCapabilities =
 				snapshot.m_PortabilityCapabilities;
 			deviceCreateInfo.m_ImageCubeArrayAvailable =
@@ -327,8 +328,9 @@ namespace gglab
 				// next adapter is examined. A failed probe device leaves the
 				// adapter unverified (probed stays false), so it cannot be selected.
 				{
-					VulkanDevice::Result probeResult = VulkanDevice::Create(
-						MakeDeviceCreateInfo(instance->Get(), physicalDevices[index], snapshot));
+					auto probeInfo = MakeDeviceCreateInfo(instance->Get(), physicalDevices[index], snapshot);
+					probeInfo.m_LayoutProbeOnly = true;
+					VulkanDevice::Result probeResult = VulkanDevice::Create(probeInfo);
 					if (!probeResult.Succeeded())
 					{
 						snapshot.m_LayoutProbeError = probeResult.m_Error;

@@ -31,6 +31,7 @@ namespace gglab
 	class WorldLightingControlBase;
 	struct DemoFrameFeedback;
 	struct RenderView;
+	struct RenderScene;
 	struct FrameCaptureGate;
 
 	// Sole transaction/receipt owner across Host and Lab sources. One queued application
@@ -101,7 +102,8 @@ namespace gglab
 		void OnFrameReady(uint64_t serial) noexcept;
 		void ApplyViewSettings(ResolvedViewRenderSettings& settings, bool enablePreExposure) noexcept;
 		void OnFrameBuilt(uint64_t serial, uint64_t lightingGeneration,
-			const ResolvedViewRenderSettings& settings, const RenderView* view = nullptr) noexcept;
+			const ResolvedViewRenderSettings& settings, const RenderView* view = nullptr,
+			const RenderScene* scene = nullptr) noexcept;
 		void OnFrameSubmitted(const DemoFrameFeedback& feedback) noexcept;
 		[[nodiscard]] ParameterFrameState CaptureFrameState(uint64_t serial,
 			uint64_t requestedLightingGeneration, uint64_t activeLightingGeneration) const;

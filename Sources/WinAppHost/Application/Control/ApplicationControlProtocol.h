@@ -7,6 +7,7 @@
 #include "Capture/NonFiniteWatchCoordinator.h"
 #include "Parameters/HostViewParameters.h"
 #include "GGLabAppRuntime.h"
+#include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
 
 #include <cstdint>
 #include <memory>
@@ -42,6 +43,7 @@ namespace gglab
 		// Sets exact Host view override states, guarded by the expected control state.
 		HostViewOverrides,
 		Assign,
+		SelectGIProbe,
 	};
 
 	struct ApplicationControlRequest
@@ -50,6 +52,8 @@ namespace gglab
 		ApplicationControlCommand m_Command = ApplicationControlCommand::Status;
 		// Capture/Graph/Export always answer admission immediately.
 		CapturePlan m_Capture;
+		// SelectGIProbe: null clears only the session-owned selection.
+		std::optional<GIProbeSelection> m_GIProbeSelection;
 		// Result/CaptureCancel: process-local job identity, never a legacy output id.
 		uint64_t m_JobId = 0;
 		// Result: only terminal receipt consumption releases its reservation.
@@ -102,6 +106,7 @@ namespace gglab
 		uint32_t m_SettledFrames = 0;
 		// Absent before the first rendered frame.
 		const FrameCaptureFrameState* m_Frame = nullptr;
+		std::string m_GIProbePickingSource;
 		// The active or most recent sequence; absent before the first one.
 		const FrameSequenceStatus* m_Sequence = nullptr;
 		bool m_NonFiniteInstrumentation = false;
@@ -116,6 +121,8 @@ namespace gglab
 		std::string m_LightingProfileError;
 		// Live control state; the frame carries the stamp it was planned with.
 		HostViewControlStamp m_HostViewControl;
+		// Owner-thread immutable snapshot captured for this query only.
+		std::optional<LabSnapshot> m_Lab;
 	};
 
 	// Response serializers. Every response carries the protocol version, the
@@ -134,6 +141,8 @@ namespace gglab
 		uint64_t id, const CaptureJobResult& result, bool consumed) noexcept;
 	[[nodiscard]] std::string SerializeApplicationControlCaptureCancellation(
 		uint64_t id, uint64_t jobId, CaptureCancelResult cancellation) noexcept;
+	[[nodiscard]] std::string SerializeApplicationControlGIProbeSelection(
+		uint64_t id, const std::optional<GIProbeSelection>& selection) noexcept;
 	[[nodiscard]] std::string SerializeApplicationControlStopping(uint64_t id) noexcept;
 	[[nodiscard]] std::string SerializeApplicationControlWatch(uint64_t id,
 		const NonFiniteWatchStatus& status, bool instrumentation) noexcept;

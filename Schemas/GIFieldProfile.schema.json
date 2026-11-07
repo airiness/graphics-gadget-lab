@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gglab.gi-field-profile",
+  "title": "GGLab field base identity and effective constructor inputs v1",
+  "description": "A Host-declared base preset plus effective overrides. Neither a supported-profile certificate nor a shader/cache artifact identity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "revision", "counts", "minimum", "spacing", "irradianceInteriorWidth", "raysPerProbe", "seed", "maximumDistance", "hysteresis", "viewBias", "receiverSampling", "feedback", "progressiveSampling", "constantEnvironment", "constantRadiance", "readiness"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "id": {"type": "string", "maxLength": 128, "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+(?![\\s\\S])"},
+    "revision": {"type": "integer", "minimum": 1, "maximum": 4294967295},
+    "counts": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "integer", "minimum": 2, "maximum": 128}},
+    "minimum": {"$ref": "#/$defs/float3"},
+    "spacing": {"type": "number", "exclusiveMinimum": 0},
+    "irradianceInteriorWidth": {"enum": [6, 14, 30]},
+    "raysPerProbe": {"enum": [64, 128, 192, 256]},
+    "seed": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+    "maximumDistance": {"type": "number", "exclusiveMinimum": 0},
+    "hysteresis": {"type": "number", "minimum": 0, "exclusiveMaximum": 1},
+    "viewBias": {"type": "number", "minimum": 0, "maximum": 1},
+    "receiverSampling": {"type": "boolean"},
+    "feedback": {"type": "boolean"},
+    "progressiveSampling": {"type": "boolean"},
+    "constantEnvironment": {"type": "boolean"},
+    "constantRadiance": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number", "minimum": 0}},
+    "readiness": {
+      "type": "object", "additionalProperties": false,
+      "required": ["enabled", "noiseSigma", "steadyNoiseSigma", "refreshHysteresis", "progressiveRefresh"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "noiseSigma": {"type": "number", "minimum": 0},
+        "steadyNoiseSigma": {"type": "number", "minimum": 0},
+        "refreshHysteresis": {"type": "number", "minimum": 0, "exclusiveMaximum": 1},
+        "progressiveRefresh": {"type": "boolean"}
+      }
+    }
+  },
+  "$defs": {
+    "float3": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}}
+  }
+}

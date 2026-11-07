@@ -56,6 +56,11 @@ def validate(document, timing_validator=None):
 	if len(document["frame"]["milliseconds"]) != expected:
 		raise ValueError("Every recorded sample requires a frame time")
 	check_statistics(document["frame"]["milliseconds"], document["frame"]["statistics"])
+	if document["schemaVersion"] == 2:
+		for sample in samples:
+			value = sample["cpuBuildRecordMilliseconds"]
+			if value is not None and (not math.isfinite(value) or value < 0):
+				raise ValueError("CPU build/record time must be finite and non-negative, or unavailable")
 	keys, stable = set(), True
 	for scope in document["scopes"]:
 		key = scope["kind"], scope["name"], scope["occurrence"]
@@ -110,7 +115,21 @@ def self_test(timing_validator):
 	reordered = copy.deepcopy(valid)
 	reordered["coverage"]["samples"] = list(reversed(reordered["coverage"]["samples"]))
 	validate(reordered, timing_validator)  # Membership names arrival-order indices.
+	cpu = copy.deepcopy(valid)
+	cpu["schemaVersion"] = 2
+	for index, sample in enumerate(cpu["coverage"]["samples"]):
+		sample["cpuBuildRecordMilliseconds"] = (index + 1) * 0.125
+	validate(cpu, timing_validator)
+	cpu["coverage"]["samples"][0]["cpuBuildRecordMilliseconds"] = None
+	validate(cpu, timing_validator)
 	cases = []
+	for value in (-1.0, math.nan, math.inf):
+		bad = copy.deepcopy(cpu)
+		bad["coverage"]["samples"][0]["cpuBuildRecordMilliseconds"] = value
+		cases.append(bad)
+	missing = copy.deepcopy(cpu)
+	del missing["coverage"]["samples"][0]["cpuBuildRecordMilliseconds"]
+	cases.append(missing)
 	for section, key, value in (("coverage", "requestedSamples", 3), ("coverage", "recordedSamples", 3),
 		("sequence", "lastFrameSerial", 99), ("sequence", "frameCount", 1),
 		("measurement", "profilingStateChanged", True), ("frame", "milliseconds", [1.0])):

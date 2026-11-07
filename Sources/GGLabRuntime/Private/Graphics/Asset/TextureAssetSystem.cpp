@@ -634,6 +634,9 @@ namespace gglab
 			.m_Texture = texture->m_Gpu.m_Texture,
 			.m_Desc = texture->m_Gpu.m_Desc,
 			.m_SrvIndex = descriptor.m_Index,
+			.m_ViewFormat = texture->m_Gpu.m_ViewFormat,
+			.m_SourceDigest = texture->m_Source.m_SourceDigest,
+			.m_ArtifactContentDigest = texture->m_Source.m_ArtifactContentDigest,
 		};
 	}
 
@@ -925,6 +928,7 @@ namespace gglab
 
 		const RHITextureViewDesc srvDesc = BuildTextureRHISRVDesc(textureData);
 
+		texture->m_Gpu.m_ViewFormat = srvDesc.m_Format;
 		texture->m_Gpu.m_Srv = m_Device->CreateTextureView(texture->m_Gpu.m_Texture, srvDesc);
 		GGLAB_ASSERT_MSG(texture->m_Gpu.m_Srv.IsValid(),
 			"TextureAssetSystem::UploadTexture: failed to create RHI texture SRV.");

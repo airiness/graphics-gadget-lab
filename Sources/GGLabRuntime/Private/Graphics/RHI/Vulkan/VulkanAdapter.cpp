@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cstring>
 #include <format>
+#include <vector>
 
 namespace gglab
 {
@@ -91,6 +92,57 @@ namespace gglab
 
 			vkGetPhysicalDeviceFeatures2(physicalDevice, &features2);
 			return features2;
+		}
+
+		[[nodiscard]] VulkanRayQueryAvailability QueryRayQueryAvailability(
+			VkPhysicalDevice physicalDevice, const std::vector<VkExtensionProperties>& extensions,
+			bool bufferDeviceAddress) noexcept
+		{
+			VulkanRayQueryAvailability result{};
+			const auto has = [&extensions](const char* name) noexcept
+				{
+					return std::ranges::any_of(extensions, [name](const VkExtensionProperties& extension)
+						{ return std::strcmp(extension.extensionName, name) == 0; });
+				};
+			result.m_AccelerationStructureExtension = has(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+			result.m_RayQueryExtension = has(VK_KHR_RAY_QUERY_EXTENSION_NAME);
+			result.m_DeferredHostOperationsExtension = has(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+			result.m_BufferDeviceAddress = bufferDeviceAddress;
+			VkPhysicalDeviceFeatures2 features{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+			VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration{
+				VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
+			VkPhysicalDeviceRayQueryFeaturesKHR rayQuery{
+				VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR };
+			if (result.m_AccelerationStructureExtension)
+			{
+				features.pNext = &acceleration;
+			}
+			if (result.m_RayQueryExtension)
+			{
+				rayQuery.pNext = features.pNext;
+				features.pNext = &rayQuery;
+			}
+			vkGetPhysicalDeviceFeatures2(physicalDevice, &features);
+			result.m_AccelerationStructure = acceleration.accelerationStructure == VK_TRUE;
+			result.m_RayQuery = rayQuery.rayQuery == VK_TRUE;
+			if (result.m_AccelerationStructureExtension)
+			{
+				VkPhysicalDeviceAccelerationStructurePropertiesKHR limits{
+					VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR };
+				VkPhysicalDeviceProperties2 properties{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
+				properties.pNext = &limits;
+				vkGetPhysicalDeviceProperties2(physicalDevice, &properties);
+				result.m_BuildLimits = {
+					.m_MaxPrimitiveCount = limits.maxPrimitiveCount,
+					.m_MaxInstanceCount = limits.maxInstanceCount,
+					.m_ScratchAlignmentInBytes = limits.minAccelerationStructureScratchOffsetAlignment,
+				};
+				result.m_MaxGeometryCount = limits.maxGeometryCount;
+				result.m_MaxDescriptorSetAccelerationStructures = limits.maxDescriptorSetAccelerationStructures;
+				result.m_MaxPerStageDescriptorAccelerationStructures =
+					limits.maxPerStageDescriptorAccelerationStructures;
+			}
+			return result;
 		}
 
 		[[nodiscard]] bool QueryQueueFamilySupport(VkPhysicalDevice physicalDevice,
@@ -270,6 +322,8 @@ namespace gglab
 			hasCustomBorderColor, hasImageViewMinLod, hasVertexAttributeDivisor);
 
 		auto& capabilities = snapshot.m_ProfileCapabilities;
+		snapshot.m_RayQueryAvailability = QueryRayQueryAvailability(
+			physicalDevice, deviceExtensions, vulkan12Features.bufferDeviceAddress == VK_TRUE);
 		capabilities.m_DynamicRendering = vulkan13Features.dynamicRendering == VK_TRUE;
 		capabilities.m_Synchronization2 = vulkan13Features.synchronization2 == VK_TRUE;
 		capabilities.m_ShaderDemoteToHelperInvocation =

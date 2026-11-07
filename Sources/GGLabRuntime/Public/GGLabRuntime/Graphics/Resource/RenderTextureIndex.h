@@ -20,6 +20,7 @@ namespace gglab
 		Preview_TemporalAA,
 		Preview_Atmosphere,
 		Preview_SceneDepth,
+		Preview_GlobalIllumination,
 
 		Count
 	};

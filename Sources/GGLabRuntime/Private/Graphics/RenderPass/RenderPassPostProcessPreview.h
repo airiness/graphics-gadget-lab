@@ -3,6 +3,8 @@
 #include "Graphics/PostProcess/PostProcessColor.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewDiagnostics.h"
+
 #include <optional>
 #include "GGLabRuntime/Graphics/RenderPass/RenderPassBase.h"
 
@@ -44,7 +46,8 @@ namespace gglab
 		void AddResolvedPass(RenderGraph& rg, const RenderFrameContext& context,
 			const RenderServices& services, RGTextureId source, float sourcePreExposure,
 			std::optional<RHITextureViewDesc> sourceViewDesc,
-			PostProcessDebugSelection selection, PostProcessPreviewChannel channel) noexcept;
+			PostProcessDebugSelection selection, PostProcessPreviewChannel channel,
+			RGTextureId validity = {}, RGTextureId activity = {}, GIPreviewSnapshot snapshot = {}) noexcept;
 		void EnsureInitialized(const RenderServices& services) noexcept;
 		RHIPipelineHandle GetOrCreatePSO(const RenderServices& services) noexcept;
 

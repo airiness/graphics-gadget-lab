@@ -15,5 +15,6 @@ namespace gglab
 		[[nodiscard]] virtual void* GetNativeHandle() const noexcept = 0;
 		[[nodiscard]] virtual uint32_t GetWidth() const noexcept = 0;
 		[[nodiscard]] virtual uint32_t GetHeight() const noexcept = 0;
+		[[nodiscard]] virtual float GetDpiScale() const noexcept { return 1; }
 	};
 }

@@ -22,6 +22,7 @@ namespace gglab
 			TemporalAA,
 			GTAO,
 			Exposure,
+			GIProbes,
 		};
 
 		[[nodiscard]] const char* GetBlockGroup(Block block) noexcept
@@ -34,6 +35,8 @@ namespace gglab
 				return "GTAO";
 			case Block::Exposure:
 				return "Exposure";
+			case Block::GIProbes:
+				return "GI Probes";
 			}
 			return "";
 		}
@@ -167,6 +170,40 @@ namespace gglab
 					Camera::MinimumManualEV100, Camera::MaximumManualEV100),
 				MakeBinding("view.exposure.compensation", Block::Exposure,
 					[](auto& s) -> auto& { return s.m_Exposure.m_CompensationEV; }, -10.0f, 10.0f),
+				MakeBinding("view.gi_probes.enabled", Block::GIProbes,
+					[](auto& s) -> auto& { return s.m_GIProbes.m_Enabled; }),
+				MakeBinding("view.gi_probes.bounds", Block::GIProbes,
+					[](auto& s) -> auto& { return s.m_GIProbes.m_Bounds; }),
+				MakeBinding("view.gi_probes.radius", Block::GIProbes,
+					[](auto& s) -> auto& { return s.m_GIProbes.m_Radius; }, 0.01f, 0.5f),
+				MakeBinding("view.gi_probes.budget", Block::GIProbes,
+					[](auto& s) -> auto& { return s.m_GIProbes.m_Budget; }, 1u, GIProbeVisualizationMaximumBudget),
+				MakeBinding("view.gi_probes.slice_axis", Block::GIProbes,
+					[](auto& s) -> auto& { return s.m_GIProbes.m_SliceAxis; }, 0u, 3u),
+				MakeBinding("view.gi_probes.layer_minimum", Block::GIProbes,
+					[](auto& s) -> auto& { return s.m_GIProbes.m_LayerMinimum; }, 0u, 65535u),
+				MakeBinding("view.gi_probes.layer_maximum", Block::GIProbes,
+					[](auto& s) -> auto& { return s.m_GIProbes.m_LayerMaximum; }, 0u, 65535u),
+				MakeBinding("view.gi_probes.classification_mask", Block::GIProbes,
+					[](auto& s) -> auto& { return s.m_GIProbes.m_ClassificationMask; }, 0u, 15u),
+				MakeBinding("view.gi_probes.maximum_distance", Block::GIProbes,
+					[](auto& s) -> auto& { return s.m_GIProbes.m_MaximumDistance; }, 0.0f, 1000000.0f),
+				MakeBinding("view.gi_probes.mode", Block::GIProbes,
+					[](auto& s) -> auto& { return s.m_GIProbes.m_Mode; }, {}, {},
+					EnumItems({ GIProbeVisualizationMode::Classification, GIProbeVisualizationMode::Irradiance, GIProbeVisualizationMode::Change },
+						&GetGIProbeVisualizationModeName)),
+				MakeBinding("view.gi_probes.preview_ev", Block::GIProbes,
+					[](auto& s) -> auto& { return s.m_GIProbes.m_PreviewExposureEV; },
+					GIProbeVisualizationMinimumExposureEV, GIProbeVisualizationMaximumExposureEV),
+				MakeBinding("view.gi_probes.change_normalized", Block::GIProbes,
+					[](auto& s) -> auto& { return s.m_GIProbes.m_ChangeNormalized; }),
+				MakeBinding("view.gi_probes.change_range", Block::GIProbes,
+					[](auto& s) -> auto& { return s.m_GIProbes.m_ChangeRange; }, 0.001f, 1000000.0f),
+				MakeBinding("view.gi_probes.change_blocks", Block::GIProbes,
+					[](auto& s) -> auto& { return s.m_GIProbes.m_ChangeBlocks; }),
+				MakeBinding("view.gi_probes.depth_mode", Block::GIProbes,
+					[](auto& s) -> auto& { return s.m_GIProbes.m_DepthMode; }, {}, {},
+					EnumItems({ GIProbeDepthMode::XRay, GIProbeDepthMode::SceneDepth }, &GetGIProbeDepthModeName)),
 			};
 			return bindings;
 		}
@@ -282,6 +319,10 @@ namespace gglab
 				entry.m_InheritedSource = tooling.m_GTAO ?
 					HostViewValueSource::Tooling :
 					HostViewValueSource::Content;
+				break;
+			case Block::GIProbes:
+				entry.m_InheritedSource = tooling.m_GIProbes ?
+					HostViewValueSource::Tooling : HostViewValueSource::Content;
 				break;
 			case Block::Exposure:
 				entry.m_InheritedSource = HostViewValueSource::Camera;

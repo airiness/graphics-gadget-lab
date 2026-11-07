@@ -22,6 +22,7 @@ namespace gglab
 
 			int32_t m_Order = 0;
 			bool m_Open = false;
+			bool m_WasOpen = false;
 			bool m_FocusRequested = false;
 
 			std::unique_ptr<DevelopGuiPanelBase> m_Panel;

@@ -3,6 +3,9 @@
 #include "Capture/RequiredFrameState.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIFieldObservation.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIReceiverObservation.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIProbePicking.h"
 
 #include <chrono>
 #include <cstdint>
@@ -91,5 +94,10 @@ namespace gglab
 		std::shared_ptr<const RequiredFrameState> m_RequiredFrameState;
 		// Predicate plans default to the maximum; retries share the admission deadline.
 		std::optional<std::chrono::milliseconds> m_FrameSelectionTimeout;
+		// Requires the compact GI.Field.ProbeInspection resource product. Selects one
+		// coordinate per frame through the ordinary capture admission/attempt path.
+		std::optional<GIProbeInspectionRequest> m_GIProbeInspection;
+		std::optional<GIReceiverInspectionRequest> m_GIReceiverInspection;
+		std::optional<GIProbePickingRequest> m_GIProbePicking;
 	};
 }

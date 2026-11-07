@@ -47,10 +47,37 @@ Atlas ID: atlas.runtime.render-pipeline
   and [RenderPipelineBlackboard.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RenderPipeline/RenderPipelineBlackboard.h).
 - **Implementation:** [Forward+ recipe](../../../Sources/GGLabRuntime/Private/Graphics/RenderPipeline/RenderPipelineForwardPlus.cpp)
   and its [factory](../../../Sources/GGLabRuntime/Private/Graphics/RenderPipeline/RenderPipelineForwardPlusFactory.cpp).
+- **GI receivers:** `RenderPipelineForwardPlusCreateInfo::m_EnableGIReceiver` selects
+  the Runtime-owned [receiver pass](../../../Sources/GGLabRuntime/Private/Graphics/RenderPass/RenderPassGIReceiver.cpp);
+  receiver records and paired raster positions stay Private.
+- **GI reference:** Public [configuration](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GIReference.h)
+  selects the Renderer-owned [observation](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIReferenceObservation.h);
+  [GIReferenceTypes.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GIReferenceTypes.h)
+  exposes read-only progress.
+- **Probe update:** Public [configuration and diagnostics](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GIProbeUpdate.h)
+  for the optional Runtime [experiment](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIProbeUpdate.cpp),
+  selected by `RenderPipelineForwardPlusCreateInfo::m_GIProbeUpdate`.
+- **Static world field:** `RenderPipelineForwardPlusCreateInfo::m_GIField` selects
+  the Runtime [owner](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIField.cpp),
+  with Public [configuration and diagnostics](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GIField.h).
+  Renderer owns its [CPU settlement participant](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIFieldState.h).
+  `GetGIFieldCaptureState` supplies Runtime readiness to AppRuntime's capture gate.
+  Opaque Forward shading and receiver diagnostics share the
+  [field lookup](../../../Shaders/Lighting/GIFieldSampling.hlsli) through Private
+  [graph resources](../../../Sources/GGLabRuntime/Private/Graphics/RenderPass/GIFieldGraphResources.h).
+- **Specular visibility:** Public [configuration/progress](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GISpecularVisibility.h)
+  selects an independent Renderer-owned [observation](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GISpecularVisibilityObservation.h)
+  and [pre-temporal pass](../../../Sources/GGLabRuntime/Private/Graphics/RenderPass/RenderPassGISpecularVisibility.cpp).
+  Both GI observations use the Private [tiled execution core](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GITiledObservation.h)
+  and [receiver cache](../../../Sources/GGLabRuntime/Private/Graphics/Pipeline/GIReceiverCache.h).
 - **Lifetime:** a Lab session owns its pipeline through `LabSessionBase`. The Forward+
   recipe owns its Runtime passes and the scene extension it was created with.
-- **Boundary:** [pass ownership](../Runtime_Boundaries_Map.md#pass-ownership); the
-  scene extension runs after temporal integration.
+- **Boundary:** [composition](../Runtime_Boundaries_Map.md#runtime-owned-passes) owns
+  GI stage placement and [pass ownership](../Runtime_Boundaries_Map.md#pass-ownership).
+  The scene extension runs after temporal integration.
+  Runtime owns persistent preview textures; the Host GUI declares sampled reads
+  through [Public preview graph outputs](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/PostProcess/PostProcessPreviewGraphResources.h).
+  The pipeline exports previews after all overlay consumers declare their reads.
 - **Verification:** `GGLabRuntimeTests`, `rendering-contracts`.
 
 ```text
@@ -85,7 +112,7 @@ Atlas ID: atlas.runtime.render-pass-authoring
   Private.
 - **Verification:** `GGLabRuntimeTests`, `rendering-contracts`; `WinAppTests`,
   `napa-voxel`; GPU checks use the
-  [frame-capture skill](../../../.agents/skills/gglab-frame-capture/SKILL.md).
+  [verification workflows](../../../Tests/Verification/README.md#gpu-regressions).
 
 ```text
 Anchors:
@@ -169,6 +196,8 @@ Atlas ID: atlas.runtime.rhi-submission
 - **Public interface:** [RHIContext.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RHI/RHIContext.h),
   [RHIDevice.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RHI/RHIDevice.h)
   and [RHIFence.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RHI/RHIFence.h).
+  [RHIAccelerationStructure.h](../../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RHI/RHIAccelerationStructure.h)
+  defines AS inputs and ray-query capability records.
 - **Implementation:** [submission resolution](../../../Sources/GGLabRuntime/Private/Graphics/RHI/RHIFrameSubmission.cpp),
   [DX12](../../../Sources/GGLabRuntime/Private/Graphics/RHI/DX12/DX12Context.cpp),
   [Vulkan](../../../Sources/GGLabRuntime/Private/Graphics/RHI/Vulkan/VulkanContext.cpp)
@@ -177,8 +206,8 @@ Atlas ID: atlas.runtime.rhi-submission
   keep accepted work until its completion permits release.
 - **Boundary:** [teardown ownership](../Frame_Execution_Map.md#teardown-ownership)
   coordinates consumers; native fence and device-loss policy stay in the backends.
-- **Verification:** Runtime submission contracts and AppRuntime's simulated fault
-  harness.
+- **Verification:** Runtime submission contracts, `ray-query-contracts`, and
+  AppRuntime's simulated fault harness.
 
 ```text
 Anchors:
@@ -188,4 +217,9 @@ ReviewPaths:
   - Sources/GGLabRuntime/Private/Graphics/RHI/DX12/DX12Context.cpp
   - Sources/GGLabRuntime/Private/Graphics/RHI/Vulkan/VulkanContext.cpp
   - Sources/GGLabRuntime/Private/Graphics/Resource/TransientResourcePool.cpp
+  - Sources/GGLabRuntime/Private/Graphics/RHI/RHIAccelerationStructure.cpp
+  - Sources/GGLabRuntime/Private/Graphics/RHI/DX12/DX12AccelerationStructureManager.cpp
+  - Sources/GGLabRuntime/Private/Graphics/RHI/Vulkan/VulkanAccelerationStructureManager.cpp
+  - Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RHI/RHIAccelerationStructure.h
+  - Tests/GGLabRuntime/RayQueryContractSelfTests.cpp
 ```

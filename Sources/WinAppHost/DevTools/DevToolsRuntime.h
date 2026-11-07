@@ -34,6 +34,7 @@ namespace gglab
 	// persisted. Active blocks replace all parameters; absent scalars inherit.
 	struct ViewRenderSettingsOverrides
 	{
+		GIProbeVisualizationSettings m_GIProbes{};
 		SettingsOverride<TemporalAASettings> m_TemporalAA{};
 		SettingsOverride<GTAOSettings> m_GTAO{};
 		SettingsOverride<BloomSettings> m_Bloom{};

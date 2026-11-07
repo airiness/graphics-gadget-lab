@@ -1,4 +1,5 @@
 #include "Application/Lab/Sessions/CoordinateConformanceLabSession.h"
+#include "Application/Lab/Validation/GIProbeDepthConformance.h"
 #include "GGLabRuntime/Graphics/RenderParameters.h"
 #include "GGLabRuntime/Graphics/Capture/NonFiniteWatchDefaults.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/LabSnapshot.h"
@@ -385,6 +386,7 @@ namespace gglab
 						m_State->m_ConformanceExecutions.fetch_add(1, std::memory_order_relaxed);
 					});
 
+				m_GIProbeDepth.AddPasses(rg, context, services);
 				if (services.m_OverlayExtension)
 				{
 					services.m_OverlayExtension->AddOverlayPasses(rg, context, services);
@@ -533,6 +535,7 @@ namespace gglab
 					m_PositionSlot, m_PositionRecipe, ConformancePassInfo);
 			}
 
+			GIProbeDepthConformance m_GIProbeDepth;
 			std::shared_ptr<CoordinateConformanceLabState> m_State;
 			RenderPipelineResolver* m_PipelineResolver = nullptr;
 			RenderPresentationAccess* m_Presentation = nullptr;

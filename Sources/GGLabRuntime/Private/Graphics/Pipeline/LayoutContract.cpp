@@ -32,6 +32,7 @@ namespace gglab
 				return RegisterClass::Constant;
 			case RHIBindingType::ReadOnlyStorageBuffer:
 			case RHIBindingType::SampledTexture:
+			case RHIBindingType::AccelerationStructure:
 				return RegisterClass::ReadOnly;
 			case RHIBindingType::ReadWriteStorageBuffer:
 			case RHIBindingType::StorageTexture:
@@ -111,6 +112,17 @@ namespace gglab
 			else if (!IsRangeValid(slot.m_Binding, slot.m_Count))
 			{
 				return LayoutCompositionErrorCode::RegisterRangeOverflow;
+			}
+			if (slot.m_Type == RHIBindingType::AccelerationStructure)
+			{
+				if (slot.m_Count != 1)
+				{
+					return LayoutCompositionErrorCode::InvalidCount;
+				}
+				if (slot.m_Space != 0)
+				{
+					return LayoutCompositionErrorCode::InvalidRegisterSpace;
+				}
 			}
 			if ((slot.m_Type == RHIBindingType::InlineConstants &&
 				(slot.m_Count != 1 || slot.m_SizeInBytes == 0 || slot.m_SizeInBytes % 4 != 0)) ||

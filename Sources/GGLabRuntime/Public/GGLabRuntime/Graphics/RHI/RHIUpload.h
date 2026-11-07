@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <type_traits>
 
@@ -160,6 +161,9 @@ namespace gglab
 		[[nodiscard]] bool HasFailed() const noexcept;
 		// An encoder failure poisons the batch shared by every encoder of the submission.
 		void Fail() noexcept;
+		// Native backing follows this batch's submission, cancellation and quarantine.
+		// Recording-only native leases; foreign-thread rejection does not mutate the batch.
+		[[nodiscard]] bool RetainForSubmission(std::shared_ptr<void> resource) noexcept;
 		// Zero while no batch is attached.
 		[[nodiscard]] RHIUploadBatchId GetBatchId() const noexcept;
 		// A producer capability bound to the currently attached batch.
