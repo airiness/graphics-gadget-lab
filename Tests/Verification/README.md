@@ -117,16 +117,23 @@ Baseline F3 cases cover the thin-wall interior back wall, floor and ceiling plus
 the exterior roof, whose D=1 reference must equal pi L. F5 cases cover the
 doorway strip and the supplementary right-floor/far-corner view. F5 gates
 ray-traced/raster receiver correspondence on the union of its declared masks and
-reports the whole-image result, whose far left-room floor exceeds the bound. Their
-G3 gates are readiness and temporal stability; energy and leakage are G4 measurements
-written to `limits.json` by [ValidateGIFieldLimits.py](ValidateGIFieldLimits.py).
+reports the whole-image result, whose far left-room floor exceeds the bound. F3 and
+F5 are measured at G3 and gated at G4: their G3 case verdict is readiness and
+reference qualification. Their stability, energy and leakage results are G4
+previews outside it, the latter two written to `limits.json` by
+[ValidateGIFieldLimits.py](ValidateGIFieldLimits.py).
 Stability against a dark or zero reference and the local-leakage metric
 `(GI - ref) / max(ref, floor)` need a predeclared floor. `-LimitPolicy` supplies
-per-fixture absolute `stabilityFloor`/`leakageFloor` luminance values. Without
-them, a stability result that passes at the numerical floor still passes, others
-remain undetermined, and leakage is reported over a floor sweep relative to the
-F3 roof or F5 right-floor reference mean, never as a verdict. The F5 right floor
-receives only doorway sky at D=1, so its sweep is a scale, not a lit basis.
+per-fixture `stabilityFloor`/`leakageFloor` values: absolute luminance, or
+`skyIrradiance`, the irradiance pi L of the fixture's frozen constant sky read from
+the run's profile receipt. [GIFieldLimitPolicy.json](GIFieldLimitPolicy.json)
+declares `skyIrradiance` for both fixtures. Without a policy, a stability result
+that passes at the numerical floor still passes, others remain undetermined, and
+leakage is reported over a floor sweep, never as a verdict. The F3 sweep scales its
+roof reference and the F5 sweep the frozen sky's pi L: at D=1 the F5 right room
+receives light only from that sky, through the doorway. Field and reference are
+both single-bounce, so F5 excess over its reference is field error, reported
+absolutely and against that basis.
 
 ### Readiness repeatability
 

@@ -4,8 +4,10 @@ Plan 9.3 measures these limits at G3 and gates them at G4, where multi-bounce,
 depth-converged references apply; nothing here qualifies either stage. The local
 leakage metric's floor is a predeclared input. Without a limit policy, values are
 reported over a floor sweep, never as a verdict. The F3 sweep scales the lit roof
-reference; the F5 sweep scales the right-floor reference, which at D=1 receives only
-sky through the doorway and is therefore no lit basis.
+reference. The F5 sweep scales the frozen sky's irradiance pi * L, read from the run:
+at D=1 the right room receives light only from that sky, through the doorway. Field
+and references are both single-bounce, so F5 excess over its reference is field error,
+reported absolutely and against this basis.
 Percentiles use the upper index ceil(0.95 n) - 1 of the sorted pixel values.
 """
 import argparse
@@ -15,7 +17,8 @@ import tempfile
 
 import numpy as np
 
-from ValidateGIFieldBaseline import FLOOR, load, load_policy, read_export, roi_masks, save, validate_case
+from ValidateGIFieldBaseline import (FLOOR, SKY_IRRADIANCE, load, load_policy, read_export, resolve_floor, roi_masks,
+                                     save, sky_irradiance, validate_case)
 from ValidateGIReferenceLighting import LUMA
 
 THIN_WALL_LIMIT = .03
@@ -68,11 +71,15 @@ def load_case(directory):
     require(len(paths) == 120, "Limit window needs 120 exported frames")
     paths.sort(key=lambda path: load(path)["frame"]["sequence"]["frame"])
     position = references[0]["GI.Receiver.Position"][0]
-    frames, rgb = [], None
+    frames, rgb, sky = [], None, None
     for index, path in enumerate(paths):
         record = load(path)
         require(record["frame"]["sequence"]["frame"] == index and record["submission"]["completed"],
                 "Gapped or incomplete limit window")
+        summary = record["frame"]["readiness"]["giField"]["summary"]
+        current = sky_irradiance(summary) if summary["profile"]["constantEnvironment"] else None
+        require(index == 0 or current == sky, "The frozen sky changed inside the limit window")
+        sky = current
         targets = {t["address"]["resource"]: t for t in record["targets"]}
         energy = np.load(path.parent/targets["GI.Field.ReceiverIrradiance"]["array"], allow_pickle=False)[0]
         receiver = np.load(path.parent/targets["GI.Receiver.Position"]["array"], allow_pickle=False)[0]
@@ -81,7 +88,7 @@ def load_case(directory):
         frames.append({name: luminance(energy[mask]) for name, mask in masks.items()})
         if index == 0:
             rgb = {name: energy[mask, :3].astype(float).mean(axis=0) for name, mask in masks.items()}
-    return dict(result, field=frames, fieldRgb=rgb, reason=None)
+    return dict(result, field=frames, fieldRgb=rgb, skyIrradiance=sky, reason=None)
 
 
 def pixel_metrics(field, reference_pair, floors, policy_floor):
@@ -119,8 +126,19 @@ def stability(series, reference_mean, floors, policy_floor):
     return result
 
 
-def fixture_floors(policy, fixture, key):
-    return (policy or {}).get("fixtures", {}).get(str(fixture), {}).get(key)
+def fixture_floors(policy, fixture, key, sky=None):
+    value = (policy or {}).get("fixtures", {}).get(str(fixture), {}).get(key)
+    if value == SKY_IRRADIANCE:
+        require(sky is not None, "A sky-basis floor needs the run's frozen constant sky")
+        return sky
+    return value
+
+
+def case_sky(cases, names):
+    """The frozen sky basis shared by every measured case of one fixture."""
+    values = {cases[name]["skyIrradiance"] for name in names if name in cases and cases[name]["field"] is not None}
+    require(len(values) <= 1, "Cases of one fixture disagree on the frozen sky")
+    return next(iter(values), None)
 
 
 def thin_wall(cases, policy):
@@ -130,8 +148,9 @@ def thin_wall(cases, policy):
     basis = float(np.mean([r[roof["masks"]["roof"]].mean() for r in roof["reference"]]))
     require(basis > 0, "F3 roof reference lost its lit basis")
     floors = [fraction*basis for fraction in FLOOR_SWEEP]
-    leak_floor = fixture_floors(policy, 3, "leakageFloor")
-    stability_floor = fixture_floors(policy, 3, "stabilityFloor")
+    sky = case_sky(cases, [*F3_PATCHES, "thin-roof"])
+    leak_floor = fixture_floors(policy, 3, "leakageFloor", sky)
+    stability_floor = fixture_floors(policy, 3, "stabilityFloor", sky)
     patches = {}
     for case_id, roi in F3_PATCHES.items():
         data = cases.get(case_id)
@@ -164,13 +183,10 @@ def thin_wall(cases, policy):
 def parallel_rooms(cases, policy):
     if not any(case_id in cases for case_id in F5_ROIS):
         return dict(available=False, reason="No F5 cases")
-    lit = cases.get("parallel-floor")
-    basis = None
-    if lit is not None:
-        basis = float(np.mean([r[lit["masks"]["right-floor"]].mean() for r in lit["reference"]]))
+    basis = case_sky(cases, F5_ROIS)
     floors = [fraction*basis for fraction in FLOOR_SWEEP] if basis else []
-    leak_floor = fixture_floors(policy, 20, "leakageFloor")
-    stability_floor = fixture_floors(policy, 20, "stabilityFloor")
+    leak_floor = fixture_floors(policy, 20, "leakageFloor", basis)
+    stability_floor = fixture_floors(policy, 20, "stabilityFloor", basis)
     rois = {}
     for case_id, names in F5_ROIS.items():
         data = cases.get(case_id)
@@ -193,13 +209,15 @@ def parallel_rooms(cases, policy):
                                                                 max(reference_mean, FLOOR)),
                          chromaticityError=chromaticity, energyLimit=ENERGY_LIMIT,
                          withinG4EnergyLimit=abs(error) <= ENERGY_LIMIT,
+                         absoluteExcess=float(means[0]-reference_mean),
+                         excessOverSkyBasis=float((means[0]-reference_mean)/basis) if basis else None,
                          stability=stability(means, reference_mean, floors, stability_floor))
             if roi == "doorway-strip":
                 pair = [r[mask] for r in data["reference"]]
                 entry["localLeakage"] = dict(limit=LOCAL_LEAKAGE_LIMIT,
                                              **pixel_metrics(data["field"][0][roi], pair, floors, leak_floor))
             rois[roi] = entry
-    return dict(available=True, sweepBasis=dict(roi="right-floor", referenceMean=basis) if basis else None,
+    return dict(available=True, sweepBasis=dict(kind=SKY_IRRADIANCE, value=basis) if basis else None,
                 floorSweepFractions=FLOOR_SWEEP, rois=rois)
 
 
@@ -273,16 +291,26 @@ def self_test():
     def measured(roi):
         return dict(masks={roi: mask}, reference=[lit, lit], referenceRgb=[rgb, rgb], referenceSamplingQualified=True,
                     field=[{roi: luminance(rgb[mask]*np.float32(1.05))} for _ in range(120)],
-                    fieldRgb={roi: rgb[mask].mean(axis=0)}, reason=None)
+                    fieldRgb={roi: rgb[mask].mean(axis=0)}, skyIrradiance=np.pi*.1, reason=None)
     rooms = parallel_rooms({"doorway": measured("doorway-strip"), "parallel-floor": dict(
         measured("right-floor"), masks={"right-floor": mask, "far-corner": mask},
         field=[{"right-floor": luminance(rgb[mask]), "far-corner": luminance(rgb[mask])}] * 120,
         fieldRgb={"right-floor": rgb[mask].mean(axis=0), "far-corner": rgb[mask].mean(axis=0)})},
-        dict(fixtures={"20": dict(stabilityFloor=.1, leakageFloor=.1)}))
+        dict(fixtures={"20": dict(stabilityFloor=SKY_IRRADIANCE, leakageFloor=.1)}))
     json.dumps(rooms, allow_nan=False)
     require(rooms["rois"]["doorway-strip"]["withinG4EnergyLimit"] is True and
             rooms["rois"]["right-floor"]["relativeEnergyError"] == 0, "F5 verdicts serialize as JSON booleans")
     checks += 1
+    right = rooms["rois"]["right-floor"]
+    require(rooms["sweepBasis"] == dict(kind=SKY_IRRADIANCE, value=np.pi*.1) and
+            np.isclose(right["stability"]["declared"]["floor"], np.pi*.1) and
+            np.isclose(rooms["rois"]["doorway-strip"]["excessOverSkyBasis"], .025/(np.pi*.1)),
+            "F5 scales its sweep, sky-basis floor and excess by the frozen sky's pi * L")
+    checks += 1
+    reject(lambda: case_sky({"doorway": dict(field=[], skyIrradiance=.1),
+                             "parallel-floor": dict(field=[], skyIrradiance=.2)}, F5_ROIS))
+    reject(lambda: fixture_floors(dict(fixtures={"20": dict(stabilityFloor=SKY_IRRADIANCE)}), 20,
+                                  "stabilityFloor"))
     print(json.dumps(dict(ok=True, checks=checks)))
 
 

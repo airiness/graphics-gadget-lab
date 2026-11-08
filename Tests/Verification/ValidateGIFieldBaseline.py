@@ -37,9 +37,13 @@ CASES = {
     "doorway": dict(fixture=20, view="F5_Doorway", counts=[11, 7, 7]),
     "parallel-floor": dict(fixture=20, view="F5_Floor", counts=[11, 7, 7]),
 }
-# F3/F5 energy and leakage are measured here and gated at G4; G3 gates their
-# readiness and stability. Their stability verdict depends on a declared dark floor.
+# F3/F5 are measured at G3 and gated at G4 (plan 9.2). G3 gates only their readiness;
+# their energy, chromaticity and stability verdicts are reported outside the G3 case
+# verdict. The stability verdict of a dark ROI depends on a declared floor.
 LIMIT_FIXTURES = (3, 20)
+# A declared floor may name this basis instead of a number: the irradiance pi * L that an
+# unoccluded receiver gets from the frozen constant sky alone, read from the run itself.
+SKY_IRRADIANCE = "skyIrradiance"
 ROOM_PATCHES = {"Interior": "back", "Floor": "floor", "Ceiling": "ceiling", "Roof": "roof"}
 FIELD_PROFILES = {
     0: ([-3, -3, -3], .5, 6), 1: ([-3, -3, -3], .5, 6), 2: ([-4, -2, -4], 1., 6), 3: ([-4, -2, -4], 1., 6),
@@ -355,7 +359,8 @@ def temporal_metrics(samples, reference):
 
 
 def load_policy(path):
-    """Optional predeclared dark-reference floors (absolute linear luminance) per limit fixture."""
+    """Optional predeclared dark-reference floors per limit fixture: absolute linear
+    luminance, or the frozen sky's irradiance basis."""
     if not Path(path).exists():
         return None
     policy = load(path)
@@ -364,9 +369,23 @@ def load_policy(path):
     for fixture, floors in policy["fixtures"].items():
         require(fixture in {str(f) for f in LIMIT_FIXTURES} and isinstance(floors, dict) and floors and
                 set(floors) <= {"stabilityFloor", "leakageFloor"} and
-                all(type(v) in (int, float) and np.isfinite(v) and v >= FLOOR for v in floors.values()),
-                "Limit policy floors must be at least the numerical floor per F3/F5 fixture")
+                all(v == SKY_IRRADIANCE or (type(v) in (int, float) and np.isfinite(v) and v >= FLOOR)
+                    for v in floors.values()),
+                "Limit policy floors must be the sky basis or at least the numerical floor per F3/F5 fixture")
     return policy
+
+
+def sky_irradiance(summary):
+    """pi * L of the field's frozen constant sky, from its published profile receipt."""
+    profile = summary["profile"]
+    radiance = np.asarray(profile["constantRadiance"], dtype=float)
+    require(profile["constantEnvironment"] is True and radiance.shape == (3,) and np.isfinite(radiance).all() and
+            float(radiance @ LUMA) > FLOOR, "The sky basis needs a nonzero frozen constant sky")
+    return float(np.pi * (radiance @ LUMA))
+
+
+def resolve_floor(value, summary):
+    return sky_irradiance(summary) if value == SKY_IRRADIANCE else value
 
 
 def stability_floor(policy, fixture):
@@ -385,6 +404,11 @@ def apply_stability_floor(result, reference_luminance, floor):
         return
     result["temporalRmsAtFloor"] = result["temporalStd"]/max(reference_luminance, floor)
     result["temporalStabilityPassed"] = result["temporalRmsAtFloor"] <= .02
+
+
+def g3_rois_passed(rois):
+    """ROI verdicts that bind at G3; G4-gated measurements never decide a G3 case."""
+    return all(r["passed"] for r in rois.values() if r.get("gatedAt") != "G4")
 
 
 def validate_readiness(field, previous, current_update, ready_offset=120):
@@ -582,9 +606,13 @@ def inspect_window(directory, case, reference, masks, reference_values, referenc
         result.update(pixels=reference["rois"][name]["pixels"], referenceMean=ref,
                       luminanceSeries=luminance.tolist(), temporalStd=float(np.sqrt(np.mean((luminance-luminance.mean())**2))))
         if case["fixture"] in LIMIT_FIXTURES:
-            # Energy and chromaticity are G4 measurements (see ValidateGIFieldLimits.py).
+            # Energy and chromaticity are G4 measurements (see ValidateGIFieldLimits.py); the
+            # stability verdict is a G4 preview and stays outside the G3 case verdict.
             result.update(energyPassed=None, chromaticityPassed=None, gatedAt="G4")
-            apply_stability_floor(result, float(np.asarray(ref) @ LUMA), stability_floor(policy, case["fixture"]))
+            declared = stability_floor(policy, case["fixture"])
+            apply_stability_floor(result, float(np.asarray(ref) @ LUMA),
+                                  resolve_floor(declared, first_field["summary"]))
+            result["stabilityFloorBasis"] = SKY_IRRADIANCE if declared == SKY_IRRADIANCE else None
             result["passed"] = result["temporalStabilityPassed"] is True
         else:
             if case["fixture"] == 1:
@@ -598,7 +626,7 @@ def inspect_window(directory, case, reference, masks, reference_values, referenc
             result["passed"] = result["energyPassed"] and result["chromaticityPassed"] and result["temporalStabilityPassed"]
         rois[name] = result
     ready = first_field["readyUpdate"] <= 120
-    return dict(case=case["id"], passed=reference["referenceSamplingQualified"] and ready and all(r["passed"] for r in rois.values()),
+    return dict(case=case["id"], passed=reference["referenceSamplingQualified"] and ready and g3_rois_passed(rois),
                 reference=reference, readinessPassed=ready, readyUpdate=first_field["readyUpdate"],
                 firstCompletedUpdate=first_field["completedUpdates"], field=first_field["summary"]["field"],
                 readyOffset=ready_offset, captureBinding=digest({k: v for k, v in binding.items() if k != "sequenceId"}),
@@ -761,10 +789,21 @@ def self_test():
         require(stability_floor(load_policy(directory/"policy.json"), 3) == .01 and
                 stability_floor(load_policy(directory/"policy.json"), 20) is None, "Per-fixture stability floor")
         checks += 1
+        save(directory/"policy.json", dict(schemaVersion=1, fixtures={"20": dict(stabilityFloor=SKY_IRRADIANCE)}))
+        require(stability_floor(load_policy(directory/"policy.json"), 20) == SKY_IRRADIANCE, "Declared sky basis")
+        checks += 1
         for fixtures in ({"2": dict(stabilityFloor=.01)}, {"3": dict(stabilityFloor=0)},
-                         {"3": dict(stabilityFloor=1e-7)}, {"3": dict(darkFloor=.01)}, {}):
+                         {"3": dict(stabilityFloor=1e-7)}, {"3": dict(darkFloor=.01)}, {},
+                         {"20": dict(stabilityFloor="sky")}):
             save(directory/"policy.json", dict(schemaVersion=1, fixtures=fixtures))
             reject(lambda: load_policy(directory/"policy.json"))
+    sky = dict(profile=dict(constantEnvironment=True, constantRadiance=[.1, .1, .1]))
+    require(np.isclose(resolve_floor(SKY_IRRADIANCE, sky), np.pi*.1) and resolve_floor(.5, sky) == .5,
+            "The sky basis is pi times the frozen sky luminance")
+    checks += 1
+    for profile in (dict(constantEnvironment=False, constantRadiance=[.1, .1, .1]),
+                    dict(constantEnvironment=True, constantRadiance=[0., 0., 0.])):
+        reject(lambda: resolve_floor(SKY_IRRADIANCE, dict(profile=profile)))
     dark = dict(temporalStabilityPassed=False, temporalStd=1e-3)
     apply_stability_floor(dark, 0., None)
     require(dark["temporalStabilityPassed"] is None and dark["temporalStabilityReason"] == "dark-floor-undeclared",
@@ -776,6 +815,10 @@ def self_test():
         require(dark["temporalStabilityPassed"] is passed and np.isclose(dark["temporalRmsAtFloor"], 1e-3/floor),
                 "Declared dark floor normalizes temporal RMS")
         checks += 1
+    require(g3_rois_passed(dict(a=dict(passed=False, gatedAt="G4"), b=dict(passed=True))) and
+            not g3_rois_passed(dict(a=dict(passed=True, gatedAt="G4"), b=dict(passed=False))),
+            "Only G3-gated ROIs decide the G3 case verdict")
+    checks += 1
     lit = dict(temporalStabilityPassed=True, temporalStd=1e-3)
     apply_stability_floor(lit, 1., None)
     require(lit["temporalStabilityPassed"] is True, "A pass at the numerical floor holds for any declared floor")

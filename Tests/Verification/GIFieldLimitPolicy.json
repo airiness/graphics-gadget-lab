@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "source": "F3/F5 dark-ROI floors are the irradiance pi * L of the fixture's frozen constant sky, read from each run. At D=1 the F5 right room receives light only from that sky, through the doorway; the F3 roof basis is the same quantity.",
+  "fixtures": {
+    "3": { "stabilityFloor": "skyIrradiance", "leakageFloor": "skyIrradiance" },
+    "20": { "stabilityFloor": "skyIrradiance", "leakageFloor": "skyIrradiance" }
+  }
+}
