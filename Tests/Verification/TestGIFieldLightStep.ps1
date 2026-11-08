@@ -1,4 +1,9 @@
-<# Static-geometry Physical Sky response experiment; deliberately not frozen F7 qualification. #>
+<#
+Static-geometry Physical Sky response experiment; deliberately not frozen F7 qualification.
+The hard reset and the lighting refresh gate with their own calibration. The lighting
+refresh calibrates on a field at the calibration seed that adopted the hard-reset
+calibration, settled at steady Ready and then took the case's own step.
+#>
 [CmdletBinding()]
 param(
     [string[]]$Configuration = @('Develop'),
@@ -11,7 +16,11 @@ param(
     [switch]$ProgressiveRefresh,
     [switch]$ProgressiveSampling,
     [switch]$RapidFeedbackRefresh,
+    # Control arm: the old endpoint's hard reset integrates at the refresh hysteresis.
+    [switch]$RapidHardReset,
     [switch]$ProgressiveAttribution,
+    # Where each reason's steady change RMS is calibrated; see GIFieldReadinessCalibration.psm1.
+    [ValidateSet('after-timeout','after-handoff')][string]$SteadyCalibration = 'after-handoff',
     [ValidateRange(1,29)][int]$AttributionStartFrame = 29,
     [uint32[]]$TraceSeed = @(61052),
     [int[]]$PreEventSettleFrames = @(128),
@@ -30,6 +39,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Import-Module "$root/Scripts/Verification/VerificationSupport.psm1"
+Import-Module "$PSScriptRoot/GIFieldReadinessCalibration.psm1"
 $Configuration = @($Configuration | ForEach-Object { $_ -split ',' })
 $Rhi = @($Rhi | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
 $Tap = @($Tap | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
@@ -110,7 +120,7 @@ function Set-Inputs($Values) {
     $changes = @($Values.Keys | Sort-Object | ForEach-Object {
         $type = if ($_ -in @('fixture','environment','albedo','secondary_albedo','ev100','sun_step_lux','field_irradiance_width')) { 'enum' }
             elseif ($Values[$_] -is [bool]) { 'bool' }
-            elseif ($_ -in @('field_refresh_noise','field_steady_noise')) { 'float' }
+            elseif (Test-GIFieldSigmaInput $_) { 'float' }
             else { 'uint' }
         @{id="gi_reference.$_";type=$type;value=$Values[$_]}
     })
@@ -119,6 +129,22 @@ function Set-Inputs($Values) {
     if (-not $effect.batch.succeeded) { throw 'Light-step inputs were not consumed.' }
     $effect
 }
+function Get-Status {
+    Invoke-VerificationSession status $script:session @{ExpectedRunIdentity=$script:run}
+}
+# Settles a new field at steady Ready, takes the case's step and returns its lighting refresh epoch.
+function Start-LightingCalibration([string]$Directory, [string]$Name, $Replaced, [int]$Settle, [int]$NewLux) {
+    $settled = Wait-VerificationCondition -Poll { Get-Status } -Until { param($r) $f=$r.frame.giField
+        $f -and $f.generation -ne $Replaced -and $r.frame.ready -and $f.state -eq 'Ready' -and -not $f.refreshing -and
+            $f.completedUpdates -ge $f.readyUpdate + $Settle } -TimeoutSeconds $TimeoutSeconds
+    Write-GIFieldCalibrationJson "$Directory/$Name-settled.json" $settled
+    Write-VerificationJson "$Directory/$Name-step.json" (Set-Inputs @{sun_step_lux=$NewLux})
+    $field = $settled.frame.giField
+    $started = Wait-VerificationCondition -Poll { Get-Status } -Until { param($r) $f=$r.frame.giField
+        $f -and $f.generation -eq $field.generation -and
+            $f.summary.field.refreshEpoch -gt $field.summary.field.refreshEpoch } -TimeoutSeconds $TimeoutSeconds
+    return $started.frame.giField.summary.field.refreshEpoch
+}
 $cases = @()
 try {
     $Python = (Get-Command $Python -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
@@ -126,6 +152,7 @@ try {
     $binaries = Get-VerificationBinaryIdentity $root $Configuration[0]
     Write-VerificationJson "$output/source-identity.json" $source
     Write-VerificationJson "$output/binaries.json" $binaries
+    Write-GIFieldCalibrationRecipe $output $SteadyCalibration
     if ($QualifyReferences) {
         foreach ($feedbackMode in $Feedback) {
             $mode = if ($feedbackMode -eq 'on') { 'multibounce' } else { 'single-bounce' }
@@ -190,6 +217,7 @@ try {
                     }
                     if ($ProgressiveSampling) { $case.progressiveSampling = $true }
                     if ($RapidFeedbackRefresh) { $case.rapidFeedbackRefresh = $true }
+                    if ($RapidHardReset) { $case.rapidHardReset = $true }
                     if ($TransientAttribution) {
                         $case.transientAttribution = $true
                         $case.traceSeed = $arm.seed
@@ -203,19 +231,44 @@ try {
                     Write-VerificationJson "$output/cases.json" $cases
                     # Consume the starting illumination before constructing the calibration field.
                     Write-VerificationJson "$directory/old-lighting.json" (Set-Inputs @{sun_step_lux=$case.oldLux})
-                    Write-VerificationJson "$directory/inputs.json" (Set-Inputs @{fixture=4;environment=3;lighting_step_experiment=$true;
-                        albedo=0;secondary_albedo=0;ev100=10;field_enabled=$true;field_feedback=$case.feedback;
-                        field_sampling=$true;field_readiness=$true;field_progressive_refresh=[bool]$ProgressiveRefresh;
-                        field_progressive_sampling=[bool]$ProgressiveSampling;receiver_diagnostics=$true;
-                        field_irradiance_width=0;probe_enabled=$true;accumulate=$true;seed=61051;
-                        field_refresh_noise=0.0;field_steady_noise=0.0})
-                    $noise = Wait-VerificationCondition -Poll { Invoke-VerificationSession status $session @{ExpectedRunIdentity=$run} } `
+                    Write-VerificationJson "$directory/inputs.json" (Set-Inputs (@{fixture=4;environment=3;
+                        lighting_step_experiment=$true;albedo=0;secondary_albedo=0;ev100=10;field_enabled=$true;
+                        field_feedback=$case.feedback;field_sampling=$true;field_readiness=$true;
+                        field_progressive_refresh=[bool]$ProgressiveRefresh;
+                        field_progressive_sampling=[bool]$ProgressiveSampling;
+                        field_rapid_hard_reset=[bool]$RapidHardReset;
+                        receiver_diagnostics=$true;field_irradiance_width=0;probe_enabled=$true;accumulate=$true;
+                        seed=61051} + (Get-GIFieldUncalibratedInputs hardReset) + (Get-GIFieldUncalibratedInputs lighting)))
+                    $noise = Wait-VerificationCondition -Poll { Get-Status } `
                         -Until { param($r) $f=$r.frame.giField; $f -and $f.refreshNoiseSamples -ge 30 -and
                             $f.steadyNoiseSamples -eq 64 } -TimeoutSeconds $TimeoutSeconds
                     Write-VerificationJson "$directory/noise.json" $noise
-                    Write-VerificationJson "$directory/calibration.json" (Set-Inputs @{seed=$arm.seed;
-                        field_refresh_noise=[float]$noise.frame.giField.refreshNoiseEstimate;
-                        field_steady_noise=[float]$noise.frame.giField.steadyNoiseEstimate})
+                    $setCalibration = { param($v) Set-Inputs $v }
+                    $hardSteady = $null
+                    if ($SteadyCalibration -eq 'after-handoff') {
+                        $hardSteady = Measure-GIFieldSteadyAfterHandoff -SetInputs $setCalibration -Status { Get-Status } `
+                            -Calibration $noise.frame.giField -Directory $directory -TimeoutSeconds $TimeoutSeconds
+                    }
+                    $hardSigma = Get-GIFieldAdoptedInputs hardReset $noise.frame.giField $hardSteady
+                    $replaced = if ($hardSteady) { $hardSteady.generation } else { $noise.frame.giField.generation }
+                    Write-VerificationJson "$directory/lighting-field.json" (Set-Inputs $hardSigma)
+                    $lightingEpoch = Start-LightingCalibration $directory 'lighting' $replaced $arm.settle $case.newLux
+                    $lightingNoise = Wait-VerificationCondition -Poll { Get-Status } -Until { param($r) $f=$r.frame.giField
+                        $f -and $f.summary.field.refreshEpoch -eq $lightingEpoch -and $f.refreshNoiseSamples -ge 30 -and
+                            $f.steadyNoiseSamples -eq 64 } -TimeoutSeconds $TimeoutSeconds
+                    Write-VerificationJson "$directory/lighting-noise.json" $lightingNoise
+                    Write-VerificationJson "$directory/lighting-reset.json" (Set-Inputs @{sun_step_lux=$case.oldLux})
+                    $lightingSteady = $null
+                    if ($SteadyCalibration -eq 'after-handoff') {
+                        $prepare = { param($replaced)
+                            Start-LightingCalibration $directory 'lighting-handoff' $replaced $arm.settle $case.newLux }
+                        $lightingSteady = Measure-GIFieldSteadyAfterHandoff -SetInputs $setCalibration `
+                            -Status { Get-Status } -Calibration $lightingNoise.frame.giField -Directory $directory `
+                            -Reason lighting -Prepare $prepare -TimeoutSeconds $TimeoutSeconds
+                        Write-VerificationJson "$directory/lighting-handoff-reset.json" (Set-Inputs @{sun_step_lux=$case.oldLux})
+                    }
+                    Write-VerificationJson "$directory/calibration.json" (Set-Inputs (@{seed=$arm.seed} + $hardSigma +
+                        (Get-GIFieldAdoptedInputs lighting $lightingNoise.frame.giField $lightingSteady)))
                     $mask = Invoke-VerificationSession export $session @{ExpectedRunIdentity=$run;View='F4_Floor';
                         Timing='after-ready';SettleFrames=128;Targets=$(if ($attribution) {
                             '[{"resource":"GI.Receiver.Position"},{"resource":"GI.Receiver.VertexNormal"},{"resource":"GI.Receiver.ShadingNormal"}]'
@@ -312,8 +365,9 @@ try {
         observedResponseTargetsPassed=$validation.observedResponseTargetsPassed;engineeringOnly=[bool]$attribution;
         responseQualityQualified=$validation.responseQualityQualified;referenceStatus=$validation.referenceStatus;
         referenceCorrelatedReadinessQualified=$validation.referenceCorrelatedReadinessQualified;
-        wholeG3Qualified=$false;progressiveRefresh=[bool]$ProgressiveRefresh;
-        progressiveSampling=[bool]$ProgressiveSampling;rapidFeedbackRefresh=[bool]$RapidFeedbackRefresh;directory=$output}
+        wholeG3Qualified=$false;progressiveRefresh=[bool]$ProgressiveRefresh;steadyCalibration=$SteadyCalibration;
+        progressiveSampling=[bool]$ProgressiveSampling;rapidFeedbackRefresh=[bool]$RapidFeedbackRefresh;
+        rapidHardReset=[bool]$RapidHardReset;directory=$output}
 } catch { $result = @{ok=$false;status='failed';experimentOnly=$true;responseQualityQualified=$false;
     wholeG3Qualified=$false;directory=$output;error=$_.Exception.Message} }
 Write-VerificationJson "$output/result.json" $result

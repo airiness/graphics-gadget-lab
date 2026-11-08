@@ -3,24 +3,32 @@
 Timing always uses the recipe's own settled endpoints. Optional independently
 certified references add GI accuracy/sign/amplitude and two distinct Ready reports;
 Final stays a composite signal. This is not F7, whole-G3 or performance qualification.
+
+Roots with readiness-calibration.json calibrate each refresh reason separately: the
+lighting refresh on a field at the calibration seed that adopted the hard-reset
+calibration, settled at steady Ready and took the case's own step.
 """
 import argparse
 import copy
 import hashlib
 import json
 from pathlib import Path
+import tempfile
 
 import numpy as np
 
 from ValidateGIFieldBaseline import camera_inputs, parameters
 from ValidateGIFieldReadiness import records as readiness_records
 from ValidateGIFieldLightStepReference import LIGHT_STEPS, certified_endpoint, endpoint_inputs, roi_masks
+import GIFieldReadinessCalibration as readiness_policy
 
 LUMA = np.array([.2126, .7152, .0722])
 FRAME_COUNT = 360
 EVENT_FRAME = 30
 HOLD = 30
 FLOOR = .001
+CALIBRATION_SEED = 61051
+TRACE_SEED = 61052
 
 
 def require(condition, message):
@@ -194,6 +202,72 @@ def progressive_hysteresis(update):
     return 1-1/weight
 
 
+def sigma_matches(policy, sigma):
+    return (readiness_policy.f32(policy["refreshSigma"]) == readiness_policy.f32(sigma["refreshSigma"]) and
+            readiness_policy.f32(policy["steadySigma"]) == readiness_policy.f32(sigma["steadySigma"]))
+
+
+def settled_calibration(directory, name, case, hard, replaced):
+    """The steady-Ready calibration-seed field a lighting calibration stepped."""
+    field = load(directory/f"{name}-settled.json")["frame"]["giField"]
+    profile = field["summary"]["profile"]
+    require(field["enabled"] and not field["failed"] and field["generation"] > replaced and
+            field["state"] == "Ready" and not field["refreshing"] and
+            field["completedUpdates"] >= field["readyUpdate"]+case.get("preEventSettleFrames", 128) and
+            profile["seed"] == CALIBRATION_SEED and
+            sigma_matches(readiness_policy.profile_policy(profile)["hardReset"], hard),
+            "Lighting calibration did not step a settled field with the adopted hard-reset calibration")
+    values, _ = readiness_policy.effect_values(load(directory/f"{name}-step.json"))
+    require(values == {"gi_reference.sun_step_lux": case["newLux"]}, "Lighting calibration did not take the case's step")
+    return field
+
+
+def calibration_policy(directory, case, recipe):
+    """Both reasons' adopted sigma, validated from their calibration receipts."""
+    hard_pass = readiness_policy.first_pass(load(directory/"noise.json"))
+    profile = hard_pass["summary"]["profile"]
+    lighting_policy = readiness_policy.profile_policy(profile)["lighting"]
+    require(profile["seed"] == CALIBRATION_SEED and
+            lighting_policy["refreshSigma"] == lighting_policy["steadySigma"] == 0,
+            "The hard-reset calibration field did not start uncalibrated at the calibration seed")
+    hard = readiness_policy.adopted(directory, hard_pass, recipe)
+    settled = settled_calibration(directory, "lighting", case, hard,
+                                  hard.get("steadyCalibrationGeneration", hard_pass["generation"]))
+    light_pass = readiness_policy.first_pass(load(directory/"lighting-noise.json"), "lighting")
+    require(light_pass["generation"] == settled["generation"] and
+            light_pass["summary"]["field"]["refreshEpoch"] > settled["summary"]["field"]["refreshEpoch"],
+            "Lighting calibration measured a refresh other than its own step")
+    lighting = readiness_policy.adopted(directory, light_pass, recipe, "lighting")
+    if lighting["method"] == "after-handoff" and not lighting.get("reusedCalibrationPass"):
+        steady = load(directory/("lighting-"+readiness_policy.STEADY_STATUS_FILE))["frame"]["giField"]
+        handoff = settled_calibration(directory, "lighting-handoff", case, hard, light_pass["generation"])
+        require(steady["generation"] == handoff["generation"] and
+                steady["summary"]["field"]["refreshEpoch"] > handoff["summary"]["field"]["refreshEpoch"],
+                "Lighting steady calibration measured a refresh other than its own step")
+    values, batch = readiness_policy.effect_values(load(directory/"calibration.json"))
+    expected = {"gi_reference.seed": case.get("traceSeed", TRACE_SEED)}
+    for reason, sigma in (("hardReset", hard), ("lighting", lighting)):
+        refresh, steady_input = readiness_policy.SIGMA_INPUTS[reason]
+        expected["gi_reference."+refresh] = readiness_policy.f32(sigma["refreshSigma"])
+        expected["gi_reference."+steady_input] = readiness_policy.f32(sigma["steadySigma"])
+    require(batch["impact"] == "RestartSession" and set(values) == set(expected) and
+            all(values[k] == v if k == "gi_reference.seed" else readiness_policy.f32(values[k]) == v
+                for k, v in expected.items()), "The measured run did not adopt both reasons' calibration")
+    return dict(hardReset=hard, lighting=lighting)
+
+
+def measured_policy(profile, values, case, calibration):
+    """The measured field's per-reason policy: its inputs, receipt, arm and adopted sigma agree."""
+    policy = readiness_policy.require_policy_matches(profile, values)
+    # The hard reset only builds the old endpoint; only the explicit control arm makes it rapid.
+    require(values.get("field_rapid_hard_reset", False) == case.get("rapidHardReset", False) and
+            (not calibration or (profile["schemaVersion"] >= 2 and
+                                 sigma_matches(policy["hardReset"], calibration["hardReset"]) and
+                                 sigma_matches(policy["lighting"], calibration["lighting"]))),
+            "Measured field does not declare its calibrated per-reason policy")
+    return policy
+
+
 def transient_case(case):
     return bool(case.get("transientAttribution") or case.get("progressiveAttribution"))
 
@@ -231,7 +305,7 @@ def validate_sampling_policy(case):
                 "Progressive sampling feedback-on requires GI-only response without attribution")
 
 
-def validate_case(root, case, qualify_references=False):
+def validate_case(root, case, qualify_references=False, recipe=None):
     step_recipe(case)
     engineering = transient_case(case)
     progressive = case.get("progressiveRefresh", False)
@@ -242,6 +316,7 @@ def validate_case(root, case, qualify_references=False):
                 "Earlier bounded exports require explicit progressive attribution")
     require(not (case.get("transientAttribution") and progressive),
             "Historical attribution requires fixed refresh integration")
+    require(isinstance(case.get("rapidHardReset", False), bool), "Invalid hard-reset control arm")
     require(not case.get("progressiveAttribution") or (progressive and not case.get("transientAttribution")),
             "Progressive attribution requires its explicit integration policy")
     if progressive or case.get("rapidFeedbackRefresh"):
@@ -258,6 +333,7 @@ def validate_case(root, case, qualify_references=False):
             case["tap"] in ("gi", "final"),
             "Changed bounded experiment inputs")
     directory = root/case["directory"]
+    calibration = calibration_policy(directory, case, recipe) if recipe else None
     receipt = load(directory/"sequence.json")["sequence"]
     require(receipt["state"] == "completed" and receipt["submittedFrames"] == FRAME_COUNT and
             receipt["parameterFrameCount"] == FRAME_COUNT and
@@ -311,6 +387,10 @@ def validate_case(root, case, qualify_references=False):
                 p.get("field_progressive_refresh", False) == progressive and
                 p.get("field_progressive_sampling", False) == case.get("progressiveSampling", False) and
                 p["receiver_diagnostics"] == (case["tap"] == "gi"), "Wrong experiment composition")
+        profile = field["summary"].get("profile")
+        if profile:
+            measured_policy(profile, p, case, calibration)
+        require(not calibration or profile, "A per-reason root lacks its field profile")
         require(frame["parameters"]["frameSerial"] == parameter_frames[index]["parameters"]["frameSerial"] ==
                 frame["frame"]["serial"] and frame["parameters"] == parameter_frames[index]["parameters"],
                 "GPU tap and submitted parameter product are not frame-paired")
@@ -345,9 +425,9 @@ def validate_case(root, case, qualify_references=False):
             if progressive and field["completedUpdates"] > 0:
                 require(abs(field["hysteresis"]-progressive_hysteresis(field["completedUpdates"])) < 1e-6,
                         "Progressive integration does not match the completed epoch's actual sample mass")
-            if case.get("rapidFeedbackRefresh") and phase == "refresh" and field["completedUpdates"] > 0:
+            if not progressive and phase == "refresh" and field["completedUpdates"] > 0:
                 require(abs(field["hysteresis"]-.5) < 1e-6,
-                        "Rapid feedback refresh did not retain its existing fast coefficient")
+                        "A rapid lighting refresh did not integrate at the refresh hysteresis")
             if field["state"] == "Ready":
                 ready_frames.append(index)
                 if phase == "refresh":
@@ -415,7 +495,8 @@ def validate_case(root, case, qualify_references=False):
             require(load(ref_root/"recipe.json")["sourceIdentity"] == source_identity, "Reference/experiment sources differ")
             references.append(certified_endpoint(ref_root, mode, lux, frame, masks, binaries))
         reference = reference_metrics(rgb_series, references, ready_frames[0], steady_ready_frames[0])
-    return dict(case=case, t0=t0, requested=effect["requested"], published=effect["published"],
+    return dict(case=case, calibration=calibration, t0=t0, requested=effect["requested"],
+                published=effect["published"],
                 firstConsumed=effect["firstConsumed"], firstFieldReady=ready_frames[0],
                 firstSteadyFieldReady=steady_ready_frames[0],
                 fieldGeneration=initial["generation"], refreshEpoch=target_epoch, globalUpdates=updates,
@@ -426,7 +507,9 @@ def validate_case(root, case, qualify_references=False):
 def validate(root, qualify_references=False):
     cases = load(root/"cases.json")
     require(cases and len({c["directory"] for c in cases}) == len(cases), "Missing/duplicate experiment cases")
-    result = [validate_case(root, case, qualify_references) for case in cases]
+    # Roots from before per-reason calibration gated both refreshes with one calibration.
+    recipe = readiness_policy.read_recipe(root) if (root/readiness_policy.RECIPE_FILE).exists() else None
+    result = [validate_case(root, case, qualify_references, recipe) for case in cases]
     references = [r["reference"] for r in result if r["case"]["tap"] == "gi"]
     require(not qualify_references or references, "Reference qualification needs a GI-only arm")
     reference_ready = bool(qualify_references and references and all(r["status"] == "ReferenceConverged" for r in references))
@@ -437,7 +520,8 @@ def validate(root, qualify_references=False):
                 responseQualityQualified=bool(reference_ready and timing and all(r["responseQualityQualified"] for r in references)),
                 referenceAmplitudeQualified=bool(reference_ready and all(r["referenceAmplitudeQualified"] for r in references)),
                 referenceCorrelatedReadinessQualified=bool(reference_ready and all(r["referenceCorrelatedReadinessQualified"] for r in references)),
-                wholeG3Qualified=False, performanceQualified=False, observations=result, observedResponseTargetsPassed=timing)
+                wholeG3Qualified=False, performanceQualified=False, observations=result, observedResponseTargetsPassed=timing,
+                steadyCalibration=recipe["steadyCalibration"] if recipe else None)
 
 
 def self_test():
@@ -603,7 +687,85 @@ def self_test():
             raise AssertionError("Implicit or out-of-scope rapid feedback policy accepted")
         except ValueError:
             pass
-    print(json.dumps(dict(status="passed", checks=76)))
+    calibration_self_test()
+    print(json.dumps(dict(status="passed", checks=88)))
+
+
+def calibration_self_test():
+    f32 = readiness_policy.f32
+
+    def profile(hard, light, seed=CALIBRATION_SEED):
+        return dict(schemaVersion=2, seed=seed, readiness=dict(
+            enabled=True, refreshHysteresis=.5,
+            hardReset=dict(integration="progressive", refreshSigma=hard[0], steadySigma=hard[1]),
+            lighting=dict(integration="rapid", refreshSigma=light[0], steadySigma=light[1])))
+
+    def status(**field):
+        return dict(frame=dict(giField=field))
+
+    hard = (f32(.3), f32(.05))
+    files = {
+        "noise.json": status(generation=3, refreshNoiseEstimate=hard[0], steadyNoiseEstimate=hard[1],
+                             refreshNoiseSamples=64, steadyNoiseSamples=64, activeBlocks=4, excludedBlocks=0,
+                             summary=dict(field=dict(refreshEpoch=1), profile=profile((0, 0), (0, 0)))),
+        "lighting-settled.json": status(enabled=True, failed=False, generation=4, state="Ready", refreshing=False,
+                                        completedUpdates=300, readyUpdate=100,
+                                        summary=dict(field=dict(refreshEpoch=1), profile=profile(hard, (0, 0)))),
+        "lighting-step.json": dict(batch=dict(succeeded=True, impact="Immediate",
+                                              values=[dict(id="gi_reference.sun_step_lux", value=20000)])),
+        "lighting-noise.json": status(generation=4, refreshNoiseEstimate=.8, steadyNoiseEstimate=.06,
+                                      refreshNoiseSamples=64, steadyNoiseSamples=64, activeBlocks=4,
+                                      excludedBlocks=0,
+                                      summary=dict(field=dict(refreshEpoch=2), profile=profile(hard, (0, 0)))),
+        "calibration.json": dict(batch=dict(succeeded=True, impact="RestartSession", values=[
+            dict(id="gi_reference.seed", value=TRACE_SEED),
+            dict(id="gi_reference.field_refresh_noise", value=hard[0]),
+            dict(id="gi_reference.field_steady_noise", value=hard[1]),
+            dict(id="gi_reference.field_lighting_refresh_noise", value=f32(.8)),
+            dict(id="gi_reference.field_lighting_steady_noise", value=f32(.06))]))}
+    case = dict(newLux=20000)
+    recipe = dict(schemaVersion=1, steadyCalibration="after-timeout")
+    with tempfile.TemporaryDirectory() as temporary:
+        directory = Path(temporary)
+
+        def write(contents):
+            for name, value in contents.items():
+                (directory/name).write_text(json.dumps(value), encoding="utf-8")
+
+        write(files)
+        policy = calibration_policy(directory, case, recipe)
+        require(policy["lighting"]["refreshSigma"] == .8 and policy["hardReset"]["steadySigma"] == hard[1],
+                "Per-reason calibration was not adopted")
+        measured = profile(hard, (f32(.8), f32(.06)))
+        measured_policy(measured, {}, {}, policy)
+        rapid = copy.deepcopy(measured)
+        rapid["readiness"]["hardReset"]["integration"] = "rapid"
+        measured_policy(rapid, {"field_rapid_hard_reset": True}, {"rapidHardReset": True}, policy)
+        for receipt, values, arm in ((rapid, {"field_rapid_hard_reset": True}, {}),
+                                     (measured, {}, {"rapidHardReset": True}),
+                                     (rapid, {}, {}),
+                                     (profile(hard, (f32(.7), f32(.06))), {}, {})):
+            try:
+                measured_policy(receipt, values, arm, policy)
+                raise AssertionError("An undeclared measured-field policy was accepted")
+            except ValueError:
+                pass
+        changes = (("lighting-step.json", lambda v: v["batch"]["values"][0].update(value=12000)),
+                   ("lighting-settled.json", lambda v: v["frame"]["giField"].update(refreshing=True)),
+                   ("lighting-noise.json", lambda v: v["frame"]["giField"].update(generation=5)),
+                   ("calibration.json", lambda v: v["batch"]["values"][3].update(value=f32(.3))),
+                   ("noise.json", lambda v: v["frame"]["giField"]["summary"]["profile"]["readiness"]["lighting"].update(
+                       refreshSigma=.8)))
+        for name, change in changes:
+            broken = copy.deepcopy(files[name])
+            change(broken)
+            write({name: broken})
+            try:
+                calibration_policy(directory, case, recipe)
+                raise AssertionError(f"Invalid {name} calibration evidence accepted")
+            except ValueError:
+                pass
+            write({name: files[name]})
 
 
 if __name__ == "__main__":

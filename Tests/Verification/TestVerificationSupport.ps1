@@ -526,7 +526,8 @@ $pythonIdentity = if ($Python) { & $Python --version } else { '' }
         'gi-specular-visibility-contracts', 'gi-probe-update-contracts', 'gi-probe-integration-contracts',
         'gi-probe-viewer-contracts', 'gi-field-sampling-contracts',
         'gi-field-baseline-contracts', 'gi-field-feedback-contracts', 'gi-field-light-step-contracts',
-        'gi-field-camera-independence-contracts', 'gi-field-readiness-repeat-contracts'
+        'gi-field-camera-independence-contracts', 'gi-field-readiness-repeat-contracts',
+        'gi-field-readiness-calibration-contracts'
     )
     foreach ($leaf in $gpuLeaves.Values) {
         [IO.File]::WriteAllText((Join-Path $runnerTests $leaf), $leafSource, (New-Object Text.UTF8Encoding($false)))

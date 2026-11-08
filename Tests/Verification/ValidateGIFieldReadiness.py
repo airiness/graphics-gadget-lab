@@ -5,6 +5,8 @@ from pathlib import Path
 
 import numpy as np
 
+import GIFieldReadinessCalibration as readiness_policy
+
 
 def require(condition, message):
     if not condition:
@@ -96,6 +98,9 @@ def validate_case(directory, case):
     require((baseline["refreshNoiseSamples"] >= 30 or (baseline["activeBlocks"] == 0 and baseline["excludedBlocks"] > 0)) and
             baseline["steadyNoiseSamples"] == 64,
             "Noise profile lacks bounded same-alpha measurements")
+    # The gated observation adopts the first pass's refresh sigma and the declared method's steady sigma.
+    adoption = readiness_policy.adopted(directory, baseline, readiness_policy.read_recipe(directory.parent.parent))
+    baseline = dict(baseline, steadyNoiseEstimate=adoption["steadySigma"])
     baseline_gate = load(directory / "baseline-gated/receipt.json")
     require(baseline_gate["status"] in ("completed", "failed"), "Missing baseline gate result")
     if baseline_gate["status"] == "failed":
@@ -132,7 +137,7 @@ def validate_case(directory, case):
             "readyWithin120": bool(gated["status"] == "completed" and readiness["readyUpdate"] <= 120),
             "baselineAfterReadyPublished": baseline_gate["status"] == "completed",
             "refreshNoiseEstimate": baseline["refreshNoiseEstimate"],
-            "steadyNoiseEstimate": baseline["steadyNoiseEstimate"],
+            "steadyNoiseEstimate": baseline["steadyNoiseEstimate"], "steadyCalibration": adoption["method"],
             "noiseCalibrationQualified": False, "referenceConvergenceQualified": False,
             "temporalStabilityQualified": False}
 

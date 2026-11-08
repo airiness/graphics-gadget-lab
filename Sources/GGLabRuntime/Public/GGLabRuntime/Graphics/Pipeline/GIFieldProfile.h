@@ -30,7 +30,8 @@ namespace gglab
 	// or inferred support certificate. Lighting/scene epochs retain their separate stamps.
 	struct GIFieldProfileReceipt
 	{
-		static constexpr uint32_t SchemaVersion = 1;
+		// Version 2 declares readiness calibration and integration per refresh reason.
+		static constexpr uint32_t SchemaVersion = 2;
 		GIFieldVolumeDescriptor m_Volume;
 		uint32_t m_IrradianceInteriorWidth = 0;
 		uint32_t m_RaysPerProbe = 0;

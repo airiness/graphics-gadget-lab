@@ -11,6 +11,8 @@ param(
     [string]$LimitPolicy,
     [ValidateRange(128,1048576)][int]$MaximumSamples = 32768,
     [string[]]$DiagnosticReadyOffsets = @(),
+    # Where the calibration measures steady change RMS; see GIFieldReadinessCalibration.psm1.
+    [ValidateSet('after-timeout','after-handoff')][string]$SteadyCalibration = 'after-handoff',
     [string]$ShaderCacheDirectory,
     [string]$OutputDirectory,
     [string]$RunDirectory,
@@ -21,6 +23,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Import-Module "$root/Scripts/Verification/VerificationSupport.psm1"
+Import-Module "$PSScriptRoot/GIFieldReadinessCalibration.psm1"
 $Configuration = @($Configuration | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
 $Rhi = @($Rhi | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
 $CaseId = @($CaseId | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
@@ -61,7 +64,7 @@ function Set-Inputs($Session, $Run, [hashtable]$Values) {
     $changes = @($Values.Keys | Sort-Object | ForEach-Object {
         $type = if ($_ -in @('fixture','environment','albedo','secondary_albedo','ev100','field_irradiance_width')) { 'enum' }
             elseif ($Values[$_] -is [bool]) { 'bool' }
-            elseif ($_ -in @('field_refresh_noise','field_steady_noise')) { 'float' }
+            elseif (Test-GIFieldSigmaInput $_) { 'float' }
             else { 'uint' }
         @{id="gi_reference.$_";type=$type;value=$Values[$_]}
     })
@@ -102,6 +105,7 @@ try {
     Write-VerificationJson "$output/cases.json" @($cases.id)
     Write-VerificationJson "$output/backends.json" $Rhi
     Write-VerificationJson "$output/diagnostic-ready-offsets.json" $readyOffsets
+    Write-GIFieldCalibrationRecipe $output $SteadyCalibration
     if ($LimitPolicy) { Copy-Item -LiteralPath $LimitPolicy -Destination "$output/limit-policy.json" }
     foreach ($backend in $Rhi) {
         $session = 'gi-baseline-'+[Guid]::NewGuid().ToString('N').Substring(0,10)
@@ -175,9 +179,13 @@ try {
                 $baseline = Invoke-VerificationSession result $session @{ExpectedRunIdentity=$run;JobId=$job.jobId;Consume=$true} -AllowFailure
                 if ($baseline.status -notin @('completed','failed')) { throw 'Uncalibrated readiness gate did not terminate.' }
                 Write-VerificationJson "$directory/baseline-gated/receipt.json" $baseline
-                $effect = Set-Inputs $session $run @{seed=61052;
-                    field_refresh_noise=[float]$noise.frame.giField.refreshNoiseEstimate;
-                    field_steady_noise=[float]$noise.frame.giField.steadyNoiseEstimate}
+                $steady = $null
+                if ($SteadyCalibration -eq 'after-handoff') {
+                    $steady = Measure-GIFieldSteadyAfterHandoff -SetInputs { param($v) Set-Inputs $session $run $v } `
+                        -Status { Invoke-VerificationSession status $session @{ExpectedRunIdentity=$run} } `
+                        -Calibration $noise.frame.giField -Directory $directory -TimeoutSeconds $TimeoutSeconds
+                }
+                $effect = Set-Inputs $session $run (@{seed=61052} + (Get-GIFieldAdoptedInputs hardReset $noise.frame.giField $steady))
                 Write-VerificationJson "$directory/calibrated-effect.json" $effect
                 $settled = Invoke-VerificationSession capture $session @{ExpectedRunIdentity=$run;View=$case.view;
                     SettleFrames=128;OutputDirectory="$directory/settled";TimeoutSeconds=$TimeoutSeconds} -AllowFailure

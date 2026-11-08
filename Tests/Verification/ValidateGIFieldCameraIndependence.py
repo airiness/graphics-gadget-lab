@@ -13,6 +13,7 @@ from pathlib import Path
 
 import numpy as np
 
+import GIFieldReadinessCalibration as readiness_policy
 from ValidateGIFieldSampling import oracle, volume
 from ValidateGIReferenceLighting import (F6_EXCLUDED_WALL, F6_OPENING_INSTANCES, LUMA, f4_oracle,
                                          masks as reference_masks, relative_error)
@@ -112,6 +113,13 @@ def query_cross_view(energies, expected):
                 observedScaledDifferenceMaximum=float(np.max(np.max(np.abs(observed)/scale, axis=1))))
 
 
+def default_refresh_policy(profile):
+    """Whether the profile declares its binary's default refresh integration for both reasons."""
+    policy = readiness_policy.profile_policy(profile)
+    default = readiness_policy.parameter_policy({}, per_reason=profile["schemaVersion"] >= 2)
+    return all(policy[reason]["integration"] == default[reason] for reason in readiness_policy.REASONS)
+
+
 def check_profile(summary, arm):
     profile = summary["profile"]
     require(profile is not None and profile["counts"] == COUNTS.tolist() and
@@ -119,7 +127,7 @@ def check_profile(summary, arm):
             profile["irradianceInteriorWidth"] == INTERIOR and profile["seed"] == SEED and
             abs(profile["viewBias"]-VIEW_BIAS) < 1e-6 and abs(profile["hysteresis"]-HYSTERESIS) < 1e-6 and
             profile["receiverSampling"] and not profile["feedback"] and not profile["progressiveSampling"] and
-            profile["readiness"]["enabled"] == (arm == "on") and not profile["readiness"]["progressiveRefresh"],
+            profile["readiness"]["enabled"] == (arm == "on") and default_refresh_policy(profile),
             "Field profile differs from the F4 precision profile under the default recipe")
     return profile
 

@@ -17,6 +17,7 @@ from ValidateGIFieldSampling import oracle
 from ValidateGIProbeUpdate import directions, progressive_directions
 from ValidateGIReferenceConvergence import file_receipts
 from ValidateGIReferenceTransport import read_case, transport_masks
+import GIFieldReadinessCalibration as readiness_policy
 
 LUMA = np.array([.2126, .7152, .0722])
 
@@ -167,12 +168,23 @@ def check_policy(case, p):
             "Rapid feedback refresh requires progressive sampling without progressive refresh")
     require(not case.get("progressiveSampling") or case.get("progressiveRefresh") or rapid,
             "Progressive sampling feedback study requires an explicit refresh policy")
+    # Feedback toggles hard-reset the field. Binaries with per-reason policy select the
+    # rapid hard reset explicitly; older ones had no such input.
+    hard_reset = p.get("field_rapid_hard_reset")
+    require(hard_reset is None or (type(hard_reset) is bool and hard_reset == rapid),
+            "Feedback hard-reset integration differs from the declared case")
 
 
 def check_frame(frame, case, enabled):
     p = parameters(frame)
     check_policy(case, p)
     f = frame["readiness"]["giField"]
+    profile = f["summary"].get("profile")
+    if profile:
+        policy = readiness_policy.require_policy_matches(profile, p)
+        require(profile["schemaVersion"] < 2 or
+                (policy["hardReset"]["integration"] == "rapid") == case.get("rapidFeedbackRefresh", False),
+                "Feedback hard-reset integration differs from the declared case")
     view_matches = frame["camera"]["referenceView"] == case["view"] or (
         (frame.get("sequence") or {}).get("cameraPath") == "GI_Static_"+case["view"])
     require(p["fixture"] == case["fixture"] and p["field_enabled"] and p["field_sampling"] and
@@ -316,6 +328,7 @@ def validate(root, reference_root):
     rows = []
     binaries = load(root/"binaries.json")
     source = load(root/"source-identity.json")
+    recipe = readiness_policy.read_recipe(root)
     for backend in load(root/"backends.json"):
         for case in load(root/"cases.json"):
             directory = root/backend/case["id"]
@@ -339,9 +352,18 @@ def validate(root, reference_root):
                 require(measured["totals"][2] > 0, "Unsupported feedback was not exercised")
             if case["id"] == "coverage":
                 require(measured["totals"][3] > 0, "Outside-coverage feedback was not exercised")
+            first = readiness_policy.first_pass(load(directory/"noise-baseline.json"))
+            calibration = readiness_policy.adopted(directory, first, recipe)
+            gate = {v["id"].removeprefix("gi_reference."): v["value"]
+                    for v in load(directory/"calibrated-effect.json")["batch"]["values"]}
+            require(gate.get("seed") == 61052 and
+                    readiness_policy.f32(gate["field_refresh_noise"]) ==
+                    readiness_policy.f32(calibration["refreshSigma"]) and
+                    readiness_policy.f32(gate["field_steady_noise"]) == readiness_policy.f32(calibration["steadySigma"]),
+                    "Feedback gate did not adopt its declared calibration")
             samples, position, sample_frame = static_window(directory, case)
             q = quality(samples, position, sample_frame, case, backend, reference_root, binaries, source)
-            rows.append(dict(backend=backend, case=case["id"], feedback=measured, warmup=warm,
+            rows.append(dict(backend=backend, case=case["id"], feedback=measured, warmup=warm, calibration=calibration,
                              quality=q, onTiming=timing(directory), offTiming=timing(directory, "off-timing.json")))
     cross = []
     for case in load(root/"cases.json"):
@@ -357,7 +379,7 @@ def validate(root, reference_root):
     available_passed = all(r["quality"]["qualified"] for r in rows if "rois" in r["quality"]) and all(r["passed"] for r in cross)
     return dict(schemaVersion=1, contractsPassed=True, staticQualityQualified=bool(has_reference and passed),
                 qualityGatesPassed=bool(passed), availableQualityGatesPassed=bool(available_passed),
-                referenceProvided=reference_root is not None,
+                referenceProvided=reference_root is not None, steadyCalibration=recipe["steadyCalibration"],
                 performanceQualified=False, wholeG3Qualified=False, results=rows, crossRhi=cross)
 
 

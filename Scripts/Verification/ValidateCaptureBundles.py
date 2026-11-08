@@ -560,23 +560,31 @@ def self_test(bundle_validator):
 		not_applicable = dict(watch, mode="fail", production="NotApplicable", firstAnomalyFrameSerial=None, reason="None")
 		(root / "image.json").write_text(json.dumps(dict(image, watch=not_applicable)), encoding="utf-8")
 		check(dict(watched, watch=not_applicable))
-	profile = dict(schemaVersion=1, id="gglab.gi.field.contract", revision=1,
+	profile = dict(schemaVersion=2, id="gglab.gi.field.contract", revision=1,
 		counts=[5, 5, 5], minimum=[-1, -1, -1], spacing=0.5, irradianceInteriorWidth=6,
 		raysPerProbe=256, seed=61052, maximumDistance=30000, hysteresis=0.97, viewBias=0.3,
 		receiverSampling=True, feedback=False, progressiveSampling=False,
 		constantEnvironment=True, constantRadiance=[1, 1, 1],
-		readiness=dict(enabled=True, noiseSigma=0, steadyNoiseSigma=0,
-			refreshHysteresis=0.5, progressiveRefresh=False))
+		readiness=dict(enabled=True, refreshHysteresis=0.5,
+			hardReset=dict(integration="progressive", refreshSigma=0.3, steadySigma=0.05),
+			lighting=dict(integration="rapid", refreshSigma=0, steadySigma=0)))
 	summary = {name: profile[name] for name in ("counts", "minimum", "spacing", "irradianceInteriorWidth")}
 	profile_frame = dict(readiness=dict(giField=dict(summary=dict(summary, profile=profile))))
 	validate_field_profile(profile_frame)
+	# Version 1 receipts declared one readiness policy for both refresh reasons.
+	single = dict(enabled=True, noiseSigma=0, steadyNoiseSigma=0, refreshHysteresis=0.5, progressiveRefresh=False)
+	legacy_frame = copy.deepcopy(profile_frame)
+	legacy_frame["readiness"]["giField"]["summary"]["profile"].update(schemaVersion=1, readiness=single)
+	validate_field_profile(legacy_frame)
 	validate_field_profile({})
 	validate_field_profile(dict(readiness=dict(giField=dict(summary=dict(profile=None)))))
 	for changes in (dict(id=""), dict(id="gglab.profile\n"), dict(revision=0),
 		dict(counts=[6, 5, 5]), dict(minimum=[0, 0, 0]), dict(spacing=1),
 		dict(irradianceInteriorWidth=14), dict(raysPerProbe=255),
 		dict(hysteresis=float("nan")), dict(maximumDistance=float("inf")),
-		dict(qualityCertified=True)):
+		dict(qualityCertified=True), dict(schemaVersion=3), dict(readiness=single),
+		dict(readiness=dict(profile["readiness"], lighting=dict(integration="fast", refreshSigma=0, steadySigma=0))),
+		dict(readiness=dict(profile["readiness"], hardReset=dict(integration="rapid", refreshSigma=-1, steadySigma=0)))):
 		invalid = copy.deepcopy(profile_frame)
 		invalid["readiness"]["giField"]["summary"]["profile"].update(changes)
 		try:

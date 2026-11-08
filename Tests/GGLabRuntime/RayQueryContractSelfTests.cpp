@@ -770,6 +770,64 @@ namespace gglab
 				"Progressive refresh enters steady integration without a second short-history handoff");
 			context.Check(progressive.Next(0.5f, true).m_Weight == 2,
 				"A superseding lighting refresh reweights growing history even before the previous refresh is Ready");
+
+			// The refresh reason alone selects the policy. A hard reset has no history to
+			// discount; a lighting refresh must discount stale lighting.
+			const GIFieldReadinessSettings defaults;
+			const auto hardEntry = SelectGIFieldUpdateDecays(defaults, GIFieldRefreshReason::HardReset,
+				true, true, 0.998f);
+			const auto hardRefresh = SelectGIFieldUpdateDecays(defaults, GIFieldRefreshReason::HardReset,
+				true, false, 0.998f);
+			const auto lightingRefresh = SelectGIFieldUpdateDecays(defaults, GIFieldRefreshReason::Lighting,
+				true, false, 0.998f);
+			const auto handedOff = SelectGIFieldUpdateDecays(defaults, GIFieldRefreshReason::HardReset,
+				false, false, 0.998f);
+			context.Check(hardEntry.m_Irradiance == 0.5f && hardRefresh.m_Irradiance == 0.998f &&
+				hardRefresh.m_Distance == 0.5f && hardRefresh.m_RefreshDistance,
+				"A hard reset integrates irradiance progressively while its distance refresh stays rapid");
+			context.Check(lightingRefresh.m_Irradiance == 0.5f && lightingRefresh.m_Distance == 0.998f &&
+				!lightingRefresh.m_RefreshDistance,
+				"A lighting refresh keeps rapid irradiance reweighting without refreshing distance");
+			context.Check(handedOff.m_Irradiance == 0.998f && handedOff.m_Distance == 0.998f &&
+				!handedOff.m_RefreshDistance,
+				"After the handoff both histories integrate at the steady decay");
+			const GIFieldReadinessSettings swapped{ .m_HardResetIntegration = GIFieldRefreshIntegration::Rapid,
+				.m_LightingIntegration = GIFieldRefreshIntegration::Progressive };
+			context.Check(SelectGIFieldUpdateDecays(swapped, GIFieldRefreshReason::HardReset,
+					true, false, 0.998f).m_Irradiance == 0.5f &&
+				SelectGIFieldUpdateDecays(swapped, GIFieldRefreshReason::Lighting,
+					true, false, 0.998f).m_Irradiance == 0.998f &&
+				SelectGIFieldUpdateDecays(swapped, GIFieldRefreshReason::Lighting,
+					true, true, 0.998f).m_Irradiance == 0.5f,
+				"Experimental integrations apply per reason and keep the rapid entry update");
+
+			// A lighting change before the hard reset's handoff takes over the refresh. The
+			// workload composes the current reason's decays with both histories as here.
+			GIFieldIntegrationHistory fieldIrradiance;
+			GIFieldIntegrationHistory fieldDistance;
+			const auto submit = [&](GIFieldRefreshReason reason, bool entry)
+				{
+					const auto decays = SelectGIFieldUpdateDecays(defaults, reason, true, entry, 0.998f);
+					fieldIrradiance = fieldIrradiance.Next(decays.m_Irradiance, true);
+					fieldDistance = fieldDistance.Next(decays.m_Distance, decays.m_RefreshDistance);
+				};
+			submit(GIFieldRefreshReason::HardReset, true);
+			for (uint32_t update = 1; update < 40; ++update)
+			{
+				submit(GIFieldRefreshReason::HardReset, false);
+			}
+			const double hardResetMass = fieldIrradiance.m_Weight;
+			const double hardResetDistanceMass = fieldDistance.m_Weight;
+			submit(GIFieldRefreshReason::Lighting, true);
+			const bool lightingEntry = fieldIrradiance.m_Weight == 2 && fieldIrradiance.m_Hysteresis == 0.5f;
+			const double lightingDistanceMass = fieldDistance.m_Weight;
+			submit(GIFieldRefreshReason::Lighting, false);
+			context.Check(hardResetMass > 30 && lightingEntry && fieldIrradiance.m_Weight == 2 &&
+				fieldIrradiance.m_Hysteresis == 0.5f,
+				"A lighting change before the hard reset's handoff restores rapid irradiance integration");
+			context.Check(std::abs(hardResetDistanceMass - 2) < 1.0e-9 && !fieldDistance.m_Refreshing &&
+				lightingDistanceMass > hardResetDistanceMass && fieldDistance.m_Weight > lightingDistanceMass,
+				"A lighting change before the hard reset's handoff keeps distance history at the steady decay");
 		}
 
 		void RunGIFieldTests(SelfTestContext& context) noexcept
@@ -872,7 +930,7 @@ namespace gglab
 
 			context.Check(estimator.GetSnapshot().m_NoiseSigma == 0,
 				"Measured noise never silently changes this owner's threshold profile");
-			GIFieldReadinessSettings noisySettings{ .m_NoiseSigma = 0.1f, .m_SteadyNoiseSigma = 0.001f };
+			GIFieldReadinessSettings noisySettings{ .m_HardReset = { .m_RefreshSigma = 0.1f, .m_SteadySigma = 0.001f } };
 			estimator.Reset(readinessCounts, noisySettings);
 			for (uint32_t update = 1; update <= 63; ++update)
 			{
@@ -923,7 +981,7 @@ namespace gglab
 				outliers.GetMeasurement()->m_Blocks[0].m_Blockers == 10,
 				"The p95 blocker remains distinct when the maximum is below three tau");
 			const auto beforeReset = outliers.GetMeasurement();
-			outliers.Reset({ 4, 4, 4 }, readinessSettings, true);
+			outliers.Reset({ 4, 4, 4 }, readinessSettings, GIFieldRefreshReason::Lighting);
 			context.Check(!outliers.GetMeasurement() && beforeReset->m_Blocks[0].m_Blockers == 10,
 				"Refresh clears current change data while retained CPU observations keep their values");
 			for (auto& probe : blockProbes)
@@ -940,9 +998,32 @@ namespace gglab
 				probe.m_Updates = 1;
 			}
 			context.Check(estimator.Observe(1, 0.001f, changes, 0.5f, false) &&
-				estimator.GetSnapshot().m_NoiseSigma == noisySettings.m_SteadyNoiseSigma,
+				estimator.GetSnapshot().m_NoiseSigma == noisySettings.m_HardReset.m_SteadySigma,
 				"Equal refresh and steady alpha still select the explicitly declared phase noise");
-			estimator.Reset(readinessCounts, readinessSettings, true);
+			// A lighting refresh integrates on its own schedule, so it never gates with the
+			// hard reset's measurement, in either phase.
+			GIFieldReadinessSettings reasonSettings{ .m_HardReset = { .m_RefreshSigma = 0.1f, .m_SteadySigma = 0.001f },
+				.m_Lighting = { .m_RefreshSigma = 0.3f, .m_SteadySigma = 0.02f } };
+			estimator.Reset(readinessCounts, reasonSettings, GIFieldRefreshReason::Lighting);
+			context.Check(estimator.GetSnapshot().m_NoiseSigma == 0.3f &&
+				std::abs(estimator.GetSnapshot().m_Threshold - 0.9f) < 1.0e-6f,
+				"A lighting refresh starts with its own refresh calibration");
+			const auto observeAt = [&](uint64_t update, float hysteresis, bool refresh)
+				{
+					for (auto& probe : changes)
+					{
+						probe.m_Updates = static_cast<uint32_t>(update);
+					}
+					return estimator.Observe(update, 0.001f, changes, hysteresis, refresh);
+				};
+			context.Check(observeAt(1, 0.5f, true) && estimator.GetSnapshot().m_NoiseSigma == 0.3f &&
+				observeAt(2, 0.97f, false) && estimator.GetSnapshot().m_NoiseSigma == 0.02f,
+				"Lighting refresh and steady phases select the lighting calibration");
+			estimator.Reset(readinessCounts, reasonSettings);
+			context.Check(estimator.GetSnapshot().m_NoiseSigma == 0.1f && observeAt(1, 0.97f, false) &&
+				estimator.GetSnapshot().m_NoiseSigma == 0.001f,
+				"A hard reset keeps its own calibration in both phases");
+			estimator.Reset(readinessCounts, readinessSettings, GIFieldRefreshReason::Lighting);
 			context.Check(estimator.GetSnapshot().m_State == GIFieldReadinessState::Settling &&
 				estimator.GetSnapshot().m_CompletedUpdates == 0 && estimator.GetSnapshot().m_ReadyUpdate == 0,
 				"A published lighting refresh keeps field history but starts a new Settling epoch");
@@ -971,7 +1052,7 @@ namespace gglab
 				};
 			GIFieldReadinessEstimator traced;
 			GIFieldReadinessEstimator untraced;
-			traced.Reset(readinessCounts, readinessSettings, false, true);
+			traced.Reset(readinessCounts, readinessSettings, GIFieldRefreshReason::HardReset, true);
 			untraced.Reset(readinessCounts, readinessSettings);
 			bool sameDecisions = true;
 			bool tracedCurrent = true;
@@ -1027,7 +1108,7 @@ namespace gglab
 				boundedTrace.size() == GIFieldReadinessTraceUpdates && boundedTrace.front() == 1 &&
 				boundedTrace.back() == GIFieldReadinessTraceUpdates,
 				"The trace keeps exactly the timeout window and then stops growing");
-			traced.Reset(readinessCounts, readinessSettings, true, true);
+			traced.Reset(readinessCounts, readinessSettings, GIFieldRefreshReason::Lighting, true);
 			for (auto& probe : changes)
 			{
 				probe.m_Updates = 1;
@@ -1222,9 +1303,11 @@ namespace gglab
 				authored.m_EnableReceiverSampling = false;
 				authored.m_EnableFeedback = true;
 				authored.m_ProgressiveSampling = true;
-				authored.m_Readiness = { .m_Enabled = false, .m_NoiseSigma = 0.02f,
-					.m_SteadyNoiseSigma = 0.03f, .m_RefreshHysteresis = 0.4f,
-					.m_ProgressiveRefresh = true };
+				authored.m_Readiness = { .m_Enabled = false,
+					.m_HardReset = { .m_RefreshSigma = 0.02f, .m_SteadySigma = 0.03f },
+					.m_Lighting = { .m_RefreshSigma = 0.25f, .m_SteadySigma = 0.04f }, .m_RefreshHysteresis = 0.4f,
+					.m_HardResetIntegration = GIFieldRefreshIntegration::Rapid,
+					.m_LightingIntegration = GIFieldRefreshIntegration::Progressive };
 				authored.m_ConstantEnvironment = true;
 				authored.m_ConstantRadiance = { 1, 0.5f, 2 };
 				GIField field(authored);
@@ -1240,10 +1323,13 @@ namespace gglab
 					retainedProfile->m_ViewBias == 0.15f && !retainedProfile->m_EnableReceiverSampling &&
 					retainedProfile->m_EnableFeedback && retainedProfile->m_ProgressiveSampling &&
 					!retainedProfile->m_Readiness.m_Enabled &&
-					retainedProfile->m_Readiness.m_NoiseSigma == 0.02f &&
-					retainedProfile->m_Readiness.m_SteadyNoiseSigma == 0.03f &&
+					retainedProfile->m_Readiness.m_HardReset.m_RefreshSigma == 0.02f &&
+					retainedProfile->m_Readiness.m_HardReset.m_SteadySigma == 0.03f &&
+					retainedProfile->m_Readiness.m_Lighting.m_RefreshSigma == 0.25f &&
+					retainedProfile->m_Readiness.m_Lighting.m_SteadySigma == 0.04f &&
 					retainedProfile->m_Readiness.m_RefreshHysteresis == 0.4f &&
-					retainedProfile->m_Readiness.m_ProgressiveRefresh &&
+					retainedProfile->m_Readiness.m_HardResetIntegration == GIFieldRefreshIntegration::Rapid &&
+					retainedProfile->m_Readiness.m_LightingIntegration == GIFieldRefreshIntegration::Progressive &&
 					retainedProfile->m_ConstantEnvironment &&
 					retainedProfile->m_ConstantRadiance == authored.m_ConstantRadiance,
 					"Diagnostics and capture share every immutable effective constructor input");

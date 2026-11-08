@@ -13,6 +13,15 @@ ends the refresh window (plan section 6.4), and the first Ready after the steady
 handoff. The exit limit counts the steady Ready; the first Ready is the handoff
 diagnostic. The runtime records the update after the one that ended the refresh in
 steady mode, so every run's handoff latency must be one update.
+
+The root's recipe.json declares the arm: the hard-reset refresh integration
+(hardResetIntegration) and where steady change RMS is calibrated. after-timeout measures
+it in the calibration run, whose refresh at the uncalibrated minimum ends at the timeout.
+after-handoff measures it in a second hard reset at the calibration seed whose refresh
+uses the adopted refresh RMS, so its steady schedule starts where the trace runs' does.
+Roots from before per-reason refresh policy declared one progressiveRefresh flag for both
+reasons, with a schema 1 field profile; roots without recipe.json ran the then-default
+rapid refresh calibrated after the timeout.
 """
 import argparse
 import copy
@@ -22,6 +31,8 @@ from pathlib import Path
 import tempfile
 
 import numpy as np
+
+import GIFieldReadinessCalibration as readiness_policy
 
 BLOCK_WIDTH = 4
 MINIMUM_WARM_UPDATES = 34
@@ -44,11 +55,13 @@ CASES = {
     "camera": dict(fixture=4, view="F6_PoseWest", counts=[18, 18, 18]),
 }
 # The default single-bounce recipe; the trace observes decisions without changing them.
+# The arm selects its refresh integration.
 RECIPE = dict(environment=0, albedo=0, secondary_albedo=0, ev100=10, field_enabled=True, field_feedback=False,
               field_sampling=True, field_readiness=True, field_progressive_sampling=False,
-              field_progressive_refresh=False, receiver_diagnostics=True, field_irradiance_width=0,
-              field_update_limit=0, field_readiness_trace=True, probe_enabled=True, accumulate=True, depth=1,
-              batch_samples=64)
+              receiver_diagnostics=True, field_irradiance_width=0, field_update_limit=0,
+              field_readiness_trace=True, probe_enabled=True, accumulate=True, depth=1, batch_samples=64)
+LEGACY_DEFAULT = dict(progressiveRefresh=False, steadyCalibration="after-timeout")
+STEADY_CALIBRATIONS = readiness_policy.STEADY_CALIBRATIONS
 VERDICTS = ("byte-identical", "within-tolerance", "determinism-finding", "tolerance-undeclared")
 
 
@@ -63,6 +76,45 @@ def load(path):
 
 def save(path, value):
     Path(path).write_text(json.dumps(value, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+
+
+def read_arm(root):
+    """The declared arm with both reasons' integration; perReasonPolicy marks schema 2 roots."""
+    path = root/"recipe.json"
+    declared = load(path) if path.exists() else dict(LEGACY_DEFAULT)
+    require(isinstance(declared, dict), "Invalid readiness repeat recipe arm")
+    if set(declared) == {"hardResetIntegration", "steadyCalibration"}:
+        require(declared["hardResetIntegration"] in readiness_policy.INTEGRATIONS and
+                declared["steadyCalibration"] in STEADY_CALIBRATIONS, "Invalid readiness repeat recipe arm")
+        return dict(hardResetIntegration=declared["hardResetIntegration"], lightingIntegration="rapid",
+                    steadyCalibration=declared["steadyCalibration"], perReasonPolicy=True)
+    require(set(declared) == set(LEGACY_DEFAULT) and isinstance(declared["progressiveRefresh"], bool) and
+            declared["steadyCalibration"] in STEADY_CALIBRATIONS, "Invalid readiness repeat recipe arm")
+    integration = "progressive" if declared["progressiveRefresh"] else "rapid"
+    return dict(hardResetIntegration=integration, lightingIntegration=integration,
+                steadyCalibration=declared["steadyCalibration"], perReasonPolicy=False)
+
+
+def run_recipe(arm):
+    recipe = dict(RECIPE, field_progressive_refresh=arm["lightingIntegration"] == "progressive")
+    if arm["perReasonPolicy"]:
+        recipe["field_rapid_hard_reset"] = arm["hardResetIntegration"] == "rapid"
+    return recipe
+
+
+def profile_matches(profile, arm, refresh_sigma, steady_sigma):
+    """The field profile declares the arm's integrations and the adopted hard-reset sigma."""
+    if profile["schemaVersion"] != (2 if arm["perReasonPolicy"] else 1):
+        return False
+    policy = readiness_policy.profile_policy(profile)
+    hard, lighting = policy["hardReset"], policy["lighting"]
+    # A hard-reset repeat has no lighting refresh, so its lighting sigma stays uncalibrated.
+    return (policy["enabled"] and policy["refreshHysteresis"] == REFRESH_HYSTERESIS and
+            hard["integration"] == arm["hardResetIntegration"] and
+            lighting["integration"] == arm["lightingIntegration"] and
+            np.float32(hard["refreshSigma"]) == np.float32(refresh_sigma) and
+            np.float32(hard["steadySigma"]) == np.float32(steady_sigma) and
+            (not arm["perReasonPolicy"] or lighting["refreshSigma"] == lighting["steadySigma"] == 0))
 
 
 def validate_runs(runs):
@@ -194,14 +246,19 @@ def camera_key(camera):
     return [float(v) for v in (*camera["position"], *camera["forward"], camera["verticalFovDegrees"])]
 
 
-def effective_inputs(directory, spec):
-    """The case recipe from its complete calibration batch, overridden by this run's batch."""
+def effective_inputs(directory, spec, arm):
+    """The case recipe from its complete calibration batch, overridden by later batches in order."""
     calibration = load(directory/"calibration-effect.json")["batch"]
+    batches = [calibration]
+    if arm["steadyCalibration"] == "after-handoff":
+        batches.append(load(directory/"steady-calibration-effect.json")["batch"])
     effect = load(directory/spec["id"]/"effect.json")["batch"]
-    require(calibration["succeeded"] and effect["succeeded"] and effect["impact"] == "RestartSession",
+    batches.append(effect)
+    require(all(b["succeeded"] for b in batches) and effect["impact"] == "RestartSession",
             "Run inputs were not consumed as a session restart")
-    values = {v["id"]: v["value"] for v in calibration["values"]}
-    values.update({v["id"]: v["value"] for v in effect["values"]})
+    values = {}
+    for batch in batches:
+        values.update({v["id"]: v["value"] for v in batch["values"]})
     require(all(k.startswith("gi_reference.") for k in values), "Run changed parameters outside the Lab")
     return {k.removeprefix("gi_reference."): v for k, v in sorted(values.items())}
 
@@ -226,18 +283,17 @@ def read_pose(directory):
                 generation=field["generation"], fieldUpdate=field["summary"]["frameUpdate"])
 
 
-def read_run(directory, case, calibration, spec):
-    inputs = effective_inputs(directory, spec)
+def read_run(directory, case, adopted, spec, arm):
+    inputs = effective_inputs(directory, spec, arm)
     pose = read_pose(directory/spec["id"])
     # Frame metadata lists non-default values; each must be one this run declared.
     require(all(k in inputs and same_value(inputs[k], v) for k, v in pose["inputs"].items()),
             "Run frame inputs differ from its declared recipe")
-    refresh_sigma = np.float32(calibration["refreshNoiseEstimate"])
-    steady_sigma = np.float32(calibration["steadyNoiseEstimate"])
-    require(all(inputs.get(k) == v for k, v in RECIPE.items()) and inputs["fixture"] == case["fixture"] and
+    refresh_sigma, steady_sigma = np.float32(adopted["refresh"]), np.float32(adopted["steady"])
+    require(all(inputs.get(k) == v for k, v in run_recipe(arm).items()) and inputs["fixture"] == case["fixture"] and
             inputs["seed"] == spec["seed"] and np.float32(inputs["field_refresh_noise"]) == refresh_sigma and
             np.float32(inputs["field_steady_noise"]) == steady_sigma,
-            "Run is not the default recipe with its seed and explicitly adopted noise")
+            "Run is not the declared recipe with its seed and explicitly adopted noise")
     status = load(directory/spec["id"]/"outcome.json")["frame"]
     field = status["giField"]
     require(pose["view"] == case["view"] and pose["generation"] == field["generation"] and
@@ -245,13 +301,10 @@ def read_run(directory, case, calibration, spec):
             "Run camera is not its case view on its own field through the trace")
     summary = field["summary"]
     profile = summary["profile"]
-    readiness = profile["readiness"]
     require(field["enabled"] and not field["failed"] and not summary["invalid"] and summary["initialized"] and
             summary["counts"] == case["counts"] and profile["seed"] == spec["seed"] and
-            not profile["feedback"] and not profile["progressiveSampling"] and readiness["enabled"] and
-            not readiness["progressiveRefresh"] and readiness["refreshHysteresis"] == REFRESH_HYSTERESIS and
-            np.float32(readiness["noiseSigma"]) == refresh_sigma and
-            np.float32(readiness["steadyNoiseSigma"]) == steady_sigma and summary["updateLimit"] == 0,
+            not profile["feedback"] and not profile["progressiveSampling"] and
+            profile_matches(profile, arm, refresh_sigma, steady_sigma) and summary["updateLimit"] == 0,
             "Run field profile differs from its declared recipe")
     stamp = summary["field"]
     require(stamp["generation"] == field["generation"] and stamp["epochOriginUpdate"] == 0 and
@@ -353,7 +406,55 @@ def compare_repeat(first, second, tolerance=None):
                 verdict=verdict)
 
 
-def inspect_case(directory, backend, runs, tolerance):
+def refresh_measures_match(first, second):
+    """Whether two traces of one seed carry identical change measures while both refresh."""
+    pairs = [(a, b) for a, b in zip(first, second) if a["phase"] == b["phase"] == "refresh"]
+    equal = all(a["update"] == b["update"] and a["activeProbes"] == b["activeProbes"] and a["p95"] == b["p95"] and
+                a["maximum"] == b["maximum"] for a, b in pairs)
+    return bool(pairs) and equal, len(pairs)
+
+
+def steady_calibration(effect, status, calibration, counts, arm):
+    """The after-handoff steady noise of a second hard reset at the calibration seed.
+
+    Its refresh uses the adopted refresh noise, so it ends where the trace runs' refresh
+    would and the steady noise is sampled on the integration history that follows.
+    """
+    batch = effect["batch"]
+    values = {v["id"]: v["value"] for v in batch["values"]}
+    require(batch["succeeded"] and batch["impact"] == "RestartSession" and
+            set(values) == {"gi_reference.field_refresh_noise", "gi_reference.field_steady_noise"} and
+            np.float32(values["gi_reference.field_refresh_noise"]) ==
+            np.float32(calibration["refreshNoiseEstimate"]) and values["gi_reference.field_steady_noise"] == 0,
+            "Steady calibration inputs are not the adopted refresh noise with uncalibrated steady noise")
+    field = status["giField"]
+    summary = field["summary"]
+    profile = summary["profile"]
+    stamp = summary["field"]
+    require(field["enabled"] and not field["failed"] and not summary["invalid"] and
+            field["generation"] > calibration["generation"] and summary["counts"] == counts and
+            profile["seed"] == CALIBRATION_SEED and not profile["feedback"] and not profile["progressiveSampling"] and
+            profile_matches(profile, arm, calibration["refreshNoiseEstimate"], 0) and
+            stamp["generation"] == field["generation"] and
+            stamp["epochOriginUpdate"] == 0 and stamp["refreshEpoch"] == 1,
+            "Steady calibration is not a hard reset of a fresh field at the calibration seed")
+    require(field["steadyNoiseSamples"] == NOISE_SAMPLES and math.isfinite(field["steadyNoiseEstimate"]) and
+            field["steadyNoiseEstimate"] >= 0, "Steady calibration lacks its bounded steady noise measurement")
+    trace = summary["readinessTrace"]
+    require(trace is not None and trace["field"] == stamp, "Steady calibration has no readiness trace of its own field")
+    updates = trace_updates(trace, counts)
+    rows = replay(updates, calibration["refreshNoiseEstimate"], 0)
+    first = calibration["summary"]["readinessTrace"]
+    require(first is not None, "Calibration has no readiness trace")
+    matched, compared = refresh_measures_match(trace_updates(first, counts), updates)
+    return dict(generation=field["generation"], refreshReadyUpdate=first_update(rows, "Ready"),
+                steadyFromUpdate=next((r["update"] for r in rows if r["phase"] == "steady"), None),
+                handoffLatency=handoff_latency(updates), tracedUpdates=len(rows),
+                steadyNoiseEstimate=field["steadyNoiseEstimate"], steadyNoiseSamples=field["steadyNoiseSamples"],
+                refreshMeasuresMatchCalibration=matched, comparedRefreshUpdates=compared)
+
+
+def inspect_case(directory, backend, runs, tolerance, arm):
     case = load(directory/"case.json")
     require(case.get("id") in CASES and case == dict(id=case["id"], **CASES[case["id"]]),
             "Changed readiness repeat case, view or field counts")
@@ -362,19 +463,29 @@ def inspect_case(directory, backend, runs, tolerance):
     require(case["view"] in status["referenceViews"], "Case view is not a registered reference view")
     profile = calibration["summary"]["profile"]
     require(calibration["enabled"] and not calibration["failed"] and profile["seed"] == CALIBRATION_SEED and
-            profile["readiness"]["noiseSigma"] == 0 and profile["readiness"]["steadyNoiseSigma"] == 0 and
-            not profile["feedback"] and not profile["progressiveSampling"] and
-            not profile["readiness"]["progressiveRefresh"] and
+            profile_matches(profile, arm, 0, 0) and not profile["feedback"] and not profile["progressiveSampling"] and
             (calibration["refreshNoiseSamples"] >= 30 or
              (calibration["activeBlocks"] == 0 and calibration["excludedBlocks"] > 0)) and
             calibration["steadyNoiseSamples"] == NOISE_SAMPLES and
             math.isfinite(calibration["refreshNoiseEstimate"]) and calibration["refreshNoiseEstimate"] >= 0 and
             math.isfinite(calibration["steadyNoiseEstimate"]) and calibration["steadyNoiseEstimate"] >= 0,
             "Calibration lacks bounded refresh/steady noise measurements at its independent seed")
-    observed = {}
+    after_handoff = arm["steadyCalibration"] == "after-handoff"
+    require((directory/"steady-calibration.json").exists() == after_handoff and
+            (directory/"steady-calibration-effect.json").exists() == after_handoff,
+            "Steady calibration evidence differs from the declared arm")
+    adopted = dict(refresh=calibration["refreshNoiseEstimate"], steady=calibration["steadyNoiseEstimate"])
     previous = calibration["generation"]
+    steady = None
+    if after_handoff:
+        steady = steady_calibration(load(directory/"steady-calibration-effect.json"),
+                                    load(directory/"steady-calibration.json")["frame"], calibration,
+                                    case["counts"], arm)
+        adopted["steady"] = steady["steadyNoiseEstimate"]
+        previous = steady["generation"]
+    observed = {}
     for spec in runs:
-        result = read_run(directory, case, calibration, spec)
+        result = read_run(directory, case, adopted, spec, arm)
         require(result["generation"] > previous, "Seed change did not hard-reset the field")
         previous = result["generation"]
         observed[spec["id"]] = result
@@ -391,7 +502,7 @@ def inspect_case(directory, backend, runs, tolerance):
                                  steadyNoiseEstimate=calibration["steadyNoiseEstimate"],
                                  refreshNoiseSamples=calibration["refreshNoiseSamples"],
                                  steadyNoiseSamples=calibration["steadyNoiseSamples"]),
-                runs=public, repeat=comparison,
+                steadyCalibration=steady, adoptedNoise=adopted, runs=public, repeat=comparison,
                 allSeedsReadyWithin120=all(r["readyWithinLimit"] for r in seeds),
                 allSeedsSteadyReadyWithin120=all(r["steadyReadyWithinLimit"] for r in seeds),
                 repeatReadyWithin120=public[-1]["readyWithinLimit"],
@@ -399,6 +510,7 @@ def inspect_case(directory, backend, runs, tolerance):
 
 
 def validate(root, tolerance=None):
+    arm = read_arm(root)
     runs = load(root/"runs.json")
     validate_runs(runs)
     cases = load(root/"cases.json")
@@ -410,7 +522,7 @@ def validate(root, tolerance=None):
     results, fields = [], {}
     for backend in backends:
         for case_id in ids:
-            result, observed = inspect_case(root/backend/case_id, backend, runs, tolerance)
+            result, observed = inspect_case(root/backend/case_id, backend, runs, tolerance, arm)
             results.append(result)
             fields[(backend, case_id)] = observed
     # F6 reuses the F4 field from another camera: matching seeds should reproduce it.
@@ -423,15 +535,17 @@ def validate(root, tolerance=None):
     findings = [dict(backend=r["backend"], case=r["case"],
                      cause="steady-handoff-timing" if r["repeat"]["handoffTimingDiffers"] else "change-measures")
                 for r in results if r["repeat"]["verdict"] == "determinism-finding"]
+    # The after-handoff calibration's own handoff must follow its refresh end like the runs'.
+    handoffs = [run["handoffLatency"] for r in results for run in r["runs"]] + \
+        [r["steadyCalibration"]["handoffLatency"] for r in results if r["steadyCalibration"]]
     return dict(schemaVersion=2, status="passed", readyLimit=READY_LIMIT, calibrationSeed=CALIBRATION_SEED,
-                traceSeeds=[r["seed"] for r in runs[:-1]], repeatSeed=runs[-1]["seed"],
+                recipe=arm, traceSeeds=[r["seed"] for r in runs[:-1]], repeatSeed=runs[-1]["seed"],
                 changeTolerance=tolerance, results=results, f4F6FieldComparison=views,
                 repeatDeterminismFindings=findings,
                 allSeedsReadyWithin120=all(r["allSeedsReadyWithin120"] for r in results),
                 allSeedsSteadyReadyWithin120=all(r["allSeedsSteadyReadyWithin120"] for r in results),
-                handoffLatencies=sorted({run["handoffLatency"] for r in results for run in r["runs"]} - {None}),
-                allHandoffsFollowRefreshEnd=all(run["handoffLatency"] == 1 for r in results for run in r["runs"]
-                                                if run["handoffLatency"] is not None),
+                handoffLatencies=sorted(set(handoffs) - {None}),
+                allHandoffsFollowRefreshEnd=all(latency == 1 for latency in handoffs if latency is not None),
                 refreshWaits=wait_totals(results),
                 readyLimitDefinition="steady-ready", readinessRepeatabilityQualified=False,
                 referenceAccuracyQualified=False,
@@ -622,7 +736,99 @@ def self_test():
     with tempfile.TemporaryDirectory() as temporary:
         directory = Path(temporary)
         save(directory/"case.json", dict(id="thin", fixture=2, view="F3_Interior", counts=[9, 9, 9]))
-        reject(lambda: inspect_case(directory, "dx12", [], None))
+        legacy_default = read_arm(directory)
+        reject(lambda: inspect_case(directory, "dx12", [], None, legacy_default))
+        require(legacy_default == dict(hardResetIntegration="rapid", lightingIntegration="rapid",
+                                       steadyCalibration="after-timeout", perReasonPolicy=False) and
+                run_recipe(legacy_default) == dict(RECIPE, field_progressive_refresh=False),
+                "A root without an arm ran the then-default rapid refresh")
+        save(directory/"recipe.json", dict(progressiveRefresh=True, steadyCalibration="after-handoff"))
+        legacy = read_arm(directory)
+        require(legacy["hardResetIntegration"] == legacy["lightingIntegration"] == "progressive" and
+                not legacy["perReasonPolicy"] and "field_rapid_hard_reset" not in run_recipe(legacy),
+                "A legacy arm's one flag selected both reasons")
+        declared = dict(hardResetIntegration="progressive", steadyCalibration="after-handoff")
+        save(directory/"recipe.json", declared)
+        candidate = read_arm(directory)
+        require(candidate == dict(declared, lightingIntegration="rapid", perReasonPolicy=True) and
+                run_recipe(candidate)["field_progressive_refresh"] is False and
+                run_recipe(candidate)["field_rapid_hard_reset"] is False, "Declared per-reason arm")
+        checks += 1
+        save(directory/"recipe.json", dict(declared, hardResetIntegration="rapid"))
+        require(run_recipe(read_arm(directory))["field_rapid_hard_reset"] is True, "Rapid hard-reset arm")
+        checks += 1
+        for arm in (dict(declared, steadyCalibration="after-ready"), dict(declared, hardResetIntegration="fast"),
+                    dict(declared, sampling=True), dict(progressiveRefresh=1, steadyCalibration="after-timeout"),
+                    dict(declared, progressiveRefresh=True)):
+            save(directory/"recipe.json", arm)
+            reject(lambda: read_arm(directory))
+
+    # A second hard reset at the calibration seed whose refresh ends at its calibrated Ready.
+    counts, adopted = [12, 4, 4], 0.02
+    stamp = dict(generation=5, epochOriginUpdate=0, refreshEpoch=1)
+
+    def layout(updates, field):
+        return dict(schemaVersion=1, capacity=TIMEOUT_UPDATES, counts=counts, blockWidth=4, blockOrder=BLOCK_ORDER,
+                    warmingUpdates=MINIMUM_WARM_UPDATES, requiredQuietUpdates=QUIET_UPDATES,
+                    blockerBits=BLOCKERS, field=field, updates=updates)
+    first = dict(generation=4, refreshNoiseEstimate=adopted,
+                 summary=dict(readinessTrace=layout(simulate(quiet, 0, 0), dict(stamp, generation=4))))
+    effect = dict(batch=dict(succeeded=True, impact="RestartSession",
+                             values=[dict(id="gi_reference.field_refresh_noise", value=adopted),
+                                     dict(id="gi_reference.field_steady_noise", value=0.0)]))
+    status = dict(giField=dict(
+        enabled=True, failed=False, generation=5, steadyNoiseSamples=NOISE_SAMPLES, steadyNoiseEstimate=0.004,
+        summary=dict(invalid=False, counts=counts, field=stamp,
+                     readinessTrace=layout(simulate(quiet[:170], adopted, 0, steady_after=1), stamp),
+                     profile=dict(schemaVersion=2, seed=CALIBRATION_SEED, feedback=False, progressiveSampling=False,
+                                  readiness=dict(enabled=True, refreshHysteresis=0.5,
+                                                 hardReset=dict(integration="progressive", refreshSigma=adopted,
+                                                                steadySigma=0),
+                                                 lighting=dict(integration="rapid", refreshSigma=0,
+                                                               steadySigma=0))))))
+    result = steady_calibration(effect, status, first, counts, candidate)
+    require(result["refreshReadyUpdate"] == 63 and result["steadyFromUpdate"] == 64 and
+            result["handoffLatency"] == 1 and result["steadyNoiseEstimate"] == 0.004 and
+            result["refreshMeasuresMatchCalibration"] and result["comparedRefreshUpdates"] == 63,
+            "After-handoff steady calibration")
+    checks += 1
+    drifted = copy.deepcopy(status)
+    drifted["giField"]["summary"]["readinessTrace"]["updates"][40]["p95"][1] = 0.0
+    require(not steady_calibration(effect, drifted, first, counts, candidate)["refreshMeasuresMatchCalibration"],
+            "A steady calibration whose refresh measures differ from the calibration run is reported")
+    checks += 1
+    legacy_status = copy.deepcopy(status)
+    legacy_status["giField"]["summary"]["profile"].update(schemaVersion=1, readiness=dict(
+        enabled=True, progressiveRefresh=True, refreshHysteresis=0.5, noiseSigma=adopted, steadyNoiseSigma=0))
+    require(steady_calibration(effect, legacy_status, first, counts, legacy)["steadyNoiseEstimate"] == 0.004,
+            "A legacy root's schema 1 steady calibration still validates")
+    checks += 1
+    reject(lambda: steady_calibration(effect, legacy_status, first, counts, candidate))
+    for path, value in ((("profile", "seed"), 61052),
+                        (("profile", "readiness", "hardReset", "steadySigma"), 0.004),
+                        (("profile", "readiness", "hardReset", "refreshSigma"), 0.03),
+                        (("profile", "readiness", "hardReset", "integration"), "rapid"),
+                        (("profile", "readiness", "lighting", "integration"), "progressive"),
+                        (("profile", "readiness", "lighting", "refreshSigma"), 0.5),
+                        (("profile", "schemaVersion"), 1), (("field", "refreshEpoch"), 2),
+                        (("counts",), [9, 9, 9])):
+        bad = copy.deepcopy(status)
+        target = bad["giField"]["summary"]
+        for key in path[:-1]:
+            target = target[key]
+        target[path[-1]] = value
+        reject(lambda bad=bad: steady_calibration(effect, bad, first, counts, candidate))
+    for key, value in (("generation", 4), ("steadyNoiseSamples", NOISE_SAMPLES-1)):
+        bad = copy.deepcopy(status)
+        bad["giField"][key] = value
+        reject(lambda bad=bad: steady_calibration(effect, bad, first, counts, candidate))
+    for mutate in (lambda e: e["batch"].__setitem__("impact", "Immediate"),
+                   lambda e: e["batch"]["values"][0].__setitem__("value", 0.03),
+                   lambda e: e["batch"]["values"][1].__setitem__("value", 0.004),
+                   lambda e: e["batch"]["values"].append(dict(id="gi_reference.seed", value=61051))):
+        bad = copy.deepcopy(effect)
+        mutate(bad)
+        reject(lambda bad=bad: steady_calibration(bad, status, first, counts, candidate))
     print(json.dumps(dict(ok=True, checks=checks)))
 
 

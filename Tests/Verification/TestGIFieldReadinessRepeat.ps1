@@ -1,4 +1,12 @@
-<# Hard-reset readiness distribution over trace seeds, with one same-seed repeat. #>
+<#
+Hard-reset readiness distribution over trace seeds, with one same-seed repeat.
+
+The default hard reset grows real irradiance mass from its entry update. -RapidHardReset
+selects the experimental rapid hard reset that reweights every refresh update at 0.5.
+-SteadyCalibration after-handoff (the default) measures steady change RMS in a second
+calibration run whose refresh ends at its calibrated Ready, as the trace runs' does;
+after-timeout measures it after the calibration run's timeout.
+#>
 [CmdletBinding()]
 param(
     [string[]]$Configuration = @('Develop'),
@@ -6,6 +14,8 @@ param(
     [string[]]$CaseId = @('sphere','plane','sealed','thin','sunroom','parallel','camera'),
     [uint32[]]$TraceSeed = @(61052,71052,81052),
     [uint32]$RepeatSeed = 61052,
+    [switch]$RapidHardReset,
+    [ValidateSet('after-timeout','after-handoff')][string]$SteadyCalibration = 'after-handoff',
     [string]$ShaderCacheDirectory,
     [string]$OutputDirectory,
     [string]$RunDirectory,
@@ -16,6 +26,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Import-Module "$root/Scripts/Verification/VerificationSupport.psm1"
+Import-Module "$PSScriptRoot/GIFieldReadinessCalibration.psm1"
 $Configuration = @($Configuration | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
 $Rhi = @($Rhi | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
 $CaseId = @($CaseId | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
@@ -50,10 +61,7 @@ function Source-Identity {
     Get-VerificationSourceIdentity $root @('Sources','Shaders','Tests/Verification','Scripts/Verification','Schemas','Projects','PropertySheets')
 }
 # Status records carry a complete readiness trace; indentation would multiply their size.
-function Write-CompactJson([string]$Path, $Value) {
-    [IO.File]::WriteAllText($Path, (ConvertTo-Json -InputObject $Value -Depth 32 -Compress),
-        (New-Object Text.UTF8Encoding($false)))
-}
+function Write-CompactJson([string]$Path, $Value) { Write-GIFieldCalibrationJson $Path $Value }
 # Capture metadata and status serialize equal coordinates differently (0 or 0.0).
 function Get-CameraKey($Camera) {
     (@($Camera.position) + @($Camera.forward) + @($Camera.verticalFovDegrees) | ForEach-Object {
@@ -64,7 +72,7 @@ function Set-Inputs($Session, $Run, [hashtable]$Values) {
     $changes = @($Values.Keys | Sort-Object | ForEach-Object {
         $type = if ($_ -in @('fixture','environment','albedo','secondary_albedo','ev100','field_irradiance_width')) { 'enum' }
             elseif ($Values[$_] -is [bool]) { 'bool' }
-            elseif ($_ -in @('field_refresh_noise','field_steady_noise')) { 'float' }
+            elseif (Test-GIFieldSigmaInput $_) { 'float' }
             else { 'uint' }
         @{id="gi_reference.$_";type=$type;value=$Values[$_]}
     })
@@ -82,6 +90,8 @@ try {
     Write-VerificationJson "$output/cases.json" $cases
     Write-VerificationJson "$output/backends.json" $Rhi
     Write-VerificationJson "$output/runs.json" $runs
+    $hardReset = if ($RapidHardReset) { 'rapid' } else { 'progressive' }
+    Write-VerificationJson "$output/recipe.json" @{hardResetIntegration=$hardReset;steadyCalibration=$SteadyCalibration}
     foreach ($backend in $Rhi) {
         $session = 'gi-repeat-'+[Guid]::NewGuid().ToString('N').Substring(0,10)
         $start = $null
@@ -106,11 +116,13 @@ try {
                 $directory = "$output/$backend/$($case.id)"
                 $null = New-Item -ItemType Directory -Path $directory -Force
                 Write-VerificationJson "$directory/case.json" $case
-                # The default single-bounce recipe with the observation-only trace; calibration
-                # uses the independent seed and the uncalibrated minimum.
+                # The default single-bounce recipe, or its declared refresh arm, with the
+                # observation-only trace; calibration uses the independent seed and the
+                # uncalibrated minimum.
                 $inputs = Set-Inputs $session $run @{fixture=$case.fixture;environment=0;albedo=0;secondary_albedo=0;
                     ev100=10;field_enabled=$true;field_feedback=$false;field_sampling=$true;field_readiness=$true;
-                    field_progressive_sampling=$false;field_progressive_refresh=$false;receiver_diagnostics=$true;
+                    field_progressive_sampling=$false;field_progressive_refresh=$false;
+                    field_rapid_hard_reset=[bool]$RapidHardReset;receiver_diagnostics=$true;
                     field_irradiance_width=0;field_update_limit=0;field_readiness_trace=$true;probe_enabled=$true;
                     accumulate=$true;depth=1;batch_samples=64;seed=61051;field_refresh_noise=0.0;field_steady_noise=0.0}
                 Write-VerificationJson "$directory/calibration-effect.json" $inputs
@@ -120,8 +132,15 @@ try {
                             ($r.frame.giField.activeBlocks -eq 0 -and $r.frame.giField.excludedBlocks -gt 0)) -and
                         $r.frame.giField.steadyNoiseSamples -eq 64 } -TimeoutSeconds $TimeoutSeconds
                 Write-CompactJson "$directory/calibration.json" $noise
-                $adopted = @{field_refresh_noise=[float]$noise.frame.giField.refreshNoiseEstimate;
-                    field_steady_noise=[float]$noise.frame.giField.steadyNoiseEstimate}
+                $steady = $null
+                if ($SteadyCalibration -eq 'after-handoff') {
+                    # The sigma change restarts the field at the calibration seed. Its refresh
+                    # ends at the calibrated Ready, so steady RMS follows the trace runs' handoff.
+                    $steady = Measure-GIFieldSteadyAfterHandoff -SetInputs { param($v) Set-Inputs $session $run $v } `
+                        -Status { Invoke-VerificationSession status $session @{ExpectedRunIdentity=$run} } `
+                        -Calibration $noise.frame.giField -Directory $directory -TimeoutSeconds $TimeoutSeconds
+                }
+                $adopted = Get-GIFieldAdoptedInputs hardReset $noise.frame.giField $steady
                 foreach ($spec in $runs) {
                     $runDirectory = "$directory/$($spec.id)"
                     $null = New-Item -ItemType Directory -Path $runDirectory -Force
@@ -189,7 +208,8 @@ try {
     Assert-VerificationIdentity $binaries $finalBinaries 'Readiness repeat binaries changed during verification.' -Depth 2
     Invoke-VerificationPython $Python $validator @('--root',$output) "$output/oracle-result.json" 'Readiness repeat contracts failed'
     $validation = Get-Content -LiteralPath "$output/validation.json" -Raw | ConvertFrom-Json
-    $summary = @{ok=$true;directory=$output;allSeedsReadyWithin120=$validation.allSeedsReadyWithin120;
+    $summary = @{ok=$true;directory=$output;hardResetIntegration=$hardReset;
+        steadyCalibration=$SteadyCalibration;allSeedsReadyWithin120=$validation.allSeedsReadyWithin120;
         allSeedsSteadyReadyWithin120=$validation.allSeedsSteadyReadyWithin120;
         allHandoffsFollowRefreshEnd=$validation.allHandoffsFollowRefreshEnd}
     Write-VerificationJson "$output/result.json" ($summary + @{readinessRepeatabilityQualified=$false})

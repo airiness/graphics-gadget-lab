@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "gglab.gi-field-profile",
-  "title": "GGLab field base identity and effective constructor inputs v1",
-  "description": "A Host-declared base preset plus effective overrides. Neither a supported-profile certificate nor a shader/cache artifact identity.",
+  "title": "GGLab field base identity and effective constructor inputs v1-v2",
+  "description": "A Host-declared base preset plus effective overrides. Neither a supported-profile certificate nor a shader/cache artifact identity. Version 2 declares readiness integration and calibration per refresh reason; version 1 declared one policy for both.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "id", "revision", "counts", "minimum", "spacing", "irradianceInteriorWidth", "raysPerProbe", "seed", "maximumDistance", "hysteresis", "viewBias", "receiverSampling", "feedback", "progressiveSampling", "constantEnvironment", "constantRadiance", "readiness"],
   "properties": {
-    "schemaVersion": {"const": 1},
+    "schemaVersion": {"enum": [1, 2]},
     "id": {"type": "string", "maxLength": 128, "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+(?![\\s\\S])"},
     "revision": {"type": "integer", "minimum": 1, "maximum": 4294967295},
     "counts": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "integer", "minimum": 2, "maximum": 128}},
@@ -24,7 +24,14 @@
     "progressiveSampling": {"type": "boolean"},
     "constantEnvironment": {"type": "boolean"},
     "constantRadiance": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number", "minimum": 0}},
-    "readiness": {
+    "readiness": {"type": "object"}
+  },
+  "if": {"properties": {"schemaVersion": {"const": 1}}},
+  "then": {"properties": {"readiness": {"$ref": "#/$defs/singleReadiness"}}},
+  "else": {"properties": {"readiness": {"$ref": "#/$defs/reasonReadiness"}}},
+  "$defs": {
+    "float3": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}},
+    "singleReadiness": {
       "type": "object", "additionalProperties": false,
       "required": ["enabled", "noiseSigma", "steadyNoiseSigma", "refreshHysteresis", "progressiveRefresh"],
       "properties": {
@@ -34,9 +41,25 @@
         "refreshHysteresis": {"type": "number", "minimum": 0, "exclusiveMaximum": 1},
         "progressiveRefresh": {"type": "boolean"}
       }
+    },
+    "reasonReadiness": {
+      "type": "object", "additionalProperties": false,
+      "required": ["enabled", "refreshHysteresis", "hardReset", "lighting"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "refreshHysteresis": {"type": "number", "minimum": 0, "exclusiveMaximum": 1},
+        "hardReset": {"$ref": "#/$defs/refreshPolicy"},
+        "lighting": {"$ref": "#/$defs/refreshPolicy"}
+      }
+    },
+    "refreshPolicy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["integration", "refreshSigma", "steadySigma"],
+      "properties": {
+        "integration": {"enum": ["rapid", "progressive"]},
+        "refreshSigma": {"type": "number", "minimum": 0},
+        "steadySigma": {"type": "number", "minimum": 0}
+      }
     }
-  },
-  "$defs": {
-    "float3": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}}
   }
 }

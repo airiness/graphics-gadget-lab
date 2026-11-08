@@ -537,6 +537,14 @@ namespace gglab
 				{ "refreshEpoch", field.m_RefreshEpoch },
 				{ "epochOriginUpdate", field.m_EpochOriginUpdate } };
 		}
+		nlohmann::json GIRefreshPolicyJson(const GIFieldReadinessSettings& settings, GIFieldRefreshReason reason)
+		{
+			const auto& calibration = GetGIFieldReadinessCalibration(settings, reason);
+			return {
+				{ "integration", GetGIFieldRefreshIntegrationName(GetGIFieldRefreshIntegration(settings, reason)) },
+				{ "refreshSigma", calibration.m_RefreshSigma },
+				{ "steadySigma", calibration.m_SteadySigma } };
+		}
 		nlohmann::json GIStampJson(const GIObservationStamp& stamp)
 		{
 			return {
@@ -890,10 +898,11 @@ namespace gglab
 				{ "constantRadiance", value.m_ConstantRadiance },
 				{ "readiness", {
 					{ "enabled", value.m_Readiness.m_Enabled },
-					{ "noiseSigma", value.m_Readiness.m_NoiseSigma },
-					{ "steadyNoiseSigma", value.m_Readiness.m_SteadyNoiseSigma },
 					{ "refreshHysteresis", value.m_Readiness.m_RefreshHysteresis },
-					{ "progressiveRefresh", value.m_Readiness.m_ProgressiveRefresh } } } };
+					{ GetGIFieldRefreshReasonName(GIFieldRefreshReason::HardReset),
+						GIRefreshPolicyJson(value.m_Readiness, GIFieldRefreshReason::HardReset) },
+					{ GetGIFieldRefreshReasonName(GIFieldRefreshReason::Lighting),
+						GIRefreshPolicyJson(value.m_Readiness, GIFieldRefreshReason::Lighting) } } } };
 		}
 		return nlohmann::json{
 			{ "schemaVersion", 1 },

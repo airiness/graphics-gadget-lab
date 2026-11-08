@@ -208,7 +208,7 @@ namespace gglab
 			std::shared_ptr<const GIFieldChangeObservation> m_ChangeObservation;
 			uint64_t m_ReadbackBytes = sizeof(GIUpdateStatus);
 			uint64_t m_FeedbackOffset = 0;
-			bool m_RefreshDistance = true;
+			GIFieldRefreshReason m_RefreshReason = GIFieldRefreshReason::HardReset;
 			bool m_CompletionFailed = false;
 			uint32_t m_RaysPerProbe = 0;
 			uint32_t m_IrradianceInteriorWidth = 0;
@@ -455,7 +455,7 @@ namespace gglab
 		m_State->m_Progress->m_Feedback.m_Enabled = field && feedback;
 		m_State->m_Progress->m_Readiness.Reset(
 			ValidateGIProbeUpdateProfile(profile) ? profile.m_Counts : std::array<uint32_t, 3>{}, readiness,
-			false, readinessTrace);
+			GIFieldRefreshReason::HardReset, readinessTrace);
 	}
 	GIProbeUpdateWorkload::~GIProbeUpdateWorkload() = default;
 	std::shared_ptr<RayScene> GIProbeUpdateWorkload::GetRayScene() const noexcept { return m_State->m_Scene; }
@@ -548,9 +548,12 @@ namespace gglab
 		++progress.m_RefreshEpoch;
 		progress.m_CompletedObservation.reset();
 		progress.m_ChangeObservation.reset();
-		progress.m_RefreshDistance = false;
-		progress.m_Readiness.Reset(m_State->m_Profile.m_Counts, progress.m_ReadinessSettings, true,
-			progress.m_ReadinessTrace);
+		// A lighting change supersedes an unfinished hard reset. Its irradiance samples
+		// are stale; distance keeps its history but leaves the refresh and the readiness
+		// measure, even before the hard reset's handoff.
+		progress.m_RefreshReason = GIFieldRefreshReason::Lighting;
+		progress.m_Readiness.Reset(m_State->m_Profile.m_Counts, progress.m_ReadinessSettings,
+			GIFieldRefreshReason::Lighting, progress.m_ReadinessTrace);
 	}
 
 	std::array<uint64_t, GIProbeUpdateWorkload::ProgramCount> GIProbeUpdateWorkload::GetShaderGenerations() const noexcept
@@ -866,20 +869,17 @@ namespace gglab
 		const bool rotateUpdates = profile.m_RotateDirections && !state.m_ProgressiveSampling;
 		const bool initialized = progress->m_StorageInitialized;
 		const auto readiness = GetReadiness();
-		// The entry update retains the existing rapid reweighting. Later progressive
-		// updates grow actual sample mass instead of exposing every new noisy pair.
-		// Derive entry from submitted progress so discarded recordings cannot age it.
+		// Progressive updates after the entry grow actual sample mass instead of exposing
+		// every new noisy pair. Derive entry from submitted progress so discarded
+		// recordings cannot age it.
 		const bool firstRefreshUpdate = progress->m_Diagnostics.m_SubmittedUpdates ==
 			progress->m_ReadinessEpoch;
-		const bool fastRefresh = readiness.m_Refreshing &&
-			(!progress->m_ReadinessSettings.m_ProgressiveRefresh || firstRefreshUpdate);
-		const float irradianceDecay = readiness.m_Enabled && fastRefresh ?
-			progress->m_ReadinessSettings.m_RefreshHysteresis : profile.m_Hysteresis;
-		const bool refreshDistance = readiness.m_Refreshing && progress->m_RefreshDistance;
-		const float distanceDecay = readiness.m_Enabled && refreshDistance ?
-			progress->m_ReadinessSettings.m_RefreshHysteresis : profile.m_Hysteresis;
+		const auto decays = SelectGIFieldUpdateDecays(progress->m_ReadinessSettings, progress->m_RefreshReason,
+			readiness.m_Refreshing, firstRefreshUpdate, profile.m_Hysteresis);
+		const float irradianceDecay = decays.m_Irradiance;
+		const float distanceDecay = decays.m_Distance;
 		const auto irradianceHistory = progress->m_IrradianceHistory.Next(irradianceDecay, readiness.m_Refreshing);
-		const auto distanceHistory = progress->m_DistanceHistory.Next(distanceDecay, refreshDistance);
+		const auto distanceHistory = progress->m_DistanceHistory.Next(distanceDecay, decays.m_RefreshDistance);
 		const float updateHysteresis = readiness.m_Enabled ? irradianceHistory.m_Hysteresis : irradianceDecay;
 		const float distanceHysteresis = readiness.m_Enabled ? distanceHistory.m_Hysteresis : distanceDecay;
 		const uint32_t update = static_cast<uint32_t>(progress->m_Diagnostics.m_SubmittedUpdates);
@@ -1111,7 +1111,8 @@ namespace gglab
 							.m_ReadinessEnabled = readiness.m_Enabled ? 1u : 0u,
 							.m_ReadinessEpoch = static_cast<uint32_t>(progress->m_ReadinessEpoch),
 							.m_DistanceHysteresis = distanceHysteresis,
-							.m_ReadinessDistance = progress->m_RefreshDistance ? 1u : 0u,
+							.m_ReadinessDistance =
+								progress->m_RefreshReason == GIFieldRefreshReason::HardReset ? 1u : 0u,
 							.m_FeedbackViewBias = viewBias,
 							.m_InspectedProbe = inspect ?
 								inspection->m_Coordinate[0] + profile.m_Counts[0] *

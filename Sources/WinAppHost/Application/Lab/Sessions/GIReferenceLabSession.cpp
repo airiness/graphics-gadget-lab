@@ -58,6 +58,9 @@ namespace gglab
 		const LabParameterId FieldProgressiveSamplingId("gi_reference.field_progressive_sampling");
 		const LabParameterId FieldRefreshNoiseId("gi_reference.field_refresh_noise");
 		const LabParameterId FieldSteadyNoiseId("gi_reference.field_steady_noise");
+		const LabParameterId FieldLightingRefreshNoiseId("gi_reference.field_lighting_refresh_noise");
+		const LabParameterId FieldLightingSteadyNoiseId("gi_reference.field_lighting_steady_noise");
+		const LabParameterId FieldRapidHardResetId("gi_reference.field_rapid_hard_reset");
 		const LabParameterId FieldUpdateLimitId("gi_reference.field_update_limit");
 		const LabParameterId FieldReadinessTraceId("gi_reference.field_readiness_trace");
 		const LabParameterId ProbeEnabledId("gi_reference.probe_enabled");
@@ -397,8 +400,10 @@ namespace gglab
 			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = int32_t(0),
 			.m_EnumItems = { { 0, "Fixture default" }, { 6, "6" }, { 14, "14" }, { 30, "30" } } }));
 		for (const auto& [id, name] : std::array{
-			std::pair{ FieldRefreshNoiseId, "Measured refresh change noise" },
-			std::pair{ FieldSteadyNoiseId, "Measured steady change noise" } })
+			std::pair{ FieldRefreshNoiseId, "Measured hard-reset refresh change RMS" },
+			std::pair{ FieldSteadyNoiseId, "Measured hard-reset steady change RMS" },
+			std::pair{ FieldLightingRefreshNoiseId, "Measured lighting refresh change RMS" },
+			std::pair{ FieldLightingSteadyNoiseId, "Measured lighting steady change RMS" } })
 		{
 			GGLAB_UNUSED(parameters.Add({ .m_Id = id, .m_Name = name, .m_Group = "GI field",
 				.m_Type = LabParameterType::Float, .m_Impact = LabChangeImpact::RestartSession,
@@ -418,7 +423,11 @@ namespace gglab
 			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
 			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = false }));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldProgressiveRefreshId,
-			.m_Name = "Progressive irradiance refresh (experimental)",
+			.m_Name = "Progressive lighting refresh (experimental)",
+			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
+			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = false }));
+		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldRapidHardResetId,
+			.m_Name = "Rapid hard-reset refresh (experimental)",
 			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
 			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = false }));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldProgressiveSamplingId,
@@ -1086,9 +1095,18 @@ namespace gglab
 				info.m_EnableFeedback = GetParameters().Get(FieldFeedbackId, false);
 				info.m_ProgressiveSampling = GetParameters().Get(FieldProgressiveSamplingId, false);
 				info.m_Readiness.m_Enabled = GetParameters().Get(FieldReadinessId, true);
-				info.m_Readiness.m_ProgressiveRefresh = GetParameters().Get(FieldProgressiveRefreshId, false);
-				info.m_Readiness.m_NoiseSigma = GetParameters().Get(FieldRefreshNoiseId, 0.0f);
-				info.m_Readiness.m_SteadyNoiseSigma = GetParameters().Get(FieldSteadyNoiseId, 0.0f);
+				info.m_Readiness.m_HardResetIntegration = GetParameters().Get(FieldRapidHardResetId, false) ?
+					GIFieldRefreshIntegration::Rapid :
+					GIFieldRefreshIntegration::Progressive;
+				info.m_Readiness.m_LightingIntegration = GetParameters().Get(FieldProgressiveRefreshId, false) ?
+					GIFieldRefreshIntegration::Progressive :
+					GIFieldRefreshIntegration::Rapid;
+				info.m_Readiness.m_HardReset = {
+					.m_RefreshSigma = GetParameters().Get(FieldRefreshNoiseId, 0.0f),
+					.m_SteadySigma = GetParameters().Get(FieldSteadyNoiseId, 0.0f) };
+				info.m_Readiness.m_Lighting = {
+					.m_RefreshSigma = GetParameters().Get(FieldLightingRefreshNoiseId, 0.0f),
+					.m_SteadySigma = GetParameters().Get(FieldLightingSteadyNoiseId, 0.0f) };
 				info.m_RaysPerProbe = GetParameters().Get(ProbeRaysId, uint32_t(256));
 				info.m_Seed = GetParameters().Get(SeedId, GIObservationLimits::DefaultSeed);
 				info.m_UpdateLimit = GetParameters().Get(FieldUpdateLimitId, uint32_t(0));

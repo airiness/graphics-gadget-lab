@@ -51,6 +51,29 @@ namespace gglab
 		}
 	};
 
+	// Nominal decays for one submitted update. The policy follows the refresh reason
+	// alone; no fixture, seed or backend selects it.
+	struct GIFieldUpdateDecays
+	{
+		float m_Irradiance = 0;
+		float m_Distance = 0;
+		// Only a hard reset refreshes distance; a lighting refresh keeps its history.
+		bool m_RefreshDistance = false;
+	};
+
+	[[nodiscard]] constexpr GIFieldUpdateDecays SelectGIFieldUpdateDecays(
+		const GIFieldReadinessSettings& settings, GIFieldRefreshReason reason, bool refreshing,
+		bool entryUpdate, float steadyHysteresis) noexcept
+	{
+		// The entry update reweights at the refresh hysteresis under either integration.
+		const bool rapid = refreshing && (entryUpdate ||
+			GetGIFieldRefreshIntegration(settings, reason) == GIFieldRefreshIntegration::Rapid);
+		const bool distance = refreshing && reason == GIFieldRefreshReason::HardReset;
+		return { .m_Irradiance = settings.m_Enabled && rapid ? settings.m_RefreshHysteresis : steadyHysteresis,
+			.m_Distance = settings.m_Enabled && distance ? settings.m_RefreshHysteresis : steadyHysteresis,
+			.m_RefreshDistance = distance };
+	}
+
 	static_assert(GIFieldReadinessTraceUpdates == gi_shader::GIFieldReadinessTimeoutUpdates);
 
 	class GIFieldReadinessEstimator final
@@ -58,17 +81,19 @@ namespace gglab
 	public:
 		// A trace observes this epoch's decisions only; it never changes them.
 		void Reset(std::array<uint32_t, 3> counts, GIFieldReadinessSettings settings,
-			bool lightingRefresh = false, bool trace = false) noexcept
+			GIFieldRefreshReason reason = GIFieldRefreshReason::HardReset, bool trace = false) noexcept
 		{
 			m_Counts = counts;
 			m_Settings = settings;
-			m_LightingRefresh = lightingRefresh;
+			m_Reason = reason;
 			m_Trace = trace;
 			m_TraceTail.reset();
-			m_Snapshot = { .m_State = lightingRefresh ? GIFieldReadinessState::Settling : GIFieldReadinessState::Initializing,
-				.m_Enabled = settings.m_Enabled, .m_Refreshing = settings.m_Enabled,
-				.m_NoiseSigma = settings.m_NoiseSigma,
-				.m_Threshold = std::max(gi_shader::GIFieldReadinessMinimumThreshold, 3 * settings.m_NoiseSigma),
+			const float sigma = GetGIFieldReadinessCalibration(settings, reason).m_RefreshSigma;
+			m_Snapshot = { .m_State = reason == GIFieldRefreshReason::Lighting ?
+					GIFieldReadinessState::Settling :
+					GIFieldReadinessState::Initializing,
+				.m_Enabled = settings.m_Enabled, .m_Refreshing = settings.m_Enabled, .m_NoiseSigma = sigma,
+				.m_Threshold = std::max(gi_shader::GIFieldReadinessMinimumThreshold, 3 * sigma),
 				.m_Hysteresis = settings.m_RefreshHysteresis };
 			const uint32_t width = gi_shader::GIFieldReadinessBlockWidth;
 			const uint32_t blocks = ((counts[0] + width - 1) / width) *
@@ -106,7 +131,8 @@ namespace gglab
 			m_RefreshMode = refresh;
 			++m_ModeUpdates;
 			m_Snapshot.m_Hysteresis = hysteresis;
-			m_Snapshot.m_NoiseSigma = refresh ? m_Settings.m_NoiseSigma : m_Settings.m_SteadyNoiseSigma;
+			const auto& calibration = GetGIFieldReadinessCalibration(m_Settings, m_Reason);
+			m_Snapshot.m_NoiseSigma = refresh ? calibration.m_RefreshSigma : calibration.m_SteadySigma;
 			m_Snapshot.m_Threshold = std::max(gi_shader::GIFieldReadinessMinimumThreshold, 3 * m_Snapshot.m_NoiseSigma);
 			m_Snapshot.m_CompletedUpdates = update;
 			m_Snapshot.m_IrradianceFloor = floor;
@@ -114,7 +140,8 @@ namespace gglab
 			m_Snapshot.m_ExcludedBlocks = 0;
 			m_Snapshot.m_QuietBlocks = 0;
 			m_Snapshot.m_MaximumChange = 0;
-			const uint32_t warming = m_LightingRefresh ? gi_shader::GIFieldReadinessChangeSpan :
+			const bool lighting = m_Reason == GIFieldRefreshReason::Lighting;
+			const uint32_t warming = lighting ? gi_shader::GIFieldReadinessChangeSpan :
 				std::max(gi_shader::GIFieldReadinessMinimumWarmUpdates,
 					uint32_t(std::ceil(1.0 / (1.0 - m_Settings.m_RefreshHysteresis))));
 			const uint32_t width = gi_shader::GIFieldReadinessBlockWidth;
@@ -124,7 +151,7 @@ namespace gglab
 			measurement->m_WarmingUpdates = warming;
 			measurement->m_RequiredQuietUpdates = gi_shader::GIFieldReadinessQuietUpdates;
 			measurement->m_RefreshMode = refresh;
-			measurement->m_IncludesDistance = !m_LightingRefresh;
+			measurement->m_IncludesDistance = !lighting;
 			measurement->m_Probes.resize(probes.size());
 			measurement->m_Blocks.resize(m_QuietUpdates.size());
 			uint32_t block = 0;
@@ -232,7 +259,7 @@ namespace gglab
 			{
 				m_Snapshot.m_ReadyUpdate = 0;
 				m_Snapshot.m_State = update >= gi_shader::GIFieldReadinessTimeoutUpdates ? GIFieldReadinessState::Unconverged :
-					update < warming && !m_LightingRefresh ? GIFieldReadinessState::Warming : GIFieldReadinessState::Settling;
+					update < warming && !lighting ? GIFieldReadinessState::Warming : GIFieldReadinessState::Settling;
 				m_Snapshot.m_Refreshing = m_Snapshot.m_Refreshing && update < gi_shader::GIFieldReadinessTimeoutUpdates;
 			}
 			measurement->m_Readiness = m_Snapshot;
@@ -259,7 +286,7 @@ namespace gglab
 		uint32_t m_ModeUpdates = 0;
 		bool m_HasMode = false;
 		bool m_RefreshMode = true;
-		bool m_LightingRefresh = false;
+		GIFieldRefreshReason m_Reason = GIFieldRefreshReason::HardReset;
 		bool m_Trace = false;
 	};
 

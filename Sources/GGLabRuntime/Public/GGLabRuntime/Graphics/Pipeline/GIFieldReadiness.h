@@ -30,19 +30,83 @@ namespace gglab
 		return "Initializing";
 	}
 
+	// Why a readiness epoch refreshes the field. A hard reset starts every history
+	// empty; a lighting refresh keeps the atlas while its lighting is stale.
+	enum class GIFieldRefreshReason : uint8_t
+	{
+		HardReset,
+		Lighting,
+	};
+
+	[[nodiscard]] constexpr std::string_view GetGIFieldRefreshReasonName(GIFieldRefreshReason reason) noexcept
+	{
+		switch (reason)
+		{
+		case GIFieldRefreshReason::HardReset: return "hardReset";
+		case GIFieldRefreshReason::Lighting: return "lighting";
+		}
+		return "hardReset";
+	}
+
+	// How a refresh integrates irradiance after its entry update, which always
+	// reweights at the refresh hysteresis.
+	enum class GIFieldRefreshIntegration : uint8_t
+	{
+		// Every refresh update reweights the history at the refresh hysteresis.
+		Rapid,
+		// Real history mass grows at the field's steady decay.
+		Progressive,
+	};
+
+	[[nodiscard]] constexpr std::string_view GetGIFieldRefreshIntegrationName(
+		GIFieldRefreshIntegration integration) noexcept
+	{
+		switch (integration)
+		{
+		case GIFieldRefreshIntegration::Rapid: return "rapid";
+		case GIFieldRefreshIntegration::Progressive: return "progressive";
+		}
+		return "rapid";
+	}
+
+	// Per-update change RMS measured on one refresh reason's own schedule: the maximum
+	// over probes of the RMS change in the calibration window of each phase. Zero
+	// selects the experimental 1% minimum; it does not claim calibration.
+	struct GIFieldReadinessCalibration
+	{
+		float m_RefreshSigma = 0;
+		float m_SteadySigma = 0;
+	};
+
 	struct GIFieldReadinessSettings
 	{
 		// Explicit opt-out for fixed-settling diagnostics; never a quality certificate.
 		bool m_Enabled = true;
-		// Measured per-update change noise for the declared refresh alpha/schedule.
-		// Zero selects the experimental 1% minimum; it does not claim calibration.
-		float m_NoiseSigma = 0;
-		float m_SteadyNoiseSigma = 0;
+		// Each reason integrates on its own schedule, so each gates with its own
+		// measurement; one reason's values never stand in for the other's.
+		GIFieldReadinessCalibration m_HardReset;
+		GIFieldReadinessCalibration m_Lighting;
 		float m_RefreshHysteresis = 0.5f;
-		// Experimental: reweight once at refresh entry, then grow real irradiance
-		// history at the field's steady decay. Requires its own noise calibration.
-		bool m_ProgressiveRefresh = false;
+		// A hard reset has no history to discount, so its real mass grows from zero.
+		GIFieldRefreshIntegration m_HardResetIntegration = GIFieldRefreshIntegration::Progressive;
+		// A lighting refresh discounts stale lighting. Progressive lighting refresh is
+		// experimental: its retained old lighting overshoots a light step.
+		GIFieldRefreshIntegration m_LightingIntegration = GIFieldRefreshIntegration::Rapid;
 	};
+
+	[[nodiscard]] constexpr const GIFieldReadinessCalibration& GetGIFieldReadinessCalibration(
+		const GIFieldReadinessSettings& settings, GIFieldRefreshReason reason) noexcept
+	{
+		return reason == GIFieldRefreshReason::Lighting ? settings.m_Lighting : settings.m_HardReset;
+	}
+
+	[[nodiscard]] constexpr GIFieldRefreshIntegration GetGIFieldRefreshIntegration(
+		const GIFieldReadinessSettings& settings, GIFieldRefreshReason reason) noexcept
+	{
+		return reason == GIFieldRefreshReason::Lighting ?
+			settings.m_LightingIntegration :
+			settings.m_HardResetIntegration;
+	}
 
 	struct GIFieldReadinessSnapshot
 	{

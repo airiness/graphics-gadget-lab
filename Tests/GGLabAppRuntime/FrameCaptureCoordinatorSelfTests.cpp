@@ -2494,14 +2494,15 @@ namespace gglab
 			profile->m_ViewBias = 0.15f;
 			profile->m_EnableFeedback = true;
 			profile->m_ProgressiveSampling = true;
-			profile->m_Readiness.m_NoiseSigma = 0.02f;
-			profile->m_Readiness.m_SteadyNoiseSigma = 0.03f;
-			profile->m_Readiness.m_ProgressiveRefresh = true;
+			profile->m_Readiness.m_HardReset = { .m_RefreshSigma = 0.02f, .m_SteadySigma = 0.03f };
+			profile->m_Readiness.m_Lighting = { .m_RefreshSigma = 0.25f, .m_SteadySigma = 0.04f };
+			profile->m_Readiness.m_LightingIntegration = GIFieldRefreshIntegration::Progressive;
 			profile->m_ConstantEnvironment = true;
 			profile->m_ConstantRadiance = { 1, 0.5f, 2 };
 			summary.m_Profile = profile;
 			const auto profileJson = nlohmann::json::parse(SerializeGIFieldSummary(summary))["profile"];
-			context.Check(profileJson["schemaVersion"] == 1 &&
+			const auto& readinessJson = profileJson["readiness"];
+			context.Check(profileJson["schemaVersion"] == 2 &&
 				profileJson["id"] == "gglab.gi.field.contract" && profileJson["revision"] == 3 &&
 				profileJson["counts"] == profile->m_Volume.m_Counts &&
 				profileJson["minimum"] == profile->m_Volume.m_Minimum && profileJson["spacing"] == 1 &&
@@ -2512,11 +2513,12 @@ namespace gglab
 				profileJson["feedback"] == true && profileJson["progressiveSampling"] == true &&
 				profileJson["constantEnvironment"] == true &&
 				profileJson["constantRadiance"] == profile->m_ConstantRadiance &&
-				profileJson["readiness"]["enabled"] == true &&
-				profileJson["readiness"]["noiseSigma"] == profile->m_Readiness.m_NoiseSigma &&
-				profileJson["readiness"]["steadyNoiseSigma"] == profile->m_Readiness.m_SteadyNoiseSigma &&
-				profileJson["readiness"]["refreshHysteresis"] == 0.5 &&
-				profileJson["readiness"]["progressiveRefresh"] == true,
+				readinessJson.size() == 4 && readinessJson["enabled"] == true &&
+				readinessJson["refreshHysteresis"] == 0.5 &&
+				readinessJson["hardReset"] == nlohmann::json{ { "integration", "progressive" },
+					{ "refreshSigma", 0.02f }, { "steadySigma", 0.03f } } &&
+				readinessJson["lighting"] == nlohmann::json{ { "integration", "progressive" },
+					{ "refreshSigma", 0.25f }, { "steadySigma", 0.04f } },
 				"Versioned profile metadata retains base identity and every effective constructor input");
 			metadata.m_Readiness.m_GIField->m_Summary = std::make_shared<GIFieldSummary>(summary);
 			context.Check(nlohmann::json::parse(SerializeFrameCaptureMetadata(metadata))

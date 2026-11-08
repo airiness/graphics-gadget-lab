@@ -71,6 +71,7 @@ $catalog = @(
     @{ name = 'gi-field-readiness'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIFieldReadiness.ps1' }) },
     @{ name = 'gi-field-readiness-repeat'; group = 'gpu'; configurations = @('Develop'); steps = @(@{ path = 'Tests/Verification/TestGIFieldReadinessRepeat.ps1' }) },
     @{ name = 'gi-field-readiness-repeat-contracts'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/ValidateGIFieldReadinessRepeat.py'; arguments = @('--self-test') }) },
+    @{ name = 'gi-field-readiness-calibration-contracts'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/GIFieldReadinessCalibration.py'; arguments = @('--self-test') }) },
     @{ name = 'gi-field-sampling'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIFieldSampling.ps1' }) },
     @{ name = 'gi-field-sampling-contracts'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/ValidateGIFieldSampling.py'; arguments = @('--self-test') }) },
     @{ name = 'gi-field-baseline'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIFieldBaseline.ps1' }) },

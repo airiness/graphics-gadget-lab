@@ -214,6 +214,25 @@ namespace gglab
 			return dotted && !segmentStart;
 		}
 
+		bool ValidReadinessCalibration(const GIFieldReadinessCalibration& calibration) noexcept
+		{
+			// Three sigma is the threshold, so it must stay finite as well.
+			for (const float sigma : std::array{ calibration.m_RefreshSigma, calibration.m_SteadySigma })
+			{
+				if (!std::isfinite(3 * sigma) || sigma < 0)
+				{
+					return false;
+				}
+			}
+			return true;
+		}
+
+		bool ValidRefreshIntegration(GIFieldRefreshIntegration integration) noexcept
+		{
+			return integration == GIFieldRefreshIntegration::Rapid ||
+				integration == GIFieldRefreshIntegration::Progressive;
+		}
+
 		GIFieldProfileReceipt ProfileReceipt(const GIFieldCreateInfo& info) noexcept
 		{
 			return { .m_Volume = info.m_Volume,
@@ -249,9 +268,10 @@ namespace gglab
 		if (!info.m_RayScene || !ValidProfileIdentity(info.m_Volume.m_Profile) ||
 			!ValidateGIProbeUpdateProfile(UpdateProfile(info)) ||
 			!std::isfinite(info.m_ViewBias) || info.m_ViewBias < 0 || info.m_ViewBias > 1 ||
-			!std::isfinite(info.m_Readiness.m_NoiseSigma) || info.m_Readiness.m_NoiseSigma < 0 ||
-			!std::isfinite(3 * info.m_Readiness.m_NoiseSigma) ||
-			!std::isfinite(3 * info.m_Readiness.m_SteadyNoiseSigma) || info.m_Readiness.m_SteadyNoiseSigma < 0 ||
+			!ValidReadinessCalibration(info.m_Readiness.m_HardReset) ||
+			!ValidReadinessCalibration(info.m_Readiness.m_Lighting) ||
+			!ValidRefreshIntegration(info.m_Readiness.m_HardResetIntegration) ||
+			!ValidRefreshIntegration(info.m_Readiness.m_LightingIntegration) ||
 			!std::isfinite(info.m_Readiness.m_RefreshHysteresis) ||
 			info.m_Readiness.m_RefreshHysteresis < 0 || info.m_Readiness.m_RefreshHysteresis >= 1 ||
 			(info.m_ReceiverList && !ValidReceiverList(*info.m_ReceiverList)))

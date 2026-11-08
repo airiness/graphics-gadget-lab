@@ -7,6 +7,8 @@ param(
     [switch]$ProgressiveRefresh,
     [switch]$ProgressiveSampling,
     [switch]$RapidFeedbackRefresh,
+    # Where the calibration measures steady change RMS; see GIFieldReadinessCalibration.psm1.
+    [ValidateSet('after-timeout','after-handoff')][string]$SteadyCalibration = 'after-handoff',
     [string]$ShaderCacheDirectory,
     [string]$ReferenceDirectory,
     [string]$OutputDirectory,
@@ -18,6 +20,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Import-Module "$root/Scripts/Verification/VerificationSupport.psm1"
+Import-Module "$PSScriptRoot/GIFieldReadinessCalibration.psm1"
 $Configuration = @($Configuration | ForEach-Object { $_ -split ',' })
 $Rhi = @($Rhi | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
 $CaseId = @($CaseId | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
@@ -55,7 +58,7 @@ function Set-Inputs($Session, $Run, [hashtable]$Values) {
     $changes = @($Values.Keys | Sort-Object | ForEach-Object {
         $type = if ($_ -in @('fixture','environment','albedo','secondary_albedo','ev100','field_irradiance_width')) { 'enum' }
             elseif ($Values[$_] -is [bool]) { 'bool' }
-            elseif ($_ -in @('field_refresh_noise','field_steady_noise')) { 'float' }
+            elseif (Test-GIFieldSigmaInput $_) { 'float' }
             else { 'uint' }
         @{id="gi_reference.$_";type=$type;value=$Values[$_]}
     })
@@ -112,6 +115,7 @@ try {
     Write-VerificationJson "$output/binaries.json" $binaries
     Write-VerificationJson "$output/cases.json" $cases
     Write-VerificationJson "$output/backends.json" $Rhi
+    Write-GIFieldCalibrationRecipe $output $SteadyCalibration
     foreach ($backend in $Rhi) {
         $session = 'gi-feedback-'+[Guid]::NewGuid().ToString('N').Substring(0,10)
         $start = $null
@@ -138,8 +142,8 @@ try {
                 $off = Set-Inputs $session $run @{fixture=$case.fixture;environment=0;albedo=0;secondary_albedo=0;ev100=10;
                     field_enabled=$true;field_feedback=$false;field_sampling=$true;field_readiness=$true;
                     field_progressive_refresh=[bool]$ProgressiveRefresh;field_progressive_sampling=[bool]$ProgressiveSampling;
-                    receiver_diagnostics=$true;field_irradiance_width=0;probe_enabled=$true;accumulate=$true;
-                    depth=1;seed=61051;field_refresh_noise=0.0;field_steady_noise=0.0}
+                    field_rapid_hard_reset=[bool]$RapidFeedbackRefresh;receiver_diagnostics=$true;field_irradiance_width=0;
+                    probe_enabled=$true;accumulate=$true;depth=1;seed=61051;field_refresh_noise=0.0;field_steady_noise=0.0}
                 Write-VerificationJson "$directory/off-effect.json" $off
                 Observe $session $run $case "$directory/off" $false 512
                 $on = Set-Inputs $session $run @{field_feedback=$true}
@@ -150,9 +154,14 @@ try {
                         ($f.refreshNoiseSamples -ge 30 -or ($f.activeBlocks -eq 0 -and $f.excludedBlocks -gt 0)) -and
                         $f.steadyNoiseSamples -eq 64 } -TimeoutSeconds $TimeoutSeconds
                 Write-VerificationJson "$directory/noise-baseline.json" $noise
-                $calibrated = Set-Inputs $session $run @{seed=61052;
-                    field_refresh_noise=[float]$noise.frame.giField.refreshNoiseEstimate;
-                    field_steady_noise=[float]$noise.frame.giField.steadyNoiseEstimate}
+                $steady = $null
+                if ($SteadyCalibration -eq 'after-handoff') {
+                    $steady = Measure-GIFieldSteadyAfterHandoff -SetInputs { param($v) Set-Inputs $session $run $v } `
+                        -Status { Invoke-VerificationSession status $session @{ExpectedRunIdentity=$run} } `
+                        -Calibration $noise.frame.giField -Directory $directory -TimeoutSeconds $TimeoutSeconds
+                }
+                $calibrated = Set-Inputs $session $run (@{seed=61052} +
+                    (Get-GIFieldAdoptedInputs hardReset $noise.frame.giField $steady))
                 Write-VerificationJson "$directory/calibrated-effect.json" $calibrated
                 $ready = Invoke-VerificationSession capture $session @{ExpectedRunIdentity=$run;View=$case.view;
                     SettleFrames=128;OutputDirectory="$directory/ready";TimeoutSeconds=$TimeoutSeconds} -AllowFailure

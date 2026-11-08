@@ -17,6 +17,7 @@ import numpy as np
 from ValidateGIReference import ROOM_FACES
 from ValidateGIReferenceLighting import LUMA, f4_oracle, masks as lighting_masks
 from ValidateGIFieldReadiness import records as readiness_records
+import GIFieldReadinessCalibration as readiness_policy
 
 FRAME_COUNT = 120
 FLOOR = 1e-6
@@ -448,12 +449,15 @@ def selected_qualification(results, cross_rhi):
     return all(r["passed"] for r in results) and all(r["passed"] for r in cross_rhi)
 
 
-def inspect_case(directory, backend, diagnostic_offsets=(), policy=None):
+def inspect_case(directory, backend, diagnostic_offsets=(), policy=None, recipe=None):
     case = load(directory/"case.json")
     validate_case(case)
     reference, masks, reference_values, reference_frame = qualify_reference(directory)
     require(reference_frame["backend"] == backend, "Baseline is filed under the wrong backend")
     noise = load(directory/"noise-baseline.json")["frame"]["giField"]
+    # The gated run adopts the first pass's refresh sigma and the declared method's steady sigma.
+    adoption = readiness_policy.adopted(directory, noise, recipe or readiness_policy.read_recipe(directory.parent.parent))
+    noise = dict(noise, steadyNoiseEstimate=adoption["steadySigma"])
     baseline = load(directory/"baseline-gated/receipt.json")
     require(noise["refreshNoiseSamples"] >= 30 and noise["steadyNoiseSamples"] == 64 and
             baseline["status"] in ("failed", "completed"), "Incomplete noise/uncalibrated gate evidence")
@@ -573,6 +577,7 @@ def inspect_window(directory, case, reference, masks, reference_values, referenc
         field = frame["readiness"]["giField"]
         validate_readiness(field, previous, current_update, ready_offset)
         summary = field["summary"]
+        readiness_policy.require_policy_matches(summary["profile"], p)
         minimum, spacing, width = FIELD_PROFILES[case["fixture"]]
         require(summary["counts"] == case["counts"] and summary["minimum"] == minimum and
                 summary["spacing"] == spacing and summary["irradianceInteriorWidth"] == width,
@@ -640,6 +645,7 @@ def validate(root):
     offsets_path = root/"diagnostic-ready-offsets.json"
     offsets = load(offsets_path) if offsets_path.exists() else []
     policy = load_policy(root/"limit-policy.json")
+    recipe = readiness_policy.read_recipe(root)
     validate_offsets(offsets)
     require(case_ids and len(set(case_ids)) == len(case_ids) and all(c in CASES for c in case_ids), "Invalid baseline cases")
     require(backends and len(set(backends)) == len(backends) and all(b in ("dx12", "vulkan") for b in backends),
@@ -647,7 +653,7 @@ def validate(root):
     results = []
     for backend in backends:
         for case_id in case_ids:
-            result = inspect_case(root/backend/case_id, backend, offsets, policy)
+            result = inspect_case(root/backend/case_id, backend, offsets, policy, recipe)
             results.append(dict(backend=backend, **result))
     cross_rhi = []
     if len(backends) == 2:
@@ -663,7 +669,8 @@ def validate(root):
     return dict(schemaVersion=1, status="passed" if passed else "failed", selectedCasesQualified=passed,
                 referenceDepth=1, referenceDepthConvergenceQualified=False, wholeG3Qualified=False,
                 performanceQualified=False, diagnosticReadyOffsets=offsets, limitPolicy=policy,
-                extent=[320, 200], results=results, crossRhi=cross_rhi)
+                steadyCalibration=recipe["steadyCalibration"], extent=[320, 200], results=results,
+                crossRhi=cross_rhi)
 
 
 def self_test():

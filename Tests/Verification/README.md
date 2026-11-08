@@ -98,6 +98,28 @@ retains its uncalibrated result, measures refresh/steady noise, then explicitly
 adopts those inputs with another seed. Recalibrate after sampling/history changes.
 Readiness-disabled suites use the fixed-settling diagnostic path.
 
+Each refresh reason has its own integration and calibration. By default a hard reset
+integrates irradiance progressively after its entry update, and a lighting refresh
+integrates it at the refresh hysteresis 0.5. The hard-reset inputs are
+`field_refresh_noise` and `field_steady_noise`; the lighting inputs are
+`field_lighting_refresh_noise` and `field_lighting_steady_noise`. A noise value is the
+largest per-probe RMS change in one phase's calibration window, not a stationary-noise
+certificate. Field profile schema 2 declares both reasons; schema 1 roots declared one
+policy for both. [GIFieldReadinessCalibration.psm1](GIFieldReadinessCalibration.psm1)
+and [GIFieldReadinessCalibration.py](GIFieldReadinessCalibration.py) hold the shared
+calibration steps and checks. The readiness, baseline, readiness repeat, feedback and
+light-step runners take `-SteadyCalibration`. The readiness repeat records it in its
+`recipe.json`, the others in `readiness-calibration.json`. Runners without lighting
+refreshes leave the lighting inputs at zero. The default `after-handoff` keeps
+refresh noise from the calibration run, whose uncalibrated refresh ends at the
+timeout. It then measures steady noise in a second field at seed 61051 that adopts
+that refresh noise, so its steady window starts at a calibrated handoff, as the
+gated runs' does. A calibration run whose refresh noise is zero, such as a field
+without active blocks, already handed off at that sigma; its unchanged inputs would
+not restart a second field, so its `steady-calibration.json` reuses that run and says
+so. `after-timeout` adopts the calibration run's steady noise. Roots without the
+recipe calibrated after the timeout.
+
 Baseline accuracy, chromaticity and temporal RMS are separate verdicts. Optional
 `TestGIFieldBaseline.ps1 -DiagnosticReadyOffsets 512,1024,2048` records later
 windows without replacing the primary Ready-plus-120 gate. Feedback-on accuracy
@@ -108,8 +130,10 @@ For the opt-in contiguous-sequence experiment, its static runner requires
 The latter is a separately admitted comparison using the existing fast refresh
 until Ready/Unconverged, not progressive history or a new product coefficient.
 It records the selected policies, reconstructs F1 hit directions accordingly and
-requires a source/binary-matched fresh F4 reference. Defaults retain the legacy
-policy. Feedback-off captures are settled toggle controls, not complete paired
+requires a source/binary-matched fresh F4 reference. Feedback toggles hard-reset the
+field, so `-RapidFeedbackRefresh` selects `field_rapid_hard_reset`; the default hard
+reset is already progressive. Without these switches the runner uses the default
+sampling and refresh policy. Feedback-off captures are settled toggle controls, not complete paired
 single-bounce baseline qualifications. Static and lighting-response qualification
 remain separate; neither admits combined-policy Final or attribution.
 
@@ -153,6 +177,14 @@ hard-resets the field. The rebuild restores the fixture's first view, so a
 next-frame capture then poses the case's reference view. Its metadata records the
 run's complete inputs and the field update the pose reached. The runner records
 the status once the trace window is full and requires the pose to have held.
+
+The root's `recipe.json` declares the arm: `hardResetIntegration` and
+`steadyCalibration`. The defaults are the progressive hard reset and after-handoff
+calibration; `-RapidHardReset` selects the rapid hard reset. For after-handoff the
+validator checks the second calibration field's inputs, fresh field and replayed
+trace, and reports its handoff. It also reports whether its refresh change measures
+equal the calibration run's. Roots from before per-reason policy declared one
+`progressiveRefresh` flag for both reasons and still validate.
 
 [ValidateGIFieldReadinessRepeat.py](ValidateGIFieldReadinessRepeat.py)
 independently replays the runtime's threshold, warming, quiet-hold, blocker and
@@ -256,6 +288,17 @@ sequence refresh allowance covers only its matching consumed lighting transactio
 ends at steady Ready, and requires refresh Ready plus the completed steady handoff.
 Unrelated Pending/Failed gates and later readiness loss still fail.
 
+Per case the runner calibrates the hard reset at seed 61051 as the other runners do.
+It calibrates the lighting refresh on a second field at that seed: the field adopts
+the hard-reset calibration, holds steady Ready for the pre-event wait and then takes
+the case's own step. Under after-handoff a third field repeats this step with the
+measured lighting refresh noise to measure lighting steady noise. The measured run
+adopts both reasons' calibration. The validator checks every calibration field and
+step. Without `-ProgressiveRefresh` it requires each lighting refresh update to
+integrate at the refresh hysteresis. `-RapidHardReset` is a control arm: the hard
+reset that builds the old endpoint integrates at the refresh hysteresis, and every
+case declares it.
+
 For engineering attribution, use `-TransientAttribution -Tap gi -Feedback off` with
 small-step recipes. `-TraceSeed 61052,71052,81052` and
 `-PreEventSettleFrames 128,145` expand repeats; waits are minima, not update-phase
@@ -266,8 +309,9 @@ analysis requires a fresh `--output`; raw inputs and failures remain preserved.
 Engineering completion, arithmetic contracts and response quality retain separate
 verdicts. Full F7, G3 and production qualification require their own gates.
 
-`-ProgressiveRefresh` selects the default-off `field_progressive_refresh` experiment:
-one fast entry update, followed by real irradiance-history growth at steady decay.
+`-ProgressiveRefresh` selects the default-off `field_progressive_refresh` experiment
+for lighting refreshes: one fast entry update, followed by real irradiance-history
+growth at steady decay.
 The runner recalibrates noise and checks completed epoch coefficients; distance
 history and thresholds retain their existing rules. It supports seed/wait repeats
 without the historical fixed-filter attribution oracle. Passing this experiment

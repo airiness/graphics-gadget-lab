@@ -3,6 +3,8 @@
 param(
     [string[]]$Configuration = @('Develop'),
     [string[]]$Rhi = @('dx12','vulkan'),
+    # Where the calibration measures steady change RMS; see GIFieldReadinessCalibration.psm1.
+    [ValidateSet('after-timeout','after-handoff')][string]$SteadyCalibration = 'after-handoff',
     [string]$OutputDirectory,
     [string]$RunDirectory,
     [string]$Python = 'python',
@@ -12,6 +14,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Import-Module "$root/Scripts/Verification/VerificationSupport.psm1"
+Import-Module "$PSScriptRoot/GIFieldReadinessCalibration.psm1"
 $Configuration = @($Configuration | ForEach-Object { $_ -split ',' })
 $Rhi = @($Rhi | ForEach-Object { $_ -split ',' })
 if ($Configuration.Count -ne 1 -or -not $Rhi.Count -or @($Rhi | Where-Object { $_ -notin @('dx12','vulkan') }).Count) {
@@ -36,6 +39,7 @@ try {
     Write-VerificationJson "$output/binaries.json" $binaries
     Write-VerificationJson "$output/cases.json" $cases
     Write-VerificationJson "$output/backends.json" $Rhi
+    Write-GIFieldCalibrationRecipe $output $SteadyCalibration
     foreach ($backend in $Rhi) {
         $session = 'gi-ready-'+[Guid]::NewGuid().ToString('N').Substring(0,10)
         $start = $null
@@ -86,11 +90,22 @@ try {
                 if ($baselineResult.status -notin @('completed','failed')) { throw 'Baseline readiness gate did not terminate.' }
                 Write-VerificationJson "$directory/baseline-gated/receipt.json" $baselineResult
                 $noise = $baseline.frame.giField
-                $noiseChanges = @(
-                    @{id='gi_reference.field_refresh_noise';type='float';value=[float]$noise.refreshNoiseEstimate},
-                    @{id='gi_reference.field_steady_noise';type='float';value=[float]$noise.steadyNoiseEstimate},
-                    @{id='gi_reference.seed';type='uint';value=61052}
-                )
+                $steady = $null
+                if ($SteadyCalibration -eq 'after-handoff') {
+                    $steady = Measure-GIFieldSteadyAfterHandoff -SetInputs {
+                        param($v)
+                        $sigmaChanges = @($v.Keys | Sort-Object | ForEach-Object { @{id="gi_reference.$_";type='float';value=$v[$_]} })
+                        $sigmaEffect = Invoke-VerificationSession set $session @{ExpectedRunIdentity=$run;WaitConsumed=$true;
+                            Changes=(ConvertTo-Json -InputObject $sigmaChanges -Compress);TimeoutSeconds=$TimeoutSeconds}
+                        if (-not $sigmaEffect.batch.succeeded) { throw 'Steady calibration inputs were not consumed.' }
+                        $sigmaEffect
+                    } -Status { Invoke-VerificationSession status $session @{ExpectedRunIdentity=$run} } `
+                        -Calibration $noise -Directory $directory -TimeoutSeconds $TimeoutSeconds
+                }
+                $adopted = Get-GIFieldAdoptedInputs hardReset $noise $steady
+                $noiseChanges = @($adopted.Keys | Sort-Object | ForEach-Object {
+                    @{id="gi_reference.$_";type='float';value=$adopted[$_]} }) +
+                    @(@{id='gi_reference.seed';type='uint';value=61052})
                 $calibrated = Invoke-VerificationSession set $session @{ExpectedRunIdentity=$run;WaitConsumed=$true;
                     Changes=(ConvertTo-Json -InputObject $noiseChanges -Compress);TimeoutSeconds=$TimeoutSeconds}
                 if (-not $calibrated.batch.succeeded) { throw 'Measured noise profile was not consumed.' }
