@@ -2167,6 +2167,11 @@ namespace gglab
 				const auto invalid = nlohmann::json::parse(SerializeGIFieldSummary(held));
 				context.Check(GetGIFieldFrameUpdate(held) == 82 && invalid["frameUpdate"] == 82,
 					"An invalid field cannot attribute consumers to an update it will not record");
+				held.m_RefreshWaits = 5;
+				held.m_RefreshWaitMilliseconds = 1.5;
+				const auto waits = nlohmann::json::parse(SerializeGIFieldSummary(held))["refreshWaits"];
+				context.Check(waits["count"] == 5 && waits["milliseconds"] == 1.5,
+					"The summary publishes the cost of settling open refreshes");
 			}
 			auto state = MakeFrameState(false);
 			state.m_Readiness.m_GIField = GIFieldCaptureState{ .m_Generation = 73, .m_Summary = summary };

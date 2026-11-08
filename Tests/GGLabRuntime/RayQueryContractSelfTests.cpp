@@ -46,6 +46,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <deque>
 #include <initializer_list>
 #include <limits>
 #include <cstring>
@@ -1035,6 +1036,119 @@ namespace gglab
 				traceUpdates(traced.GetMeasurement()) == std::vector<uint64_t>{ 1 } &&
 				readyTrace.size() == 63,
 				"A lighting refresh starts a new trace epoch without changing retained histories");
+
+			GIFieldReadinessSnapshot openRefresh{ .m_Enabled = true, .m_Refreshing = true, .m_CompletedUpdates = 3 };
+			GIFieldReadinessSnapshot closedRefresh = openRefresh;
+			closedRefresh.m_Refreshing = false;
+			GIFieldReadinessSnapshot failedRefresh = openRefresh;
+			failedRefresh.m_Failed = true;
+			GIFieldReadinessSnapshot disabledRefresh = openRefresh;
+			disabledRefresh.m_Enabled = false;
+			context.Check(RequiresGIFieldRefreshPrefix(openRefresh, 10, 14) &&
+				!RequiresGIFieldRefreshPrefix(openRefresh, 10, 13) &&
+				!RequiresGIFieldRefreshPrefix(closedRefresh, 10, 14) &&
+				!RequiresGIFieldRefreshPrefix(failedRefresh, 10, 14) &&
+				!RequiresGIFieldRefreshPrefix(disabledRefresh, 10, 14),
+				"Only an open, healthy refresh missing one of its epoch's submitted updates must settle first");
+
+			// A simulated readback path delivers each record in submission order, some frames
+			// after it was recorded. Settling an open refresh before each record fixes the
+			// policy of every update, whatever the arrival pattern or discarded recordings.
+			struct RefreshRun
+			{
+				std::vector<bool> m_Refreshing;
+				uint64_t m_Ended = 0;
+				uint32_t m_Waits = 0;
+				bool m_Failed = false;
+			};
+			const auto simulateRefresh = [&](auto delay, bool settle, bool converging, uint32_t discard = 0)
+				{
+					struct Record
+					{
+						uint64_t m_Update = 0;
+						bool m_Refreshing = false;
+						uint64_t m_Arrival = 0;
+					};
+					GIFieldReadinessEstimator simulated;
+					simulated.Reset(readinessCounts, readinessSettings);
+					std::deque<Record> pending;
+					std::vector<GIFieldProbeChange> records(changes.size());
+					RefreshRun run;
+					const auto deliver = [&]()
+						{
+							const Record next = pending.front();
+							pending.pop_front();
+							// Steady records change every fifth update, so later decisions also
+							// depend on where the handoff landed.
+							const float change = !converging || (!next.m_Refreshing && next.m_Update % 5 == 0) ?
+								0.2f : 0.0f;
+							for (auto& probe : records)
+							{
+								probe = { .m_Change = change, .m_Active = 1, .m_Updates = uint32_t(next.m_Update) };
+							}
+							const bool wasRefreshing = simulated.GetSnapshot().m_Refreshing;
+							run.m_Failed = !simulated.Observe(next.m_Update, 0.001f, records,
+								next.m_Refreshing ? 0.5f : 0.97f, next.m_Refreshing) || run.m_Failed;
+							if (wasRefreshing && !simulated.GetSnapshot().m_Refreshing)
+							{
+								run.m_Ended = next.m_Update;
+							}
+						};
+					uint64_t submitted = 0;
+					for (uint64_t frame = 1; submitted < 260; ++frame)
+					{
+						while (!pending.empty() && pending.front().m_Arrival <= frame)
+						{
+							deliver();
+						}
+						while (settle && !pending.empty() &&
+							RequiresGIFieldRefreshPrefix(simulated.GetSnapshot(), 0, submitted))
+						{
+							deliver();
+							++run.m_Waits;
+						}
+						const bool refreshing = simulated.GetSnapshot().m_Refreshing;
+						if (discard != 0 && frame % discard == 0)
+						{
+							continue;
+						}
+						++submitted;
+						pending.push_back({ .m_Update = submitted, .m_Refreshing = refreshing,
+							.m_Arrival = frame + delay(submitted) });
+						run.m_Refreshing.push_back(refreshing);
+					}
+					return run;
+				};
+			const auto nextFrame = [](uint64_t) { return uint64_t(1); };
+			const auto twoFrames = [](uint64_t) { return uint64_t(2); };
+			const auto mixed = [](uint64_t update) { return 1 + (update * 7) % 3; };
+			const auto batched = [](uint64_t update) { return 4 - update % 4; };
+			bool settledMatches = true;
+			for (const bool converging : { true, false })
+			{
+				const auto reference = simulateRefresh(nextFrame, true, converging);
+				const uint64_t ended = converging ? 63 : gi_shader::GIFieldReadinessTimeoutUpdates;
+				const auto handsOff = [ended](const RefreshRun& run)
+					{
+						return !run.m_Failed && run.m_Ended == ended && run.m_Refreshing[ended - 1] &&
+							!run.m_Refreshing[ended] && std::ranges::count(run.m_Refreshing, true) == int64_t(ended);
+					};
+				settledMatches = settledMatches && handsOff(reference) && reference.m_Waits == 0;
+				for (const auto& run : { simulateRefresh(twoFrames, true, converging),
+					simulateRefresh(mixed, true, converging), simulateRefresh(batched, true, converging),
+					simulateRefresh(twoFrames, true, converging, 3) })
+				{
+					settledMatches = settledMatches && handsOff(run) && run.m_Waits > 0 &&
+						run.m_Refreshing == reference.m_Refreshing;
+				}
+			}
+			context.Check(settledMatches,
+				"Settling an open refresh fixes the steady policy one update after Ready or the timeout, "
+				"for late, mixed and batched readbacks and discarded recordings");
+			const auto unsettled = simulateRefresh(twoFrames, false, true);
+			context.Check(!unsettled.m_Failed && unsettled.m_Ended == 63 && unsettled.m_Refreshing[63],
+				"Without settling, a late readback keeps the refresh policy past the update after Ready");
+
 			GIUpdateStatus status;
 			context.Check(IsGIUpdateStatusValid(status, 8, 256, 1),
 				"Clean GPU status has no stale error coordinates");

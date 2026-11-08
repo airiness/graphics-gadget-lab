@@ -296,13 +296,12 @@ namespace gglab
 		}
 		using RHIDevice::ObserveFenceQueryResult;
 		using RHIDevice::ObserveGpuWaitResult;
-		// Checked CPU wait on a graphics or transfer timeline point; an invalid or foreign
-		// point fails.
-		[[nodiscard]] RHIGpuWaitResult WaitFencePoint(
-			const RHIFencePoint& fencePoint, uint32_t timeoutMilliseconds) const noexcept;
 
 	private:
 		RHIFenceQueryResult QueryFencePointImpl(const RHIFencePoint& fencePoint) const noexcept override;
+		// Checked CPU wait on a graphics or transfer timeline point; a foreign point fails.
+		RHIGpuWaitResult WaitFencePointImpl(
+			const RHIFencePoint& fencePoint, uint32_t timeoutMilliseconds) const noexcept override;
 		bool m_PixelStorageAtomics = false;
 		void Destroy() noexcept;
 		[[nodiscard]] const VulkanTimelineFence* FindTimeline(RHIFenceHandle fence) const noexcept;

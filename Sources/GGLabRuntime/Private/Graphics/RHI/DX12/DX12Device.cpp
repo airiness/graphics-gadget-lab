@@ -444,6 +444,14 @@ namespace gglab
 			RHIFenceQueryResult::Failed;
 	}
 
+	RHIGpuWaitResult DX12Device::WaitFencePointImpl(
+		const RHIFencePoint& fencePoint, uint32_t timeoutMilliseconds) const noexcept
+	{
+		return m_QueueSystem ?
+			m_QueueSystem->WaitForFenceCompletion(fencePoint, timeoutMilliseconds) :
+			RHIGpuWaitResult::Failed;
+	}
+
 	void DX12Device::RecordTextureUse(
 		RHITextureHandle texture, const DX12FencePoint& fencePoint) noexcept
 	{

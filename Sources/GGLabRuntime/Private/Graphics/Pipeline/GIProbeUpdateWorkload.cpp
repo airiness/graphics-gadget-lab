@@ -176,6 +176,9 @@ namespace gglab
 		};
 		static_assert(sizeof(FeedbackRecord) == 32 && offsetof(FeedbackRecord, m_Observation) == 16);
 
+		// Bounds one wait that settles an open refresh. Reaching it is a completion failure.
+		constexpr uint32_t RefreshPrefixWaitMilliseconds = 10'000;
+
 		// Borrowed handles only: submissions and the workload retain the actual buffers.
 		struct StatusReadback
 		{
@@ -336,6 +339,46 @@ namespace gglab
 					}
 					m_Diagnostics.m_Initialized = m_Diagnostics.m_CompletedUpdates != 0 && !m_Diagnostics.m_Failed;
 					slot.m_Fence.Reset();
+				}
+			}
+			// While a refresh is open, the next update's policy depends on every submitted
+			// update of its epoch. Wait for the oldest outstanding readback instead of
+			// recording with whichever readbacks happen to have completed, so that the
+			// handoff lands one update after the update that ended the refresh.
+			void SettleRefreshPrefix() noexcept
+			{
+				while (!m_CompletionFailed && !m_Diagnostics.m_Failed &&
+					RequiresGIFieldRefreshPrefix(m_Readiness.GetSnapshot(), m_ReadinessEpoch,
+						m_Diagnostics.m_SubmittedUpdates))
+				{
+					const StatusReadback* oldest = nullptr;
+					for (const auto& candidate : m_Readbacks)
+					{
+						if (candidate.m_Fence.IsValid() && (!oldest || candidate.m_Update < oldest->m_Update))
+						{
+							oldest = &candidate;
+						}
+					}
+					if (!oldest)
+					{
+						m_CompletionFailed = true;
+						m_Diagnostics.m_Failed = true;
+						m_Diagnostics.m_Reason = "An open field refresh has no readback for its submitted updates";
+						return;
+					}
+					const auto begin = std::chrono::steady_clock::now();
+					const auto wait = m_Device->WaitFencePoint(oldest->m_Fence, RefreshPrefixWaitMilliseconds);
+					++m_Diagnostics.m_RefreshWaits;
+					m_Diagnostics.m_RefreshWaitMilliseconds +=
+						std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - begin).count();
+					if (wait != RHIGpuWaitResult::Completed)
+					{
+						m_CompletionFailed = true;
+						m_Diagnostics.m_Failed = true;
+						m_Diagnostics.m_Reason = "An open field refresh could not settle its submitted updates";
+						return;
+					}
+					Poll();
 				}
 			}
 		};
@@ -533,6 +576,7 @@ namespace gglab
 			return RenderFrameValidationResult::ContractFailure("Probe workload requires a complete ray scene and ray interval");
 		}
 		state.m_Progress->Poll();
+		state.m_Progress->SettleRefreshPrefix();
 		if (state.m_Progress->m_Diagnostics.m_SubmittedUpdates >= UINT32_MAX)
 		{
 			return RenderFrameValidationResult::ContractFailure("Probe update index exhausted; replace the owner");

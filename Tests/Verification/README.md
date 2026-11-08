@@ -150,15 +150,18 @@ the status once the trace window is full and requires the pose to have held.
 [ValidateGIFieldReadinessRepeat.py](ValidateGIFieldReadinessRepeat.py)
 independently replays the runtime's threshold, warming, quiet-hold, blocker and
 state rules from the traced change measures. It requires every traced decision to
-match, including the refresh-to-steady handoff. Against the unchanged 120-update
-limit it reports both each seed's first Ready, which ends the refresh window, and
-the later steady Ready that the field then holds; the acceptance plan declares
-which one the limit counts. The repeat comparison covers the Ready update,
-per-update non-quiet blocks and change measures until the two runs first measure
-in different phases. A steady handoff at a different update after the same first
-Ready is a determinism finding. Otherwise, without `--change-tolerance` from the
-acceptance plan, only exact equality resolves determinism. Ready counts never
-qualify reference accuracy or stability.
+match, including the refresh-to-steady handoff. The 120-update limit counts the
+steady Ready that the field holds after the handoff; each seed's first Ready, which
+ends the refresh window, is reported as the handoff diagnostic. While a refresh is
+open, the runtime settles the readback of the last submitted update before it
+records the next one, so the steady policy starts exactly one update after the
+update that ended the refresh. The validator reports each run's handoff latency,
+which must be one, and the summary's `refreshWaits` cost of that settlement. The
+repeat comparison covers the Ready update, per-update non-quiet blocks and change
+measures until the two runs first measure in different phases. A steady handoff at
+a different update after the same first Ready is a determinism finding. Otherwise,
+without `--change-tolerance` from the acceptance plan, only exact equality resolves
+determinism. Ready counts never qualify reference accuracy or stability.
 
 Baseline, feedback, lighting-step and readiness-repeat runners accept
 `-ShaderCacheDirectory` with matching `<root>/<rhi>/ShaderCache` and

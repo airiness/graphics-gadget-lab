@@ -79,6 +79,10 @@ namespace gglab
 		double m_AllocationMilliseconds = 0;
 		double m_ShaderLookupMilliseconds = 0;
 		double m_PipelineMilliseconds = 0;
+		// CPU waits that settled an open refresh before its next update was recorded. A
+		// cost measure only: no decision depends on them.
+		uint64_t m_RefreshWaits = 0;
+		double m_RefreshWaitMilliseconds = 0;
 		bool m_Initialized = false;
 		bool m_Failed = false;
 		std::string m_Reason;

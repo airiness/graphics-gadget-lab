@@ -190,7 +190,8 @@ try {
     Invoke-VerificationPython $Python $validator @('--root',$output) "$output/oracle-result.json" 'Readiness repeat contracts failed'
     $validation = Get-Content -LiteralPath "$output/validation.json" -Raw | ConvertFrom-Json
     $summary = @{ok=$true;directory=$output;allSeedsReadyWithin120=$validation.allSeedsReadyWithin120;
-        allSeedsSteadyReadyWithin120=$validation.allSeedsSteadyReadyWithin120}
+        allSeedsSteadyReadyWithin120=$validation.allSeedsSteadyReadyWithin120;
+        allHandoffsFollowRefreshEnd=$validation.allHandoffsFollowRefreshEnd}
     Write-VerificationJson "$output/result.json" ($summary + @{readinessRepeatabilityQualified=$false})
     [Console]::Out.WriteLine(($summary | ConvertTo-Json -Compress))
 } catch {

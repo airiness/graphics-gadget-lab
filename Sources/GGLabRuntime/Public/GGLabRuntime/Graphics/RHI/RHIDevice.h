@@ -137,6 +137,15 @@ namespace gglab
 				ApplyObservedDeviceLoss(QueryFencePointImpl(fencePoint)) :
 				RHIFenceQueryResult::Failed;
 		}
+		// Checked blocking CPU wait for one point, bounded by the timeout. An invalid point
+		// fails as caller misuse; a timeout says nothing about the device.
+		[[nodiscard]] RHIGpuWaitResult WaitFencePoint(
+			const RHIFencePoint& fencePoint, uint32_t timeoutMilliseconds) const noexcept
+		{
+			return fencePoint.IsValid() ?
+				WaitFencePointImpl(fencePoint, timeoutMilliseconds) :
+				RHIGpuWaitResult::Failed;
+		}
 		// Sticky completion failures poison recording, not the native device. Only checked
 		// native results set them: pending queries, routine wait timeouts and caller misuse
 		// (invalid, unknown or off-owner points) never do; only a native loss sets the latter.
@@ -178,6 +187,13 @@ namespace gglab
 		// ObserveFenceQueryResult and fail unknown or off-owner points without observing them.
 		[[nodiscard]] virtual RHIFenceQueryResult QueryFencePointImpl(
 			const RHIFencePoint& fencePoint) const noexcept = 0;
+		// Receives only valid points. A device without a native wait answers with one
+		// checked query, which reports a pending point as Timeout.
+		[[nodiscard]] virtual RHIGpuWaitResult WaitFencePointImpl(
+			const RHIFencePoint& fencePoint, uint32_t /*timeoutMilliseconds*/) const noexcept
+		{
+			return ToRHIGpuWaitResult(QueryFencePoint(fencePoint));
+		}
 		// Records a checked native query result in the sticky health state.
 		RHIFenceQueryResult ObserveFenceQueryResult(RHIFenceQueryResult result) const noexcept
 		{

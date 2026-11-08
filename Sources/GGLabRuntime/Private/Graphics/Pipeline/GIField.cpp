@@ -411,6 +411,8 @@ namespace gglab
 				summary->m_UpdateLimit = state.m_Info.m_UpdateLimit;
 				summary->m_UpdateHeld = state.IsUpdateHeld();
 				summary->m_Readiness = state.m_Workload.GetReadiness();
+				summary->m_RefreshWaits = diagnostics.m_RefreshWaits;
+				summary->m_RefreshWaitMilliseconds = diagnostics.m_RefreshWaitMilliseconds;
 				summary->m_Invalid = diagnostics.m_Failed || state.m_Update->IsInvalid();
 				auto change = state.m_Workload.GetChangeObservation();
 				if (change && change->m_Observation.m_Field == summary->m_Field && !summary->m_Invalid)

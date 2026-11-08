@@ -659,7 +659,7 @@ namespace gglab
 		}
 	}
 
-	RHIGpuWaitResult VulkanDevice::WaitFencePoint(
+	RHIGpuWaitResult VulkanDevice::WaitFencePointImpl(
 		const RHIFencePoint& fencePoint, uint32_t timeoutMilliseconds) const noexcept
 	{
 		// Off-owner, invalid and foreign points are caller misuse, not native failures.

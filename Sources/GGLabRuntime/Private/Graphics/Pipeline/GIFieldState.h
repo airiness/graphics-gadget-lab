@@ -263,6 +263,18 @@ namespace gglab
 		bool m_Trace = false;
 	};
 
+	// The next update takes the refresh decision observed through the last submitted one.
+	// Ready and the timeout only end a refresh, so a closed refresh needs no further
+	// observation, while an open one must first observe every submitted update of its
+	// epoch. The steady policy then starts exactly one update after the update that ended
+	// the refresh, however early or late each readback completes.
+	[[nodiscard]] constexpr bool RequiresGIFieldRefreshPrefix(const GIFieldReadinessSnapshot& readiness,
+		uint64_t epochOrigin, uint64_t submittedUpdates) noexcept
+	{
+		return readiness.m_Enabled && readiness.m_Refreshing && !readiness.m_Failed &&
+			submittedUpdates > epochOrigin + readiness.m_CompletedUpdates;
+	}
+
 	[[nodiscard]] inline bool IsGIUpdateStatusValid(const GIUpdateStatus& status,
 		uint32_t probes, uint32_t rays, uint64_t submittedUpdates,
 		uint32_t irradianceInteriorWidth = gi_shader::GIProbeIrradianceInteriorWidth) noexcept

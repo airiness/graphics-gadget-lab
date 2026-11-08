@@ -184,6 +184,8 @@ namespace gglab
 
 	private:
 		RHIFenceQueryResult QueryFencePointImpl(const RHIFencePoint& fencePoint) const noexcept override;
+		RHIGpuWaitResult WaitFencePointImpl(
+			const RHIFencePoint& fencePoint, uint32_t timeoutMilliseconds) const noexcept override;
 		void InitializeWinPIX() noexcept;
 		void InitializeDXGIFactory(bool enableDebugValidation) noexcept;
 		void InitializeDXGIAdapter() noexcept;

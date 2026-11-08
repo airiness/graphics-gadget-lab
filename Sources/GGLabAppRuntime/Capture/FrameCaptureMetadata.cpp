@@ -908,6 +908,9 @@ namespace gglab
 			{ "updateLimit", summary.m_UpdateLimit },
 			{ "updateHeld", summary.m_UpdateHeld },
 			{ "frameUpdate", GetGIFieldFrameUpdate(summary) },
+			{ "refreshWaits", {
+				{ "count", summary.m_RefreshWaits },
+				{ "milliseconds", summary.m_RefreshWaitMilliseconds } } },
 			{ "initialized", summary.m_Initialized },
 			{ "invalid", summary.m_Invalid },
 			{ "inspectionAvailable", summary.m_InspectionAvailable },

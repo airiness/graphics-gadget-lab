@@ -270,6 +270,9 @@ namespace gglab
 		uint32_t m_UpdateLimit = 0;
 		bool m_UpdateHeld = false;
 		GIFieldReadinessSnapshot m_Readiness;
+		// Timing cost of settling open refreshes; never part of a decision or identity.
+		uint64_t m_RefreshWaits = 0;
+		double m_RefreshWaitMilliseconds = 0;
 		std::optional<GIObservationStamp> m_CompletedMeasurement;
 		bool m_Initialized = false;
 		bool m_Invalid = false;

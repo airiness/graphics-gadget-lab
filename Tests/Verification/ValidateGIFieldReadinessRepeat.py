@@ -10,8 +10,9 @@ stay unresolved.
 
 Two Ready updates are reported against the 120-update limit: the first Ready, which
 ends the refresh window (plan section 6.4), and the first Ready after the steady
-handoff, which earlier readiness evidence reported. Which one the exit limit counts
-belongs to the acceptance plan.
+handoff. The exit limit counts the steady Ready; the first Ready is the handoff
+diagnostic. The runtime records the update after the one that ended the refresh in
+steady mode, so every run's handoff latency must be one update.
 """
 import argparse
 import copy
@@ -178,6 +179,13 @@ def replay(updates, refresh_sigma, steady_sigma, warming=MINIMUM_WARM_UPDATES):
     return rows
 
 
+def handoff_latency(updates):
+    """Updates from the one that ended the refresh to the first recorded in steady mode."""
+    ended = next((u["update"] for u in updates if not u["refreshing"]), None)
+    steady = next((u["update"] for u in updates if u["phase"] == "steady"), None)
+    return None if ended is None or steady is None else steady-ended
+
+
 def first_update(rows, state, phase=None):
     return next((r["update"] for r in rows if r["state"] == state and (phase is None or r["phase"] == phase)), None)
 
@@ -274,6 +282,7 @@ def read_run(directory, case, calibration, spec):
                 readyWithinLimit=ready is not None and ready <= READY_LIMIT, steadyReadyUpdate=steady,
                 steadyReadyWithinLimit=steady is not None and steady <= READY_LIMIT,
                 steadyFromUpdate=next((r["update"] for r in rows if r["phase"] == "steady"), None),
+                handoffLatency=handoff_latency(updates), refreshWaits=summary.get("refreshWaits"),
                 finalState=rows[-1]["state"], tracedUpdates=len(rows), observationCrossChecked=cross_checked,
                 refreshThreshold=float(threshold(refresh_sigma)), steadyThreshold=float(threshold(steady_sigma)),
                 inputs=inputs, rows=rows)
@@ -420,8 +429,29 @@ def validate(root, tolerance=None):
                 repeatDeterminismFindings=findings,
                 allSeedsReadyWithin120=all(r["allSeedsReadyWithin120"] for r in results),
                 allSeedsSteadyReadyWithin120=all(r["allSeedsSteadyReadyWithin120"] for r in results),
-                readyLimitDefinition="undeclared", readinessRepeatabilityQualified=False, referenceAccuracyQualified=False,
+                handoffLatencies=sorted({run["handoffLatency"] for r in results for run in r["runs"]} - {None}),
+                allHandoffsFollowRefreshEnd=all(run["handoffLatency"] == 1 for r in results for run in r["runs"]
+                                                if run["handoffLatency"] is not None),
+                refreshWaits=wait_totals(results),
+                readyLimitDefinition="steady-ready", readinessRepeatabilityQualified=False,
+                referenceAccuracyQualified=False,
                 temporalStabilityQualified=False)
+
+
+def wait_totals(results):
+    """Per-backend cost of settling open refreshes; runs without the measure are counted apart."""
+    totals = {}
+    for r in results:
+        entry = totals.setdefault(r["backend"], dict(runs=0, unmeasuredRuns=0, count=0, milliseconds=0.0))
+        for run in r["runs"]:
+            waits = run["refreshWaits"]
+            if waits is None:
+                entry["unmeasuredRuns"] += 1
+                continue
+            entry["runs"] += 1
+            entry["count"] += waits["count"]
+            entry["milliseconds"] += waits["milliseconds"]
+    return totals
 
 
 def simulate(measures, refresh_sigma, steady_sigma, steady_after=3):
@@ -537,6 +567,15 @@ def self_test():
                     rows=rows)
     base = run(quiet)
     require(compare_repeat(base, run(quiet))["verdict"] == "byte-identical", "Exact equality")
+    checks += 1
+    require(handoff_latency(simulate(quiet, refresh, steady, steady_after=1)) == 1 and
+            handoff_latency(simulate(quiet, refresh, steady, steady_after=2)) == 2 and
+            handoff_latency(simulate([[(1.0, 1.0)]*4]*10, refresh, steady)) is None,
+            "Handoff latency counts from the update that ended the refresh")
+    checks += 1
+    totals = wait_totals([dict(backend="dx12", runs=[dict(refreshWaits=dict(count=3, milliseconds=1.5)),
+                                                     dict(refreshWaits=None)])])
+    require(totals == dict(dx12=dict(runs=1, unmeasuredRuns=1, count=3, milliseconds=1.5)), "Wait totals")
     checks += 1
     nudged = [[(float(np.nextafter(np.float32(0.01), np.float32(1))), 0.04) if b == (0.01, 0.04) else b
                for b in u] for u in quiet]
