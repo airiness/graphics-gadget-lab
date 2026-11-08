@@ -120,7 +120,7 @@ namespace gglab
 		MarkProjDirty();
 	}
 
-	void Camera::LookAt(const Vector3& eye, const Vector3& target) noexcept
+	void Camera::SetLookAt(const Vector3& eye, const Vector3& target) noexcept
 	{
 		m_Position = eye;
 
@@ -128,6 +128,11 @@ namespace gglab
 		ComputeYawPitchFromForward(forward);
 
 		MarkViewDirty();
+	}
+
+	void Camera::LookAt(const Vector3& eye, const Vector3& target) noexcept
+	{
+		SetLookAt(eye, target);
 		RequestTemporalReset();
 	}
 

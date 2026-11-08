@@ -173,10 +173,9 @@ namespace gglab
 		}
 		else
 		{
-			// Same yaw/pitch convention as LookAt, without requesting a temporal reset.
-			camera.SetPosition(pose->m_Position);
-			camera.SetYawPitch(std::atan2(forward.m_X, forward.m_Z),
-				std::asin(std::clamp(forward.m_Y, -1.0f, 1.0f)));
+			// The LookAt derivation without a reset: a held pose must reproduce its cut
+			// exactly, because static observations compare receivers bit for bit.
+			camera.SetLookAt(pose->m_Position, pose->m_Target);
 		}
 		camera.SetFov(pose->m_VerticalFovDegrees);
 		camera.SetNearFar(path->m_NearPlane, path->m_FarPlane);

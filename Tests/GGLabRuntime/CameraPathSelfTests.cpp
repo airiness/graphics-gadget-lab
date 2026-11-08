@@ -5,6 +5,7 @@
 #include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabRuntime/Graphics/CameraRig.h"
 
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <optional>
@@ -151,6 +152,35 @@ namespace gglab
 			context.Check(!rig.ApplyCameraPathFrame("SEQ_Test", 7) &&
 				!rig.ApplyCameraPathFrame("SEQ_Missing", 0),
 				"Missing paths and frames past the end are not applied");
+
+			// A held pose must reproduce its cut exactly: static observation windows compare
+			// every frame's receivers bit for bit. Without LookAt's derivation, a held frame
+			// on this direction differs from the cut by an ulp.
+			const Vector3 heldPosition = { 0.0f, 1.6f, 1.4f };
+			const Vector3 heldTarget = Vector3::Zero;
+			CameraPath held = MakePath({ MakeKey(0, 0.0f), MakeKey(4, 0.0f) });
+			held.m_Id = "SEQ_Held";
+			for (CameraPathKey& key : held.m_Keys)
+			{
+				key.m_Position = heldPosition;
+				key.m_Target = heldTarget;
+			}
+			Camera reference(Camera::CreateInfo{});
+			reference.LookAt(heldPosition, heldTarget);
+			reference.Update();
+			const bool heldRegistered = rig.SetCameraPaths({ held });
+			const bool heldCut = rig.ApplyCameraPathFrame("SEQ_Held", 0).has_value();
+			const float cutYaw = camera.GetYaw();
+			const float cutPitch = camera.GetPitch();
+			const std::array<float, 16> cutView = camera.GetViewMatrix().ToArray();
+			const uint64_t heldSerial = camera.GetTemporalResetSerial();
+			const bool heldFrame = rig.ApplyCameraPathFrame("SEQ_Held", 2).has_value();
+			context.Check(heldRegistered && heldCut && heldFrame &&
+				camera.GetTemporalResetSerial() == heldSerial && camera.GetYaw() == cutYaw &&
+				camera.GetPitch() == cutPitch && camera.GetViewMatrix().ToArray() == cutView &&
+				cutYaw == reference.GetYaw() && cutPitch == reference.GetPitch() &&
+				cutView == reference.GetViewMatrix().ToArray(),
+				"A held path pose derives the same orientation as LookAt, without a reset");
 		}
 	}
 
