@@ -945,6 +945,96 @@ namespace gglab
 			context.Check(estimator.GetSnapshot().m_State == GIFieldReadinessState::Settling &&
 				estimator.GetSnapshot().m_CompletedUpdates == 0 && estimator.GetSnapshot().m_ReadyUpdate == 0,
 				"A published lighting refresh keeps field history but starts a new Settling epoch");
+
+			const auto traceUpdates = [](const std::shared_ptr<const GIFieldReadinessMeasurement>& measurement)
+				{
+					std::vector<uint64_t> updates;
+					for (const auto* record = measurement ? measurement->m_Trace.get() : nullptr; record;
+						record = record->m_Previous.get())
+					{
+						updates.push_back(record->m_Readiness.m_CompletedUpdates);
+					}
+					std::ranges::reverse(updates);
+					return updates;
+				};
+			const auto sameBlocks = [](const std::vector<GIFieldBlockMeasurement>& left,
+				const std::vector<GIFieldBlockMeasurement>& right)
+				{
+					return std::ranges::equal(left, right, [](const auto& a, const auto& b)
+						{
+							return a.m_ActiveProbes == b.m_ActiveProbes && a.m_Percentile95 == b.m_Percentile95 &&
+								a.m_Maximum == b.m_Maximum && a.m_QuietUpdates == b.m_QuietUpdates &&
+								a.m_Blockers == b.m_Blockers && a.m_WarmingMet == b.m_WarmingMet &&
+								a.m_CurrentQuiet == b.m_CurrentQuiet;
+						});
+				};
+			GIFieldReadinessEstimator traced;
+			GIFieldReadinessEstimator untraced;
+			traced.Reset(readinessCounts, readinessSettings, false, true);
+			untraced.Reset(readinessCounts, readinessSettings);
+			bool sameDecisions = true;
+			bool tracedCurrent = true;
+			std::shared_ptr<const GIFieldReadinessMeasurement> tracedReady;
+			for (uint32_t update = 1; update <= 250; ++update)
+			{
+				for (auto& probe : changes)
+				{
+					probe = { .m_Change = update > 63 && update % 7 == 0 ? 0.2f : 0, .m_Active = 1,
+						.m_Updates = update };
+				}
+				sameDecisions = sameDecisions && traced.Observe(update, 0.001f, changes) &&
+					untraced.Observe(update, 0.001f, changes);
+				const auto withTrace = traced.GetMeasurement();
+				const auto without = untraced.GetMeasurement();
+				if (!withTrace || !without)
+				{
+					sameDecisions = false;
+					continue;
+				}
+				const auto& readiness = withTrace->m_Readiness;
+				sameDecisions = sameDecisions && !without->m_Trace &&
+					readiness.m_State == without->m_Readiness.m_State &&
+					readiness.m_ReadyUpdate == without->m_Readiness.m_ReadyUpdate &&
+					readiness.m_QuietBlocks == without->m_Readiness.m_QuietBlocks &&
+					sameBlocks(withTrace->m_Blocks, without->m_Blocks);
+				if (update <= GIFieldReadinessTraceUpdates)
+				{
+					const auto* record = withTrace->m_Trace.get();
+					tracedCurrent = tracedCurrent && record &&
+						record->m_Readiness.m_CompletedUpdates == update && record->m_RefreshMode &&
+						record->m_Readiness.m_State == readiness.m_State &&
+						record->m_Readiness.m_ReadyUpdate == readiness.m_ReadyUpdate &&
+						sameBlocks(record->m_Blocks, withTrace->m_Blocks);
+				}
+				if (update == 63)
+				{
+					tracedReady = withTrace;
+				}
+			}
+			context.Check(sameDecisions,
+				"A readiness trace observes decisions without changing any snapshot or block measurement");
+			context.Check(tracedCurrent,
+				"Each traced update publishes its own final snapshot and block decisions as the newest record");
+			const auto readyTrace = traceUpdates(tracedReady);
+			context.Check(tracedReady && tracedReady->m_Readiness.m_State == GIFieldReadinessState::Ready &&
+				readyTrace.size() == 63 && readyTrace.front() == 1 && readyTrace.back() == 63 &&
+				std::ranges::adjacent_find(readyTrace, [](uint64_t a, uint64_t b) { return b != a + 1; }) ==
+					readyTrace.end(),
+				"A retained Ready measurement keeps its contiguous history from the first update");
+			const auto boundedTrace = traceUpdates(traced.GetMeasurement());
+			context.Check(traced.GetMeasurement()->m_Readiness.m_CompletedUpdates == 250 &&
+				boundedTrace.size() == GIFieldReadinessTraceUpdates && boundedTrace.front() == 1 &&
+				boundedTrace.back() == GIFieldReadinessTraceUpdates,
+				"The trace keeps exactly the timeout window and then stops growing");
+			traced.Reset(readinessCounts, readinessSettings, true, true);
+			for (auto& probe : changes)
+			{
+				probe.m_Updates = 1;
+			}
+			context.Check(!traced.GetMeasurement() && traced.Observe(1, 0.001f, changes) &&
+				traceUpdates(traced.GetMeasurement()) == std::vector<uint64_t>{ 1 } &&
+				readyTrace.size() == 63,
+				"A lighting refresh starts a new trace epoch without changing retained histories");
 			GIUpdateStatus status;
 			context.Check(IsGIUpdateStatusValid(status, 8, 256, 1),
 				"Clean GPU status has no stale error coordinates");

@@ -195,6 +195,7 @@ namespace gglab
 			bool m_StorageInitialized = false;
 			GIFieldReadinessEstimator m_Readiness;
 			GIFieldReadinessSettings m_ReadinessSettings;
+			bool m_ReadinessTrace = false;
 			GIFieldIntegrationHistory m_IrradianceHistory;
 			GIFieldIntegrationHistory m_DistanceHistory;
 			GIFieldFeedbackSnapshot m_Feedback;
@@ -398,7 +399,7 @@ namespace gglab
 
 	GIProbeUpdateWorkload::GIProbeUpdateWorkload(std::shared_ptr<RayScene> scene,
 		GIProbeUpdateProfile profile, bool field, GIFieldReadinessSettings readiness, bool feedback,
-		bool progressiveSampling) noexcept :
+		bool progressiveSampling, bool readinessTrace) noexcept :
 		m_State(std::make_unique<State>())
 	{
 		m_State->m_Scene = std::move(scene);
@@ -407,9 +408,11 @@ namespace gglab
 		m_State->m_ProgressiveSampling = field && progressiveSampling;
 		readiness.m_Enabled = field && readiness.m_Enabled;
 		m_State->m_Progress->m_ReadinessSettings = readiness;
+		m_State->m_Progress->m_ReadinessTrace = readinessTrace;
 		m_State->m_Progress->m_Feedback.m_Enabled = field && feedback;
 		m_State->m_Progress->m_Readiness.Reset(
-			ValidateGIProbeUpdateProfile(profile) ? profile.m_Counts : std::array<uint32_t, 3>{}, readiness);
+			ValidateGIProbeUpdateProfile(profile) ? profile.m_Counts : std::array<uint32_t, 3>{}, readiness,
+			false, readinessTrace);
 	}
 	GIProbeUpdateWorkload::~GIProbeUpdateWorkload() = default;
 	std::shared_ptr<RayScene> GIProbeUpdateWorkload::GetRayScene() const noexcept { return m_State->m_Scene; }
@@ -503,7 +506,8 @@ namespace gglab
 		progress.m_CompletedObservation.reset();
 		progress.m_ChangeObservation.reset();
 		progress.m_RefreshDistance = false;
-		progress.m_Readiness.Reset(m_State->m_Profile.m_Counts, progress.m_ReadinessSettings, true);
+		progress.m_Readiness.Reset(m_State->m_Profile.m_Counts, progress.m_ReadinessSettings, true,
+			progress.m_ReadinessTrace);
 	}
 
 	std::array<uint64_t, GIProbeUpdateWorkload::ProgramCount> GIProbeUpdateWorkload::GetShaderGenerations() const noexcept

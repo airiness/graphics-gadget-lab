@@ -306,7 +306,8 @@ namespace gglab
 		State(GIFieldCreateInfo info) noexcept :
 			m_Info(std::move(info)), m_Profile(std::make_shared<GIFieldProfileReceipt>(ProfileReceipt(m_Info))),
 			m_Workload(m_Info.m_RayScene, UpdateProfile(m_Info), true,
-				m_Info.m_Readiness, m_Info.m_EnableFeedback, m_Info.m_ProgressiveSampling)
+				m_Info.m_Readiness, m_Info.m_EnableFeedback, m_Info.m_ProgressiveSampling,
+				m_Info.m_ReadinessTrace)
 		{
 			if (m_Info.m_ReceiverList && ValidReceiverList(*m_Info.m_ReceiverList))
 			{

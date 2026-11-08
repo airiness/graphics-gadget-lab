@@ -51,15 +51,20 @@ namespace gglab
 		}
 	};
 
+	static_assert(GIFieldReadinessTraceUpdates == gi_shader::GIFieldReadinessTimeoutUpdates);
+
 	class GIFieldReadinessEstimator final
 	{
 	public:
+		// A trace observes this epoch's decisions only; it never changes them.
 		void Reset(std::array<uint32_t, 3> counts, GIFieldReadinessSettings settings,
-			bool lightingRefresh = false) noexcept
+			bool lightingRefresh = false, bool trace = false) noexcept
 		{
 			m_Counts = counts;
 			m_Settings = settings;
 			m_LightingRefresh = lightingRefresh;
+			m_Trace = trace;
+			m_TraceTail.reset();
 			m_Snapshot = { .m_State = lightingRefresh ? GIFieldReadinessState::Settling : GIFieldReadinessState::Initializing,
 				.m_Enabled = settings.m_Enabled, .m_Refreshing = settings.m_Enabled,
 				.m_NoiseSigma = settings.m_NoiseSigma,
@@ -231,6 +236,13 @@ namespace gglab
 				m_Snapshot.m_Refreshing = m_Snapshot.m_Refreshing && update < gi_shader::GIFieldReadinessTimeoutUpdates;
 			}
 			measurement->m_Readiness = m_Snapshot;
+			if (m_Trace && update <= GIFieldReadinessTraceUpdates)
+			{
+				GIFieldReadinessTraceUpdate record{ .m_Readiness = m_Snapshot, .m_RefreshMode = refresh,
+					.m_Blocks = measurement->m_Blocks, .m_Previous = std::move(m_TraceTail) };
+				m_TraceTail = std::make_shared<const GIFieldReadinessTraceUpdate>(std::move(record));
+			}
+			measurement->m_Trace = m_TraceTail;
 			m_Measurement = std::move(measurement);
 			return true;
 		}
@@ -240,6 +252,7 @@ namespace gglab
 		GIFieldReadinessSettings m_Settings;
 		GIFieldReadinessSnapshot m_Snapshot;
 		std::shared_ptr<const GIFieldReadinessMeasurement> m_Measurement;
+		std::shared_ptr<const GIFieldReadinessTraceUpdate> m_TraceTail;
 		std::vector<uint32_t> m_QuietUpdates;
 		std::array<std::vector<double>, 2> m_NoiseSquares;
 		std::array<uint32_t, 2> m_NoiseSamples{};
@@ -247,6 +260,7 @@ namespace gglab
 		bool m_HasMode = false;
 		bool m_RefreshMode = true;
 		bool m_LightingRefresh = false;
+		bool m_Trace = false;
 	};
 
 	[[nodiscard]] inline bool IsGIUpdateStatusValid(const GIUpdateStatus& status,

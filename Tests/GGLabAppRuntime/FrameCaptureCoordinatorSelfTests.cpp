@@ -2454,6 +2454,29 @@ namespace gglab
 				changeJson["probeVisualization"]["mode"] == "change" &&
 				changeJson["probeVisualization"]["schemaVersion"] == 7,
 				"Change metadata shares the completed observation and preserves Excluded/null semantics");
+			context.Check(changeJson["readinessTrace"].is_null(),
+				"A field without an opt-in trace reports no readiness history");
+			auto first = std::make_shared<GIFieldReadinessTraceUpdate>();
+			first->m_Readiness = { .m_State = GIFieldReadinessState::Warming, .m_CompletedUpdates = 4 };
+			first->m_RefreshMode = true;
+			first->m_Blocks.push_back({ .m_ActiveProbes = 64, .m_Percentile95 = 0.5f, .m_Maximum = 0.75f,
+				.m_Blockers = 15 });
+			auto latest = std::make_shared<GIFieldReadinessTraceUpdate>();
+			latest->m_Readiness = { .m_State = GIFieldReadinessState::Ready, .m_CompletedUpdates = 5,
+				.m_ReadyUpdate = 5, .m_Threshold = 0.25f };
+			latest->m_Blocks.push_back({});
+			latest->m_Previous = first;
+			measurement->m_Trace = latest;
+			const auto traceJson = nlohmann::json::parse(SerializeGIFieldSummary(summary))["readinessTrace"];
+			context.Check(traceJson["schemaVersion"] == 1 && traceJson["capacity"] == 240 &&
+				traceJson["field"]["refreshEpoch"] == 2 && traceJson["updates"].size() == 2 &&
+				traceJson["updates"][0]["update"] == 4 && traceJson["updates"][0]["phase"] == "refresh" &&
+				traceJson["updates"][0]["p95"][0] == 0.5f && traceJson["updates"][0]["blockers"][0] == 15 &&
+				traceJson["updates"][1]["state"] == "Ready" && traceJson["updates"][1]["phase"] == "steady" &&
+				traceJson["updates"][1]["readyUpdate"] == 5 && traceJson["updates"][1]["threshold"] == 0.25f &&
+				traceJson["updates"][1]["p95"][0].is_null() && traceJson["updates"][1]["activeProbes"][0] == 0,
+				"A readiness trace lists its updates oldest first with per-block decisions and null statistics");
+			measurement->m_Trace.reset();
 			context.Check(changeJson["profile"].is_null(),
 				"Absent profile receipts remain unavailable instead of inventing a qualified default");
 			auto profile = std::make_shared<GIFieldProfileReceipt>();

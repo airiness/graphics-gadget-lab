@@ -93,6 +93,20 @@ namespace gglab
 		bool m_CurrentQuiet = false;
 	};
 
+	// Updates retained by an opt-in readiness trace, equal to the Unconverged timeout.
+	inline constexpr uint32_t GIFieldReadinessTraceUpdates = 240;
+
+	// One estimator update of an opt-in diagnostic trace: its final snapshot and block
+	// decisions, without per-probe values. Records never change once published.
+	struct GIFieldReadinessTraceUpdate
+	{
+		GIFieldReadinessSnapshot m_Readiness;
+		bool m_RefreshMode = false;
+		std::vector<GIFieldBlockMeasurement> m_Blocks;
+		// The preceding update of the same readiness epoch; null for its first update.
+		std::shared_ptr<const GIFieldReadinessTraceUpdate> m_Previous;
+	};
+
 	// Owned CPU values from one successful estimator observation. No GPU owners.
 	struct GIFieldReadinessMeasurement
 	{
@@ -105,6 +119,9 @@ namespace gglab
 		GIFieldReadinessSnapshot m_Readiness;
 		std::vector<GIFieldProbeMeasurement> m_Probes;
 		std::vector<GIFieldBlockMeasurement> m_Blocks;
+		// Newest record of the opt-in trace since this epoch's reset, or null when
+		// disabled. It is this update until the trace window ends, then the last kept.
+		std::shared_ptr<const GIFieldReadinessTraceUpdate> m_Trace;
 	};
 
 	// Frozen before graph construction, from fence-completed measurement records.

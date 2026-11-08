@@ -59,6 +59,7 @@ namespace gglab
 		const LabParameterId FieldRefreshNoiseId("gi_reference.field_refresh_noise");
 		const LabParameterId FieldSteadyNoiseId("gi_reference.field_steady_noise");
 		const LabParameterId FieldUpdateLimitId("gi_reference.field_update_limit");
+		const LabParameterId FieldReadinessTraceId("gi_reference.field_readiness_trace");
 		const LabParameterId ProbeEnabledId("gi_reference.probe_enabled");
 		const LabParameterId ProbeRaysId("gi_reference.probe_rays");
 		const LabParameterId ProbeDivisorId("gi_reference.probe_divisor");
@@ -407,6 +408,9 @@ namespace gglab
 			.m_Group = "GI field", .m_Type = LabParameterType::UInt,
 			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = uint32_t(0),
 			.m_MinValue = LabValue(uint32_t(0)), .m_MaxValue = LabValue(GIProbeUpdateLimits::MaximumUpdateCount) }));
+		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldReadinessTraceId, .m_Name = "Trace readiness updates",
+			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
+			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = false }));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldReadinessId, .m_Name = "Observe field readiness and refresh",
 			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
 			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = true }));
@@ -1088,6 +1092,7 @@ namespace gglab
 				info.m_RaysPerProbe = GetParameters().Get(ProbeRaysId, uint32_t(256));
 				info.m_Seed = GetParameters().Get(SeedId, GIObservationLimits::DefaultSeed);
 				info.m_UpdateLimit = GetParameters().Get(FieldUpdateLimitId, uint32_t(0));
+				info.m_ReadinessTrace = GetParameters().Get(FieldReadinessTraceId, false);
 				if (IsCoastalGIFixture(fixture))
 				{
 					info.m_Volume = CoastalSceneGIFieldVolume;

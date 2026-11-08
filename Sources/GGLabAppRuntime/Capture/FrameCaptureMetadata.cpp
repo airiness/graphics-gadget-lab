@@ -5,6 +5,7 @@
 #include "GGLabFoundation/Hash/Sha256.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIFieldProfile.h"
 
+#include <algorithm>
 #include <cmath>
 #include <array>
 #include <cstdint>
@@ -16,6 +17,7 @@
 #include <type_traits>
 #include <utility>
 #include <variant>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
@@ -675,6 +677,76 @@ namespace gglab
 				{ "blocks", std::move(blocks) } };
 		}
 
+		// The opt-in estimator history, oldest first. Each update holds its final snapshot
+		// and the changeObservation block fields as per-block arrays in block order.
+		nlohmann::json GIReadinessTraceJson(const std::shared_ptr<const GIFieldChangeObservation>& observation)
+		{
+			using Json = nlohmann::json;
+			if (!observation || !observation->m_Measurement->m_Trace)
+			{
+				return nullptr;
+			}
+			std::vector<const GIFieldReadinessTraceUpdate*> records;
+			for (const auto* record = observation->m_Measurement->m_Trace.get(); record;
+				record = record->m_Previous.get())
+			{
+				records.push_back(record);
+			}
+			std::ranges::reverse(records);
+			Json updates = Json::array();
+			for (const auto* record : records)
+			{
+				const auto& readiness = record->m_Readiness;
+				Json activeProbes = Json::array();
+				Json p95 = Json::array();
+				Json maximum = Json::array();
+				Json quietUpdates = Json::array();
+				Json blockers = Json::array();
+				Json currentQuiet = Json::array();
+				for (const auto& block : record->m_Blocks)
+				{
+					activeProbes.push_back(block.m_ActiveProbes);
+					p95.push_back(block.m_Percentile95 ? Json(*block.m_Percentile95) : Json(nullptr));
+					maximum.push_back(block.m_Maximum ? Json(*block.m_Maximum) : Json(nullptr));
+					quietUpdates.push_back(block.m_QuietUpdates);
+					blockers.push_back(block.m_Blockers);
+					currentQuiet.push_back(block.m_CurrentQuiet);
+				}
+				updates.push_back({
+					{ "update", readiness.m_CompletedUpdates },
+					{ "state", GetGIFieldReadinessName(readiness.m_State) },
+					{ "phase", record->m_RefreshMode ? "refresh" : "steady" },
+					{ "readyUpdate", readiness.m_ReadyUpdate },
+					{ "refreshing", readiness.m_Refreshing },
+					{ "hysteresis", readiness.m_Hysteresis },
+					{ "noiseSigma", readiness.m_NoiseSigma },
+					{ "threshold", readiness.m_Threshold },
+					{ "irradianceFloor", readiness.m_IrradianceFloor },
+					{ "activeBlocks", readiness.m_ActiveBlocks },
+					{ "excludedBlocks", readiness.m_ExcludedBlocks },
+					{ "quietBlocks", readiness.m_QuietBlocks },
+					{ "maximumChange", readiness.m_MaximumChange },
+					{ "activeProbes", std::move(activeProbes) },
+					{ "p95", std::move(p95) },
+					{ "maximum", std::move(maximum) },
+					{ "quietUpdates", std::move(quietUpdates) },
+					{ "blockers", std::move(blockers) },
+					{ "currentQuiet", std::move(currentQuiet) } });
+			}
+			const auto& data = *observation->m_Measurement;
+			return {
+				{ "schemaVersion", 1 },
+				{ "field", GIIdentityJson(observation->m_Observation.m_Field) },
+				{ "capacity", GIFieldReadinessTraceUpdates },
+				{ "counts", data.m_Counts },
+				{ "blockWidth", data.m_BlockWidth },
+				{ "blockOrder", "x + Bx * (z + Bz * y)" },
+				{ "warmingUpdates", data.m_WarmingUpdates },
+				{ "requiredQuietUpdates", data.m_RequiredQuietUpdates },
+				{ "blockerBits", { { "warming", 1 }, { "p95", 2 }, { "maximum", 4 }, { "quietHold", 8 } } },
+				{ "updates", std::move(updates) } };
+		}
+
 		nlohmann::json GIProbeVisualizationJson(const GIProbeVisualizationSnapshot& snapshot)
 		{
 			using Json = nlohmann::json;
@@ -843,6 +915,7 @@ namespace gglab
 			{ "receiverMarkersAvailable", summary.m_ReceiverMarkersAvailable },
 			{ "classificationCounts", nullptr },
 			{ "changeObservation", GIChangeObservationJson(summary.m_ChangeObservation) },
+			{ "readinessTrace", GIReadinessTraceJson(summary.m_ChangeObservation) },
 			{ "changeState", summary.m_Invalid ? "failed-or-unknown-completion" :
 				!summary.m_Readiness.m_Enabled ? "disabled" : summary.m_ChangeObservation ? "completed" : "pending" },
 			{ "probeVisualization", GIProbeVisualizationJson(summary.m_Visualization) },

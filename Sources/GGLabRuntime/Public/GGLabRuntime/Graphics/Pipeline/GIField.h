@@ -69,6 +69,8 @@ namespace gglab
 		// Diagnostic hold; zero is unlimited. After this many full updates the field
 		// records none, and later frames sample the contents of the last update.
 		uint32_t m_UpdateLimit = 0;
+		// Diagnostic CPU history of readiness decisions; never changes the field or them.
+		bool m_ReadinessTrace = false;
 		std::optional<GIReceiverListQuery> m_ReceiverList;
 	};
 
