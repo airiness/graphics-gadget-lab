@@ -77,7 +77,8 @@ fixtures, resource meanings and reference qualification. Select the relevant sui
 | `gi-field` | Static full-field update and lifecycle |
 | `gi-field-sampling` | FP64 receiver interpolation, support/coverage, Forward composition and GI-off controls |
 | `gi-field-readiness` | Completed-update change reduction, calibrated refresh/steady noise and capture gating |
-| `gi-field-baseline` | Feedback-off D=1 reference accuracy and 120 consecutive Ready-plus-120 observations |
+| `gi-field-readiness-repeat` | Hard-reset Ready counts over trace seeds and a same-seed repeat; see below |
+| `gi-field-baseline` | Feedback-off D=1 reference accuracy and 120 consecutive Ready-plus-120 observations, with F3/F5 limits |
 | `gi-field-feedback` | Previous-field transport, safe toggles, support accounting and age-one consumption |
 | `gi-field-light-step` | Published-lighting response; see below |
 | `gi-field-camera-independence` | F6 held pose-specific fields, per-view lookups and the frozen receiver list; see below |
@@ -112,9 +113,57 @@ policy. Feedback-off captures are settled toggle controls, not complete paired
 single-bounce baseline qualifications. Static and lighting-response qualification
 remain separate; neither admits combined-policy Final or attribution.
 
-Baseline, feedback and lighting-step runners accept `-ShaderCacheDirectory` with
-matching `<root>/<rhi>/ShaderCache` and `ShaderArtifacts` seeds. They copy artifacts
-into isolated state and preserve normal identity validation.
+Baseline F3 cases cover the thin-wall interior back wall, floor and ceiling plus
+the exterior roof, whose D=1 reference must equal pi L. F5 cases cover the
+doorway strip and the supplementary right-floor/far-corner view. F5 gates
+ray-traced/raster receiver correspondence on the union of its declared masks and
+reports the whole-image result, whose far left-room floor exceeds the bound. Their
+G3 gates are readiness and temporal stability; energy and leakage are G4 measurements
+written to `limits.json` by [ValidateGIFieldLimits.py](ValidateGIFieldLimits.py).
+Stability against a dark or zero reference and the local-leakage metric
+`(GI - ref) / max(ref, floor)` need a predeclared floor. `-LimitPolicy` supplies
+per-fixture absolute `stabilityFloor`/`leakageFloor` luminance values. Without
+them, a stability result that passes at the numerical floor still passes, others
+remain undetermined, and leakage is reported over a floor sweep relative to the
+F3 roof or F5 right-floor reference mean, never as a verdict. The F5 right floor
+receives only doorway sky at D=1, so its sweep is a scale, not a lit basis.
+
+### Readiness repeatability
+
+[TestGIFieldReadinessRepeat.ps1](TestGIFieldReadinessRepeat.ps1) runs the default
+single-bounce recipe for F1 sphere and plane, F2, F3, F4, F5 and F6 (the F4 field
+from the F6 west pose). It enables the observation-only `field_readiness_trace`
+parameter. The runtime then keeps every readiness update of the field's epoch, up
+to the 240-update timeout, in the status and capture summary as `readinessTrace`.
+Each record holds the update's snapshot and its block change measures and
+decisions. Sequences cannot observe a field that is still settling, because they
+require every readiness gate to stay Ready.
+
+Per case the runner calibrates refresh/steady noise at seed 61051 from the
+uncalibrated minimum, then adopts the measured noise. Each trace seed (default
+61052, 71052, 81052) and a final same-seed repeat (`-RepeatSeed`, default 61052)
+hard-resets the field. The rebuild restores the fixture's first view, so a
+next-frame capture then poses the case's reference view. Its metadata records the
+run's complete inputs and the field update the pose reached. The runner records
+the status once the trace window is full and requires the pose to have held.
+
+[ValidateGIFieldReadinessRepeat.py](ValidateGIFieldReadinessRepeat.py)
+independently replays the runtime's threshold, warming, quiet-hold, blocker and
+state rules from the traced change measures. It requires every traced decision to
+match, including the refresh-to-steady handoff. Against the unchanged 120-update
+limit it reports both each seed's first Ready, which ends the refresh window, and
+the later steady Ready that the field then holds; the acceptance plan declares
+which one the limit counts. The repeat comparison covers the Ready update,
+per-update non-quiet blocks and change measures until the two runs first measure
+in different phases. A steady handoff at a different update after the same first
+Ready is a determinism finding. Otherwise, without `--change-tolerance` from the
+acceptance plan, only exact equality resolves determinism. Ready counts never
+qualify reference accuracy or stability.
+
+Baseline, feedback, lighting-step and readiness-repeat runners accept
+`-ShaderCacheDirectory` with matching `<root>/<rhi>/ShaderCache` and
+`ShaderArtifacts` seeds. They copy artifacts into isolated state and preserve
+normal identity validation.
 
 ### F6 camera independence
 

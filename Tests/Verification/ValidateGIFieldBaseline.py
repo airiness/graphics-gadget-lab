@@ -20,6 +20,8 @@ from ValidateGIFieldReadiness import records as readiness_records
 
 FRAME_COUNT = 120
 FLOOR = 1e-6
+# World-space ray-traced/raster receiver position agreement, in metres.
+CORRESPONDENCE_BOUND = 2e-4
 SEEDS = (61051, 61052)
 COMPONENTS = ("Irradiance", "SunIrradiance", "EnvironmentIrradiance")
 CASES = {
@@ -28,6 +30,20 @@ CASES = {
     "sunroom": dict(fixture=4, view="F4_Floor", counts=[18, 18, 18]),
     "sunroom-back": dict(fixture=4, view="F4_Back", counts=[18, 18, 18]),
     "black": dict(fixture=19, view="F2_Interior", counts=[9, 9, 9]),
+    "thin": dict(fixture=3, view="F3_Interior", counts=[9, 9, 9]),
+    "thin-floor": dict(fixture=3, view="F3_Floor", counts=[9, 9, 9]),
+    "thin-ceiling": dict(fixture=3, view="F3_Ceiling", counts=[9, 9, 9]),
+    "thin-roof": dict(fixture=3, view="F3_Roof", counts=[9, 9, 9]),
+    "doorway": dict(fixture=20, view="F5_Doorway", counts=[11, 7, 7]),
+    "parallel-floor": dict(fixture=20, view="F5_Floor", counts=[11, 7, 7]),
+}
+# F3/F5 energy and leakage are measured here and gated at G4; G3 gates their
+# readiness and stability. Their stability verdict depends on a declared dark floor.
+LIMIT_FIXTURES = (3, 20)
+ROOM_PATCHES = {"Interior": "back", "Floor": "floor", "Ceiling": "ceiling", "Roof": "roof"}
+FIELD_PROFILES = {
+    0: ([-3, -3, -3], .5, 6), 1: ([-3, -3, -3], .5, 6), 2: ([-4, -2, -4], 1., 6), 3: ([-4, -2, -4], 1., 6),
+    4: ([-3.125, -1.3125, -3.0625], .375, 30), 19: ([-4, -2, -4], 1., 6), 20: ([-5, -1, -3], 1., 6),
 }
 DEFAULTS = dict(fixture=0, seed=61051, depth=1, samples=64, batch_samples=64,
                 albedo=0, secondary_albedo=0, environment=0, ev100=10,
@@ -98,13 +114,13 @@ def validate_frame(frame, case, field):
     require(lighting["active"]["generation"] == lighting["requested"]["generation"] ==
             scene["environment"]["activeIBLGeneration"] > 0, "Unpublished baseline lighting")
     sun = scene["sun"]
-    if case["fixture"] == 4:
+    if case["fixture"] in (4, 20):
         direction = np.array([.2, -1, -1]) / np.sqrt(2.04)
         require(sun is not None and sun["toaIlluminanceLux"] == 10000 and
                 np.max(np.abs(np.asarray(sun["photonDirection"])-direction)) < 1e-6,
-                "Wrong frozen F4 sun")
+                "Wrong frozen F4/F5 sun")
     else:
-        require(sun is None, "Furnace/sealed/black baseline must have no sun")
+        require(sun is None, "Furnace/sealed/thin/black baseline must have no sun")
     require(p["field_irradiance_width"] == 0, "Baseline must use the declared fixture profile")
     return p
 
@@ -127,6 +143,55 @@ def read_export(directory):
     return record, values
 
 
+def room_patch_masks(view, position, identity, covered):
+    """F2/F3 patches: interior floor/ceiling X/Z[-1.5,1.5], back wall X[-1.5,1.5]/Y[0.5,3.5], roof X/Z[-1,1]."""
+    suffix = view.split("_", 1)[1]
+    instance, triangles = ROOM_FACES[view.replace("F3_", "F2_")]
+    x, y, z = (position[..., axis] for axis in range(3))
+    mask = covered & (identity[..., 0] == instance) & np.isin(identity[..., 1], triangles)
+    if suffix in ("Floor", "Ceiling", "Roof"):
+        radius = 1 if suffix == "Roof" else 1.5
+        mask &= (np.abs(x) <= radius) & (np.abs(z) <= radius)
+    else:
+        require(suffix == "Interior", f"Undeclared room patch view: {view}")
+        mask &= (np.abs(x) <= 1.5) & (y >= .5) & (y <= 3.5)
+    return {ROOM_PATCHES[suffix]: mask}
+
+
+def parallel_room_masks(view, position, identity, covered):
+    """F5 v1 masks; membership comes from receiver primitive identity, then pixel-centre intervals."""
+    x, y, z = (position[..., axis] for axis in range(3))
+    if view == "F5_Doorway":
+        # Right (+X) faces of the two divider sections and the doorway lintel.
+        face = covered & np.isin(identity[..., 0], [8, 9, 10]) & np.isin(identity[..., 1], [10, 11])
+        require(np.all(np.abs(x[face]-.1) <= 1e-3), "Divider identity does not lie on its right face")
+        distance = np.hypot(np.maximum(y-2.2, 0), np.maximum(np.abs(z)-.5, 0))
+        return {"doorway-strip": face & (distance <= .25)}
+    require(view == "F5_Floor", f"Undeclared F5 view: {view}")
+    floor = covered & (identity[..., 0] == 0) & np.isin(identity[..., 1], [4, 5]) & \
+        (x >= .5) & (x <= 3.5) & (np.abs(z) <= 1.5)
+    return {"right-floor": floor, "far-corner": floor & (x >= 2.5) & (z >= .5) & (z <= 1.5)}
+
+
+def receiver_correspondence(case, position, receiver, masks):
+    """Ray-traced reference against raster receiver positions on the gated domain.
+
+    F5 quality is measured only on its frozen ROIs, so its correspondence gate covers
+    their union. The whole-image result remains a reported diagnostic: far
+    left-room floor pixels exceed the bound outside every declared mask.
+    """
+    covered = receiver[..., 3] == 1
+    offsets = np.abs(position[..., :3]-receiver[..., :3]).max(-1)
+    declared = case["fixture"] == 20
+    domain = np.logical_or.reduce(list(masks.values())) if declared else covered
+    require(covered.any() and np.array_equal(position[..., 3], receiver[..., 3]) and
+            not (domain & ~covered).any() and offsets[domain].max() < CORRESPONDENCE_BOUND,
+            "Reference lost an opaque receiver")
+    return dict(domain="declared-masks" if declared else "covered", maximum=float(offsets[domain].max()),
+                wholeImageMaximum=float(offsets[covered].max()),
+                wholeImagePixelsOutsideBound=int((offsets[covered] >= CORRESPONDENCE_BOUND).sum()))
+
+
 def roi_masks(case, values):
     position = values["GI.Reference.Position"][0]
     identity = values["GI.Reference.Identity"][0]
@@ -135,11 +200,10 @@ def roi_masks(case, values):
         masks = {"plane": covered & (identity[..., 0] == 0) &
                  np.isin(identity[..., 1], [0, 1]) & (np.abs(position[..., 0]) <= 1) &
                  (np.abs(position[..., 2]) <= 1)}
-    elif case["fixture"] in (2, 19):
-        instance, triangles = ROOM_FACES[case["view"]]
-        masks = {"back": covered & (identity[..., 0] == instance) &
-                 np.isin(identity[..., 1], triangles) & (np.abs(position[..., 0]) <= 1.5) &
-                 (position[..., 1] >= .5) & (position[..., 1] <= 3.5)}
+    elif case["fixture"] in (2, 3, 19):
+        masks = room_patch_masks(case["view"], position, identity, covered)
+    elif case["fixture"] == 20:
+        masks = parallel_room_masks(case["view"], position, identity, covered)
     else:
         masks = lighting_masks(case, {k: v[0] for k, v in values.items()}, {})
     require(masks and all(m.dtype == np.bool_ and m.sum() >= 32 for m in masks.values()),
@@ -174,6 +238,7 @@ def qualify_reference(directory):
     require(observations and len({(o["samples"], o["seed"]) for o in observations}) == len(observations),
             "Missing/duplicate reference observations")
     captures, records, summaries, base_values = {}, {}, {}, None
+    correspondence = []
     identity = None
     masks = None
     for observation in observations:
@@ -199,9 +264,9 @@ def qualify_reference(directory):
         receiver = values["GI.Receiver.Position"][0]
         covered = receiver[..., 3] == 1
         energy = values["GI.Reference.Irradiance"][0]
-        require(covered.any() and np.array_equal(position[..., 3], receiver[..., 3]) and
-                np.max(np.abs(position[covered, :3]-receiver[covered, :3])) < 2e-4 and
-                np.array_equal(energy[..., 3], covered.astype(float)) and (energy[..., :3] >= 0).all(),
+        current_masks = roi_masks(case, values)
+        correspondence.append(receiver_correspondence(case, position, receiver, current_masks))
+        require(np.array_equal(energy[..., 3], covered.astype(float)) and (energy[..., :3] >= 0).all(),
                 "Reference lost an opaque receiver")
         diag = values["GI.Reference.Diagnostics"][0]
         paths = values["GI.Reference.PathDiagnostics"][0]
@@ -213,7 +278,6 @@ def qualify_reference(directory):
         sky = values["GI.Reference.EnvironmentIrradiance"][0, ..., :3]
         require(np.allclose(energy[..., :3], sun+sky, rtol=1e-6, atol=FLOOR),
                 "Reference component sums differ")
-        current_masks = roi_masks(case, values)
         if base_values is not None:
             require(np.array_equal(base_values["GI.Receiver.Position"], values["GI.Receiver.Position"]) and
                     np.array_equal(base_values["GI.Reference.Identity"], values["GI.Reference.Identity"]) and
@@ -245,6 +309,11 @@ def qualify_reference(directory):
         qualified = qualified and all(e <= .01 for e in analytic.values())
     elif case["fixture"] == 1:
         require(all(np.max(np.abs(v/np.pi-1)) <= .01 for v in reference.values()), "F1 reference furnace failed")
+    elif case["view"] == "F3_Roof":
+        # The exterior roof sees only the unit sky: the lit reference for thin-wall leakage.
+        require(all(np.max(np.abs(v/np.pi-1)) <= .01 for v in reference.values()), "F3 roof reference is not pi L")
+    elif case["fixture"] == 20:
+        pass
     else:
         require(all(np.count_nonzero(captures[key]["GI.Reference.Irradiance"][0, ..., :3]) == 0
                     for key in captures), "Sealed/black reference has false energy")
@@ -252,6 +321,9 @@ def qualify_reference(directory):
                   samples=high, seeds=list(SEEDS), errors=errors, analyticRelativeErrors=analytic,
                   referenceDepth=1, referenceSamplingQualified=qualified,
                   referenceDepthConvergenceQualified=False, perPixelNoiseQualified=False,
+                  receiverCorrespondence=dict(correspondence[0], **{
+                      key: max(c[key] for c in correspondence)
+                      for key in ("maximum", "wholeImageMaximum", "wholeImagePixelsOutsideBound")}),
                   rois={n: dict(pixels=int(m.sum()), maskSha256=hashlib.sha256(m.tobytes()).hexdigest(),
                                 mean=reference[n].tolist()) for n, m in masks.items()})
     save(directory/"reference-validation.json", result)
@@ -280,6 +352,39 @@ def temporal_metrics(samples, reference):
                 temporalRms=rms, chromaticityError=chroma,
                 chromaticityUnavailableReason="black-reference" if chroma is None else None,
                 temporalStabilityPassed=rms <= .02)
+
+
+def load_policy(path):
+    """Optional predeclared dark-reference floors (absolute linear luminance) per limit fixture."""
+    if not Path(path).exists():
+        return None
+    policy = load(path)
+    require(policy.get("schemaVersion") == 1 and set(policy) <= {"schemaVersion", "source", "fixtures"} and
+            isinstance(policy.get("fixtures"), dict) and policy["fixtures"], "Invalid limit policy")
+    for fixture, floors in policy["fixtures"].items():
+        require(fixture in {str(f) for f in LIMIT_FIXTURES} and isinstance(floors, dict) and floors and
+                set(floors) <= {"stabilityFloor", "leakageFloor"} and
+                all(type(v) in (int, float) and np.isfinite(v) and v >= FLOOR for v in floors.values()),
+                "Limit policy floors must be at least the numerical floor per F3/F5 fixture")
+    return policy
+
+
+def stability_floor(policy, fixture):
+    return (policy or {}).get("fixtures", {}).get(str(fixture), {}).get("stabilityFloor")
+
+
+def apply_stability_floor(result, reference_luminance, floor):
+    """A pass at the numerical floor holds for any larger declared floor; otherwise the
+    verdict needs the predeclared dark floor and stays undetermined without it."""
+    result["stabilityFloor"] = floor
+    if result["temporalStabilityPassed"]:
+        return
+    if floor is None:
+        result["temporalStabilityPassed"] = None
+        result["temporalStabilityReason"] = "dark-floor-undeclared"
+        return
+    result["temporalRmsAtFloor"] = result["temporalStd"]/max(reference_luminance, floor)
+    result["temporalStabilityPassed"] = result["temporalRmsAtFloor"] <= .02
 
 
 def validate_readiness(field, previous, current_update, ready_offset=120):
@@ -319,7 +424,7 @@ def selected_qualification(results, cross_rhi):
     return all(r["passed"] for r in results) and all(r["passed"] for r in cross_rhi)
 
 
-def inspect_case(directory, backend, diagnostic_offsets=()):
+def inspect_case(directory, backend, diagnostic_offsets=(), policy=None):
     case = load(directory/"case.json")
     validate_case(case)
     reference, masks, reference_values, reference_frame = qualify_reference(directory)
@@ -339,7 +444,8 @@ def inspect_case(directory, backend, diagnostic_offsets=()):
         return dict(case=case["id"], passed=False, reference=reference, readinessPassed=False,
                     temporalStabilityQualified=False, reason="Unconverged", rois={})
     require(settled["publication"] == "Published", "Settled baseline was not published")
-    result = inspect_window(directory, case, reference, masks, reference_values, reference_frame, noise)
+    result = inspect_window(directory, case, reference, masks, reference_values, reference_frame, noise,
+                            policy=policy)
     diagnostics = []
     previous = result
     for offset in diagnostic_offsets:
@@ -351,7 +457,8 @@ def inspect_case(directory, backend, diagnostic_offsets=()):
                 observed["state"] == "Ready" and observed["readyUpdate"] == result["readyUpdate"] and
                 observed["completedUpdates"] >= result["readyUpdate"]+offset,
                 "Diagnostic admission does not meet the original completed-update/epoch anchor")
-        current = inspect_window(window, case, reference, masks, reference_values, reference_frame, noise, offset)
+        current = inspect_window(window, case, reference, masks, reference_values, reference_frame, noise, offset,
+                                 policy)
         validate_window_relation(previous, current)
         current["diagnosticOnly"] = True
         diagnostics.append(current)
@@ -360,7 +467,8 @@ def inspect_case(directory, backend, diagnostic_offsets=()):
     return result
 
 
-def inspect_window(directory, case, reference, masks, reference_values, reference_frame, noise, ready_offset=120):
+def inspect_window(directory, case, reference, masks, reference_values, reference_frame, noise, ready_offset=120,
+                   policy=None):
     sequence = load(directory/"sequence.json")["sequence"]
     require(sequence["state"] == "completed" and sequence["frameCount"] == FRAME_COUNT and
             sequence["parameterPublication"]["outcome"] == "Published", "Incomplete static baseline sequence")
@@ -441,12 +549,9 @@ def inspect_window(directory, case, reference, masks, reference_values, referenc
         field = frame["readiness"]["giField"]
         validate_readiness(field, previous, current_update, ready_offset)
         summary = field["summary"]
-        minimum = [-3.125, -1.3125, -3.0625] if case["fixture"] == 4 else (
-            [-3, -3, -3] if case["fixture"] == 1 else [-4, -2, -4])
-        spacing = .375 if case["fixture"] == 4 else (.5 if case["fixture"] == 1 else 1.)
+        minimum, spacing, width = FIELD_PROFILES[case["fixture"]]
         require(summary["counts"] == case["counts"] and summary["minimum"] == minimum and
-                summary["spacing"] == spacing and
-                summary["irradianceInteriorWidth"] == (30 if case["fixture"] == 4 else 6),
+                summary["spacing"] == spacing and summary["irradianceInteriorWidth"] == width,
                 "Baseline field profile changed")
         require(np.isclose(field["noiseSigma"], noise["steadyNoiseEstimate"], rtol=1e-6) and
                 np.isclose(field["threshold"], max(.01, 3*noise["steadyNoiseEstimate"]), rtol=1e-6),
@@ -473,17 +578,24 @@ def inspect_window(directory, case, reference, masks, reference_values, referenc
     for name, samples in rows.items():
         ref = reference["rois"][name]["mean"]
         result = temporal_metrics(samples, ref)
-        if case["fixture"] == 1:
-            energy_ok = max(abs(np.asarray(samples) @ LUMA / np.pi - 1)) <= .01
-        elif case["fixture"] in (2, 19):
-            energy_ok = max(np.asarray(samples) @ LUMA / np.pi) <= .01
-        else:
-            energy_ok = result["maximumEnergyError"] <= .1
+        luminance = np.asarray(samples) @ LUMA
         result.update(pixels=reference["rois"][name]["pixels"], referenceMean=ref,
-                      luminanceSeries=(np.asarray(samples) @ LUMA).tolist(),
-                      energyPassed=bool(energy_ok), chromaticityPassed=result["chromaticityError"] is None or
-                      result["chromaticityError"] <= .02)
-        result["passed"] = result["energyPassed"] and result["chromaticityPassed"] and result["temporalStabilityPassed"]
+                      luminanceSeries=luminance.tolist(), temporalStd=float(np.sqrt(np.mean((luminance-luminance.mean())**2))))
+        if case["fixture"] in LIMIT_FIXTURES:
+            # Energy and chromaticity are G4 measurements (see ValidateGIFieldLimits.py).
+            result.update(energyPassed=None, chromaticityPassed=None, gatedAt="G4")
+            apply_stability_floor(result, float(np.asarray(ref) @ LUMA), stability_floor(policy, case["fixture"]))
+            result["passed"] = result["temporalStabilityPassed"] is True
+        else:
+            if case["fixture"] == 1:
+                energy_ok = max(abs(luminance / np.pi - 1)) <= .01
+            elif case["fixture"] in (2, 19):
+                energy_ok = max(luminance / np.pi) <= .01
+            else:
+                energy_ok = result["maximumEnergyError"] <= .1
+            result.update(energyPassed=bool(energy_ok), chromaticityPassed=result["chromaticityError"] is None or
+                          result["chromaticityError"] <= .02)
+            result["passed"] = result["energyPassed"] and result["chromaticityPassed"] and result["temporalStabilityPassed"]
         rois[name] = result
     ready = first_field["readyUpdate"] <= 120
     return dict(case=case["id"], passed=reference["referenceSamplingQualified"] and ready and all(r["passed"] for r in rois.values()),
@@ -492,13 +604,14 @@ def inspect_window(directory, case, reference, masks, reference_values, referenc
                 readyOffset=ready_offset, captureBinding=digest({k: v for k, v in binding.items() if k != "sequenceId"}),
                 frameSerials=serials, observedUpdates=updates, samples=FRAME_COUNT,
                 refreshNoiseInput=noise["refreshNoiseEstimate"], steadyNoiseInput=noise["steadyNoiseEstimate"],
-                temporalStabilityQualified=all(r["temporalStabilityPassed"] for r in rois.values()), rois=rois)
+                temporalStabilityQualified=all(r["temporalStabilityPassed"] is True for r in rois.values()), rois=rois)
 
 
 def validate(root):
     case_ids, backends = load(root/"cases.json"), load(root/"backends.json")
     offsets_path = root/"diagnostic-ready-offsets.json"
     offsets = load(offsets_path) if offsets_path.exists() else []
+    policy = load_policy(root/"limit-policy.json")
     validate_offsets(offsets)
     require(case_ids and len(set(case_ids)) == len(case_ids) and all(c in CASES for c in case_ids), "Invalid baseline cases")
     require(backends and len(set(backends)) == len(backends) and all(b in ("dx12", "vulkan") for b in backends),
@@ -506,7 +619,7 @@ def validate(root):
     results = []
     for backend in backends:
         for case_id in case_ids:
-            result = inspect_case(root/backend/case_id, backend, offsets)
+            result = inspect_case(root/backend/case_id, backend, offsets, policy)
             results.append(dict(backend=backend, **result))
     cross_rhi = []
     if len(backends) == 2:
@@ -521,7 +634,7 @@ def validate(root):
     passed = selected_qualification(results, cross_rhi)
     return dict(schemaVersion=1, status="passed" if passed else "failed", selectedCasesQualified=passed,
                 referenceDepth=1, referenceDepthConvergenceQualified=False, wholeG3Qualified=False,
-                performanceQualified=False, diagnosticReadyOffsets=offsets,
+                performanceQualified=False, diagnosticReadyOffsets=offsets, limitPolicy=policy,
                 extent=[320, 200], results=results, crossRhi=cross_rhi)
 
 
@@ -642,6 +755,77 @@ def self_test():
         save(directory/"test.resource-export.json", dict(frameSerial=1, frame=dict(frame=dict(serial=2)),
                                                         submission=dict(completed=True), targets=[]))
         reject(lambda: read_export(directory))
+        require(load_policy(directory/"missing.json") is None, "Absent limit policy")
+        checks += 1
+        save(directory/"policy.json", dict(schemaVersion=1, fixtures={"3": dict(stabilityFloor=.01)}))
+        require(stability_floor(load_policy(directory/"policy.json"), 3) == .01 and
+                stability_floor(load_policy(directory/"policy.json"), 20) is None, "Per-fixture stability floor")
+        checks += 1
+        for fixtures in ({"2": dict(stabilityFloor=.01)}, {"3": dict(stabilityFloor=0)},
+                         {"3": dict(stabilityFloor=1e-7)}, {"3": dict(darkFloor=.01)}, {}):
+            save(directory/"policy.json", dict(schemaVersion=1, fixtures=fixtures))
+            reject(lambda: load_policy(directory/"policy.json"))
+    dark = dict(temporalStabilityPassed=False, temporalStd=1e-3)
+    apply_stability_floor(dark, 0., None)
+    require(dark["temporalStabilityPassed"] is None and dark["temporalStabilityReason"] == "dark-floor-undeclared",
+            "A zero reference cannot pass or fail stability without its declared floor")
+    checks += 1
+    for floor, passed in ((.1, True), (.01, False)):
+        dark = dict(temporalStabilityPassed=False, temporalStd=1e-3)
+        apply_stability_floor(dark, 0., floor)
+        require(dark["temporalStabilityPassed"] is passed and np.isclose(dark["temporalRmsAtFloor"], 1e-3/floor),
+                "Declared dark floor normalizes temporal RMS")
+        checks += 1
+    lit = dict(temporalStabilityPassed=True, temporalStd=1e-3)
+    apply_stability_floor(lit, 1., None)
+    require(lit["temporalStabilityPassed"] is True, "A pass at the numerical floor holds for any declared floor")
+    checks += 1
+    # Room and F5 masks: identity first, then pixel-centre intervals.
+    position = np.zeros((4, 4, 3))
+    identity = np.zeros((4, 4, 2), dtype=int)
+    covered = np.ones((4, 4), dtype=bool)
+    position[..., 0] = .1
+    position[..., 1] = [[2.3, 2.3, 2.6, 1.]]*4
+    position[..., 2] = [[0., .6, 0., .7]]*4
+    identity[..., 0] = [[8, 10, 10, 9]]*4
+    identity[..., 1] = 10
+    identity[3] = (10, 6)
+    strip = parallel_room_masks("F5_Doorway", position, identity, covered)["doorway-strip"]
+    require(strip[:3].tolist() == [[True, True, False, True]]*3 and not strip[3].any(),
+            "Doorway strip uses Euclidean distance on the divider's right face only")
+    checks += 1
+    off_face = position.copy()
+    off_face[0, 0, 0] = .3
+    reject(lambda: parallel_room_masks("F5_Doorway", off_face, np.tile([8, 10], (4, 4, 1)), covered))
+    floor_position = np.zeros((1, 3, 3))
+    floor_position[0, :, 0] = [.5, 3., 3.6]
+    floor_position[0, :, 2] = [0., 1., 1.]
+    floor = parallel_room_masks("F5_Floor", floor_position, np.tile([0, 4], (1, 3, 1)), np.ones((1, 3), dtype=bool))
+    require(floor["right-floor"].tolist() == [[True, True, False]] and floor["far-corner"].tolist() == [[False, True, False]],
+            "Right floor and far corner intervals")
+    checks += 1
+    patch_position = np.zeros((1, 2, 3))
+    patch_position[0, :, 0] = [1., 1.2]
+    patch_position[0, :, 2] = [.5, .5]
+    roof = room_patch_masks("F3_Roof", patch_position, np.tile([1, 4], (1, 2, 1)), np.ones((1, 2), dtype=bool))
+    require(roof == {"roof": roof["roof"]} and roof["roof"].tolist() == [[True, False]], "F3 roof radius")
+    reject(lambda: room_patch_masks("F3_West", patch_position, np.tile([2, 10], (1, 2, 1)), np.ones((1, 2), dtype=bool)))
+    checks += 1
+    raster = np.zeros((1, 3, 4))
+    raster[..., 3] = 1
+    traced = raster.copy()
+    traced[0, 2, 0] = 2.5e-4
+    inside = {"right-floor": np.array([[True, True, False]])}
+    for fixture, valid in ((20, True), (4, False)):
+        case = dict(fixture=fixture)
+        if valid:
+            result = receiver_correspondence(case, traced, raster, inside)
+            require(result == dict(domain="declared-masks", maximum=0., wholeImageMaximum=2.5e-4,
+                                   wholeImagePixelsOutsideBound=1), "F5 correspondence reports its whole image")
+        else:
+            reject(lambda case=case: receiver_correspondence(case, traced, raster, inside))
+    reject(lambda: receiver_correspondence(dict(fixture=20), traced, raster, {"strip": np.array([[False, True, True]])}))
+    checks += 1
     print(json.dumps(dict(ok=True, checks=checks)))
 
 

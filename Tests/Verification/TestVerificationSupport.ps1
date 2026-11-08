@@ -483,6 +483,7 @@ $pythonIdentity = if ($Python) { & $Python --version } else { '' }
         'gi-probe-picking' = 'TestGIProbePicking.ps1'
         'gi-probe-viewer' = 'TestGIProbeViewer.ps1'
         'gi-field-readiness' = 'TestGIFieldReadiness.ps1'
+        'gi-field-readiness-repeat' = 'TestGIFieldReadinessRepeat.ps1'
         'gi-field-sampling' = 'TestGIFieldSampling.ps1'
         'gi-field-baseline' = 'TestGIFieldBaseline.ps1'
         'gi-field-feedback' = 'TestGIFieldFeedback.ps1'
@@ -525,7 +526,7 @@ $pythonIdentity = if ($Python) { & $Python --version } else { '' }
         'gi-specular-visibility-contracts', 'gi-probe-update-contracts', 'gi-probe-integration-contracts',
         'gi-probe-viewer-contracts', 'gi-field-sampling-contracts',
         'gi-field-baseline-contracts', 'gi-field-feedback-contracts', 'gi-field-light-step-contracts',
-        'gi-field-camera-independence-contracts'
+        'gi-field-camera-independence-contracts', 'gi-field-readiness-repeat-contracts'
     )
     foreach ($leaf in $gpuLeaves.Values) {
         [IO.File]::WriteAllText((Join-Path $runnerTests $leaf), $leafSource, (New-Object Text.UTF8Encoding($false)))
@@ -547,7 +548,7 @@ $pythonIdentity = if ($Python) { & $Python --version } else { '' }
     }
     Check (($gpuResult.suites | Where-Object name -eq 'taa-comparison').steps[0].receipt.python -eq
         $runnerPython) 'runner-forwards-selected-python-to-taa-workflow'
-    foreach ($suite in @('session-lifecycle', 'startup-readiness', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-probe-inspection', 'gi-receiver-inspection', 'gi-probe-visualization', 'gi-probe-depth', 'gi-probe-temporal', 'gi-probe-selection', 'gi-probe-change', 'gi-probe-picking', 'gi-probe-viewer', 'gi-field-readiness', 'gi-field-sampling', 'gi-field-baseline', 'gi-field-feedback', 'gi-field-light-step', 'gi-field-camera-independence', 'gi-invalid-updates', 'gi-receiver-cache')) {
+    foreach ($suite in @('session-lifecycle', 'startup-readiness', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-probe-inspection', 'gi-receiver-inspection', 'gi-probe-visualization', 'gi-probe-depth', 'gi-probe-temporal', 'gi-probe-selection', 'gi-probe-change', 'gi-probe-picking', 'gi-probe-viewer', 'gi-field-readiness', 'gi-field-readiness-repeat', 'gi-field-sampling', 'gi-field-baseline', 'gi-field-feedback', 'gi-field-light-step', 'gi-field-camera-independence', 'gi-invalid-updates', 'gi-receiver-cache')) {
         $suiteSteps = ($gpuResult.suites | Where-Object name -eq $suite).steps
         for ($index = 0; $index -lt $suiteSteps.Count; ++$index) {
             $leafResult = $suiteSteps[$index].receipt

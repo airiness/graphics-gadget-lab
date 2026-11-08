@@ -121,6 +121,7 @@ namespace gglab
 	{
 		return fixture == GIReferenceFixture::IsolatedPlane ||
 			fixture == GIReferenceFixture::ThickWallRoom ||
+			fixture == GIReferenceFixture::ThinWallRoom ||
 			fixture == GIReferenceFixture::SunlitColoredRoom ||
 			fixture == GIReferenceFixture::ParallelRooms ||
 			fixture == GIReferenceFixture::FieldCoverage ||

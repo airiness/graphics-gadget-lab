@@ -69,10 +69,14 @@ $catalog = @(
     @{ name = 'gi-probe-viewer'; group = 'gpu'; configurations = @('Develop'); steps = @(@{ path = 'Tests/Verification/TestGIProbeViewer.ps1' }) },
     @{ name = 'gi-receiver-inspection'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIReceiverInspection.ps1' }) },
     @{ name = 'gi-field-readiness'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIFieldReadiness.ps1' }) },
+    @{ name = 'gi-field-readiness-repeat'; group = 'gpu'; configurations = @('Develop'); steps = @(@{ path = 'Tests/Verification/TestGIFieldReadinessRepeat.ps1' }) },
+    @{ name = 'gi-field-readiness-repeat-contracts'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/ValidateGIFieldReadinessRepeat.py'; arguments = @('--self-test') }) },
     @{ name = 'gi-field-sampling'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIFieldSampling.ps1' }) },
     @{ name = 'gi-field-sampling-contracts'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/ValidateGIFieldSampling.py'; arguments = @('--self-test') }) },
     @{ name = 'gi-field-baseline'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIFieldBaseline.ps1' }) },
-    @{ name = 'gi-field-baseline-contracts'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/ValidateGIFieldBaseline.py'; arguments = @('--self-test') }) },
+    @{ name = 'gi-field-baseline-contracts'; group = 'contracts'; steps = @(
+        @{ path = 'Tests/Verification/ValidateGIFieldBaseline.py'; arguments = @('--self-test') },
+        @{ path = 'Tests/Verification/ValidateGIFieldLimits.py'; arguments = @('--self-test') }) },
     @{ name = 'gi-field-feedback'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIFieldFeedback.ps1' }) },
     @{ name = 'gi-field-feedback-contracts'; group = 'contracts'; steps = @(@{ path = 'Tests/Verification/ValidateGIFieldFeedback.py'; arguments = @('--self-test') }) },
     @{ name = 'gi-field-light-step'; group = 'gpu'; configurations = @('Debug', 'Develop', 'Release'); steps = @(@{ path = 'Tests/Verification/TestGIFieldLightStep.ps1' }) },
@@ -167,7 +171,7 @@ try {
                     if ($item.group -eq 'gpu') {
                         $leafDirectory = if ($item.steps.Count -gt 1) { "run-$($steps.Count + 1)" } else { 'run' }
                         $parameters = @{ RunDirectory = (Join-Path $directory $leafDirectory); Configuration = $config; Rhi = $Rhi }
-                        if ($item.name -in @('taa-comparison', 'session-lifecycle', 'startup-readiness', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-probe-inspection', 'gi-receiver-inspection', 'gi-probe-visualization', 'gi-probe-depth', 'gi-probe-temporal', 'gi-probe-selection', 'gi-probe-change', 'gi-probe-picking', 'gi-probe-viewer', 'gi-field-readiness', 'gi-field-sampling', 'gi-field-baseline', 'gi-field-feedback', 'gi-field-light-step', 'gi-field-camera-independence', 'gi-invalid-updates', 'gi-receiver-cache')) { $parameters.Python = $Python }
+                        if ($item.name -in @('taa-comparison', 'session-lifecycle', 'startup-readiness', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-probe-inspection', 'gi-receiver-inspection', 'gi-probe-visualization', 'gi-probe-depth', 'gi-probe-temporal', 'gi-probe-selection', 'gi-probe-change', 'gi-probe-picking', 'gi-probe-viewer', 'gi-field-readiness', 'gi-field-readiness-repeat', 'gi-field-sampling', 'gi-field-baseline', 'gi-field-feedback', 'gi-field-light-step', 'gi-field-camera-independence', 'gi-invalid-updates', 'gi-receiver-cache')) { $parameters.Python = $Python }
                     }
                     $execution = Invoke-VerificationScript $path $parameters
                     $text = $execution.output + $execution.error

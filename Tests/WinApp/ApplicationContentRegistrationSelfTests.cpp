@@ -1789,7 +1789,7 @@ namespace gglab
 				UsesGIStaticCostPath(fixture) ==
 					(index == 4 || index == 20 || (index >= 12 && index <= 16)) &&
 				UsesGIStaticObservationPaths(fixture) ==
-					(index == 1 || index == 2 || index == 4 || index == 20 || (index >= 17 && index <= 19)) &&
+					((index >= 1 && index <= 4) || index == 20 || (index >= 17 && index <= 19)) &&
 				IsGIContractFixture(fixture) == (index >= 5 && index <= 18),
 				"Named fixture capabilities preserve frozen IDs without ordering-based dispatch");
 		}

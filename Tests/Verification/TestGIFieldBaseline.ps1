@@ -3,8 +3,12 @@
 param(
     [string[]]$Configuration = @('Develop'),
     [string[]]$Rhi = @('dx12','vulkan'),
-    [string[]]$CaseId = @('plane','sealed','sunroom','sunroom-back','black'),
+    [string[]]$CaseId = @('plane','sealed','sunroom','sunroom-back','black',
+        'thin','thin-floor','thin-ceiling','thin-roof','doorway','parallel-floor'),
+    # Initial reference samples for the sunlit F4 and F5 fixtures.
     [ValidateRange(64,524288)][int]$InitialF4Samples = 4096,
+    # Optional predeclared dark-reference floors for F3/F5 stability and leakage.
+    [string]$LimitPolicy,
     [ValidateRange(128,1048576)][int]$MaximumSamples = 32768,
     [string[]]$DiagnosticReadyOffsets = @(),
     [string]$ShaderCacheDirectory,
@@ -30,7 +34,14 @@ $cases = @(
     @{id='sealed';fixture=2;view='F2_Interior';counts=@(9,9,9)},
     @{id='sunroom';fixture=4;view='F4_Floor';counts=@(18,18,18)},
     @{id='sunroom-back';fixture=4;view='F4_Back';counts=@(18,18,18)},
-    @{id='black';fixture=19;view='F2_Interior';counts=@(9,9,9)}
+    @{id='black';fixture=19;view='F2_Interior';counts=@(9,9,9)},
+    # F3 interior patches plus the exterior roof that supplies the lit reference.
+    @{id='thin';fixture=3;view='F3_Interior';counts=@(9,9,9)},
+    @{id='thin-floor';fixture=3;view='F3_Floor';counts=@(9,9,9)},
+    @{id='thin-ceiling';fixture=3;view='F3_Ceiling';counts=@(9,9,9)},
+    @{id='thin-roof';fixture=3;view='F3_Roof';counts=@(9,9,9)},
+    @{id='doorway';fixture=20;view='F5_Doorway';counts=@(11,7,7)},
+    @{id='parallel-floor';fixture=20;view='F5_Floor';counts=@(11,7,7)}
 )
 if ($Configuration.Count -ne 1 -or $Configuration[0] -notin @('Debug','Develop','Release') -or
     -not $Rhi.Count -or @($Rhi | Where-Object { $_ -notin @('dx12','vulkan') }).Count -or
@@ -41,6 +52,8 @@ if (-not $OutputDirectory -and -not $RunDirectory) { $OutputDirectory = "$root/B
 $output = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory `
     -RunId ([Guid]::NewGuid().ToString('N').Substring(0,8))
 $validator = "$PSScriptRoot/ValidateGIFieldBaseline.py"
+$limitsValidator = "$PSScriptRoot/ValidateGIFieldLimits.py"
+if ($LimitPolicy -and -not (Test-Path -LiteralPath $LimitPolicy -PathType Leaf)) { throw 'Limit policy file does not exist.' }
 function Source-Identity {
     Get-VerificationSourceIdentity $root @('Sources','Shaders','Tests/Verification','Scripts/Verification','Schemas','Projects','PropertySheets')
 }
@@ -89,6 +102,7 @@ try {
     Write-VerificationJson "$output/cases.json" @($cases.id)
     Write-VerificationJson "$output/backends.json" $Rhi
     Write-VerificationJson "$output/diagnostic-ready-offsets.json" $readyOffsets
+    if ($LimitPolicy) { Copy-Item -LiteralPath $LimitPolicy -Destination "$output/limit-policy.json" }
     foreach ($backend in $Rhi) {
         $session = 'gi-baseline-'+[Guid]::NewGuid().ToString('N').Substring(0,10)
         $start = $null
@@ -122,7 +136,7 @@ try {
                     'GI.Reference.EnvironmentIrradiance','GI.Reference.Position','GI.Reference.Identity',
                     'GI.Reference.Diagnostics','GI.Reference.PathDiagnostics','GI.Receiver.Position' | ForEach-Object { @{resource=$_} })
                 $observations = @()
-                $samples = if ($case.fixture -eq 4) { $InitialF4Samples } else { 64 }
+                $samples = if ($case.fixture -in @(4,20)) { $InitialF4Samples } else { 64 }
                 do {
                     foreach ($count in @($samples, (2*$samples))) {
                         foreach ($seed in @(61051,61052)) {
@@ -216,6 +230,10 @@ try {
     Write-VerificationJson "$output/binaries-final.json" $finalBinaries
     Assert-VerificationIdentity $source $finalSource 'Field baseline sources changed during verification.'
     Assert-VerificationIdentity $binaries $finalBinaries 'Field baseline binaries changed during verification.' -Depth 2
+    # Limits are measurements gated at G4; record them even when a G3 baseline gate fails.
+    if (@($cases | Where-Object { $_.fixture -in @(3,20) }).Count) {
+        Invoke-VerificationPython $Python $limitsValidator @('--root',$output) "$output/limits-result.json" 'F3/F5 limit measurement contracts failed'
+    }
     Invoke-VerificationPython $Python $validator @('--root',$output) "$output/oracle-result.json" 'Single-bounce baseline gates failed'
     Write-VerificationJson "$output/result.json" @{ok=$true;directory=$output;wholeG3Qualified=$false}
     [Console]::Out.WriteLine((@{ok=$true;directory=$output} | ConvertTo-Json -Compress))
