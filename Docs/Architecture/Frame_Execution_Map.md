@@ -178,9 +178,31 @@ Each frame derives one private outcome from the Renderer path and the RHI result
 
 | Outcome | Required Runtime participant order |
 | --- | --- |
-| Submitted / Failed | Runtime capture → live/bake atmosphere → temporal transaction/history → last submitted fence and IBL scheduler → graph retirement |
-| Discarded | Live/bake atmosphere → IBL scheduler → last submitted fence → temporal transaction → graph retirement → Runtime capture |
-| CompletionUnknown | Poison → fail/retain Runtime capture → retain live/bake atmosphere → abort IBL scheduling → abort/invalidate temporal state; no ordinary graph retirement |
+| Submitted / Failed | GI reference observation → field CPU update state → specular visibility observation → Runtime capture → live/bake atmosphere → temporal transaction/history → last submitted fence and IBL scheduler → graph retirement |
+| Discarded | GI reference observation → field CPU update state → specular visibility observation → live/bake atmosphere → IBL scheduler → last submitted fence → temporal transaction → graph retirement → Runtime capture |
+| CompletionUnknown | Retain GI reference observation → invalidate field CPU update state → retain specular visibility observation → poison → fail/retain Runtime capture → retain live/bake atmosphere → abort IBL scheduling → abort/invalidate temporal state; no ordinary graph retirement |
+
+Renderer-owned GI observations advance receiver preparation and sampling only on
+Submitted. Preparation-only and resolve-only frames leave sample, tile and RNG
+progress unchanged; sampling waits for preparation completion. Accumulation and
+RNG state publish atomically after a complete spatial sweep; partial sweeps resolve
+the previous complete result. GPU completion gates subsequent tiles and capture
+readiness. Cancellation retires resources through the last-use fence; unknown
+completion retains them through checked teardown.
+
+Observation identity does not retain content assets. Query/build submission leases
+retain the immutable scene snapshot and selected material texture interests;
+observations do not extend asset ownership into AssetManager shutdown.
+
+`GIField` publishes update progress through deferred CPU commits. Failed or
+CompletionUnknown invalidates its in-place contents; Discarded preserves the prior
+state. Its completion counter advances only after checked fence completion.
+Field preparation processes completed readbacks on the Runtime owner thread;
+queries return its cached CPU summary. While a readiness refresh is open,
+preparation first waits for the readback of the last submitted update, so the
+steady policy starts one update after the update that ended the refresh. Measurements retain submission-time
+identities and frame/update stamps. Lighting refresh starts a new epoch with
+no completed measurement; readiness accepts only that epoch's records.
 
 On the abort path, capture releases unsubmitted taps after the RHI abort has
 recorded the frame's resource uses.

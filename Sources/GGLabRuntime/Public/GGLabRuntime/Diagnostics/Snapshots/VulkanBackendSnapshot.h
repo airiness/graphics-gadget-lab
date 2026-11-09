@@ -1,4 +1,5 @@
 #pragma once
+#include "GGLabRuntime/Graphics/RHI/RHIAccelerationStructure.h"
 #include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
 
 #include <cstdint>
@@ -105,6 +106,7 @@ namespace gglab
 		uint32_t m_ComputePipelineCount = 0;
 		uint32_t m_BindingLayoutCount = 0;
 		bool m_GpuProfilerAvailable = false;
+		RHIRayQueryCapabilities m_RayQueryCapabilities{};
 		bool m_GpuProfilerEnabled = false;
 		bool m_NativePipelineCachePersistenceEnabled = false;
 

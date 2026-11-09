@@ -104,6 +104,7 @@ namespace gglab
 		const auto& identity = adapter.m_Identity;
 		const auto& capabilities = adapter.m_ProfileCapabilities;
 		const VulkanDevice& device = *context.m_Bootstrap->m_Device;
+		outSnapshot.m_RayQueryCapabilities = device.GetRayQueryCapabilities();
 		const VulkanFrameRuntime& runtime = *context.m_Bootstrap->m_FrameRuntime;
 		const VulkanSwapChain& swapChain = runtime.GetSwapChain();
 

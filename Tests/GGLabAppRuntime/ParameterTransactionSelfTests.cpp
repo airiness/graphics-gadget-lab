@@ -197,6 +197,21 @@ namespace gglab
 			auto parameters = DescribeHostViewParameters(view);
 			const std::array values
 			{
+				LabParameterValue{ LabParameterId("view.gi_probes.enabled"), true },
+				LabParameterValue{ LabParameterId("view.gi_probes.bounds"), false },
+				LabParameterValue{ LabParameterId("view.gi_probes.radius"), 0.25f },
+				LabParameterValue{ LabParameterId("view.gi_probes.budget"), uint32_t(99) },
+				LabParameterValue{ LabParameterId("view.gi_probes.slice_axis"), uint32_t(2) },
+				LabParameterValue{ LabParameterId("view.gi_probes.layer_minimum"), uint32_t(1) },
+				LabParameterValue{ LabParameterId("view.gi_probes.layer_maximum"), uint32_t(3) },
+				LabParameterValue{ LabParameterId("view.gi_probes.classification_mask"), uint32_t(6) },
+				LabParameterValue{ LabParameterId("view.gi_probes.maximum_distance"), 25.0f },
+				LabParameterValue{ LabParameterId("view.gi_probes.mode"), int32_t(1) },
+				LabParameterValue{ LabParameterId("view.gi_probes.preview_ev"), 2.5f },
+				LabParameterValue{ LabParameterId("view.gi_probes.change_normalized"), false },
+				LabParameterValue{ LabParameterId("view.gi_probes.change_range"), 2.0f },
+				LabParameterValue{ LabParameterId("view.gi_probes.change_blocks"), true },
+				LabParameterValue{ LabParameterId("view.gi_probes.depth_mode"), int32_t(1) },
 				LabParameterValue{ LabParameterId("view.taa.enabled"), false },
 				LabParameterValue{ LabParameterId("view.taa.max_history_feedback"), 0.8f },
 				LabParameterValue{ LabParameterId("view.taa.depth_absolute_threshold"), 0.1f },
@@ -228,6 +243,14 @@ namespace gglab
 				parameters.ApplyBatch(values, error).has_value(),
 				"Every Host view binding accepts a strictly validated typed value");
 			ApplyHostViewParameters(values, view, true);
+			context.Check(view.m_GIProbes == GIProbeVisualizationSettings{
+				.m_Enabled = true, .m_Bounds = false, .m_Radius = 0.25f, .m_Budget = 99,
+				.m_SliceAxis = 2, .m_LayerMinimum = 1, .m_LayerMaximum = 3,
+				.m_ClassificationMask = 6, .m_MaximumDistance = 25,
+				.m_Mode = GIProbeVisualizationMode::Irradiance, .m_PreviewExposureEV = 2.5f,
+				.m_ChangeNormalized = false, .m_ChangeRange = 2.0f, .m_ChangeBlocks = true,
+				.m_DepthMode = GIProbeDepthMode::SceneDepth },
+				"Host probe display controls use the same Runtime settings as the GUI");
 			const TemporalAASettings expectedTAA
 			{
 				.m_Enabled = false,
@@ -296,7 +319,7 @@ namespace gglab
 			const auto* radius = find(projection, "view.gtao.radius");
 			const auto* steps = find(projection, "view.gtao.step_count");
 			const auto* ev100 = find(projection, "view.exposure.ev100");
-			context.Check(projection.size() == 25 && feedback && taaEnabled && radius && steps && ev100,
+			context.Check(projection.size() == 40 && feedback && taaEnabled && radius && steps && ev100,
 				"The projection covers every Host view binding");
 			if (!feedback || !taaEnabled || !radius || !steps || !ev100)
 			{
@@ -393,7 +416,7 @@ namespace gglab
 			planned.m_HostViewProjection.clear();
 			planned.m_Temporal.m_Consumers.clear();
 			previous.m_Outcome = FrameCaptureFrameOutcome::Submitted;
-			context.Check(snapshot.m_HostView.size() == 25 && snapshot.m_PlannedFrame.m_Values.size() == 25 &&
+			context.Check(snapshot.m_HostView.size() == 40 && snapshot.m_PlannedFrame.m_Values.size() == 40 &&
 				snapshot.m_PlannedFrame.m_Consumers.front().m_Status == "disabled" &&
 				snapshot.m_Inherited.Get(LabParameterId("view.gtao.radius"), 0.0f) == 2.0f &&
 				snapshot.m_PreviousFrame->m_Outcome == ViewControlFrameOutcome::Aborted,

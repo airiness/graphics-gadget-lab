@@ -2766,7 +2766,7 @@ namespace gglab
 			checks.Check(revisionBeforeDiscovery != 0,
 				"Production frames already carry a valid parameter identity before observer activation");
 			runtime.EnableParameterControl();
-			checks.Check(parameters.IsAvailable() && parameters.GetHostParameters().GetParameters().size() == 25 &&
+			checks.Check(parameters.IsAvailable() && parameters.GetHostParameters().GetParameters().size() == 40 &&
 				(parameters.GetLabParameters() != nullptr) == withLab,
 				"Host descriptors are available with Demo content and alongside the active Lab source");
 			std::string error;
@@ -3062,7 +3062,7 @@ namespace gglab
 			checks.Check(!control.IsEnabled() && frame && frame->m_Outcome == FrameCaptureFrameOutcome::Submitted &&
 				frame->m_HostViewControl.m_RunIdentity == runtime.GetRunIdentity() &&
 				frame->m_HostViewControl.m_ContentIdentity == control.GetContentIdentity() &&
-				frame->m_HostViewControl.m_HostViewRevision == initial && frame->m_HostViewProjection.size() == 25 &&
+				frame->m_HostViewControl.m_HostViewRevision == initial && frame->m_HostViewProjection.size() == 40 &&
 				find(frame->m_HostViewProjection, "view.taa.enabled").m_Source == HostViewValueSource::Tooling &&
 				find(frame->m_HostViewProjection, "view.gtao.radius").m_Source == HostViewValueSource::Content &&
 				find(frame->m_HostViewProjection, "view.exposure.ev100").m_Source == HostViewValueSource::Camera,
@@ -3085,7 +3085,7 @@ namespace gglab
 
 			runtime.EnableParameterControl();
 			const auto discovered = control.DescribeHostView();
-			checks.Check(control.GetHostViewRevision() == initial && discovered.size() == 25 &&
+			checks.Check(control.GetHostViewRevision() == initial && discovered.size() == 40 &&
 				find(discovered, "view.taa.enabled").m_InheritedSource == HostViewValueSource::Tooling &&
 				!find(discovered, "view.gtao.radius").m_Override,
 				"Discovery describes the next frame without advancing the Host view revision");
@@ -4159,6 +4159,12 @@ namespace gglab
 			checks.Check(until([&]() { return abortedPublication; }) &&
 				!sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_FirstConsumed,
 				"An aborted publication frame keeps its stamp without becoming firstConsumed");
+			const auto* publicationFrame = runtime.GetFrameCaptureCoordinator()->GetLastFrameState();
+			checks.Check(publicationFrame && publicationFrame->m_Readiness.IsReady() &&
+				publicationFrame->m_FrameSerial ==
+					sequence.GetStatus()->m_Events[0].m_Batch->m_Items[0].m_Published &&
+				publicationFrame->m_Outcome == FrameCaptureFrameOutcome::Aborted,
+				"Build-time lighting publication updates readiness in that exact frame without inventing consumption");
 			probe.m_ParameterBuiltCallback = {};
 			checks.Check(until([&]() { return sequence.GetStatus()->IsTerminal(); }) &&
 				sequence.GetStatus()->m_State == FrameSequenceState::Completed &&
@@ -6122,6 +6128,7 @@ namespace gglab
 					"Suspension preserves published services");
 				runtime.HandleHostEvent({ .m_Type = AppHostEventType::Resumed });
 				std::latch registered(1);
+				std::latch cancelled(1);
 				bool cancellationRejected = false;
 				const auto task = runtime.GetTaskSystem()->Submit({}, [&](std::stop_token token) noexcept
 					{
@@ -6130,12 +6137,12 @@ namespace gglab
 								cancellationRejected = !runtime.GetRenderServices().IsValid() &&
 									!retained.IsValid() && runtime.GetLifecycleState() ==
 									AppRuntimeLifecycleState::ShuttingDown;
+								cancelled.count_down();
 							});
 						registered.count_down();
-						while (!token.stop_requested())
-						{
-							std::this_thread::yield();
-						}
+						// Keep the registration alive until its callback runs. The stop
+						// bit can become visible before request_stop invokes the callback.
+						cancelled.wait();
 						return TaskResult::Success();
 					});
 				checks.Check(task.IsValid(), "Service shutdown regression registers a cancellable task");
@@ -6159,8 +6166,10 @@ namespace gglab
 							runtime.GetRenderHost()->IsInitialized();
 					};
 				runtime.Shutdown({ .m_ApplicationTooling = &tooling });
-				checks.Check(cancellationRejected && toolingRejected && probe.m_ContainedCleanupAfterRevocation,
-					"Shutdown revokes before callbacks while contained cleanup retains live providers");
+				checks.Check(cancellationRejected, "Shutdown revokes before task cancellation callbacks");
+				checks.Check(toolingRejected, "Shutdown revokes before tooling callbacks");
+				checks.Check(probe.m_ContainedCleanupAfterRevocation,
+					"Contained cleanup retains live providers after revocation");
 				bool invoked = false;
 				checks.Check(!runtime.GetRenderServices().IsValid() && !retained.TryUse(
 					[&](const RenderServices&) noexcept { invoked = true; }) && !invoked,

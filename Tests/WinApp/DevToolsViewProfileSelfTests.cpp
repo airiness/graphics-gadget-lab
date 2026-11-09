@@ -2,13 +2,22 @@
 
 #include "DevTools/DevToolsRuntime.h"
 #include "DevTools/DevelopGui/DevelopGuiContext.h"
+#include "DevTools/DevelopGui/DevelopGuiRegistry.h"
 #include "DevTools/DevelopGui/Panels/RenderingSettingsPanel.h"
 #include "DevTools/DevelopGui/Panels/TemporalAAInspectorPanel.h"
 #include "DevTools/DevelopGui/Panels/GTAOInspectorPanel.h"
 #include "DevTools/DevelopGui/Panels/PostProcessInspectorPanel.h"
+#include "DevTools/DevelopGui/Panels/GIViewerPanel.h"
+#include "DevTools/DevelopGui/Panels/LabPanel.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewControlBase.h"
+#include "GGLabRuntime/Graphics/PostProcess/PostProcessPreviewViewBase.h"
 #include "Parameters/ViewControlSnapshot.h"
+#include "Parameters/HostViewParameters.h"
 #include "Parameters/ViewControlActions.h"
 #include "Capture/FrameCaptureCoordinator.h"
+#include "Capture/GIProbeInspectionControl.h"
+#include "Capture/GIReceiverInspectionControl.h"
+#include "Capture/GIProbePickingControl.h"
 #include "GGLabRuntime/Diagnostics/DiagnosticsView.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RenderingSettingsDiagnosticsSnapshot.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
@@ -17,13 +26,582 @@
 #include <imgui_internal.h>
 
 #include <array>
+#include <cstdint>
+#include <initializer_list>
 #include <memory>
+#include <optional>
 #include <string>
+#include <string_view>
 
 namespace gglab
 {
 	namespace
 	{
+		class GIPreviewProbe final : public PostProcessPreviewViewBase, public PostProcessPreviewControlBase
+		{
+		public:
+			PostProcessPreviewDiagnostics m_Preview{};
+			uint32_t m_Requests = 0;
+			PostProcessPreviewDiagnostics GetPostProcessPreviewDiagnostics(PostProcessPreviewChannel) const noexcept override
+			{
+				return m_Preview;
+			}
+			void SetPostProcessPreviewSelection(PostProcessDebugSelection selection, PostProcessPreviewChannel) noexcept override
+			{
+				m_Preview.m_Selected = selection;
+			}
+			void SetPostProcessPreviewExposureEV(float exposure, PostProcessPreviewChannel) noexcept override
+			{
+				m_Preview.m_ExposureEV = exposure;
+			}
+			void RequestPostProcessPreview(PostProcessPreviewChannel) noexcept override { ++m_Requests; }
+		};
+
+		class GIInspectionProbe final : public GIProbeInspectionControlBase
+		{
+		public:
+			std::optional<GIProbeInspectionRequest> m_Request;
+			std::shared_ptr<const GIProbeInspectionResult> m_Result;
+			std::string m_Status = "Fixture inspection";
+			uint32_t m_Cancellations = 0;
+			bool Inspect(GIProbeInspectionRequest request) noexcept override
+			{
+				m_Request = request;
+				return true;
+			}
+			void Cancel() noexcept override
+			{
+				++m_Cancellations;
+				m_Result.reset();
+			}
+			bool IsPending() const noexcept override { return false; }
+			std::shared_ptr<const GIProbeInspectionResult> GetResult() const noexcept override { return m_Result; }
+			const std::string& GetStatus() const noexcept override { return m_Status; }
+		};
+
+		class GIReceiverProbe final : public GIReceiverInspectionControlBase
+		{
+		public:
+			std::optional<GIReceiverInspectionRequest> m_Request;
+			std::shared_ptr<const GIReceiverInspectionResult> m_Result;
+			std::string m_Status = "Fixture receiver";
+			std::string m_ImagePath;
+			uint32_t m_Cancellations = 0;
+			bool Inspect(GIReceiverInspectionRequest request) noexcept override
+			{
+				m_Request = request;
+				return true;
+			}
+			void Cancel() noexcept override
+			{
+				++m_Cancellations;
+				m_Result.reset();
+			}
+			bool IsPending() const noexcept override { return false; }
+			std::shared_ptr<const GIReceiverInspectionResult> GetResult() const noexcept override { return m_Result; }
+			const std::string& GetStatus() const noexcept override { return m_Status; }
+			const std::string& GetImagePath() const noexcept override { return m_ImagePath; }
+		};
+
+		class GIPickingProbe final : public GIProbePickingControlBase
+		{
+		public:
+			GIProbePickingDisplay m_Display;
+			std::optional<GIProbePickingRequest> m_Request;
+			std::shared_ptr<const GIProbePickingResult> m_Result;
+			std::string m_Status = "Fixture picking";
+			uint32_t m_Requests = 0;
+			uint32_t m_Cancellations = 0;
+			const GIProbePickingDisplay& GetDisplay() const noexcept override { return m_Display; }
+			bool Pick(GIProbePickingRequest request) noexcept override
+			{
+				m_Request = std::move(request);
+				++m_Requests;
+				return true;
+			}
+			void Cancel() noexcept override { ++m_Cancellations; }
+			std::shared_ptr<const GIProbePickingResult> GetResult() const noexcept override { return m_Result; }
+			const std::string& GetStatus() const noexcept override { return m_Status; }
+		};
+
+		void RunGIProbePickingGuiChecks(SelfTestContext& context) noexcept
+		{
+			auto* previous = ImGui::GetCurrentContext();
+			ImGui::CreateContext();
+			auto& io = ImGui::GetIO();
+			io.IniFilename = io.LogFilename = nullptr;
+			io.DisplaySize = ImVec2(1600, 1000);
+			io.ConfigInputTrickleEventQueue = false;
+			unsigned char* pixels = nullptr;
+			int width = 0, height = 0;
+			io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+			auto source = std::make_shared<GIFieldSummary>();
+			source->m_Field = { .m_Generation = 7, .m_SceneRevision = 4 };
+			source->m_Counts = { 4, 4, 4 };
+			source->m_InspectionAvailable = true;
+			auto& display = source->m_Visualization;
+			display.m_SettingsRevision = 2;
+			display.m_Settings.m_Enabled = true;
+			display.m_Available = display.m_PickingAvailable = true;
+			display.m_Observation = GIObservationStamp{ .m_ProducingFrame = 100 };
+			display.m_View = { .m_Revision = 3, .m_RenderExtent = { 1600, 1000 },
+				.m_DisplayExtent = { 1600, 1000 }, .m_TemporalAA = true,
+				.m_ProjectionSupported = true, .m_Valid = true };
+			auto current = *source;
+			current.m_Visualization.m_View.m_TemporalFrameIndex = 23;
+			current.m_Visualization.m_View.m_JitterPixels = { .25f, -.25f };
+			DevToolsRuntime tools;
+			auto& overrides = tools.GetViewRenderSettingsOverrides();
+			overrides.m_GIProbes = display.m_Settings;
+			GIPickingProbe picking;
+			picking.m_Display = { source, 1, "gglab.lab.test" };
+			GIInspectionProbe numeric;
+			DevelopGuiContext gui{ .m_ViewRenderSettingsOverrides = &overrides, .m_GIFieldSummary = &current,
+				.m_GIProbeInspection = &numeric, .m_GIProbePicking = &picking,
+				.m_AbsolutePointer = true, .m_ContentId = "gglab.lab.test" };
+			GIViewerPanel panel;
+			const auto draw = [&](ImGuiID activation = 0, bool captured = false, bool contents = true)
+				{
+					if (activation)
+					{
+						ImGui::ActivateItemByID(activation);
+					}
+					ImGui::NewFrame();
+					if (contents)
+					{
+						ImGui::Begin("PickingFixture");
+						panel.Draw(gui);
+						ImGui::End();
+					}
+					io.WantCaptureMouse = captured;
+					panel.OnFrame(gui);
+					ImGui::EndFrame();
+				};
+			draw();
+			draw(ImHashStr("Pick probes with left click", 0, ImHashStr("PickingFixture")));
+			const auto click = [&](bool captured = false)
+				{
+					io.AddMousePosEvent(100, 800);
+					io.AddMouseButtonEvent(0, false);
+					draw();
+					io.AddMouseButtonEvent(0, true);
+					draw(0, captured);
+				};
+			click(true);
+			gui.m_AbsolutePointer = false;
+			click();
+			context.Check(picking.m_Requests == 0, "GUI picking ignores captured and relative-pointer clicks");
+			gui.m_AbsolutePointer = true;
+			click();
+			context.Check(picking.m_Request && picking.m_Request->m_SourceFrame == 100 &&
+				picking.m_Request->m_View == display.m_View && picking.m_Request->m_Pixel == std::array<uint32_t, 2>{ 100, 800 },
+				"Mouse clicks freeze the previous submitted display rather than the planned jitter phase");
+			if (picking.m_Request)
+			{
+				const auto earlier = *picking.m_Request;
+				click();
+				auto result = std::make_shared<GIProbePickingResult>();
+				result->m_Request = earlier;
+				result->m_Validity = GIProbePickingValidity::Hit;
+				result->m_Coordinate = std::array<uint32_t, 3>{ 1, 2, 3 };
+				picking.m_Result = result;
+				draw(0, false, false);
+				context.Check(!overrides.m_GIProbes.m_Selection, "A late earlier token cannot overwrite the latest GUI selection");
+				result->m_Request = *picking.m_Request;
+				draw(0, false, false);
+				context.Check(overrides.m_GIProbes.m_Selection &&
+					overrides.m_GIProbes.m_Selection->m_Coordinate == *result->m_Coordinate && numeric.m_Cancellations == 0,
+					"A matching result applies while collapsed without cancelling independent numeric inspection");
+				const GIProbeSelection selected{ { 1, 2, 3 }, source->m_Field.m_Generation };
+				for (const char* action : { "Select / highlight probe", "Inspect probe", "Cancel / clear" })
+				{
+					for (bool completedBeforeAction : { false, true })
+					{
+						const bool clear = std::string_view(action) == "Cancel / clear";
+						const auto expected = clear ?
+							std::optional<GIProbeSelection>{} :
+							std::optional(selected);
+						overrides.m_GIProbes.m_Selection = expected;
+						display.m_Settings.m_Selection = expected;
+						current.m_Visualization.m_Settings.m_Selection = expected;
+						picking.m_Result.reset();
+						const auto requests = picking.m_Requests;
+						click();
+						context.Check(picking.m_Requests == requests + 1,
+							"Each explicit-selection regression starts with a new pending click");
+						auto late = std::make_shared<GIProbePickingResult>();
+						late->m_Request = *picking.m_Request;
+						late->m_Validity = GIProbePickingValidity::Hit;
+						late->m_Coordinate = std::array<uint32_t, 3>{ 3, 1, 0 };
+						if (completedBeforeAction)
+						{
+							picking.m_Result = late;
+						}
+						const auto cancellations = picking.m_Cancellations;
+						const auto numericCancellations = numeric.m_Cancellations;
+						draw(ImHashStr(action, 0, ImHashStr("PickingFixture")), true);
+						context.Check(picking.m_Cancellations == cancellations + 1 &&
+							overrides.m_GIProbes.m_Selection == expected &&
+							numeric.m_Cancellations == numericCancellations + (clear ? 1u : 0u),
+							"Same-value select/inspect and empty clear supersede picking "
+							"without extra numeric cancellation");
+						// Retain the old result even after Cancel to exercise the panel's token guard.
+						picking.m_Result = late;
+						draw(0, false, false);
+						context.Check(overrides.m_GIProbes.m_Selection == expected,
+							"A completed or late pick cannot overwrite "
+							"a newer same-value selection action");
+						picking.m_Result.reset();
+						draw(ImHashStr("Select / highlight probe", 0, ImHashStr("PickingFixture")), true);
+						context.Check(overrides.m_GIProbes.m_Selection == selected,
+							"A superseded pick cannot overwrite the manual coordinate editor");
+					}
+				}
+				display.m_Settings.m_Selection = overrides.m_GIProbes.m_Selection;
+				current.m_Visualization.m_Settings.m_Selection = overrides.m_GIProbes.m_Selection;
+				picking.m_Result.reset();
+				click();
+				const auto before = picking.m_Cancellations;
+				gui.m_DisplayDpiScale = 1.25f;
+				draw(0, false, false);
+				context.Check(picking.m_Cancellations == before + 1, "DPI changes invalidate an in-flight GUI token");
+				gui.m_DisplayDpiScale = 1;
+				click();
+				const auto closing = picking.m_Cancellations;
+				panel.OnClosed(gui);
+				context.Check(picking.m_Cancellations == closing + 1 && !overrides.m_GIProbes.m_Selection,
+					"Closing the panel invalidates its picking token and releases its GUI selection");
+			}
+			ImGui::DestroyContext();
+			ImGui::SetCurrentContext(previous);
+		}
+
+		void RunGIViewerPanelChecks(SelfTestContext& context) noexcept
+		{
+			ImGuiContext* previousContext = ImGui::GetCurrentContext();
+			ImGui::CreateContext();
+			auto& io = ImGui::GetIO();
+			io.IniFilename = nullptr;
+			io.LogFilename = nullptr;
+			io.DisplaySize = ImVec2(1600, 1000);
+			unsigned char* pixels = nullptr;
+			int width = 0, height = 0;
+			io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+			GIPreviewProbe probe;
+			probe.m_Preview.m_Selected.m_Tap = PostProcessDebugTap::GIIrradiance;
+			probe.m_Preview.m_Published = probe.m_Preview.m_Selected;
+			probe.m_Preview.m_HasPublished = true;
+			probe.m_Preview.m_GISnapshot = { .m_Generation = 7, .m_Samples = 32,
+				.m_TargetSamples = 64, .m_MaximumDepth = 4 };
+			DevelopGuiContext gui{ .m_PostProcessPreview = &probe, .m_PostProcessPreviewControl = &probe };
+			GIViewerPanel panel;
+			const auto draw = [&](bool toggleFreeze = false)
+				{
+					if (toggleFreeze)
+					{
+						ImGui::ActivateItemByID(ImHashStr("Freeze preview", 0, ImHashStr("GIViewerFixture")));
+					}
+					ImGui::NewFrame();
+					ImGui::Begin("GIViewerFixture");
+					ImGui::LogToBuffer();
+					panel.Draw(gui);
+					const std::string text = ImGui::GetCurrentContext()->LogBuffer.c_str();
+					ImGui::LogFinish();
+					ImGui::End();
+					ImGui::EndFrame();
+					return text;
+				};
+			GGLAB_UNUSED(draw());
+			const auto live = draw();
+			context.Check(probe.m_Requests == 2 && live.find("samples 32 / 64") != std::string::npos && live.find("depth 4") != std::string::npos,
+				"The GI Viewer requests live updates and labels submitted estimator provenance");
+			const auto frozen = draw(true);
+			GGLAB_UNUSED(draw());
+			context.Check(probe.m_Requests == 2 && frozen.find("Frozen") != std::string::npos,
+				"Freezing the real Viewer checkbox stops preview demand across later draws");
+			const auto resumed = draw(true);
+			context.Check(probe.m_Requests == 3 && resumed.find("Live") != std::string::npos,
+				"Unfreezing resumes preview demand without changing reference sampling controls");
+			context.Check(resumed.find("No preview yet") != std::string::npos &&
+				ImGui::FindWindowByName("GIViewerFixture")->Size.x >= 760 &&
+				ImGui::FindWindowByName("GIViewerFixture")->Size.y >= 660,
+				"Unavailable GI has an explanation and the first-use Viewer leaves room for its image");
+			DevToolsRuntime displayTools;
+			auto& displayOverrides = displayTools.GetViewRenderSettingsOverrides();
+			gui.m_ViewRenderSettingsOverrides = &displayOverrides;
+			ImGui::ActivateItemByID(ImHashStr("Probe array", 0, ImHashStr("GIViewerFixture")));
+			GGLAB_UNUSED(draw());
+			ImGui::ActivateItemByID(ImHashStr("Show probe spheres", 0, ImHashStr("GIViewerFixture")));
+			GGLAB_UNUSED(draw());
+			context.Check(displayOverrides.m_GIProbes.m_Enabled && displayOverrides.GetActiveCount() == 1,
+				"The real Viewer checkbox enables only its GUI probe display block");
+			Camera displayCamera(Camera::CreateInfo{});
+			displayOverrides.m_GIProbes.m_Mode = GIProbeVisualizationMode::Irradiance;
+			displayOverrides.m_GIProbes.m_PreviewExposureEV = 1.5f;
+			displayOverrides.m_GIProbes.m_DepthMode = GIProbeDepthMode::SceneDepth;
+			const auto displaySettings = displayTools.CaptureFrameSettings();
+			auto resolvedDisplay = ResolveApplicationViewSettings({}, displayCamera, displaySettings);
+			context.Check(resolvedDisplay.m_ToolingBlocks.m_GIProbes && resolvedDisplay.m_View.m_GIProbes.m_Enabled &&
+				resolvedDisplay.m_View.m_GIProbes.m_Mode == GIProbeVisualizationMode::Irradiance &&
+				resolvedDisplay.m_View.m_GIProbes.m_PreviewExposureEV == 1.5f &&
+				resolvedDisplay.m_View.m_GIProbes.m_DepthMode == GIProbeDepthMode::SceneDepth,
+				"GUI probe settings reach Runtime frame settings with tooling attribution");
+			const std::array changeDisplay{
+				LabParameterValue{ LabParameterId("view.gi_probes.mode"), int32_t(2) },
+				LabParameterValue{ LabParameterId("view.gi_probes.change_normalized"), false },
+				LabParameterValue{ LabParameterId("view.gi_probes.change_range"), 0.25f },
+				LabParameterValue{ LabParameterId("view.gi_probes.change_blocks"), true } };
+			ApplyHostViewParameters(changeDisplay, resolvedDisplay.m_View, true);
+			context.Check(resolvedDisplay.m_View.m_GIProbes.m_Mode == GIProbeVisualizationMode::Change &&
+				!resolvedDisplay.m_View.m_GIProbes.m_ChangeNormalized &&
+				resolvedDisplay.m_View.m_GIProbes.m_ChangeRange == 0.25f && resolvedDisplay.m_View.m_GIProbes.m_ChangeBlocks,
+				"Host Change controls reach the same Runtime settings as the GUI");
+			const std::array sessionDisplay{
+				LabParameterValue{ LabParameterId("view.gi_probes.enabled"), true },
+				LabParameterValue{ LabParameterId("view.gi_probes.budget"), uint32_t(17) } };
+			ApplyHostViewParameters(sessionDisplay, resolvedDisplay.m_View, true);
+			context.Check(resolvedDisplay.m_View.m_GIProbes.m_Budget == 17 &&
+				displayOverrides.m_GIProbes.m_Budget == 4096,
+				"Session display settings override GUI intent without modifying its owned request");
+			ImGui::ActivateItemByID(ImHashStr("Probe array", 0, ImHashStr("GIViewerFixture")));
+			GGLAB_UNUSED(draw());
+			GIFieldSummary fieldSummary{ .m_Field = { .m_Generation = 73, .m_RefreshEpoch = 2,
+				.m_EpochOriginUpdate = 80 }, .m_Counts = { 4, 4, 4 }, .m_InspectionAvailable = true,
+				.m_ReceiverInspectionAvailable = true, .m_ReceiverMarkersAvailable = true };
+			GIInspectionProbe inspection;
+			gui.m_GIFieldSummary = &fieldSummary;
+			gui.m_GIProbeInspection = &inspection;
+			// Exercise full Coastal counts through the actual panel and a smaller window.
+			displayOverrides.m_GIProbes.m_Budget = 2048;
+			fieldSummary.m_Counts = { 33, 10, 39 };
+			fieldSummary.m_Visualization.m_Settings = displayOverrides.m_GIProbes;
+			fieldSummary.m_Visualization.m_CompletedObservation = GIObservationStamp{
+				.m_Field = fieldSummary.m_Field, .m_ProducingFrame = 101 };
+			fieldSummary.m_Visualization.m_CompletedCounts = {
+				.m_Enumerated = 12870, .m_AfterSlice = 12870, .m_AfterClassification = 12870,
+				.m_AfterDistance = 12870, .m_AfterFrustum = 8000,
+				.m_Rendered = 2048, .m_BudgetDropped = 5952 };
+			ImGui::ActivateItemByID(ImHashStr("Probe array", 0, ImHashStr("GIViewerFixture")));
+			const auto budgetText = draw();
+			context.Check(budgetText.find("2048 / 12870 displayed, 5952 budget drops") != std::string::npos &&
+				budgetText.find("Scene Depth can hide the retained first-N probes") != std::string::npos,
+				"Full Coastal counts distinguish display-budget truncation from filtering");
+			ImGui::SetWindowSize("GIViewerFixture", ImVec2(640, 400));
+			const auto resizedText = draw();
+			context.Check(resizedText.find("5952 budget drops") != std::string::npos &&
+				displayOverrides.m_GIProbes.m_Budget == 2048,
+				"Resizing the Viewer retains its budget and truncation explanation");
+			ImGui::SetWindowSize("GIViewerFixture", ImVec2(760, 660));
+			auto completedChange = std::make_shared<GIFieldChangeObservation>();
+			auto changeMeasurement = std::make_shared<GIFieldReadinessMeasurement>();
+			changeMeasurement->m_Counts = { 4, 4, 4 };
+			changeMeasurement->m_WarmingUpdates = 4;
+			changeMeasurement->m_RequiredQuietUpdates = 30;
+			changeMeasurement->m_Readiness.m_State = GIFieldReadinessState::Settling;
+			changeMeasurement->m_Readiness.m_Threshold = 0.3f;
+			changeMeasurement->m_Probes.resize(64, { 0.2f, true });
+			changeMeasurement->m_Blocks.push_back({ .m_ActiveProbes = 64,
+				.m_Percentile95 = 0.2f, .m_Maximum = 0.4f, .m_QuietUpdates = 17,
+				.m_Blockers = 8, .m_WarmingMet = true, .m_CurrentQuiet = true });
+			completedChange->m_Observation = { .m_Field = fieldSummary.m_Field,
+				.m_ProducingFrame = 113, .m_FieldUpdate = 100, .m_ReadinessUpdate = 20 };
+			completedChange->m_Measurement = changeMeasurement;
+			fieldSummary.m_Visualization.m_ChangeObservation = completedChange;
+			fieldSummary.m_Visualization.m_Settings.m_Mode = GIProbeVisualizationMode::Change;
+			const auto changeText = draw();
+			context.Check(changeText.find("Completed frame 113") != std::string::npos &&
+				changeText.find("17 / 30") != std::string::npos && changeText.find("hold") != std::string::npos &&
+				changeText.find("irradiance change only") != std::string::npos &&
+				changeMeasurement->m_Blocks[0].m_QuietUpdates == 17,
+				"The real Change panel displays the completed source and incomplete hold without advancing readiness");
+			fieldSummary.m_Visualization.m_ChangeObservation.reset();
+			fieldSummary.m_Readiness.m_Enabled = true;
+			const auto pendingChange = draw();
+			context.Check(pendingChange.find("no completed measurement for this field/refresh epoch") != std::string::npos,
+				"A missing completed observation is displayed as pending rather than zero change");
+			fieldSummary.m_Readiness.m_Enabled = false;
+			context.Check(draw().find("readiness measurements disabled") != std::string::npos,
+				"The real Change panel distinguishes an explicitly disabled measurement owner");
+			fieldSummary.m_Visualization.m_Settings.m_Mode = GIProbeVisualizationMode::Irradiance;
+			ImGui::ActivateItemByID(ImHashStr("Probe array", 0, ImHashStr("GIViewerFixture")));
+			GGLAB_UNUSED(draw());
+			fieldSummary.m_Counts = { 4, 4, 4 };
+			GGLAB_UNUSED(draw());
+			ImGui::ActivateItemByID(ImHashStr("Inspect probe", 0, ImHashStr("GIViewerFixture")));
+			const auto inspectionText = draw();
+			context.Check(inspection.m_Request && inspection.m_Request->m_ExpectedGeneration == 73 &&
+				inspection.m_Request->m_ExpectedRefreshEpoch == 2 &&
+				inspectionText.find("No completed readiness measurement") != std::string::npos,
+				"GUI inspection binds the displayed field identity and keeps pending measurement absence explicit");
+			context.Check(displayOverrides.m_GIProbes.m_Selection &&
+				displayOverrides.m_GIProbes.m_Selection->m_ExpectedGeneration == 73,
+				"Inspecting a coordinate selects the same field-bound diagnostic highlight");
+			ImGui::ActivateItemByID(ImHashStr("Cancel / clear", 0, ImHashStr("GIViewerFixture")));
+			GGLAB_UNUSED(draw());
+			context.Check(!displayOverrides.m_GIProbes.m_Selection && !inspection.m_Result,
+				"Clearing the numeric inspector releases its GUI selection and retained result");
+			ImGui::ActivateItemByID(ImHashStr("Select / highlight probe", 0, ImHashStr("GIViewerFixture")));
+			GGLAB_UNUSED(draw());
+			fieldSummary.m_Field.m_Generation = 74;
+			GGLAB_UNUSED(draw());
+			context.Check(displayOverrides.m_GIProbes.m_Selection &&
+				displayOverrides.m_GIProbes.m_Selection->m_ExpectedGeneration == 73,
+				"A field replacement cannot silently rebind the GUI selection to a new generation");
+			fieldSummary.m_Field.m_Generation = 73;
+			auto historical = std::make_shared<GIProbeInspectionResult>();
+			historical->m_Observation.m_Field.m_Generation = 72;
+			historical->m_Observation.m_ProducingFrame = 913;
+			historical->m_Observation.m_FieldUpdate = 85;
+			inspection.m_Result = historical;
+			const auto historicalText = draw();
+			context.Check(historicalText.find("Historical field/selection") != std::string::npos &&
+				historicalText.find("frame 913") != std::string::npos,
+				"Retained GPU values show their historical identity after a field replacement");
+			GIReceiverProbe receiver;
+			gui.m_GIReceiverInspection = &receiver;
+			fieldSummary.m_ReceiverView = { .m_Revision = 3, .m_RenderExtent = { 320, 200 },
+				.m_DisplayExtent = { 320, 200 }, .m_ReceiversAvailable = true, .m_Supported = true };
+			ImGui::ActivateItemByID(ImHashStr("Receiver contribution inspection", 0, ImHashStr("GIViewerFixture")));
+			GGLAB_UNUSED(draw());
+			ImGui::ActivateItemByID(ImHashStr("Inspect receiver", 0, ImHashStr("GIViewerFixture")));
+			GGLAB_UNUSED(draw());
+			context.Check(receiver.m_Request && receiver.m_Request->m_ExpectedGeneration == 73 &&
+				receiver.m_Request->m_ExpectedViewRevision == 3 && receiver.m_Request->m_Markers,
+				"The receiver GUI binds the displayed logical field/view and requests a paired marker capture");
+			receiver.m_Request.reset();
+			fieldSummary.m_ReceiverMarkersAvailable = false;
+			ImGui::ActivateItemByID(ImHashStr("Inspect receiver", 0, ImHashStr("GIViewerFixture")));
+			const auto unavailableMarkers = draw();
+			context.Check(!receiver.m_Request && unavailableMarkers.find("X-ray markers are unavailable") != std::string::npos,
+				"The Viewer disables paired-marker inspection when only numeric querying is available");
+			ImGui::ActivateItemByID(ImHashStr("Capture X-ray contribution markers", 0, ImHashStr("GIViewerFixture")));
+			GGLAB_UNUSED(draw());
+			ImGui::ActivateItemByID(ImHashStr("Inspect receiver", 0, ImHashStr("GIViewerFixture")));
+			GGLAB_UNUSED(draw());
+			context.Check(receiver.m_Request && !receiver.m_Request->m_Markers,
+				"Disabling unavailable markers leaves numeric receiver inspection usable");
+			receiver.m_Request.reset();
+			fieldSummary.m_ReceiverInspectionAvailable = false;
+			ImGui::ActivateItemByID(ImHashStr("Inspect receiver", 0, ImHashStr("GIViewerFixture")));
+			GGLAB_UNUSED(draw());
+			context.Check(!receiver.m_Request, "The Viewer disables inspection when the receiver query is unavailable");
+			fieldSummary.m_ReceiverInspectionAvailable = true;
+			fieldSummary.m_ReceiverMarkersAvailable = true;
+			auto zero = std::make_shared<GIReceiverInspectionResult>();
+			zero->m_Validity = GIReceiverInspectionValidity::NoValidSupport;
+			zero->m_CageEvaluated = true;
+			zero->m_Observation.m_Field = fieldSummary.m_Field;
+			zero->m_Observation.m_ProducingFrame = 123;
+			zero->m_View.m_Revision = 2;
+			receiver.m_Result = zero;
+			const auto receiverText = draw();
+			context.Check(receiverText.find("Historical field/view/selection") != std::string::npos &&
+				receiverText.find("Normalization unavailable") != std::string::npos,
+				"Receiver tables retain historical source identity and explain zero-weight normalization");
+			DevelopGuiRegistry registry;
+			registry.RegisterPanel(std::make_unique<GIViewerPanel>());
+			const auto drawRegistry = [&]()
+				{
+					ImGui::NewFrame();
+					registry.DrawMenuBar();
+					registry.DrawPanels(gui);
+					ImGui::EndFrame();
+				};
+			GGLAB_UNUSED(registry.OpenPanel("Rendering/GI Viewer"));
+			drawRegistry();
+			drawRegistry();
+			ImGuiWindow* viewerWindow = nullptr;
+			for (auto* window : ImGui::GetCurrentContext()->Windows)
+			{
+				if (std::string_view(window->Name).starts_with("GI Viewer##"))
+				{
+					viewerWindow = window;
+					break;
+				}
+			}
+			context.Check(viewerWindow != nullptr, "The registered GI Viewer creates its real window");
+			if (viewerWindow)
+			{
+				displayOverrides.m_GIProbes.m_Enabled = true;
+				const auto probeCancellations = inspection.m_Cancellations;
+				const auto receiverCancellations = receiver.m_Cancellations;
+				ImGui::SetWindowCollapsed(viewerWindow, true);
+				drawRegistry();
+				context.Check(inspection.m_Cancellations == probeCancellations &&
+					receiver.m_Cancellations == receiverCancellations,
+					"Collapsing the GI Viewer preserves its inspection requests");
+				ImGui::SetWindowCollapsed(viewerWindow, false);
+				drawRegistry();
+				ImGui::ActivateItemByID(viewerWindow->GetID("#CLOSE"));
+				drawRegistry();
+				context.Check(!registry.IsPanelOpen("Rendering/GI Viewer") &&
+					inspection.m_Cancellations == probeCancellations + 1 &&
+					receiver.m_Cancellations == receiverCancellations + 1 &&
+					!inspection.m_Result && !receiver.m_Result,
+					"The GI Viewer close button cancels both owned inspections in the closing frame");
+				context.Check(!displayOverrides.m_GIProbes.m_Enabled && !displayOverrides.m_GIProbes.m_Selection,
+					"Closing the Viewer releases its GUI probe display request");
+				resolvedDisplay = ResolveApplicationViewSettings({}, displayCamera, displayTools.CaptureFrameSettings());
+				ApplyHostViewParameters(sessionDisplay, resolvedDisplay.m_View, true);
+				context.Check(!resolvedDisplay.m_ToolingBlocks.m_GIProbes &&
+					resolvedDisplay.m_View.m_GIProbes.m_Enabled && resolvedDisplay.m_View.m_GIProbes.m_Budget == 17,
+					"Closing the GUI request preserves independent session display intent");
+				drawRegistry();
+				context.Check(inspection.m_Cancellations == probeCancellations + 1 &&
+					receiver.m_Cancellations == receiverCancellations + 1,
+					"A closed GI Viewer does not repeatedly cancel requests on later frames");
+				GGLAB_UNUSED(registry.OpenPanel("Rendering/GI Viewer"));
+				drawRegistry();
+				const auto menuBarId = ImHashStr("##MenuBar", 0, ImHashStr("##MainMenuBar"));
+				ImGui::ActivateItemByID(ImHashStr("Rendering", 0, menuBarId));
+				drawRegistry();
+				auto* menuWindow = ImGui::FindWindowByName("Rendering###Menu_00");
+				context.Check(menuWindow && menuWindow->Active, "The Rendering menu opens through its real menu item");
+				if (menuWindow && menuWindow->Active)
+				{
+					ImGui::ActivateItemByID(menuWindow->GetID(viewerWindow->Name));
+					drawRegistry();
+					context.Check(!registry.IsPanelOpen("Rendering/GI Viewer") &&
+						inspection.m_Cancellations == probeCancellations + 2 &&
+						receiver.m_Cancellations == receiverCancellations + 2,
+						"Closing the GI Viewer from the menu notifies it before the registry skips its draw");
+				}
+			}
+			gui.m_ViewRenderSettingsOverrides = nullptr;
+			LabSessionLog log;
+			LabSnapshot snapshot;
+			snapshot.m_ActiveLabName = "GI Reference";
+			snapshot.m_IsHostActive = true;
+			const auto drawLog = [&]()
+				{
+					ImGui::NewFrame();
+					ImGui::SetNextWindowSize(ImVec2(500, 600));
+					ImGui::Begin("LabLogFixture");
+					log.Draw(snapshot);
+					const float controlY = ImGui::GetCursorPosY();
+					ImGui::Button("Parameter below log");
+					ImGui::End();
+					ImGui::EndFrame();
+					return controlY;
+				};
+			snapshot.m_State = LabSnapshotRunState::Ready;
+			GGLAB_UNUSED(drawLog());
+			const float readyY = drawLog();
+			snapshot.m_State = LabSnapshotRunState::WarmingUp;
+			snapshot.m_WarmupFramesRemaining = 30;
+			const float warmupY = drawLog();
+			snapshot.m_HasPendingSession = true;
+			snapshot.m_LoadingDetail = std::string(1000, 'x');
+			for (uint32_t entry = 0; entry < 100; ++entry)
+			{
+				log.Append(std::to_string(entry));
+			}
+			context.Check(readyY == warmupY && readyY == drawLog(),
+				"Warm-up, long loading details and scrolling history cannot shift controls below the Lab log");
+			ImGui::DestroyContext();
+			ImGui::SetCurrentContext(previousContext);
+		}
+
 		bool ProfilesMatch(const ViewRenderProfile& left, const ViewRenderProfile& right) noexcept
 		{
 			const auto& leftGTAO = left.m_Lighting.m_GTAO;
@@ -601,5 +1179,7 @@ namespace gglab
 			"DevTools reset clears rendering overrides without modifying authoring state");
 		RunRenderingSettingsPanelChecks(context);
 		RunViewControlPanelChecks(context);
+		RunGIViewerPanelChecks(context);
+		RunGIProbePickingGuiChecks(context);
 	}
 }

@@ -4,6 +4,7 @@
 #include "GGLabRuntime/Diagnostics/Snapshots/DX12BackendSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/DX12ResourceManagerSnapshot.h"
 #include "GGLabRuntime/Diagnostics/Snapshots/RHIPipelineSystemSnapshot.h"
+#include "GGLabRuntime/Graphics/RHI/RHIAccelerationStructure.h"
 
 #include <algorithm>
 #include <d3d12.h>
@@ -137,6 +138,15 @@ namespace gglab
 		}
 
 		ImGui::SeparatorText("Capabilities");
+		const auto& rayQuery = snapshot->m_RayQueryCapabilities;
+		ImGui::Text("Inline ray queries: supported %s | device %s",
+			rayQuery.m_Supported ? "yes" : "no", EnabledText(rayQuery.m_Enabled));
+		const auto reason = GetRHIRayQueryUnavailableReasonName(rayQuery.m_UnavailableReason);
+		ImGui::TextDisabled("Ray query reason: %.*s | scratch alignment %llu B | primitives %llu | instances %llu",
+			static_cast<int>(reason.size()), reason.data(),
+			static_cast<unsigned long long>(rayQuery.m_BuildLimits.m_ScratchAlignmentInBytes),
+			static_cast<unsigned long long>(rayQuery.m_BuildLimits.m_MaxPrimitiveCount),
+			static_cast<unsigned long long>(rayQuery.m_BuildLimits.m_MaxInstanceCount));
 		ImGui::Text("Ray tracing: %s | mesh shaders: %s | enhanced barriers: %s",
 			EnabledText(snapshot->m_RayTracingSupported),
 			EnabledText(snapshot->m_MeshShaderSupported),

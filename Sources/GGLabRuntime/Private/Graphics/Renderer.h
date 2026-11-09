@@ -147,6 +147,21 @@ namespace gglab
 		{
 			return m_PersistentTexturePool.get();
 		}
+		GIFieldFrameState* GetGIFieldFrameState() const noexcept { return m_GIFieldFrameState.get(); }
+
+		GIReferenceObservation* GetGIReferenceObservation() const noexcept
+		{
+			return m_GIReferenceObservation.get();
+		}
+		void CaptureTransientResourcePool(TransientResourcePoolSnapshot& snapshot) const noexcept override;
+		[[nodiscard]] GIReferenceObservationDiagnostics GetGIReferenceObservationDiagnostics()
+			const noexcept override;
+		GISpecularVisibilityObservation* GetGISpecularVisibilityObservation() const noexcept
+		{
+			return m_GISpecularVisibilityObservation.get();
+		}
+		[[nodiscard]] GISpecularVisibilityProgress GetGISpecularVisibilityProgress()
+			const noexcept override;
 		TemporalHistoryManager* GetTemporalHistoryManager() const noexcept
 		{
 			return m_TemporalHistoryManager.get();
@@ -333,6 +348,9 @@ namespace gglab
 		std::unique_ptr<AssetUploadScheduling> m_AssetUploadScheduler;
 		std::unique_ptr<TransientResourcePool> m_TransientResourcePool;
 		std::unique_ptr<PersistentTexturePool> m_PersistentTexturePool;
+		std::unique_ptr<GIReferenceObservation> m_GIReferenceObservation;
+		std::unique_ptr<GIFieldFrameState> m_GIFieldFrameState;
+		std::unique_ptr<GISpecularVisibilityObservation> m_GISpecularVisibilityObservation;
 		std::unique_ptr<TemporalHistoryManager> m_TemporalHistoryManager;
 		std::unique_ptr<TemporalReferenceAccumulator> m_TemporalReferenceAccumulator;
 		std::unique_ptr<GTAOTemporalHistory> m_GTAOTemporalHistory;

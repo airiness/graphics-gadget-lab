@@ -2,6 +2,7 @@
 
 #include "Capture/NonFiniteWatchCoordinator.h"
 #include "Parameters/HostViewParameters.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIFieldReadiness.h"
 
 #include <algorithm>
 #include <cmath>
@@ -69,7 +70,9 @@ namespace gglab
 				{ "referenceSample", sample.m_ReferenceSample },
 				{ "firstFrame", sample.m_FirstFrame },
 				{ "cameraCut", sample.m_CameraCut },
-				{ "conditions", {
+				{ "cpuBuildRecordMilliseconds", sample.m_Observation.m_CpuBuildRecordMilliseconds ?
+					Json(*sample.m_Observation.m_CpuBuildRecordMilliseconds) : Json(nullptr) },
+				{ "conditions",{
 					{ "gpuProfiling", true },
 					{ "profilingStateChanged", sample.m_ProfilingStateChanged },
 					{ "developmentTools", sample.m_DevelopmentTools },
@@ -95,8 +98,8 @@ namespace gglab
 		const Json environment = Json::parse(m_Capture->GetEnvironmentJson());
 		return Json{
 			{ "schema", "gglab.gpu-timing" },
-			{ "schemaVersion", 1 },
-			{ "sequence", {
+			{ "schemaVersion", 2 },
+			{ "sequence",{
 				{ "id", m_Status->m_SequenceId },
 				{ "path", m_Status->m_CameraPathId },
 				{ "pathVersion", m_Status->m_CameraPathVersion },
@@ -105,16 +108,16 @@ namespace gglab
 				{ "firstFrameSerial", first },
 				{ "lastFrameSerial", last } } },
 			{ "context", Json::parse(m_TimingContext) },
-			{ "coverage", {
+			{ "coverage",{
 				{ "requestedSamples", requested },
 				{ "recordedSamples", timing.m_Samples.size() },
 				{ "samples", std::move(samples) } } },
-			{ "frame", {
+			{ "frame",{
 				{ "milliseconds", timing.m_FrameMilliseconds },
 				{ "statistics", summary(timing.m_FrameMilliseconds) } } },
 			{ "scopes", std::move(scopes) },
 			{ "stablePassSet", stable },
-			{ "measurement", {
+			{ "measurement",{
 				{ "gpuProfilingRequested", true },
 				{ "validation", environment.at("validation") },
 				{ "profilingStateChanged", profilingChanged } } },
@@ -142,7 +145,7 @@ namespace gglab
 		return Json{
 			{ "schema", "gglab.parameter-frames" },
 			{ "schemaVersion", 1 },
-			{ "sequence", {
+			{ "sequence",{
 				{ "id", m_Status->m_SequenceId },
 				{ "path", m_Status->m_CameraPathId },
 				{ "pathVersion", m_Status->m_CameraPathVersion },
@@ -259,6 +262,25 @@ namespace gglab
 		{
 			return requiredContentId.empty() || state.m_DemoId == requiredContentId ||
 				state.m_LabId == requiredContentId;
+		}
+
+		[[nodiscard]] const GIFieldReadinessMeasurement* GetMatchingReadinessMeasurement(
+			const GIFieldCaptureState& field) noexcept
+		{
+			if (!field.m_Summary || !field.m_Summary->m_ChangeObservation)
+			{
+				return nullptr;
+			}
+			const auto& change = *field.m_Summary->m_ChangeObservation;
+			if (!change.m_Measurement || change.m_Observation.m_Field != field.m_Summary->m_Field ||
+				change.m_Observation.m_Kind != GIObservationKind::CompletedReadiness ||
+				change.m_Observation.m_ReadinessUpdate != field.m_Readiness.m_CompletedUpdates ||
+				change.m_Measurement->m_Readiness.m_CompletedUpdates != field.m_Readiness.m_CompletedUpdates ||
+				change.m_Measurement->m_Readiness.m_State != field.m_Readiness.m_State)
+			{
+				return nullptr;
+			}
+			return change.m_Measurement.get();
 		}
 
 		[[nodiscard]] std::string DescribePendingGates(const FrameCaptureReadiness& readiness)
@@ -460,6 +482,10 @@ namespace gglab
 		m_ExportedFrame.reset();
 		m_AdmissionDeferred = false;
 		m_LastSettleKey.reset();
+		m_InitialGIField.reset();
+		m_LightingRefresh.reset();
+		m_ReadyLightingGeneration = 0;
+		m_RefreshPhaseReady = false;
 		m_BegunRenderFrameSerial = 0;
 		m_PendingGpuTimingFrames.clear();
 		m_GpuTimingSubmissionCount = 0;
@@ -693,6 +719,11 @@ namespace gglab
 				}
 				m_EventContentIdentity = contentIdentity;
 			}
+			if (const auto& field = previousFrame->m_Readiness.m_GIField; field && field->m_Summary)
+			{
+				m_InitialGIField = field->m_Summary->m_Field;
+				m_ReadyLightingGeneration = field->m_LightingGeneration;
+			}
 			m_Status->m_CameraPathVersion = path->m_Version;
 			m_Status->m_FrameCount = frameCount;
 			m_Status->m_State = FrameSequenceState::Running;
@@ -767,10 +798,10 @@ namespace gglab
 				}
 				if (batch.m_State == ParameterBatchState::Failed ||
 					std::ranges::any_of(batch.m_Items, [](const auto& item)
-					{
-						return item.IsTerminal() && item.m_State != ParameterEffectState::Consumed &&
-							item.m_State != ParameterEffectState::NoChange;
-					}))
+						{
+							return item.IsTerminal() && item.m_State != ParameterEffectState::Consumed &&
+								item.m_State != ParameterEffectState::NoChange;
+						}))
 				{
 					event.m_Failure = batch.m_Failure.empty() ? "An event effect did not reach consumption." : batch.m_Failure;
 					Fail(event.m_Failure);
@@ -811,18 +842,116 @@ namespace gglab
 		m_AppliedPose = pose;
 	}
 
+	bool FrameSequenceCoordinator::CoversGIFieldRefresh(const FrameCaptureFrameState& state,
+		const FrameCaptureGate& gate, FrameSequenceLightingState lighting) noexcept
+	{
+		const auto& field = state.m_Readiness.m_GIField;
+		if (m_Frame + 1 >= m_Status->m_FrameCount ||
+			gate.m_Name != "gi-field" || gate.m_State != FrameCaptureGateState::Pending ||
+			gate.m_EffectDomain != "gi-field" || !m_InitialGIField || !field || !field->m_Summary ||
+			gate.m_EffectGeneration != field->m_Generation || !field->m_Readiness.m_Enabled ||
+			field->m_Readiness.m_Failed ||
+			field->m_Readiness.m_State == GIFieldReadinessState::Unconverged ||
+			field->m_Summary->m_Invalid || !field->m_Summary->m_Initialized ||
+			lighting.m_BuiltGeneration == 0 || lighting.m_BuiltGeneration != lighting.m_RequestedGeneration)
+		{
+			return false;
+		}
+		const auto* measurement = GetMatchingReadinessMeasurement(*field);
+		const bool steadyHandoff = m_RefreshPhaseReady && measurement && !measurement->m_RefreshMode;
+		if (!field->m_Readiness.m_Refreshing && !steadyHandoff)
+		{
+			return false;
+		}
+		const auto& identity = field->m_Summary->m_Field;
+		if (m_RefreshPhaseReady && m_LightingRefresh == identity && !steadyHandoff)
+		{
+			return false;
+		}
+		if (identity.m_Generation != m_InitialGIField->m_Generation ||
+			identity.m_SceneRevision != m_InitialGIField->m_SceneRevision ||
+			identity.m_LightingGeneration != lighting.m_BuiltGeneration ||
+			identity.m_LightingGeneration == m_ReadyLightingGeneration ||
+			(identity.m_EnvironmentGeneration != 0 &&
+				identity.m_EnvironmentGeneration != lighting.m_BuiltGeneration) ||
+			identity.m_RefreshEpoch <= m_InitialGIField->m_RefreshEpoch ||
+			field->m_Generation != identity.m_Generation || field->m_SceneRevision != identity.m_SceneRevision ||
+			field->m_LightingGeneration != identity.m_LightingGeneration ||
+			field->m_EnvironmentGeneration != identity.m_EnvironmentGeneration)
+		{
+			return false;
+		}
+		// Consumption terminates a lighting receipt, not its field's refresh. Retain
+		// this sequence owner's exact published generation through the estimator's
+		// refresh-to-steady quiet-window handoff. Steady Ready closes coverage;
+		// a consumed event must never excuse subsequent readiness loss.
+		const bool ownsLighting = std::ranges::any_of(m_Status->m_Events, [&](const auto& event)
+			{
+				return event.m_Frame <= m_Frame && event.m_Batch &&
+					std::ranges::any_of(event.m_Batch->m_Items, [&](const auto& item)
+						{
+							return item.m_DeclaredClass == ParameterEffectClass::Deferred &&
+								(item.m_State == ParameterEffectState::Published || item.m_State == ParameterEffectState::Consumed) &&
+								item.m_Applied && item.m_Published && item.m_Identity.m_Domain == "lighting" &&
+								item.m_Identity.m_Generation == lighting.m_BuiltGeneration &&
+								item.m_Identity.m_Revision == event.m_Batch->m_Revision;
+						});
+			});
+		if (!ownsLighting)
+		{
+			return false;
+		}
+		if (!m_LightingRefresh || m_LightingRefresh->m_LightingGeneration != identity.m_LightingGeneration)
+		{
+			// A steady handoff cannot borrow the previous lighting target's Ready evidence.
+			if (!field->m_Readiness.m_Refreshing)
+			{
+				return false;
+			}
+			m_LightingRefresh = identity;
+			m_RefreshPhaseReady = false;
+		}
+		return *m_LightingRefresh == identity;
+	}
+
 	bool FrameSequenceCoordinator::BeginFrame(const FrameCaptureFrameState& state,
-		const std::function<bool(const FrameCaptureGate&)>& coversReadinessGate) noexcept
+		const std::function<bool(const FrameCaptureGate&)>& coversReadinessGate,
+		FrameSequenceLightingState lighting) noexcept
 	{
 		if (!m_Status || m_Status->m_State != FrameSequenceState::Running || !m_AppliedPose)
 		{
 			return true;
 		}
+		if (state.m_Readiness.m_GIField &&
+			state.m_Readiness.m_GIField->m_Readiness.m_State == GIFieldReadinessState::Ready)
+		{
+			const auto& field = *state.m_Readiness.m_GIField;
+			const auto* measurement = GetMatchingReadinessMeasurement(field);
+			const bool refreshReady = m_LightingRefresh && field.m_Summary &&
+				field.m_Summary->m_Field == *m_LightingRefresh && measurement && measurement->m_RefreshMode &&
+				field.m_LightingGeneration != m_ReadyLightingGeneration &&
+				field.m_LightingGeneration == lighting.m_BuiltGeneration &&
+				lighting.m_BuiltGeneration == lighting.m_RequestedGeneration;
+			if (refreshReady)
+			{
+				m_RefreshPhaseReady = true;
+				if (m_Frame + 1 >= m_Status->m_FrameCount)
+				{
+					Fail("The final lighting refresh observation has not reached steady Ready.");
+					return false;
+				}
+			}
+			else
+			{
+				m_ReadyLightingGeneration = field.m_LightingGeneration;
+			}
+		}
 		if (!std::ranges::all_of(state.m_Readiness.m_Gates, [&](const auto& gate)
 			{
 				return gate.m_State == FrameCaptureGateState::Ready ||
-					(gate.m_State == FrameCaptureGateState::Pending && coversReadinessGate &&
-						coversReadinessGate(gate));
+					(gate.m_State == FrameCaptureGateState::Pending &&
+						((coversReadinessGate && coversReadinessGate(gate)) ||
+							CoversGIFieldRefresh(state, gate, lighting)));
 			}))
 		{
 			Fail(std::format("A readiness gate left Ready at sequence frame {}: {}", m_Frame,
@@ -947,9 +1076,9 @@ namespace gglab
 		{
 			if (event.m_Frame == m_Frame && (!event.m_Batch ||
 				std::ranges::any_of(event.m_Batch->m_Items, [](const auto& item)
-				{
-					return item.m_DeclaredClass == ParameterEffectClass::Immediate && !item.IsTerminal();
-				})))
+					{
+						return item.m_DeclaredClass == ParameterEffectClass::Immediate && !item.IsTerminal();
+					})))
 			{
 				Fail("An Immediate event did not reach its terminal receipt in the submitted sequence frame.");
 				return;
@@ -961,6 +1090,13 @@ namespace gglab
 		}
 		if (WantsGpuTiming())
 		{
+			if (observation.m_CpuBuildRecordMilliseconds &&
+				(!std::isfinite(*observation.m_CpuBuildRecordMilliseconds) ||
+					*observation.m_CpuBuildRecordMilliseconds < 0.0))
+			{
+				Fail("Sequence CPU build/record timing must be finite and non-negative.");
+				return;
+			}
 			m_PendingGpuTimingFrames.push_back({ .m_RenderFrameSerial = renderFrameSerial,
 				.m_SubmissionOrdinal = m_GpuTimingSubmissionCount,
 				.m_SequenceFrame = m_Frame, .m_ReferenceSample = m_Sample,
@@ -1160,11 +1296,13 @@ namespace gglab
 	void FrameSequenceCoordinator::CompleteIfFinished() noexcept
 	{
 		CollectArtifactPublication();
-		if (m_Status && m_Status->m_State == FrameSequenceState::Finishing &&
-			std::ranges::all_of(m_Status->m_Events, [](const auto& event)
+
+		const auto allEventsTerminal = m_Status && std::ranges::all_of(m_Status->m_Events, [](const auto& event)
 			{
 				return event.m_Batch && event.m_Batch->IsTerminal();
-			}) &&
+			});
+		if (m_Status && m_Status->m_State == FrameSequenceState::Finishing &&
+			allEventsTerminal &&
 			m_CaptureJobs.empty() &&
 			m_PendingGpuTimingFrames.empty() &&
 			(!m_WatchCoverageId || (m_Status->m_WatchCoverage && m_Status->m_WatchCoverage->m_Complete)))

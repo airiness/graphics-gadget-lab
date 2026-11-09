@@ -401,7 +401,8 @@ namespace gglab
 					RHIResourceState beforeState = trackedState.m_State;
 					passNode.m_PreBarriers.push_back({
 						.m_Resource = access.m_Resource,
-						.m_Kind = RGBarrierKind::Uav,
+						.m_Kind = virtualResource->m_ResourceType == RGResourceType::RGAccelerationStructure ?
+							RGBarrierKind::AccelerationStructure : RGBarrierKind::Uav,
 						.m_Reason = RGBarrierReason::OrderedStorageHazard,
 						.m_Before = beforeState,
 						.m_After = requiredState,

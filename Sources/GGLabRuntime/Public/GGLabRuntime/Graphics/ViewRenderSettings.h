@@ -2,6 +2,7 @@
 
 #include "GGLabRuntime/Graphics/Camera.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
+#include "GGLabRuntime/Graphics/Pipeline/GIProbeVisualization.h"
 
 #include <cstdint>
 
@@ -70,6 +71,7 @@ namespace gglab
 	// Authoring settings owned above the renderer by the active Demo or Lab.
 	struct ViewRenderProfile
 	{
+		GIProbeVisualizationSettings m_GIProbes{};
 		TemporalAASettings m_TemporalAA{};
 		// The V2 temporal ABI rescales committed history into this frame's storage scale.
 		bool m_EnableScenePreExposure = true;
@@ -105,6 +107,7 @@ namespace gglab
 	// Immutable settings resolved for one RenderView and one frame.
 	struct ResolvedViewRenderSettings
 	{
+		GIProbeVisualizationSettings m_GIProbes{};
 		TemporalAASettings m_TemporalAA{};
 		ResolvedExposureSettings m_Exposure{};
 		ResolvedLightingSettings m_Lighting{};

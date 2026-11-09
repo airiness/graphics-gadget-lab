@@ -37,7 +37,9 @@
 
 namespace gglab
 {
-	GGLabAppRuntime::GGLabAppRuntime() noexcept : m_ToolingViewControl(*this) {}
+	GGLabAppRuntime::GGLabAppRuntime() noexcept :
+		m_ToolingViewControl(*this), m_ToolingGIProbeInspection(*this), m_ToolingGIReceiverInspection(*this),
+		m_ToolingGIProbePicking(*this) {}
 
 	GGLabAppRuntime::~GGLabAppRuntime() noexcept
 	{
@@ -62,6 +64,20 @@ namespace gglab
 		// One owner establishes host visibility after internal result routing. The
 		// reserved receipt remains in the coordinator until explicit host consumption.
 		m_FrameCapture->PublishAppRuntimeJobResults();
+		m_ToolingGIProbeInspection.Update();
+		m_ToolingGIReceiverInspection.Update();
+		m_ToolingGIProbePicking.Update();
+	}
+
+	std::string GGLabAppRuntime::GetGIProbePickingSourceJson() const noexcept
+	{
+		const auto& display = m_ToolingGIProbePicking.GetDisplay();
+		if (!display.m_Summary || !display.m_Summary->m_Visualization.m_Available ||
+			!display.m_Summary->m_Visualization.m_Observation)
+		{
+			return {};
+		}
+		return SerializeGIProbePickingSource(*display.m_Summary, display.m_DpiScale, display.m_ContentId);
 	}
 
 	CaptureAdmission GGLabAppRuntime::TrySubmitCaptureJob(CapturePlan&& plan) noexcept

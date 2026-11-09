@@ -68,6 +68,16 @@ can cover `ibl` Pending. Expected domains alone grant no exception. Failed gates
 unrelated requests and other gates still fail; `environment` means external asset
 loading and is not covered. Temporal-continuity checks remain active outside cuts.
 
+With `sequenceGIFieldRefresh`, a published/consumed lighting receipt can also cover
+its initialized field's refresh while requested/built/field lighting generations
+match. Field generation and scene revision must remain unchanged, and the refresh
+identity must remain fixed. Its observed refresh-mode Ready may be followed by the
+estimator's steady quiet-window handoff, proven by matching completed measurement
+identity. Coverage ends at steady Ready; final refresh-mode Ready cannot complete;
+subsequent readiness loss, failure, an unrelated target, or a final Pending frame
+fails. This does not relax ordinary after-ready captures. Use
+`gi-field-light-step` for the bounded Physical Sky experiment; it is not frozen F7.
+
 Atmosphere Range registers the 240-frame `SEQ_AtmosphereRange_Static` path:
 
 ```powershell

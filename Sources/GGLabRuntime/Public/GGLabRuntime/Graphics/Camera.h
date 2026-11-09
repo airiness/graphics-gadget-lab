@@ -58,6 +58,9 @@ namespace gglab
 
 		void OnResize(uint32_t width, uint32_t height) noexcept;
 
+		// Moves to the pose without requesting a temporal reset. LookAt is this pose plus a
+		// reset, so equal inputs give an identical orientation either way.
+		void SetLookAt(const Vector3& eye, const Vector3& target) noexcept;
 		void LookAt(const Vector3& eye, const Vector3& target) noexcept;
 		void RequestTemporalReset() noexcept;
 

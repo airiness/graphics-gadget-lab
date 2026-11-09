@@ -7,6 +7,12 @@
 
 namespace gglab
 {
+	float Win32Window::GetDpiScale() const noexcept
+	{
+		const UINT dpi = m_Hwnd ? GetDpiForWindow(m_Hwnd) : 96;
+		return float(dpi ? dpi : 96) / 96.0f;
+	}
+
 	Win32Window::MessageSubscription::MessageSubscription(MessageSubscription&& other) noexcept :
 		m_Window(std::exchange(other.m_Window, nullptr)),
 		m_Id(std::exchange(other.m_Id, 0))

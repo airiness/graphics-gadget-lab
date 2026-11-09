@@ -151,7 +151,14 @@ namespace gglab
 			builder.Export(surface.m_Next, RGTextureAccess::None);
 		}
 
-		// The frame that wrote the next textures was submitted: they become the history.
+		// A submitted initialization can define pending contents without publishing
+		// them. Owners may then update that pending version over several submissions.
+		void MarkWriteInitialized() noexcept
+		{
+			m_Initialized[GetWriteIndex()] = true;
+		}
+
+		// The frame that completed the next textures was submitted: publish the history.
 		void Commit() noexcept
 		{
 			m_ReadIndex = 1u - m_ReadIndex;

@@ -32,6 +32,9 @@ namespace gglab
 		RHITextureHandle m_Texture{};
 		RHITextureDesc m_Desc{};
 		uint32_t m_SrvIndex = 0;
+		RHIFormat m_ViewFormat = RHIFormat::Unknown;
+		SourceDigest m_SourceDigest{};
+		ArtifactContentDigest m_ArtifactContentDigest{};
 	};
 
 	// Copied inspection data used to keep diagnostics away from texture storage.

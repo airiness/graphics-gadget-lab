@@ -2,6 +2,9 @@
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "Application/Platform/Windows/Input/InputBase.h"
 
+#include <cstdint>
+#include <vector>
+
 namespace gglab
 {
 	enum KeyCode : unsigned char
@@ -451,10 +454,8 @@ namespace gglab
 		State GetState() noexcept;
 
 	private:
-		static constexpr uint32_t MaxKeyStateCount = 16;
-
-	private:
-		GameInputKeyState m_KeyStates[MaxKeyStateCount] = {};
+		std::vector<ComPtr<IGameInputDevice>> m_Devices;
+		std::vector<GameInputKeyState> m_KeyStates;
 
 		StateTracker m_StateTracker;
 	};

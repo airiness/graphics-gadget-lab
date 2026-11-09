@@ -33,6 +33,51 @@ Common wire fields are `timing` (default `after-ready`), `settleFrames` (default
 0-10000), `requiredContentId`, `view`, absolute `outputDirectory`, `label`, `note`.
 There is no wire `wait` or `requestId`.
 
+## DDGI probe observations
+
+Discover `capabilities.giProbeInspection` and read `frame.giField.summary` for
+the cached volume, field identity and completed readiness stamp. A null
+`completedMeasurement` means this epoch has no completed readiness measurement,
+including when readiness is disabled.
+
+`capture -GIProbeInspection` (or `-GIProbeInspectionFile`) accepts
+`coordinate: [x,y,z]`, required `expectedGeneration` and optional
+`expectedRefreshEpoch`. Bind them to the summary and pass `-ExpectedRunIdentity`
+from status. The adapter adds `GI.Field.ProbeInspection` to the required resource
+product. Use `-Timing next-frame` for non-Ready diagnosis. Identity/coordinate
+mismatches report `GIProbeIdentityMismatch`; missing data reports `GIProbeUnavailable`.
+
+Results appear in the resource product's `metadata.giProbeInspection` and the
+artifact's `frame.giProbeInspection`; see the [value schema](../../../../Schemas/GIProbeInspection.schema.json).
+Bordered octahedral tiles contain scene-referred irradiance E and distance
+mean/second moment. Each result carries its request, validity, units and GPU
+observation stamp, independently of the cached readiness stamp. Readiness update
+equals field-lifetime update U minus `epochOriginUpdate`; producing frame is separate.
+
+Native compact probe payload is at most 20,496 bytes. One distinct request issues
+per frame; conflicting coordinates or replay settings wait for a later frame.
+
+If `capabilities.giProbeInspection.integrationInspection` is present, optional
+`integrationReplayUpdate` enables a separate raw `GI.Field.IntegrationInspection`
+witness and probe value schema v2 (ordinary results remain v1). Zero observes the
+current update; a positive one-based update replays sampling directions only,
+without changing Trace, field history, readiness or the actual update index.
+Use only for bounded numerical diagnosis; it can add up to 3,784,704 GPU bytes.
+See [integration numerical inspection](../../../../Tests/Verification/README.md#integration-numerical-inspection)
+for the versioned layout, conditional FP64 checks and historical-replay limits.
+
+### Probe visualization selection
+
+`select-gi-probe -GIProbeSelection '{"coordinate":[x,y,z],"expectedGeneration":n}'`
+requires `-ExpectedRunIdentity` and the current nonzero field generation.
+It overrides GUI selection until `-ClearSelection` releases the session override.
+Enable `view.gi_probes.enabled` separately; numeric inspection remains independent.
+
+Admission does not confirm rendering. Check `frame.giField.summary.probeVisualization`
+for `settings.selection`, `highlight.state` and `highlightCount`. Rejected requests
+preserve the accepted selection; field replacement reports `field-mismatch`
+instead of rebinding it.
+
 ## Admit, query and consume
 
 Accepted admission returns `reason: None` and a nonzero `jobId`. Busy/Rejected
@@ -124,7 +169,7 @@ python Scripts/Verification/ValidateCaptureBundles.py $result.manifest
 | --- | --- |
 | `gglab.capture-bundle` | v3; readers retain v1/v2. |
 | Image JSON sidecar | v1, with nested `parameters` v1 and `control` v1. |
-| `gglab.render-graph` | v6; readers retain v1-v5 without parameter provenance. |
+| `gglab.render-graph` | v8 preserves explicit AS scratch access; readers retain v1-v7, including v7 typed AS resources. Parameter provenance is optional since v7 and required in v6. |
 | `gglab.resource-export` | v3; readers retain v1/v2 without parameter provenance. |
 | `gglab.parameter-frames`, `gglab.gpu-timing` | v1 sequence-range products; see [Sequences](sequences.md#published-range-artifacts). |
 

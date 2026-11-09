@@ -9,6 +9,11 @@ namespace gglab
 		return std::make_unique<RenderPipelineForwardPlus>(RenderPipelineForwardPlus::CreateInfo{
 			.m_ForwardPlusDebugReadback = std::move(createInfo.m_ForwardPlusDebugReadback),
 			.m_SceneExtension = std::move(createInfo.m_SceneExtension),
+			.m_EnableGIReceiver = createInfo.m_EnableGIReceiver,
+			.m_GIReference = std::move(createInfo.m_GIReference),
+			.m_GISpecularVisibility = std::move(createInfo.m_GISpecularVisibility),
+			.m_GIProbeUpdate = std::move(createInfo.m_GIProbeUpdate),
+			.m_GIField = std::move(createInfo.m_GIField),
 			});
 	}
 }

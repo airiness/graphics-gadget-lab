@@ -5,6 +5,8 @@
 #include <GameInput.h>
 
 #include <cstdint>
+#include <mutex>
+#include <vector>
 
 namespace gglab
 {
@@ -19,6 +21,8 @@ namespace gglab
 		bool IsConnected() const noexcept;
 
 	protected:
+		void CopyConnectedDevices(std::vector<ComPtr<IGameInputDevice>>& devices) const noexcept;
+
 		static void CALLBACK OnGameInputDevice(GameInputCallbackToken callbackToken, void* context,
 			IGameInputDevice* gameInputDevice, uint64_t timestamp,
 			GameInputDeviceStatus currentStatus, GameInputDeviceStatus previousStatus) noexcept;
@@ -26,6 +30,9 @@ namespace gglab
 	protected:
 		ComPtr<IGameInput> m_GameInput;
 		GameInputCallbackToken m_CallbackToken = 0;
-		uint32_t m_Connected = 0;
+
+	private:
+		mutable std::mutex m_DeviceMutex;
+		std::vector<ComPtr<IGameInputDevice>> m_ConnectedDevices;
 	};
 }

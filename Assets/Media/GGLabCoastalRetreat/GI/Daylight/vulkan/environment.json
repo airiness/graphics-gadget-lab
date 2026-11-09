@@ -1,0 +1,36 @@
+{
+  "build": {
+    "compiler": "MSVC 19.51.36260",
+    "configuration": "Develop",
+    "dirty": false,
+    "pixIntegration": false,
+    "revision": "d2835a77eb4e2e39a3317f4244e9bfade15ae054",
+    "source": "build-stamp"
+  },
+  "device": {
+    "adapterName": "NVIDIA GeForce RTX 3060",
+    "api": {
+      "apiVersion": "1.4.303"
+    },
+    "backend": "vulkan",
+    "compatibilityIdentity": "vulkan:18b9c71a164e2c971590b88d840f7049:09fe01db1e4359f6b491c67c1a90a3ce:0040412f:9044c000",
+    "dedicatedVideoMemoryBytes": null,
+    "deviceId": 9476,
+    "driverVersion": "577.19",
+    "driverVersionRaw": "0x9044c000",
+    "revision": null,
+    "subsystemId": null,
+    "vendorId": 4318
+  },
+  "process": {
+    "host": "hidden",
+    "os": "Windows 10.0.26100",
+    "runIdentity": "f60a0e3d0282f22e25863595b28287ef",
+    "startedAtUtc": "2026-10-27T16:43:22Z"
+  },
+  "schemaVersion": 1,
+  "validation": {
+    "effective": "standard",
+    "requested": "standard"
+  }
+}

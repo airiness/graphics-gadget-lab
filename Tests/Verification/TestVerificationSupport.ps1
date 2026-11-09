@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Checks verification transport, polling, cleanup and runner selection without a GPU.
+Checks verification evidence, transport, polling, cleanup and runner selection without a GPU.
 #>
 [CmdletBinding()]
 param([string]$OutputDirectory)
@@ -36,6 +36,10 @@ try {
         $missingStop.error -match 'not running') 'real-session-client-reports-missing-session-as-json'
     $missingAttach = Invoke-VerificationSession attach $missingSession -AllowFailure
     Check (-not $missingAttach.ok -and $missingAttach.error -match 'not running') 'attach-transport-failure-remains-json'
+    $missingSelection = Invoke-VerificationSession select-gi-probe $missingSession @{
+        ExpectedRunIdentity=('a'*32); ClearSelection=$true } -AllowFailure
+    Check (-not $missingSelection.ok -and $missingSelection.session -eq $missingSession -and
+        $missingSelection.error -match 'not running') 'selection-transport-failure-remains-json'
     $conflict = Invoke-VerificationScript (Join-Path $root 'Scripts/Verification/GGLabSession.ps1') @{
         Command='start';Session=$missingSession;SessionLifetime='developer';IdleTimeout=1 }
     $conflictResult = $conflict.output | ConvertFrom-Json
@@ -88,7 +92,7 @@ try {
             'exited-during-query', 'cleanup-failure')) {
             $Session = "startup-$scenario"
             $state = @{ scenario=$scenario;commands=@();queryHadHandle=$false;result=$null;exitCode=$null
-                process=[pscustomobject]@{ Id=4242;HasExited=$false;handleRetained=$false;killed=$false
+                process=[pscustomobject]@{ Id=4242;StartTime=[datetime]'2026-01-01';HasExited=$false;handleRetained=$false;killed=$false
                     cleanupFails=($scenario -eq 'cleanup-failure') }
                 status=[pscustomobject]@{ ok=$true;session=[pscustomobject]@{id=$Session;pid=4242}
                     environment=[pscustomobject]@{process=[pscustomobject]@{runIdentity=('a'*32)}} } }
@@ -120,6 +124,7 @@ try {
                 $saved = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
                 Check ($state.exitCode -eq 0 -and $state.result.ok -and -not $state.process.killed -and
                     $state.result.ownership -eq 'created' -and $state.result.pid -eq 4242 -and
+                    $saved.processStartedAtUtc -ceq $state.process.StartTime.ToUniversalTime().ToString('o') -and
                     $state.result.runIdentity -eq ('a'*32) -and $saved.runIdentity -eq ('a'*32)) `
                     'startup-matching-live-process-confirms-created-ownership'
             } else {
@@ -307,15 +312,17 @@ try {
         . ([scriptblock]::Create($commands.Extent.Text))
         $ExpectedRunIdentity = '0123456789abcdef0123456789abcdef'
         $set = @{ command='set' }; Add-ExpectedRunIdentity $set
+        $selection = @{ command='select-gi-probe'; selection=$null }; Add-ExpectedRunIdentity $selection
         $status = @{ command='status' }; Add-ExpectedRunIdentity $status
         # The guarded override operation names its run in the expected control state.
         $guarded = @{ command='host-view-overrides' }; Add-ExpectedRunIdentity $guarded
         $ExpectedRunIdentity = ''
         $unchecked = @{ command='stop' }; Add-ExpectedRunIdentity $unchecked
         Check ($set.expectedRunIdentity -eq '0123456789abcdef0123456789abcdef' -and
+            $selection.expectedRunIdentity -eq '0123456789abcdef0123456789abcdef' -and
             -not $status.ContainsKey('expectedRunIdentity') -and -not $guarded.ContainsKey('expectedRunIdentity') -and
             -not $unchecked.ContainsKey('expectedRunIdentity') -and
-            $RunCheckedCommands.Count -eq 11) 'client-expected-run-identity-only-on-protected-commands'
+            $RunCheckedCommands.Count -eq 12) 'client-expected-run-identity-only-on-protected-commands'
     }
     $invalidParameter = Invoke-VerificationScript (Join-Path $root 'Scripts/Verification/GGLabSession.ps1') @{
         Command='set';Session='parameter-invalid';Changes='[]';NoWait=$true;WaitConsumed=$true }
@@ -412,6 +419,20 @@ switch ($Command) {
     $path = Join-Path $output 'empty.json'
     Write-VerificationJson $path @()
     Check (([IO.File]::ReadAllText($path) -replace '\s', '') -eq '[]' -and [IO.File]::ReadAllBytes($path)[0] -eq 91) 'empty-array-without-bom'
+    $pythonFixture = Join-Path $fixtureDirectory 'evidence python.cmd'
+    [IO.File]::WriteAllText($pythonFixture, "@echo %~1`r`n@echo %~2`r`n@echo %~3`r`n@exit /b 0`r`n")
+    $pythonPath = Join-Path $output 'python.json'
+    $leaked = @(Invoke-VerificationPython $pythonFixture 'validator with spaces.py' @('first argument','second') `
+        $pythonPath 'Fixture verification failed')
+    $pythonReceipt = Get-Content $pythonPath -Raw | ConvertFrom-Json
+    Check ($leaked.Count -eq 0 -and $pythonReceipt.exitCode -eq 0 -and
+        $pythonReceipt.output -ceq "validator with spaces.py`nfirst argument`nsecond" -and
+        @($pythonReceipt.PSObject.Properties).Count -eq 2) 'python-preserves-arguments-and-receipt-without-stdout-leaks'
+    [IO.File]::WriteAllText($pythonFixture, "@exit /b 0`r`n")
+    $leaked = @(Invoke-VerificationPython $pythonFixture 'empty.py' @() $pythonPath 'Fixture verification failed')
+    $pythonReceipt = Get-Content $pythonPath -Raw | ConvertFrom-Json
+    Check ($leaked.Count -eq 0 -and $pythonReceipt.exitCode -eq 0 -and $pythonReceipt.output -ceq '' -and
+        [IO.File]::ReadAllBytes($pythonPath)[0] -eq 123) 'python-retains-empty-output-and-utf8-without-bom'
     $stopPath = Join-Path $output 'stop.json'
     $null = Stop-VerificationSession normal -ReceiptPath $stopPath -RequireCleanExit
     Check ((Get-Content $stopPath -Raw | ConvertFrom-Json).exitCode -eq 0) 'clean-stop-receipt'
@@ -440,14 +461,43 @@ switch ($Command) {
     Copy-Item -LiteralPath $runner -Destination $runnerTests
     Copy-Item -LiteralPath (Join-Path $root 'Scripts/Verification/VerificationSupport.psm1') -Destination $runnerTools
     [IO.File]::WriteAllText((Join-Path $runnerBin 'GraphicsGadgetLab.exe'), '')
+    $runnerPython = Join-Path $runnerRepository 'configured python.cmd'
+    [IO.File]::WriteAllText($runnerPython, "@echo inspection-test-python`r`n@exit /b 0`r`n")
     $leafSource = @'
 param([string]$OutputDirectory, [string]$RunDirectory, [string[]]$Configuration, [string[]]$Rhi, [string]$Python)
 Import-Module (Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'Scripts/Verification/VerificationSupport.psm1')
 $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory -RunId 'leaf-run-id'
-[Console]::Out.WriteLine((@{ ok=$true; directory=$directory; configuration=$Configuration; rhi=$Rhi; python=$Python } | ConvertTo-Json -Compress))
+$pythonIdentity = if ($Python) { & $Python --version } else { '' }
+[Console]::Out.WriteLine((@{ ok=$true; directory=$directory; configuration=$Configuration; rhi=$Rhi; python=$Python; pythonIdentity=$pythonIdentity } | ConvertTo-Json -Compress))
 '@
     # Keep catalog expectations and leaf fixtures together so their counts cannot drift.
     $gpuLeaves = [ordered]@{
+        'gi-field' = 'TestGIField.ps1'
+        'gi-probe-inspection' = 'TestGIProbeInspection.ps1'
+        'gi-receiver-inspection' = 'TestGIReceiverInspection.ps1'
+        'gi-probe-visualization' = 'TestGIProbeVisualization.ps1'
+        'gi-probe-depth' = 'TestGIProbeDepth.ps1'
+        'gi-probe-temporal' = 'TestGIProbeTemporal.ps1'
+        'gi-probe-selection' = 'TestGIProbeSelection.ps1'
+        'gi-probe-change' = 'TestGIProbeChange.ps1'
+        'gi-probe-picking' = 'TestGIProbePicking.ps1'
+        'gi-probe-viewer' = 'TestGIProbeViewer.ps1'
+        'gi-field-readiness' = 'TestGIFieldReadiness.ps1'
+        'gi-field-readiness-repeat' = 'TestGIFieldReadinessRepeat.ps1'
+        'gi-field-sampling' = 'TestGIFieldSampling.ps1'
+        'gi-field-baseline' = 'TestGIFieldBaseline.ps1'
+        'gi-field-feedback' = 'TestGIFieldFeedback.ps1'
+        'gi-field-light-step' = 'TestGIFieldLightStep.ps1'
+        'gi-field-camera-independence' = 'TestGIFieldCameraIndependence.ps1'
+        'gi-invalid-updates' = 'TestGIInvalidUpdates.ps1'
+        'gi-receiver-cache' = 'TestGIReceiverCache.ps1'
+        'gi-probe-update' = 'TestGIProbeUpdate.ps1'
+        'gi-specular-visibility' = 'TestGISpecularVisibility.ps1'
+        'gi-reference' = 'TestGIReference.ps1'
+        'gi-reference-tiling' = 'TestGIReferenceTiling.ps1'
+        'gi-reference-convergence' = 'TestGIReferenceConvergence.ps1'
+        'gi-reference-materials' = 'TestGIReferenceMaterials.ps1'
+        'coastal-ray-scene' = 'TestCoastalRayScene.ps1'
         'lighting-profiles' = 'TestLightingProfiles.ps1'
         'sequence-parameter-events' = 'TestSequenceParameterEvents.ps1'
         'sequence-deferred-events' = 'TestDeferredSequenceEvents.ps1'
@@ -459,6 +509,7 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
         'session-parameters' = 'TestSessionParameters.ps1'
         'capture-jobs' = 'TestCaptureJobs.ps1'
         'session-lifecycle' = 'TestSessionLifecycle.ps1'
+        'startup-readiness' = 'TestStartupReadiness.ps1'
         'capture-on-ready' = 'TestCaptureOnReady.ps1'
         'pass-profile-identity' = 'TestPassProfileIdentity.ps1'
         'graph-allocation-facts' = 'TestGraphAllocationFacts.ps1'
@@ -468,28 +519,184 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
         'temporal-aa-counters' = 'TestTemporalAACounters.ps1'
     }
     $contractSuites = @(
-        'coastal-assets', 'verification-support', 'nonfinite-sites', 'render-graph-schema',
+        'coastal-assets', 'gi-inputs', 'verification-support', 'process-diagnostics', 'source-normalization', 'shader-project-ownership',
+        'nonfinite-sites', 'render-graph-schema',
         'resource-export-schema', 'nonfinite-coverage-schema', 'capture-comparison', 'taa-comparison-workflow',
-        'capture-bundle-schema', 'gpu-timing-schema', 'parameter-frames-schema'
+        'capture-bundle-schema', 'gpu-timing-schema', 'parameter-frames-schema', 'gi-reference-contracts',
+        'gi-specular-visibility-contracts', 'gi-probe-update-contracts', 'gi-probe-integration-contracts',
+        'gi-probe-viewer-contracts', 'gi-field-sampling-contracts',
+        'gi-field-baseline-contracts', 'gi-field-feedback-contracts', 'gi-field-light-step-contracts',
+        'gi-field-camera-independence-contracts', 'gi-field-readiness-repeat-contracts',
+        'gi-field-readiness-calibration-contracts'
     )
     foreach ($leaf in $gpuLeaves.Values) {
         [IO.File]::WriteAllText((Join-Path $runnerTests $leaf), $leafSource, (New-Object Text.UTF8Encoding($false)))
     }
+    [IO.File]::WriteAllText((Join-Path $runnerTests 'TestGIProbePickingDepth.ps1'), $leafSource, (New-Object Text.UTF8Encoding($false)))
     $execution = Invoke-VerificationScript (Join-Path $runnerTests 'RunVerification.ps1') @{
-        Group='gpu'; Python='fixture-python-path'; OutputDirectory=(Join-Path $output 'runner-results') }
+        Group='gpu'; Python=$runnerPython; OutputDirectory=(Join-Path $output 'runner-results') }
     $gpuResult = $execution.output | ConvertFrom-Json
     Check ($execution.exitCode -eq 0 -and $gpuResult.ok -and
         $gpuResult.suites.Count -eq $gpuLeaves.Count -and
         @(Compare-Object @($gpuLeaves.Keys) @($gpuResult.suites.name)).Count -eq 0) 'runner-gpu-leaf-handoff'
     foreach ($suiteResult in $gpuResult.suites) {
-        $leafResult = $suiteResult.steps[0].receipt
-        Check ($leafResult.directory -eq (Join-Path $suiteResult.directory 'run') -and
-            $leafResult.configuration[0] -eq 'Develop' -and $leafResult.rhi.Count -eq 2) "runner-compact-$($suiteResult.name)"
+        for ($index = 0; $index -lt $suiteResult.steps.Count; ++$index) {
+            $leafResult = $suiteResult.steps[$index].receipt
+            $leafDirectory = if ($suiteResult.steps.Count -gt 1) { "run-$($index + 1)" } else { 'run' }
+            Check ($leafResult.directory -eq (Join-Path $suiteResult.directory $leafDirectory) -and
+                $leafResult.configuration[0] -eq 'Develop' -and $leafResult.rhi.Count -eq 2) "runner-compact-$($suiteResult.name)-$index"
+        }
     }
     Check (($gpuResult.suites | Where-Object name -eq 'taa-comparison').steps[0].receipt.python -eq
-        'fixture-python-path') 'runner-forwards-selected-python-to-taa-workflow'
-    Check (($gpuResult.suites | Where-Object name -eq 'session-lifecycle').steps[0].receipt.python -eq
-        'fixture-python-path') 'runner-forwards-selected-python-to-session-lifecycle'
+        $runnerPython) 'runner-forwards-selected-python-to-taa-workflow'
+    foreach ($suite in @('session-lifecycle', 'startup-readiness', 'coastal-ray-scene', 'gi-reference', 'gi-reference-tiling', 'gi-reference-convergence', 'gi-reference-materials', 'gi-specular-visibility', 'gi-probe-update', 'gi-field', 'gi-probe-inspection', 'gi-receiver-inspection', 'gi-probe-visualization', 'gi-probe-depth', 'gi-probe-temporal', 'gi-probe-selection', 'gi-probe-change', 'gi-probe-picking', 'gi-probe-viewer', 'gi-field-readiness', 'gi-field-readiness-repeat', 'gi-field-sampling', 'gi-field-baseline', 'gi-field-feedback', 'gi-field-light-step', 'gi-field-camera-independence', 'gi-invalid-updates', 'gi-receiver-cache')) {
+        $suiteSteps = ($gpuResult.suites | Where-Object name -eq $suite).steps
+        for ($index = 0; $index -lt $suiteSteps.Count; ++$index) {
+            $leafResult = $suiteSteps[$index].receipt
+            Check ($leafResult.python -eq $runnerPython -and $leafResult.pythonIdentity -eq
+                'inspection-test-python') "runner-forwards-selected-python-to-$suite-$index"
+        }
+    }
+    # Exercise both real producers through the catalog with only native transport and
+    # Python stubbed. Keep their source/binary seals, receipts and failure paths real.
+    & {
+        foreach ($leaf in @('TestGIProbeUpdate.ps1','TestGIField.ps1')) {
+            Copy-Item -LiteralPath (Join-Path $root "Tests/Verification/$leaf") -Destination $runnerTests
+        }
+        $supportPath = Join-Path $runnerTools 'VerificationSupport.psm1'
+        $originalSupport = [IO.File]::ReadAllText($supportPath)
+        $stub = @'
+$script:FixtureRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$script:FixtureMode = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'mode.txt'))
+$script:Mutated = $false
+function git {
+    Write-VerificationJson (Join-Path $PSScriptRoot 'git-arguments.json') @($args)
+    $global:LASTEXITCODE = if ($script:FixtureMode -eq 'enumeration-failure') { 7 } else { 0 }
+    # Deliberately unsorted; ordinal order differs from culture-sensitive sorting.
+    $names = @('Sources/input.cpp','Sources/Z-input.cpp')
+    if ($script:Mutated -and $script:FixtureMode -eq 'source-addition') { $names += 'Sources/added.cpp' }
+    if ($script:Mutated -and $script:FixtureMode -eq 'source-removal') { $names = @('Sources/input.cpp') }
+    return $names
+}
+function Invoke-VerificationSession {
+    param([string]$Command, [string]$Session, [hashtable]$Parameters = @{})
+    switch ($Command) {
+        'start' { return @{ownership='created';runIdentity='evidence-fixture';outputLog=(Join-Path $PSScriptRoot 'native.log')} }
+        'set' { return @{batch=@{succeeded=$true}} }
+        'capture' {
+            $null = New-Item -ItemType Directory -Path $Parameters.OutputDirectory -Force
+            return @{status='completed';publication='Published'}
+        }
+        'status' { return @{ok=$true} }
+        'stop' {
+            if (-not $script:Mutated) {
+                switch ($script:FixtureMode) {
+                    'source-mutation' { [IO.File]::WriteAllText("$script:FixtureRoot/Sources/input.cpp", 'modified') }
+                    'source-addition' { [IO.File]::WriteAllText("$script:FixtureRoot/Sources/added.cpp", 'new') }
+                    'source-removal' { Remove-Item -LiteralPath "$script:FixtureRoot/Sources/Z-input.cpp" }
+                    'compiler-mutation' { [IO.File]::WriteAllText("$script:FixtureRoot/Build/Output/x64/Develop/gglab-shaderc.exe", 'modified') }
+                }
+                $script:Mutated = $true
+            }
+            return @{ok=$true;exitCode=0}
+        }
+        default { throw "Unexpected evidence fixture command: $Command" }
+    }
+}
+Export-ModuleMember -Function git, Invoke-VerificationSession
+'@
+        $null = New-Item -ItemType Directory -Path (Join-Path $runnerRepository 'Sources') -Force
+        [IO.File]::WriteAllText((Join-Path $runnerTools 'native.log'), 'clean native fixture')
+        $fixturePython = Join-Path $runnerRepository 'evidence-python.cmd'
+        $validators = @('ValidateCaptureBundles.py','ValidateResourceExports.py','ValidateRenderGraphExports.py')
+        $modes = @('passed','oracle-failure','source-mutation','source-addition','source-removal',
+            'compiler-mutation','enumeration-failure') + $validators
+        try {
+            [IO.File]::WriteAllText($supportPath, $originalSupport + "`r`n" + $stub,
+                (New-Object Text.UTF8Encoding($false)))
+            foreach ($suite in @('gi-probe-update','gi-field')) {
+                $context = if ($suite -eq 'gi-field') { 'Field' } else { 'Probe' }
+                foreach ($mode in $modes) {
+                    [IO.File]::WriteAllText((Join-Path $runnerTools 'mode.txt'), $mode)
+                    foreach ($name in @('input.cpp','Z-input.cpp')) {
+                        [IO.File]::WriteAllText("$runnerRepository/Sources/$name", 'input')
+                    }
+                    foreach ($name in @('GraphicsGadgetLab.exe','gglab-shaderc.exe','dxcompiler.dll','dxil.dll')) {
+                        [IO.File]::WriteAllText((Join-Path $runnerBin $name), 'binary')
+                    }
+                    $python = "@echo %~nx1`r`n"
+                    if ($mode -eq 'oracle-failure') { $python += "@if `"%~2`"==`"--root`" exit /b 7`r`n" }
+                    if ($mode -in $validators) { $python += "@if `"%~nx1`"==`"$mode`" exit /b 7`r`n" }
+                    [IO.File]::WriteAllText($fixturePython, $python + "@exit /b 0`r`n")
+                    $execution = Invoke-VerificationScript (Join-Path $runnerTests 'RunVerification.ps1') @{
+                        Suite=$suite;Python=$fixturePython;OutputDirectory=(Join-Path $output "$suite-$mode") }
+                    $producerResult = $execution.output | ConvertFrom-Json
+                    $step = $producerResult.suites[0].steps[0]
+                    $directory = $step.receipt.directory
+                    $disk = Get-Content (Join-Path $directory 'result.json') -Raw | ConvertFrom-Json
+                    if ($mode -eq 'passed') {
+                        Check ($execution.exitCode -eq 0 -and $producerResult.ok -and $step.receipt.ok -and
+                            $disk.status -eq 'passed' -and $disk.observations -gt 0) "$suite-one-catalog-receipt-and-disk-result"
+                        $qualified = if ($suite -eq 'gi-field') {
+                            $disk.productionLookupQualified -or $disk.readinessQualified
+                        } else { $disk.productionFieldQualified }
+                        Check (-not $qualified) "$suite-preserves-qualification-scope"
+                        $source = Get-Content "$directory/source-identity.json" -Raw | ConvertFrom-Json
+                        $finalSource = Get-Content "$directory/source-identity-final.json" -Raw | ConvertFrom-Json
+                        $binaryPath = if ($suite -eq 'gi-field') { "$directory/binaries.json" } else { "$directory/Develop/binaries.json" }
+                        $binaries = Get-Content $binaryPath -Raw | ConvertFrom-Json
+                        Check (($source.path -join ',') -ceq 'Sources/Z-input.cpp,Sources/input.cpp' -and
+                            ($source[0].PSObject.Properties.Name -join ',') -ceq 'path,sha256' -and
+                            $source[0].sha256 -cmatch '^[0-9A-F]{64}$') "$suite-preserves-source-order-shape-and-hash-case"
+                        Assert-VerificationIdentity $source $finalSource 'Fixture source seals differ.'
+                        Check (($binaries.file -join ',') -ceq 'GraphicsGadgetLab.exe,gglab-shaderc.exe,dxcompiler.dll,dxil.dll' -and
+                            ($binaries[0].PSObject.Properties.Name -join ',') -ceq 'file,sha256' -and
+                            $binaries[0].sha256 -cmatch '^[0-9A-F]{64}$') "$suite-preserves-binary-order-shape-and-hash-case"
+                        $gitArguments = Get-Content (Join-Path $runnerTools 'git-arguments.json') -Raw | ConvertFrom-Json
+                        # PowerShell consumes -- at the function stub boundary, unlike native Git.
+                        $expectedArguments = @('-c',"safe.directory=$($runnerRepository.Replace('\','/'))",'-C',
+                            $runnerRepository,'ls-files','--cached','--others','--exclude-standard',
+                            'Sources','Shaders','Tests/Verification','Scripts/Verification','Schemas','Projects','PropertySheets')
+                        Assert-VerificationIdentity $expectedArguments $gitArguments 'Fixture source scope differs.'
+                        Check $true "$suite-preserves-git-enumeration-scope"
+                        foreach ($validator in $validators) {
+                            $audit = Get-Content "$directory/$validator.result.json" -Raw | ConvertFrom-Json
+                            Check ($audit.exitCode -eq 0 -and $audit.output -ceq $validator) "$suite-retains-$validator-receipt"
+                        }
+                        $lower = @($source | ForEach-Object { [ordered]@{path=$_.path;sha256=$_.sha256.ToLowerInvariant()} })
+                        Reject { Assert-VerificationIdentity $source $lower 'Hash case changed.' } 'Hash case changed' "$suite-identity-comparison-is-case-sensitive"
+                    } else {
+                        $pattern = switch ($mode) {
+                            'enumeration-failure' { 'Source enumeration failed' }
+                            'compiler-mutation' { 'Compiler/product changed|Sources or product/compiler binaries changed' }
+                            { $_ -like 'source-*' } { 'Sources changed|Sources or product/compiler binaries changed' }
+                            default { "$context verification failed" }
+                        }
+                        Check ($execution.exitCode -ne 0 -and -not $producerResult.ok -and -not $step.receipt.ok -and
+                            $step.receipt.error -match $pattern -and $disk.status -eq 'failed') "$suite-rejects-$mode-and-retains-result"
+                        if ($mode -eq 'oracle-failure' -or $mode -in $validators) {
+                            $receiptName = if ($mode -eq 'oracle-failure') { 'oracle-result.json' } else { "$mode.result.json" }
+                            $failed = Get-Content (Join-Path $directory $receiptName) -Raw | ConvertFrom-Json
+                            Check ($failed.exitCode -eq 7 -and $failed.output) "$suite-$mode-retains-python-failure-receipt"
+                            $remaining = $mode -eq 'oracle-failure'
+                            foreach ($validator in $validators) {
+                                if ($remaining) {
+                                    Check (-not (Test-Path "$directory/$validator.result.json")) "$suite-$mode-stops-before-$validator"
+                                } elseif ($validator -eq $mode) { $remaining = $true }
+                                else {
+                                    $audit = Get-Content "$directory/$validator.result.json" -Raw | ConvertFrom-Json
+                                    Check ($audit.exitCode -eq 0) "$suite-$mode-runs-$validator-first"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } finally {
+            [IO.File]::WriteAllText($supportPath, $originalSupport,
+                (New-Object Text.UTF8Encoding($false)))
+        }
+    }
     $unused = Join-Path $output 'must-not-create'
     $list = Invoke-VerificationScript $runner @{ List=$true; OutputDirectory=$unused }
     $items = $list.output | ConvertFrom-Json
@@ -530,6 +737,60 @@ $directory = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -Run
     $execution = Invoke-VerificationScript $runner @{ Suite='resource-export-schema'; Python=$badPython; OutputDirectory=(Join-Path $output 'failed-run') }
     $result = $execution.output | ConvertFrom-Json
     Check ($execution.exitCode -ne 0 -and -not $result.ok -and $result.suites[0].steps[0].exitCode -eq 7 -and (Test-Path (Join-Path $result.directory 'result.json'))) 'runner-retains-failure-and-log'
+    # Exercise the visibility runner's actual provenance/audit functions without a GPU.
+    & {
+        $tokens = $null; $parseErrors = $null
+        $visibilityScript = Join-Path $root 'Tests/Verification/TestGISpecularVisibility.ps1'
+        $ast = [Management.Automation.Language.Parser]::ParseFile(
+            $visibilityScript, [ref]$tokens, [ref]$parseErrors)
+        Check ($parseErrors.Count -eq 0) 'visibility-runner-parses'
+        foreach ($name in @('Get-VisibilitySourceIdentity','Get-VisibilityBinaryIdentity',
+            'Assert-VisibilityIdentity','Test-VisibilityArtifacts')) {
+            $definition = $ast.Find({ param($node)
+                $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name
+            }, $true)
+            . ([scriptblock]::Create($definition.Extent.Text))
+        }
+        $root = Join-Path $fixtureDirectory 'visibility-provenance'
+        $binaryRoot = Join-Path $root 'Build/Output/x64/Develop'
+        $null = New-Item -ItemType Directory -Path "$root/Sources", $binaryRoot -Force
+        $sourceNames = @('Sources/input.cpp')
+        function git { $global:LASTEXITCODE = 0; return $sourceNames }
+        [IO.File]::WriteAllText("$root/Sources/input.cpp", 'original')
+        $originalSource = Get-VisibilitySourceIdentity
+        Assert-VisibilityIdentity $originalSource (Get-VisibilitySourceIdentity) 'Source'
+        [IO.File]::WriteAllText("$root/Sources/input.cpp", 'modified')
+        Reject { Assert-VisibilityIdentity $originalSource (Get-VisibilitySourceIdentity) 'Source' } `
+            'Source inputs changed' 'visibility-rejects-source-mutation'
+        [IO.File]::WriteAllText("$root/Sources/input.cpp", 'original')
+        [IO.File]::WriteAllText("$root/Sources/added.cpp", 'new')
+        $sourceNames += 'Sources/added.cpp'
+        Reject { Assert-VisibilityIdentity $originalSource (Get-VisibilitySourceIdentity) 'Source' } `
+            'Source inputs changed' 'visibility-rejects-source-addition'
+        $sourceNames = @()
+        Reject { Assert-VisibilityIdentity $originalSource (Get-VisibilitySourceIdentity) 'Source' } `
+            'Source inputs changed' 'visibility-rejects-source-removal'
+        foreach ($file in @('GraphicsGadgetLab.exe','gglab-shaderc.exe','dxcompiler.dll','dxil.dll')) {
+            [IO.File]::WriteAllText((Join-Path $binaryRoot $file), 'original')
+        }
+        $originalBinaries = Get-VisibilityBinaryIdentity Develop
+        Assert-VisibilityIdentity $originalBinaries (Get-VisibilityBinaryIdentity Develop) 'Executable/compiler'
+        [IO.File]::WriteAllText("$binaryRoot/gglab-shaderc.exe", 'modified')
+        Reject { Assert-VisibilityIdentity $originalBinaries (Get-VisibilityBinaryIdentity Develop) 'Executable/compiler' } `
+            'Executable/compiler inputs changed' 'visibility-rejects-compiler-mutation'
+        $audits = [Collections.Generic.List[string]]::new()
+        $rejectAudit = ''
+        function Invoke-PythonCheck([string]$Script, [string[]]$Arguments, [string]$Receipt) {
+            $audits.Add([IO.Path]::GetFileName($Script))
+            if ($Script.EndsWith($rejectAudit) -and $rejectAudit) { throw 'Invalid captured artifact' }
+        }
+        Test-VisibilityArtifacts $root
+        Check ($audits.Count -eq 3 -and
+            @('ValidateCaptureBundles.py','ValidateResourceExports.py','ValidateRenderGraphExports.py' |
+                Where-Object { $_ -notin $audits }).Count -eq 0) 'visibility-audits-all-required-artifact-contracts'
+        $rejectAudit = 'ValidateResourceExports.py'
+        Reject { Test-VisibilityArtifacts $root } 'Invalid captured artifact' 'visibility-rejects-artifact-audit-failure'
+    }
     $result = @{ ok=$true; checks=$checks; directory=$output }
 } catch { $result = @{ ok=$false; checks=$checks; directory=$output; error=$_.Exception.Message } }
 Write-VerificationJson (Join-Path $output 'result.json') $result

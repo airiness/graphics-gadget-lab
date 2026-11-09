@@ -128,6 +128,7 @@
     <ClCompile Include="..\..\Tests\GGLabRuntime\NonFiniteWatchSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\GGLabRuntimeTestsMain.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\PublicationAccountingSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\RayQueryContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\RenderingContractSelfTests.cpp">
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -150,6 +151,7 @@
     <ClInclude Include="..\..\Tests\GGLabRuntime\LayoutContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\NonFiniteWatchSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\PublicationAccountingSelfTests.h" />
+    <ClInclude Include="..\..\Tests\GGLabRuntime\RayQueryContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\RenderingContractSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\RGObjectArenaSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\RenderServicesViewSelfTests.h" />

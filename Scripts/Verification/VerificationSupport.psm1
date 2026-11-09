@@ -22,6 +22,47 @@ function Write-VerificationJson {
         (New-Object Text.UTF8Encoding($false)))
 }
 
+function Get-VerificationSourceIdentity {
+    param([string]$Root, [string[]]$Paths)
+    # The caller owns the source scope; retain Git paths, ordinal order and hash case.
+    $names = @(& git -c "safe.directory=$($Root.Replace('\','/'))" -C $Root ls-files --cached --others --exclude-standard -- @Paths)
+    if ($LASTEXITCODE -ne 0) { throw 'Source enumeration failed.' }
+    [Array]::Sort($names, [StringComparer]::Ordinal)
+    return @($names | ForEach-Object {
+        [ordered]@{path=$_;sha256=(Get-FileHash -LiteralPath "$Root/$_" -Algorithm SHA256).Hash}
+    })
+}
+
+function Get-VerificationBinaryIdentity {
+    param([string]$Root, [string]$Configuration)
+    return @(@('GraphicsGadgetLab.exe','gglab-shaderc.exe','dxcompiler.dll','dxil.dll') | ForEach-Object {
+        [ordered]@{file=$_;sha256=(Get-FileHash -LiteralPath "$Root/Build/Output/x64/$Configuration/$_" -Algorithm SHA256).Hash}
+    })
+}
+
+function Assert-VerificationIdentity {
+    param($Expected, $Actual, [string]$Message, [int]$Depth = 4)
+    if ((ConvertTo-Json -InputObject @($Expected) -Depth $Depth -Compress) -cne
+        (ConvertTo-Json -InputObject @($Actual) -Depth $Depth -Compress)) { throw $Message }
+}
+
+function Invoke-VerificationPython {
+    param([string]$Python, [string]$Script, [string[]]$Arguments, [string]$Receipt,
+        [string]$FailureMessage)
+    $lines = @(& $Python $Script @Arguments)
+    $code = $LASTEXITCODE
+    Write-VerificationJson $Receipt @{exitCode=$code;output=($lines -join "`n")}
+    if ($code -ne 0) { throw "${FailureMessage}: $Script" }
+}
+
+function Assert-VerificationArtifacts {
+    param([string]$Root, [string]$Directory, [string]$Python, [string]$FailureMessage)
+    foreach ($validator in @('ValidateCaptureBundles.py','ValidateResourceExports.py','ValidateRenderGraphExports.py')) {
+        Invoke-VerificationPython $Python "$Root/Scripts/Verification/$validator" @($Directory) `
+            "$Directory/$validator.result.json" $FailureMessage
+    }
+}
+
 function Invoke-VerificationScript {
     param([string]$Path, [hashtable]$Parameters = @{})
     # Contain script exit calls and preserve typed arrays/switches across the child shell.
@@ -104,6 +145,60 @@ function Test-VerificationProcessOwner {
         $Process.CommandLine -match ('(?:^|\s)--session\s+"?' + [regex]::Escape($Session) + '"?(?=\s|$)')
 }
 
+function Save-VerificationProcessDump {
+    # The caller retains the handle of its created process throughout diagnosis.
+    # Do not reacquire a process by PID here: the original process may have exited.
+    param([Diagnostics.Process]$Process, [string]$Path)
+    $result = @{status='failed';path=[IO.Path]::GetFullPath($Path)}
+    $stream = $null
+    try {
+        $handle = $Process.Handle
+        if ($Process.HasExited) {
+            $result.status = 'process-exited'
+            return $result
+        }
+        if (Test-Path -LiteralPath $result.path) {
+            $result.status = 'already-exists'
+            return $result
+        }
+        if (-not ('GGLab.Verification.ProcessDump' -as [type])) {
+            Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+namespace GGLab.Verification {
+    public static class ProcessDump {
+        [DllImport("dbghelp.dll", SetLastError=true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool MiniDumpWriteDump(IntPtr process, uint processId,
+            IntPtr file, uint type, IntPtr exception, IntPtr streams, IntPtr callback);
+    }
+}
+'@
+        }
+        $stream = [IO.File]::Open($result.path, [IO.FileMode]::CreateNew,
+            [IO.FileAccess]::ReadWrite, [IO.FileShare]::Read)
+        # MiniDumpWithThreadInfo includes thread contexts/stacks; this is not a
+        # full-memory dump. Capture out of process, before requesting shutdown.
+        $written = [GGLab.Verification.ProcessDump]::MiniDumpWriteDump($handle,
+            [uint32]$Process.Id, $stream.SafeFileHandle.DangerousGetHandle(),
+            [uint32]0x1000, [IntPtr]::Zero, [IntPtr]::Zero, [IntPtr]::Zero)
+        if (-not $written) {
+            $result.nativeError = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+            return $result
+        }
+        $stream.Flush()
+        $result.status = 'written'
+        $result.bytes = $stream.Length
+        $result.processId = $Process.Id
+        $result.startedAtUtc = $Process.StartTime.ToUniversalTime().ToString('o')
+    } catch {
+        $result.error = $_.Exception.Message
+    } finally {
+        if ($stream) { $stream.Dispose() }
+    }
+    return $result
+}
+
 function Stop-VerificationSession {
     param([string]$Session, $StartedSession, [string]$ReceiptPath, [int]$Depth = 32,
         [switch]$RequireCleanExit, [switch]$AllowFailure, [switch]$AllowMissing,
@@ -125,4 +220,6 @@ function Stop-VerificationSession {
 }
 
 Export-ModuleMember -Function New-VerificationRunDirectory, Write-VerificationJson, Invoke-VerificationScript, Invoke-VerificationSession,
-    Wait-VerificationCondition, Stop-VerificationSession, Get-VerificationCaptureFile
+    Wait-VerificationCondition, Stop-VerificationSession, Get-VerificationCaptureFile,
+    Get-VerificationSourceIdentity, Get-VerificationBinaryIdentity, Assert-VerificationIdentity,
+    Invoke-VerificationPython, Assert-VerificationArtifacts, Save-VerificationProcessDump

@@ -135,7 +135,7 @@
                     "const": "gglab.gpu-timing"
                   },
                   "schemaVersion": {
-                    "const": 1
+                    "enum": [1, 2]
                   }
                 }
               }
@@ -199,7 +199,7 @@
                     ]
                   },
                   "schemaVersion": {
-                    "const": 1
+                    "enum": [1, 2]
                   }
                 }
               }

@@ -149,6 +149,68 @@ namespace gglab::shader_programs
 		"gglab.shader.nonfinite-scan", "compute.buffer", ShaderStage::Compute };
 	inline const ShaderProgramRef RenderGraphComputeWrite{
 		"gglab.shader.render-graph-compute", "compute.write", ShaderStage::Compute };
+	inline const ShaderProgramRef RayQueryCompute{
+		"gglab.shader.ray-query", "compute.trace", ShaderStage::Compute };
+	inline const ShaderProgramRef RayQueryVertex{
+		"gglab.shader.ray-query", "vertex.preview", ShaderStage::Vertex };
+	inline const ShaderProgramRef RayQueryPixel{
+		"gglab.shader.ray-query", "pixel.preview", ShaderStage::Pixel };
+	inline const ShaderProgramRef RaySceneProbeCompute{
+		"gglab.shader.ray-scene", "compute.membership", ShaderStage::Compute };
+	inline const ShaderProgramRef RaySceneSunVisibilityCompute{
+		"gglab.shader.ray-scene", "compute.sun-visibility", ShaderStage::Compute };
+	inline const ShaderProgramRef RaySceneHitMaterialCompute{
+		"gglab.shader.ray-scene", "compute.hit-material", ShaderStage::Compute };
+	inline const ShaderProgramRef GISpecularVisibilityCompute{
+		"gglab.shader.ray-scene", "compute.gi-specular-visibility", ShaderStage::Compute };
+	inline const ShaderProgramRef GIReferenceCompute{
+		"gglab.shader.ray-scene", "compute.gi-reference", ShaderStage::Compute };
+	inline const ShaderProgramRef GIProbeInitializeCompute{
+		"gglab.shader.gi-probe-update", "compute.initialize", ShaderStage::Compute };
+	inline const ShaderProgramRef GIProbeTraceCompute{
+		"gglab.shader.gi-probe-update", "compute.trace", ShaderStage::Compute };
+	inline const ShaderProgramRef GIProbeBlendDirectCompute{
+		"gglab.shader.gi-probe-update", "compute.blend-direct", ShaderStage::Compute };
+	inline const ShaderProgramRef GIProbeBlendSharedCompute{
+		"gglab.shader.gi-probe-update", "compute.blend-shared", ShaderStage::Compute };
+	inline const ShaderProgramRef GIProbeBordersCompute{
+		"gglab.shader.gi-probe-update", "compute.borders", ShaderStage::Compute };
+	inline const ShaderProgramRef GIProbeClassifyCompute{
+		"gglab.shader.gi-field", "compute.classify", ShaderStage::Compute };
+	inline const ShaderProgramRef GIFieldReadinessFloorCompute{
+		"gglab.shader.gi-field", "compute.readiness-floor", ShaderStage::Compute };
+	inline const ShaderProgramRef GIProbeIntegrationInspectionCompute{
+		"gglab.shader.gi-field", "compute.integration-inspection", ShaderStage::Compute };
+	inline const ShaderProgramRef GIFieldLookupCompute{
+		"gglab.shader.gi-field", "compute.lookup-diagnostics", ShaderStage::Compute };
+	inline const ShaderProgramRef GIProbeInspectionCompute{
+		"gglab.shader.gi-field", "compute.probe-inspection", ShaderStage::Compute };
+	inline const ShaderProgramRef GIReceiverInspectionCompute{
+		"gglab.shader.gi-field", "compute.receiver-inspection", ShaderStage::Compute };
+	inline const ShaderProgramRef GIReceiverListCompute{
+		"gglab.shader.gi-field", "compute.receiver-list", ShaderStage::Compute };
+	inline const ShaderProgramRef GIReceiverMarkersVertex{
+		"gglab.shader.gi-field", "vertex.receiver-markers", ShaderStage::Vertex };
+	inline const ShaderProgramRef GIReceiverMarkersPixel{
+		"gglab.shader.gi-field", "pixel.receiver-markers", ShaderStage::Pixel };
+	inline const ShaderProgramRef GIProbeVisualizationCompute{
+		"gglab.shader.gi-field", "compute.probe-visualization", ShaderStage::Compute };
+	inline const ShaderProgramRef GIProbeVisualizationVertex{
+		"gglab.shader.gi-field", "vertex.probe-visualization", ShaderStage::Vertex };
+	inline const ShaderProgramRef GIProbeVisualizationPixel{
+		"gglab.shader.gi-field", "pixel.probe-visualization", ShaderStage::Pixel };
+	inline const ShaderProgramRef GIProbePickingPixel{
+		"gglab.shader.gi-field", "pixel.probe-picking", ShaderStage::Pixel };
+	inline const ShaderProgramRef GIProbeDepthConformanceVertex{
+		"gglab.shader.gi-probe-depth-conformance", "vertex.probe", ShaderStage::Vertex };
+	inline const ShaderProgramRef GIProbeDepthConformancePixel{
+		"gglab.shader.gi-probe-depth-conformance", "pixel.probe", ShaderStage::Pixel };
+	inline const ShaderProgramRef GIProbeDepthConformanceScene{
+		"gglab.shader.gi-probe-depth-conformance", "pixel.scene", ShaderStage::Pixel };
+	inline const ShaderProgramRef GIReceiverPixel{
+		"gglab.shader.gi-receiver", "pixel.receiver", ShaderStage::Pixel };
+	inline const ShaderProgramRef GIReceiverPositionPixel{
+		"gglab.shader.gi-receiver", "pixel.position", ShaderStage::Pixel };
 	inline const ShaderProgramRef RenderGraphComputeReadWrite{
 		"gglab.shader.render-graph-compute", "compute.read-write", ShaderStage::Compute };
 	inline const ShaderProgramRef RenderGraphComputeNonFiniteProbe{

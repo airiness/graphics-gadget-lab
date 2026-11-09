@@ -372,6 +372,7 @@ namespace gglab
 			m_CaptureOnReadyJob->TryAdmit();
 		}
 		const AppRuntimeTickResult tickResult = m_AppRuntime->Tick({
+			.m_WindowDpiScale = m_PlatformHost->GetMainWindow().GetDpiScale(),
 			.m_ApplicationTooling = m_ApplicationTooling.get(),
 			.m_LabRuntimeLocator = m_LabRuntimeLocator.get(),
 			});
@@ -615,6 +616,7 @@ namespace gglab
 				.m_CaptureIntake = m_AppRuntime ? m_AppRuntime->GetCaptureIntakeSnapshot() : CaptureIntakeSnapshot{},
 				.m_SettledFrames = m_FrameCapture ? m_FrameCapture->GetSettledFrameCount() : 0,
 				.m_Frame = m_FrameCapture ? m_FrameCapture->GetLastFrameState() : nullptr,
+				.m_GIProbePickingSource = m_AppRuntime ? m_AppRuntime->GetGIProbePickingSourceJson() : std::string{},
 				.m_Sequence = frameSequence ? frameSequence->GetStatus() : nullptr,
 				.m_NonFiniteInstrumentation = frameCapture && frameCapture->HasNonFiniteInstrumentation(),
 				.m_NonFiniteProduction = frameCapture ? frameCapture->GetLatestNonFiniteProductionFrame() : nullptr,
@@ -626,6 +628,8 @@ namespace gglab
 				.m_LightingProfiles = parameters ? &parameters->GetLightingProfilePublication() : nullptr,
 				.m_LightingProfileError = parameters ? parameters->GetLightingProfileError() : std::string{},
 				.m_HostViewControl = m_AppRuntime ? m_AppRuntime->GetHostViewControlStamp() : HostViewControlStamp{},
+				.m_Lab = m_LabRuntimeLocator && m_LabRuntimeLocator->GetLabRuntimeIfCreated() ?
+					std::optional(m_LabRuntimeLocator->GetLabRuntimeIfCreated()->GetLabSnapshot()) : std::nullopt,
 				}));
 			return;
 		case ApplicationControlCommand::Parameters:
@@ -647,6 +651,18 @@ namespace gglab
 			pipeRequest->Respond(SubmitApplicationControlHostViewOverrides(request.m_Id,
 				request.m_ExpectedHostView, request.m_HostViewOverrides, m_AppRuntime.get()));
 			return;
+		case ApplicationControlCommand::SelectGIProbe:
+		{
+			std::string error;
+			if (!m_AppRuntime || !m_AppRuntime->SelectGIProbe(request.m_GIProbeSelection, error))
+			{
+				pipeRequest->Respond(SerializeApplicationControlError(request.m_Id,
+					m_AppRuntime ? error : "GIProbeSelectionUnavailable"));
+				return;
+			}
+			pipeRequest->Respond(SerializeApplicationControlGIProbeSelection(request.m_Id, request.m_GIProbeSelection));
+			return;
+		}
 		case ApplicationControlCommand::Watch:
 		{
 			auto* watch = m_AppRuntime ? m_AppRuntime->GetNonFiniteWatchCoordinator() : nullptr;

@@ -515,6 +515,9 @@ namespace gglab
 				AppRuntimeTickResult::Continue :
 				FailRuntime("The render host failed to begin a frame.");
 		}
+		const bool measureCpu = m_FrameSequence->WantsGpuTiming();
+		const auto cpuBuildRecordStart = measureCpu ?
+			std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
 		const auto sequencePose = m_FrameSequence->PrepareFrame(
 			m_FrameCapture->GetLastFrameState(), demo->GetCameraRig().GetCameraPaths(),
 			m_ParameterControl->GetContentIdentity(),
@@ -607,6 +610,10 @@ namespace gglab
 		ResolvedViewRenderSettings displayViewSettings = inheritedView.m_View;
 		m_ParameterControl->ApplyViewSettings(displayViewSettings,
 			effectiveViewRenderProfile.m_EnableScenePreExposure);
+		if (m_SessionGIProbeSelection)
+		{
+			displayViewSettings.m_GIProbes.m_Selection = m_SessionGIProbeSelection;
+		}
 		// Records which fields the frame-local layer below writes, for value attribution.
 		ViewRenderSettingsPatch framePatch;
 		if (referenceSample)
@@ -675,6 +682,13 @@ namespace gglab
 			.m_BackBufferIndex = backBufferIndex,
 			.m_FrameSerial = rendererFrame.GetSerial(),
 		};
+		// Building can publish a completed IBL generation. Freeze readiness after
+		// that boundary so its gate agrees with the built scene and effect receipts.
+		RenderFrameBuildResult frame;
+		{
+			GGLAB_CPU_PROFILE_SCOPE("RenderHostFrameBuilder");
+			frame = m_RenderHost->BuildFrame(frameBuildRequest);
+		}
 		// Captures due this frame, including a sequence frame capture, are issued
 		// before its graph binds capture taps.
 		FrameCaptureFrameState captureFrameState = BuildCaptureFrameState({
@@ -697,37 +711,17 @@ namespace gglab
 			.m_DevelopmentTools = applicationTooling != nullptr,
 		});
 		captureFrameState.m_ParameterRevision = m_ParameterControl->GetParameterRevision();
+		captureFrameState.m_DisplayDpiScale = tickInfo.m_WindowDpiScale;
 		captureFrameState.m_HostViewControl = GetHostViewControlStamp();
 		captureFrameState.m_HostViewProjection = DescribeHostViewProjection(displayViewSettings,
 			inheritedView.m_ToolingBlocks, m_ParameterControl->GetHostViewOverrides(), {
 				.m_Sequence = referenceSample ? nullptr : &framePatch,
 				.m_ForcedReference = referenceSample ? &framePatch : nullptr,
 			});
-		if (!m_FrameSequence->BeginFrame(captureFrameState, [this](const FrameCaptureGate& gate)
-			{
-				return m_ParameterControl->CoversReadinessGate(
-					ParameterBatchOwner::Sequence(m_FrameSequence->GetStatus()->m_SequenceId), gate);
-			}))
-		{
-			UpdateSequenceParameterEvents();
-			toolingFrame.Complete();
-			return AppRuntimeTickResult::Continue;
-		}
-		// Freeze the previous outcome before BeginFrame replaces it with this plan.
-		// Observation must not enable parameter tracking or reset capture settling.
-		const std::optional<ViewControlSnapshot> viewControl = toolingFrame.IsOpen() ?
-			std::optional(BuildViewControlSnapshot(inheritedView, m_ParameterControl->GetHostViewOverrides(),
-				captureFrameState, m_FrameCapture->GetLastFrameState())) :
-			std::nullopt;
-		m_FrameCapture->BeginFrame(std::move(captureFrameState));
-		RenderFrameBuildResult frame;
-		{
-			GGLAB_CPU_PROFILE_SCOPE("RenderHostFrameBuilder");
-			frame = m_RenderHost->BuildFrame(frameBuildRequest);
-		}
+
 		m_ParameterControl->OnFrameBuilt(frame.m_FrameSerial, frame.m_RenderScene.m_WorldLightingGeneration,
 			frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)],
-			&frame.m_RenderViews[utils::ToIndex(frame.m_DisplayViewId)]);
+			&frame.m_RenderViews[utils::ToIndex(frame.m_DisplayViewId)], &frame.m_RenderScene);
 		auto parameterFrame = m_ParameterControl->IsEnabled() ?
 			std::make_shared<ParameterFrameState>(m_ParameterControl->CaptureFrameState(
 				frame.m_FrameSerial, m_RenderServiceBindings.m_Environment->GetBakeRequestGeneration(),
@@ -736,21 +730,14 @@ namespace gglab
 		demo->OnFrameBuilt(frame.m_FrameSerial, frame.m_RenderScene.m_WorldLightingGeneration);
 		RenderFrameContext validationContext = frame.MakeRenderFrameContext();
 		const auto& capturedView = frame.m_ViewRenderSettings[utils::ToIndex(frame.m_DisplayViewId)];
-		m_FrameCapture->SetFrameSceneInputs(frame.m_FrameSerial, {
-			.m_Exposure = capturedView.m_Exposure,
-			.m_PostProcess = capturedView.m_PostProcess,
-			.m_Shadows = frame.m_DirectionalShadowSettings,
-			.m_Environment = m_RenderServiceBindings.m_Environment->GetEnvironmentLightingSettings(),
-			.m_ActiveIBLGeneration = frame.m_RenderScene.m_WorldLightingGeneration,
-			.m_Atmosphere = frame.m_RenderScene.m_Atmosphere,
-			.m_Sun = frame.m_RenderScene.m_WorldSun,
-			.m_LocalLightCount = frame.m_RenderScene.m_LocalLightCount,
-			.m_AerialPerspective = capturedView.m_Lighting.m_EnableAerialPerspective,
-		});
+
 		const RenderFrameValidationResult validation =
 			renderPipeline.ValidateRenderFrame(validationContext, services);
 		if (!validation.IsReady())
 		{
+			// Preserve the aborted frame record even though successful capture selection
+			// now waits for the validated observation identity.
+			m_FrameCapture->BeginFrame(std::move(captureFrameState));
 			// Nothing has been recorded. The temporal transaction is aborted and the
 			// RenderFrame handle retires the begun frame on return.
 			m_RenderHost->InvalidateTemporalFrameAfterLateContractFailure(rendererFrame);
@@ -769,6 +756,94 @@ namespace gglab
 				validation.m_Reason, validation.m_Detail.empty() ? "" : ", detail=",
 				validation.m_Detail));
 		}
+		const auto field = renderPipeline.GetGIFieldCaptureState();
+		if (field.m_Generation != 0)
+		{
+			captureFrameState.m_Readiness.m_GIField = field;
+			const auto& readiness = field.m_Readiness;
+			if (readiness.m_Enabled)
+			{
+				captureFrameState.m_Readiness.Add("gi-field",
+					readiness.m_Failed || readiness.m_State == GIFieldReadinessState::Unconverged ? FrameCaptureGateState::Failed :
+						readiness.m_State == GIFieldReadinessState::Ready ? FrameCaptureGateState::Ready : FrameCaptureGateState::Pending,
+					std::format("Field {}: {}, {} completed updates, {}/{} quiet blocks, {} excluded; threshold {}, max change {}",
+						field.m_Generation, GetGIFieldReadinessName(readiness.m_State), readiness.m_CompletedUpdates,
+						readiness.m_QuietBlocks, readiness.m_ActiveBlocks, readiness.m_ExcludedBlocks,
+						readiness.m_Threshold, readiness.m_MaximumChange), "gi-field", field.m_Generation);
+			}
+		}
+		const auto reference = services.m_Presentation->GetGIReferenceObservationDiagnostics();
+		if (reference.m_Active)
+		{
+			captureFrameState.m_Readiness.Add("gi-reference",
+				reference.m_Status == GIReferenceObservationStatus::Completed ? FrameCaptureGateState::Ready :
+					reference.m_Status == GIReferenceObservationStatus::Failed ? FrameCaptureGateState::Failed :
+						FrameCaptureGateState::Pending,
+				std::format("Observation {}: D={}, {}/{} completed samples, {} submitted, version {}; "
+					"sweep {} samples, tiles {}/{} submitted; "
+					"receiver cache: {}/{} pixels, {} query work (cap {}), {} bytes.",
+					reference.m_Generation, reference.m_MaximumDepth, reference.m_CompletedSamples, reference.m_TargetSamples,
+					reference.m_SubmittedSamples, reference.m_CommittedVersion, reference.m_SweepSamples,
+					reference.m_SubmittedTiles, reference.m_TileCount,
+					reference.m_ReceiverPreparation.m_CompletedPixels, reference.m_ReceiverPreparation.m_TotalPixels,
+					reference.m_ReceiverPreparation.m_BatchQueryWork, reference.m_ReceiverPreparation.m_QueryWorkPerSubmission,
+					reference.m_ReceiverPreparation.m_CacheBytes),
+				"gi-reference", reference.m_Generation);
+		}
+		const auto visibility = services.m_Presentation->GetGISpecularVisibilityProgress();
+		if (visibility.m_Active)
+		{
+			captureFrameState.m_Readiness.Add("gi-specular-visibility",
+				visibility.m_Status == GISpecularVisibilityStatus::Completed ?
+					FrameCaptureGateState::Ready :
+					visibility.m_Status == GISpecularVisibilityStatus::Failed ?
+						FrameCaptureGateState::Failed : FrameCaptureGateState::Pending,
+				std::format("Observation {}: {}/{} completed samples, {} submitted, version {}; "
+					"sweep {} samples, tiles {}/{} submitted; "
+					"receiver cache: {}/{} pixels, {} query work (cap {}), {} bytes.",
+					visibility.m_Generation, visibility.m_CompletedSamples, visibility.m_TargetSamples,
+					visibility.m_SubmittedSamples, visibility.m_CommittedVersion, visibility.m_SweepSamples,
+					visibility.m_SubmittedTiles, visibility.m_TileCount,
+					visibility.m_ReceiverPreparation.m_CompletedPixels, visibility.m_ReceiverPreparation.m_TotalPixels,
+					visibility.m_ReceiverPreparation.m_BatchQueryWork, visibility.m_ReceiverPreparation.m_QueryWorkPerSubmission,
+					visibility.m_ReceiverPreparation.m_CacheBytes),
+				"gi-specular-visibility", visibility.m_Generation);
+		}
+		// Select captures only after validation has identified this frame's observation.
+		if (!m_FrameSequence->BeginFrame(captureFrameState, [this](const FrameCaptureGate& gate)
+			{
+				return m_ParameterControl->CoversReadinessGate(
+					ParameterBatchOwner::Sequence(m_FrameSequence->GetStatus()->m_SequenceId), gate);
+			}, { .m_RequestedGeneration = m_RenderServiceBindings.m_Environment->GetBakeRequestGeneration(),
+				.m_BuiltGeneration = frame.m_RenderScene.m_WorldLightingGeneration }))
+		{
+			UpdateSequenceParameterEvents();
+			toolingFrame.Complete();
+			return AppRuntimeTickResult::Continue;
+		}
+		// Freeze the previous outcome before BeginFrame replaces it with this plan.
+		// Observation must not enable parameter tracking or reset capture settling.
+		const std::optional<ViewControlSnapshot> viewControl = toolingFrame.IsOpen() ?
+			std::optional(BuildViewControlSnapshot(inheritedView, m_ParameterControl->GetHostViewOverrides(),
+				captureFrameState, m_FrameCapture->GetLastFrameState())) :
+			std::nullopt;
+		const std::string toolingContentId = captureFrameState.m_LabId.empty() ?
+			captureFrameState.m_DemoId : captureFrameState.m_LabId;
+		m_FrameCapture->BeginFrame(std::move(captureFrameState));
+		renderPipeline.SetGIProbeInspection(m_FrameCapture->GetFrameGIProbeInspection());
+		renderPipeline.SetGIReceiverInspection(m_FrameCapture->GetFrameGIReceiverInspection());
+		renderPipeline.SetGIProbePicking(m_FrameCapture->GetFrameGIProbePicking());
+		m_FrameCapture->SetFrameSceneInputs(frame.m_FrameSerial, {
+			.m_Exposure = capturedView.m_Exposure,
+			.m_PostProcess = capturedView.m_PostProcess,
+			.m_Shadows = frame.m_DirectionalShadowSettings,
+			.m_Environment = m_RenderServiceBindings.m_Environment->GetEnvironmentLightingSettings(),
+			.m_ActiveIBLGeneration = frame.m_RenderScene.m_WorldLightingGeneration,
+			.m_Atmosphere = frame.m_RenderScene.m_Atmosphere,
+			.m_Sun = frame.m_RenderScene.m_WorldSun,
+			.m_LocalLightCount = frame.m_RenderScene.m_LocalLightCount,
+			.m_AerialPerspective = capturedView.m_Lighting.m_EnableAerialPerspective,
+		});
 		demo->GetCameraRig().SubmitDebugDraw(m_DebugDrawService->GetContext());
 		frame.m_DebugDrawFrame = m_DebugDrawService->SealFrame(frameSlotIndex,
 			static_cast<float>(m_Time->GetDeltaTime()), frame.m_DebugDrawCullContext);
@@ -876,6 +951,13 @@ namespace gglab
 				.m_LoadingProgress = loadingProgress ? &*loadingProgress : nullptr,
 				.m_ViewControl = viewControl ? &*viewControl : nullptr,
 				.m_ViewControlActions = &m_ToolingViewControl,
+				.m_GIFieldSummary = field.m_Summary.get(),
+				.m_GIProbeInspection = &m_ToolingGIProbeInspection,
+				.m_GIReceiverInspection = &m_ToolingGIReceiverInspection,
+				.m_GIProbePicking = &m_ToolingGIProbePicking,
+				.m_DisplayDpiScale = tickInfo.m_WindowDpiScale,
+				.m_AbsolutePointer = m_Input && m_Input->GetPointerMode() == AppPointerMode::Absolute,
+				.m_ContentId = toolingContentId,
 			};
 			toolingFrame.Draw(toolingContext);
 		}
@@ -884,6 +966,9 @@ namespace gglab
 			GGLAB_CPU_PROFILE_SCOPE("RenderGraph Execute");
 			m_RenderHost->Render(rendererFrame, renderGraph, renderContext);
 		}
+		const std::optional<double> cpuBuildRecordMilliseconds = measureCpu ?
+			std::optional(std::chrono::duration<double, std::milli>(
+				std::chrono::steady_clock::now() - cpuBuildRecordStart).count()) : std::nullopt;
 		RHIFrameEndResult frameEndResult = RHIFrameEndResult::Fatal();
 		{
 			GGLAB_CPU_PROFILE_SCOPE("RenderHost EndFrame");
@@ -897,9 +982,14 @@ namespace gglab
 		}
 		m_NonFiniteWatch->OnFrameSubmitted(frame.m_FrameSerial);
 		m_FrameCapture->OnFrameSubmitted();
+		if (const auto* presented = m_FrameCapture->GetLastFrameState())
+		{
+			m_ToolingGIProbePicking.OnPresented(field.m_Summary, tickInfo.m_WindowDpiScale,
+				presented->m_LabId.empty() ? presented->m_DemoId : presented->m_LabId);
+		}
 		const FrameSequenceObservation sequenceObservation = m_FrameSequence->WantsGpuTiming() ?
 			FrameSequenceObservation{ m_FrameCapture->HasFrameGraphExports(frame.m_FrameSerial),
-				renderGraph.GetObservationActivity() } :
+				renderGraph.GetObservationActivity(), cpuBuildRecordMilliseconds } :
 			FrameSequenceObservation{};
 
 		m_ParameterControl->OnFrameSubmitted({

@@ -1,5 +1,6 @@
 #pragma once
 #include "GGLabRuntime/Diagnostics/SnapshotCommon.h"
+#include "GGLabRuntime/Graphics/RHI/RHIAccelerationStructure.h"
 
 #include <cstdint>
 #include <string>
@@ -42,6 +43,7 @@ namespace gglab
 
 		uint32_t m_FeatureLevel = 0;
 		bool m_RayTracingSupported = false;
+		RHIRayQueryCapabilities m_RayQueryCapabilities{};
 		bool m_MeshShaderSupported = false;
 		bool m_EnhancedBarriersSupported = false;
 		bool m_TearingSupported = false;

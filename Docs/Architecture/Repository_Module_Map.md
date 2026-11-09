@@ -10,8 +10,9 @@ DevTools belong to `WinAppHost`. Instance ownership is described separately in t
 
 ## Projects and source ownership
 
-Project links resolve to the authoritative `ClCompile`/`ClInclude` membership.
-The source roots below locate those items.
+Project links resolve to the authoritative `ClCompile`/`ClInclude` membership for
+C++ and `FxCompile`/`None` membership for shader sources, shared includes and
+metadata. The source roots below locate the C++ items.
 
 | Project | Source roots | Role |
 | --- | --- | --- |
@@ -34,9 +35,30 @@ The source roots below locate those items.
 | [ShaderRuntimeIntegrationTests](../../Projects/ShaderRuntimeIntegrationTests/ShaderRuntimeIntegrationTests.vcxproj) | [Tests/ShaderRuntimeIntegration](../../Tests/ShaderRuntimeIntegration) | Privileged Shader/Runtime integration tests |
 | [GGLabVulkanQualification](../../Projects/GGLabVulkanQualification/GGLabVulkanQualification.vcxproj) | [Sources/GGLabVulkanQualification](../../Sources/GGLabVulkanQualification) | Standalone Vulkan hardware qualification and headless contracts |
 
-`GGLabFoundationHeaderSelfContainment.targets` generates the Foundation probes
-inside that test project's intermediate directory. Vendored DirectXTex is a
-separate solution project under `Externals/Vender`, outside this first-party set.
+Vendored DirectXTex is a separate solution project under `Externals/Vender`.
+
+### Shader source ownership
+
+Shader files stay under `Shaders`; project membership follows the implemented
+feature rather than the executable that requests it:
+
+| Project | Shader items |
+| --- | --- |
+| `GGLabRuntime` | Runtime pass sources and shared rendering includes under `Common`, `Lighting` and `PBR`, including CPU/HLSL GI contracts |
+| `WinAppHost` | Lab-authored CoordinateConformance, NapaVoxel, RayQuery, RaySceneProbe and RenderGraphComputeSmoke sources |
+| `ShaderRuntimeIntegrationTests` | `Shaders/Tests` compile/numerical fixtures, including generated fixtures when present |
+| `ShaderArtifactRuntime` | `Common/NonFiniteSiteIds.hlsli` and `Metadata` artifact-contract inventories |
+| `ShaderCompiler` | `shadertoolsconfig.json` source-tooling configuration |
+
+[ShaderProjectOwnership.psm1](../../Scripts/ShaderProjectOwnership.psm1) defines
+feature-domain routing for [SyncShadersToVS.ps1](../../Scripts/SyncShadersToVS.ps1)
+and the boundary validator. Synchronization generates shader membership and filters.
+Shared shader consumption does not imply a C++ project reference or ownership.
+
+Shader IDE items are conditional on the build profile and excluded from MSBuild
+shader compilation by `Directory.Build.targets`; Shader-domain build records own
+compilation policy. WinApp deploys development sources through
+`LinkShaderDirectory.targets` independently of source ownership.
 
 ## Declared project references
 
@@ -100,7 +122,7 @@ Shared properties and project imports define these build profiles:
 
 | Input | Declared effect and evidence |
 | --- | --- |
-| Debug / Develop / Release, x64 | All eighteen first-party projects declare these configurations. [GGLabBuildBaseline.props](../../PropertySheets/GGLabBuildBaseline.props), directly or through [Common.props](../../PropertySheets/Common.props), supplies the shared build policy. `NapaVoxelCore` keeps its own C++20 build identity |
+| Debug / Develop / Release, x64 | First-party projects declare these configurations. [GGLabBuildBaseline.props](../../PropertySheets/GGLabBuildBaseline.props), directly or through [Common.props](../../PropertySheets/Common.props), supplies the shared build policy. `NapaVoxelCore` keeps its own C++20 build identity |
 | `GGLAB_ENABLE_VULKAN` | Defaults to 1 in [VulkanImport.props](../../PropertySheets/VulkanImport.props). `!=0` enables SDK inputs, Runtime/WinAppHost Vulkan sources, the host presentation test and the two [V] references. Qualification's Shader-directory/DXC imports and target also require `!=0` |
 | `GGLAB_ARTIFACT_ONLY_RUNTIME` | [WinAppBuildProfile.props](../../PropertySheets/WinAppBuildProfile.props) isolates normal/artifact-only outputs and intermediates for all three Windows host targets. `!=1` includes development Shader startup/process sources and tests; WinApp also retains its conditional Shader/asset deployment imports |
 | `GGLAB_USE_PCH` | WinAppHost owns the PCH and disables it for `=0`; both executables use no PCH. The shared host profile separates no-PCH intermediates within each normal/artifact-only profile |
@@ -135,10 +157,10 @@ and [application interfaces](Modules/Application_Content.md).
 
 ## Review and verification
 
-The [maintenance guide](Boundary_And_Drift_Guide.md#checks) lists ownership and map
-checks. Build/test commands are in the [CI workflow](../../.github/workflows/build.yml);
-scripted suites are listed by
-[RunVerification.ps1](../../Tests/Verification/RunVerification.ps1) `-List`.
+Use the [verification guide](../../Tests/Verification/README.md) for repository
+checks and scripted suites, and the [CI workflow](../../.github/workflows/build.yml)
+for native build/test commands. The [maintenance guide](Boundary_And_Drift_Guide.md)
+describes map maintenance.
 
 ```text
 Anchors:

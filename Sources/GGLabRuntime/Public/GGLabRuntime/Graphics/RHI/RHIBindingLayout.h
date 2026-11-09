@@ -5,6 +5,7 @@
 #include <array>
 #include <cstdint>
 #include <cstddef>
+#include <span>
 
 namespace gglab
 {
@@ -20,6 +21,7 @@ namespace gglab
 		InlineConstants,
 		BindlessResourceTable,
 		BindlessSamplerTable,
+		AccelerationStructure,
 	};
 
 	[[nodiscard]] constexpr bool IsBindlessBindingType(RHIBindingType type) noexcept
@@ -55,6 +57,29 @@ namespace gglab
 		uint32_t m_SlotCount = 0;
 		const char* m_DebugName = nullptr;
 	};
+
+	// Diagnostic names do not change logical layout identity. Slot order remains significant.
+	[[nodiscard]] constexpr bool HaveSameRHIBindingSlots(std::span<const RHIBindingSlotDesc> a,
+		std::span<const RHIBindingSlotDesc> b) noexcept
+	{
+		if (a.size() != b.size())
+		{
+			return false;
+		}
+		for (size_t index = 0; index < a.size(); ++index)
+		{
+			const auto& x = a[index];
+			const auto& y = b[index];
+			if (x.m_Type != y.m_Type || x.m_Visibility != y.m_Visibility ||
+				x.m_Binding != y.m_Binding || x.m_Space != y.m_Space ||
+				x.m_Count != y.m_Count || x.m_SizeInBytes != y.m_SizeInBytes ||
+				x.m_BufferBindingMode != y.m_BufferBindingMode)
+			{
+				return false;
+			}
+		}
+		return true;
+	}
 
 	[[nodiscard]] constexpr bool IsValidInlineConstantWrite(uint32_t sizeInBytes,
 		size_t wordCount, uint32_t destOffsetInWords) noexcept

@@ -68,6 +68,7 @@ namespace gglab
 		RHITextureViewHandle m_Srv{};
 		RHITextureDesc m_Desc{};
 		RHITextureViewDimension m_SrvDimension = RHITextureViewDimension::Unknown;
+		RHIFormat m_ViewFormat = RHIFormat::Unknown;
 		bool m_IsUploaded = false;
 	};
 

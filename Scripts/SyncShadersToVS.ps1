@@ -37,16 +37,16 @@ function New-MsbuildElement {
 
 function Remove-ShaderItems {
     param(
-        [xml]$Document,
-        [System.Xml.XmlNamespaceManager]$NamespaceManager
+        [string]$Root,
+        [string]$ProjectPath,
+        [xml]$Document
     )
 
-    $nodes = @($Document.SelectNodes("//msb:None[contains(@Include, '\Shaders\') or contains(@Include, '/Shaders/')]", $NamespaceManager))
-    $nodes += @($Document.SelectNodes("//msb:FxCompile[contains(@Include, '\Shaders\') or contains(@Include, '/Shaders/')]", $NamespaceManager))
-
-    foreach ($node in $nodes) {
-        [void]$node.ParentNode.RemoveChild($node)
+    $items = @(Get-ShaderProjectItems $Root $ProjectPath $Document)
+    foreach ($item in $items) {
+        [void]$item.Node.ParentNode.RemoveChild($item.Node)
     }
+    return $items.Count
 }
 
 function Read-XmlDocument {
@@ -167,12 +167,13 @@ function Add-ShaderItemsToProject {
 
     $noneGroup = New-MsbuildElement $Document "ItemGroup"
     $fxGroup = New-MsbuildElement $Document "ItemGroup"
-    $artifactOnlyCondition = "'`$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'"
-    [void]$noneGroup.SetAttribute("Condition", $artifactOnlyCondition)
-    [void]$fxGroup.SetAttribute("Condition", $artifactOnlyCondition)
+    [void]$noneGroup.SetAttribute("Label", "ShaderSources")
+    [void]$fxGroup.SetAttribute("Label", "ShaderSources")
+    [void]$noneGroup.SetAttribute("Condition", $ShaderFiles[0].Condition)
+    [void]$fxGroup.SetAttribute("Condition", $ShaderFiles[0].Condition)
 
     foreach ($shader in $ShaderFiles) {
-        $itemName = if ($shader.Extension -ieq ".hlsl") { "FxCompile" } else { "None" }
+        $itemName = $shader.ItemType
         $item = New-MsbuildElement $Document $itemName
         [void]$item.SetAttribute("Include", $shader.ProjectInclude)
 
@@ -193,37 +194,47 @@ function Add-ShaderItemsToProject {
 }
 
 $root = Get-RepoRoot $RootDir
-$shaderDir = Join-Path $root "Shaders"
-$projectDir = Join-Path $root "Projects\WinApp"
-$projectPath = Join-Path $projectDir "WinApp.vcxproj"
+Import-Module (Join-Path $PSScriptRoot 'ShaderProjectOwnership.psm1') -Force
+$assignments = @(Get-ShaderProjectAssignments $root)
 
-if (-not (Test-Path $shaderDir)) {
-    throw "Shader directory not found: $shaderDir"
+# Validate all routing destinations before changing any project. Existing project
+# membership remains authoritative; routing regenerates only the shader entries.
+foreach ($owner in ($assignments.Owner | Select-Object -Unique)) {
+    $ownerPath = Join-Path $root "Projects/$owner/$owner.vcxproj"
+    if (-not (Test-Path -LiteralPath $ownerPath -PathType Leaf)) {
+        throw "Shader owner project not found: $ownerPath"
+    }
 }
-if (-not (Test-Path $projectPath)) {
-    throw "Project file not found: $projectPath"
-}
-
-$shaderFiles = Get-ChildItem $shaderDir -Recurse -File |
-    Where-Object { $_.Extension -in @(".hlsl", ".hlsli", ".json") } |
-    Sort-Object FullName |
-    ForEach-Object {
+$plans = @()
+foreach ($project in (Get-ChildItem -LiteralPath (Join-Path $root 'Projects') -Recurse -Filter '*.vcxproj' |
+        Sort-Object FullName)) {
+    $projectDoc = Read-XmlDocument $project.FullName
+    $removed = Remove-ShaderItems $root $project.FullName $projectDoc
+    $ownedShaders = @($assignments | Where-Object {
+        $ownerPath = Join-Path $root "Projects/$($_.Owner)/$($_.Owner).vcxproj"
+        [IO.Path]::GetFullPath($ownerPath) -ieq $project.FullName
+    })
+    if ($removed -eq 0 -and $ownedShaders.Count -eq 0) { continue }
+    $projectDir = $project.DirectoryName
+    $shaderFiles = @($ownedShaders | ForEach-Object {
         [pscustomobject]@{
-            FullName = $_.FullName
-            Extension = $_.Extension
+            ItemType = $_.ItemType
+            Condition = $_.Condition
             ProjectInclude = ConvertTo-ProjectInclude $projectDir $_.FullName
         }
-    }
-
-$projectDoc = Read-XmlDocument $projectPath
-$projectNs = New-Object System.Xml.XmlNamespaceManager($projectDoc.NameTable)
-$projectNs.AddNamespace("msb", $projectDoc.DocumentElement.NamespaceURI)
-Remove-ShaderItems $projectDoc $projectNs
-Remove-EmptyItemGroups $projectDoc $projectNs
-Add-ShaderItemsToProject $projectDoc $shaderFiles
-Remove-EmptyItemGroups $projectDoc $projectNs
-Remove-WhitespaceTextNodes $projectDoc
-$projectChanged = Save-XmlDocumentIfChanged $projectDoc $projectPath
+    })
+    $projectNs = New-Object System.Xml.XmlNamespaceManager($projectDoc.NameTable)
+    $projectNs.AddNamespace('msb', $projectDoc.DocumentElement.NamespaceURI)
+    Remove-EmptyItemGroups $projectDoc $projectNs
+    if ($shaderFiles.Count -gt 0) { Add-ShaderItemsToProject $projectDoc $shaderFiles }
+    Remove-WhitespaceTextNodes $projectDoc
+    $plans += [pscustomobject]@{ Path=$project.FullName; Name=$project.BaseName;
+        Document=$projectDoc; Count=$shaderFiles.Count }
+}
+foreach ($plan in $plans) {
+    $changed = Save-XmlDocumentIfChanged $plan.Document $plan.Path
+    Write-Host "$($plan.Name): $(if ($changed) { 'updated' } else { 'unchanged' }) ($($plan.Count) shader items)"
+}
 
 $filterGeneratorPath = Join-Path $PSScriptRoot "GenerateProjectFilters.ps1"
 if (-not (Test-Path -LiteralPath $filterGeneratorPath)) {
@@ -231,5 +242,8 @@ if (-not (Test-Path -LiteralPath $filterGeneratorPath)) {
 }
 & $filterGeneratorPath -RootDir $root
 
-Write-Host "Synced $($shaderFiles.Count) shader files to Visual Studio project."
-Write-Host "WinApp.vcxproj: $(if ($projectChanged) { 'updated' } else { 'unchanged' })"
+$findings = @(Get-ShaderProjectOwnershipFindings $root)
+if ($findings.Count -gt 0) {
+    throw "Shader ownership validation failed after synchronization: $($findings | Out-String)"
+}
+Write-Host "Synced $($assignments.Count) shader files to their owning Visual Studio projects."

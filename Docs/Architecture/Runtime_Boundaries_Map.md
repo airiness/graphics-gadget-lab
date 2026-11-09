@@ -47,6 +47,51 @@ A Runtime pass is a stage of a Runtime recipe:
 `RenderPassForwardPlusCull` shows transient records and a fenced readback;
 `RenderPassGTAO` shows temporal history.
 
+Optional GI stages are selected through `RenderPipelineForwardPlusCreateInfo`;
+the [pipeline card](Modules/Runtime_Rendering.md#render-pipeline-composition)
+links their Public configuration and Private implementation entries.
+
+| Selection | Composition and ownership |
+| --- | --- |
+| `m_EnableGIReceiver` | Private receiver records and paired raster positions before the temporal boundary; requires Native, unjittered rendering with TAA off |
+| `m_GIReference` | Reference after receivers; Renderer owns accumulation independently of Lab and temporal history. `m_Accumulate=false` selects stateless sampling |
+| `m_GISpecularVisibility` | Pre-temporal diagnostic with a separate Renderer-owned observation; requires a `PrimaryReceiver` RayScene and leaves production IBL unchanged |
+| `m_GIProbeUpdate` | Pre-temporal experiment owning persistent ray/probe resources, independent of screen receivers and production field lookup |
+| `m_GIField` | Field update before ForwardOpaque, owning persistent atlases and ray storage; mutually exclusive with `m_GIProbeUpdate` |
+
+GI stages share one recipe-owned import of their prepared `RayScene`. Reference
+and visibility observations cache primary matches, using paired raster positions
+only for primary coverage. Observation reset invalidates both cache and accumulation;
+submission and completion follow [frame settlement](Frame_Execution_Map.md#frame-settlement).
+Non-constant probe environments wait for initial requested IBL publication. After
+the first submitted update, later bakes do not interrupt use of the built frame's
+matching active bank; staging resources are never sampled. Persistent resource
+exports define the next frame's import state, including after updates stop.
+
+Scene and shader changes require field replacement. With readiness enabled,
+published lighting changes refresh irradiance in place.
+Opaque shading and receiver diagnostics share the field query. Coverage blends
+field irradiance with diffuse IBL before material response; GTAO applies to the
+IBL share. Consumers declare reads before final export.
+
+AppRuntime forwards a capture-selected probe coordinate through pipeline wrappers
+via `RenderPipelineBase::SetGIProbeInspection`. Runtime extracts the graph-owned
+`GI.Field.ProbeInspection` resource before final field export; resource capture
+publishes its [CPU observation values](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GIFieldObservation.h).
+An opt-in `GI.Field.IntegrationInspection` witness records integration intermediates;
+its sampling-direction replay never changes field updates or history.
+The [GUI adapter](../../Sources/GGLabAppRuntime/Capture/GIProbeInspectionControl.h)
+owns its capture job and result independently of session jobs.
+
+Probe picking uses [`GIProbePickingRequest`](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/Pipeline/GIProbePicking.h) through `RenderPipelineBase::SetGIProbePicking`.
+AppRuntime binds requests to the last submitted display snapshot and validates them before issue;
+Runtime executes the matching GPU query.
+
+`RenderPresentationAccess` exposes immutable progress and transient-pool snapshots;
+[`RayScene::GetMemorySnapshot`](../../Sources/GGLabRuntime/Public/GGLabRuntime/Graphics/RayScene.h)
+reports scene memory without retaining the observed resources. See the
+[GI checks](../../Tests/Verification/README.md#gpu-regressions) for verification.
+
 ## Lab-owned composition
 
 A Lab composes graph work through two Public seams:
@@ -66,8 +111,10 @@ with the Lab.
 A pass that uses a new shader program:
 
 1. References it as a `shader_programs` entry in `GGLabShaderPrograms.h`.
-2. Adds its build record in `Sources/Tools/ShaderCompiler/GGLabRuntimeShaderBuild.cpp`;
-   a new shader source also needs `Scripts/SyncShadersToVS.ps1`.
+2. Adds its build record in `Sources/Tools/ShaderCompiler/GGLabRuntimeShaderBuild.cpp`.
+   New shader sources also need `Scripts/SyncShadersToVS.ps1`, which registers them
+   in their [feature-domain project](Repository_Module_Map.md#shader-source-ownership),
+   independently of recipe ownership and deployment.
 3. Registers demand: production programs in `GetRendererInitialShaderProgramDemand`,
    Lab programs in its `LabRegistration::m_ShaderPrograms`.
 4. Loads it through `RenderServices::m_ShaderPrograms` and resolves pipelines through

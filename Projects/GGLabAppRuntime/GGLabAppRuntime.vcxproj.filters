@@ -45,6 +45,15 @@
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\FrameSequenceCoordinator.cpp">
       <Filter>Capture</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\GIProbeInspectionControl.cpp">
+      <Filter>Capture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\GIProbePickingControl.cpp">
+      <Filter>Capture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\GIReceiverInspectionControl.cpp">
+      <Filter>Capture</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabAppRuntime\Capture\NonFiniteWatchCoordinator.cpp">
       <Filter>Capture</Filter>
     </ClCompile>
@@ -160,6 +169,15 @@
       <Filter>Capture</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\FrameSequenceCoordinator.h">
+      <Filter>Capture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\GIProbeInspectionControl.h">
+      <Filter>Capture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\GIProbePickingControl.h">
+      <Filter>Capture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\GIReceiverInspectionControl.h">
       <Filter>Capture</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabAppRuntime\Capture\NonFiniteWatchCoordinator.h">

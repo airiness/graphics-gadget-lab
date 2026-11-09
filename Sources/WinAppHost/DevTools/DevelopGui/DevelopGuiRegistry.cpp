@@ -49,6 +49,7 @@ namespace gglab
 
 		PanelRuntime runtime{};
 		runtime.m_Open = panel->IsDefaultOpen();
+		runtime.m_WasOpen = runtime.m_Open;
 		runtime.m_Order = panel->GetOrder();
 
 		runtime.m_FullPath = panel->GetPath();
@@ -195,15 +196,25 @@ namespace gglab
 
 		context.m_StateStore = &m_StateStore;
 		context.m_PanelRegistry = this;
+		const auto notifyClosed = [&context](PanelRuntime& panel)
+			{
+				const bool closed = panel.m_WasOpen && !panel.m_Open;
+				panel.m_WasOpen = panel.m_Open;
+				if (closed && panel.m_Panel)
+				{
+					panel.m_Panel->OnClosed(context);
+				}
+			};
 
 		for (auto& panel : m_Panels)
 		{
+			context.m_CurrentPanelKey = panel.m_Key;
+			notifyClosed(panel);
 			if (!panel.m_Open)
 			{
 				continue;
 			}
 
-			context.m_CurrentPanelKey = panel.m_Key;
 			if (panel.m_FocusRequested)
 			{
 				ImGui::SetNextWindowCollapsed(false);
@@ -211,7 +222,7 @@ namespace gglab
 				panel.m_FocusRequested = false;
 			}
 
-			if (ImGui::Begin(panel.m_ImGuiWindowTitle.c_str(), &panel.m_Open))
+			if (ImGui::Begin(panel.m_ImGuiWindowTitle.c_str(), &panel.m_Open) && panel.m_Open)
 			{
 				if (panel.m_Panel)
 				{
@@ -223,6 +234,11 @@ namespace gglab
 				}
 			}
 			ImGui::End();
+			notifyClosed(panel);
+			if (panel.m_Open && panel.m_Panel)
+			{
+				panel.m_Panel->OnFrame(context);
+			}
 		}
 
 		context.m_CurrentPanelKey = prevKey;

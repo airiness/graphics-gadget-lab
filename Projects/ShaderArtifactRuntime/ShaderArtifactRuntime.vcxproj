@@ -105,15 +105,19 @@
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderArtifactManifest.h" />
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderArtifactStore.h" />
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderArtifactTypes.h" />
-	<ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderCompilerProcessContract.h" />
+    <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderCompilerProcessContract.h" />
     <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\ShaderRuntimeArtifact.h" />
-	<ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\VulkanShaderRuntimeABI.h" />
-	<ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\GGLabShaderPrograms.h" />
+    <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\VulkanShaderRuntimeABI.h" />
+    <ClInclude Include="..\..\Sources\ShaderArtifactRuntime\Public\ShaderArtifactRuntime\GGLabShaderPrograms.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\GGLabFoundation\GGLabFoundation.vcxproj">
       <Project>{5C275408-928E-43C7-A2B5-7099FEA072D4}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup Label="ShaderSources" Condition="'$(GGLAB_ARTIFACT_ONLY_RUNTIME)'!='1'">
+    <None Include="..\..\Shaders\Common\NonFiniteSiteIds.hlsli" />
+    <None Include="..\..\Shaders\Metadata\NonFiniteSites.json" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

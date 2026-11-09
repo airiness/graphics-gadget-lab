@@ -1,0 +1,291 @@
+{
+  "schemaVersion": 1,
+  "id": "gglab.gi.coastal-daylight.pre-gi",
+  "date": "2026-10-28",
+  "timeZone": "Asia/Tokyo",
+  "purpose": "Pre-GI input/identity and GI-off regression baseline, not GI qualification",
+  "codeBaseline": "d2835a77eb4e2e39a3317f4244e9bfade15ae054",
+  "configuration": "Develop",
+  "buildProperties": {
+    "PreferredToolArchitecture": "x64",
+    "GGLAB_ENABLE_PIX": 0
+  },
+  "captures": [
+    {
+      "observation": "C1",
+      "rhi": "dx12",
+      "referenceView": "Retreat_SeaPassage",
+      "image": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j1-a1.p0.png",
+      "metadata": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j1-a1.p0.json",
+      "manifest": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j1-a1.capture-bundle.json"
+    },
+    {
+      "observation": "C2",
+      "rhi": "dx12",
+      "referenceView": "Retreat_Courtyard",
+      "image": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j2-a1.p0.png",
+      "metadata": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j2-a1.p0.json",
+      "manifest": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j2-a1.capture-bundle.json"
+    },
+    {
+      "observation": "C3",
+      "rhi": "dx12",
+      "referenceView": "GI_InteriorExterior",
+      "image": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j3-a1.p0.png",
+      "metadata": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j3-a1.p0.json",
+      "manifest": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j3-a1.capture-bundle.json"
+    },
+    {
+      "observation": "C4",
+      "rhi": "dx12",
+      "referenceView": "Retreat_Lounge",
+      "image": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j4-a1.p0.png",
+      "metadata": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j4-a1.p0.json",
+      "manifest": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j4-a1.capture-bundle.json"
+    },
+    {
+      "observation": "C1",
+      "rhi": "vulkan",
+      "referenceView": "Retreat_SeaPassage",
+      "image": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j1-a1.p0.png",
+      "metadata": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j1-a1.p0.json",
+      "manifest": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j1-a1.capture-bundle.json"
+    },
+    {
+      "observation": "C2",
+      "rhi": "vulkan",
+      "referenceView": "Retreat_Courtyard",
+      "image": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j2-a1.p0.png",
+      "metadata": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j2-a1.p0.json",
+      "manifest": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j2-a1.capture-bundle.json"
+    },
+    {
+      "observation": "C3",
+      "rhi": "vulkan",
+      "referenceView": "GI_InteriorExterior",
+      "image": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j3-a1.p0.png",
+      "metadata": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j3-a1.p0.json",
+      "manifest": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j3-a1.capture-bundle.json"
+    },
+    {
+      "observation": "C4",
+      "rhi": "vulkan",
+      "referenceView": "Retreat_Lounge",
+      "image": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j4-a1.p0.png",
+      "metadata": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j4-a1.p0.json",
+      "manifest": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j4-a1.capture-bundle.json"
+    }
+  ],
+  "repeatChecks": [
+    {
+      "observation": "C1",
+      "rhi": "dx12",
+      "pngBytesIdentical": true,
+      "baselineFrameSerial": 252,
+      "repeatFrameSerial": 576,
+      "imageSha256": "51d8f45ac0fad38ad2758723d7745a82c05c05ce8eebe3f213ed8c011bc2906b",
+      "repeatImageSha256": "51d8f45ac0fad38ad2758723d7745a82c05c05ce8eebe3f213ed8c011bc2906b"
+    },
+    {
+      "observation": "C2",
+      "rhi": "dx12",
+      "pngBytesIdentical": true,
+      "baselineFrameSerial": 324,
+      "repeatFrameSerial": 650,
+      "imageSha256": "da6144999364aa0de72ce86519df6e2ae469e81a3db5c4c490a8c306471ca4ff",
+      "repeatImageSha256": "da6144999364aa0de72ce86519df6e2ae469e81a3db5c4c490a8c306471ca4ff"
+    },
+    {
+      "observation": "C3",
+      "rhi": "dx12",
+      "pngBytesIdentical": true,
+      "baselineFrameSerial": 400,
+      "repeatFrameSerial": 726,
+      "imageSha256": "baa815bf0570565edbcd49366219d6d8f36cd6660c05c47b2871fe37e0588055",
+      "repeatImageSha256": "baa815bf0570565edbcd49366219d6d8f36cd6660c05c47b2871fe37e0588055"
+    },
+    {
+      "observation": "C4",
+      "rhi": "dx12",
+      "pngBytesIdentical": true,
+      "baselineFrameSerial": 476,
+      "repeatFrameSerial": 800,
+      "imageSha256": "eef28e59bfd774d1bb9e071acc377b317220272d58789f5cf502ab3834a18da8",
+      "repeatImageSha256": "eef28e59bfd774d1bb9e071acc377b317220272d58789f5cf502ab3834a18da8"
+    },
+    {
+      "observation": "C1",
+      "rhi": "vulkan",
+      "pngBytesIdentical": true,
+      "baselineFrameSerial": 259,
+      "repeatFrameSerial": 574,
+      "imageSha256": "488ad5c65b57f51f8c0d2e3a2038f9a5d602915c6074a4a4f428dec1a318ca95",
+      "repeatImageSha256": "488ad5c65b57f51f8c0d2e3a2038f9a5d602915c6074a4a4f428dec1a318ca95"
+    },
+    {
+      "observation": "C2",
+      "rhi": "vulkan",
+      "pngBytesIdentical": true,
+      "baselineFrameSerial": 330,
+      "repeatFrameSerial": 648,
+      "imageSha256": "04f0a9ecf57fce202f338dea6f373686175a00be130e178ce92e197a35d003b2",
+      "repeatImageSha256": "04f0a9ecf57fce202f338dea6f373686175a00be130e178ce92e197a35d003b2"
+    },
+    {
+      "observation": "C3",
+      "rhi": "vulkan",
+      "pngBytesIdentical": true,
+      "baselineFrameSerial": 404,
+      "repeatFrameSerial": 721,
+      "imageSha256": "509c3bd44c0e0770edb5b41d06764415c7c204b3ac271c1c6f8a010affb5bbce",
+      "repeatImageSha256": "509c3bd44c0e0770edb5b41d06764415c7c204b3ac271c1c6f8a010affb5bbce"
+    },
+    {
+      "observation": "C4",
+      "rhi": "vulkan",
+      "pngBytesIdentical": true,
+      "baselineFrameSerial": 477,
+      "repeatFrameSerial": 795,
+      "imageSha256": "5e0da61b740c6f1874934df756f62e5f1e55b953be90518ef0d6aa092239a4cd",
+      "repeatImageSha256": "5e0da61b740c6f1874934df756f62e5f1e55b953be90518ef0d6aa092239a4cd"
+    }
+  ],
+  "shaderRegistries": [
+    {
+      "rhi": "dx12",
+      "registryId": "2a177e168f2e747333e9124c615a782252659c879dee9a1992ce3e182b062f25",
+      "sha256": "967f6a4b2b9fc7fadfc9c977dd90d12375491bd7f221ed75be1fa803c58cc8ae",
+      "artifactPath": "program-registry/2a/2a177e168f2e747333e9124c615a782252659c879dee9a1992ce3e182b062f25.ggsh.registry"
+    },
+    {
+      "rhi": "vulkan",
+      "registryId": "91e3a53e97d9a535b49e7b00abbfa5bec865830b41a5fef5c7ce6e4c53990d3f",
+      "sha256": "02838f001d28fc35de4ad4039cbd76093a98ab99cb2a9a93e0a9a34bd124130a",
+      "artifactPath": "program-registry/91/91e3a53e97d9a535b49e7b00abbfa5bec865830b41a5fef5c7ce6e4c53990d3f.ggsh.registry"
+    }
+  ],
+  "sessionExitCodes": {
+    "dx12": 0,
+    "vulkan": 0
+  },
+  "files": [
+    {
+      "path": "dx12/environment.json",
+      "sha256": "14c76745a021e3ec36988ed31abe9415978b23fbfe8155b697f0e30cb4c6b3bb"
+    },
+    {
+      "path": "dx12/output.txt",
+      "sha256": "9998f4da190af19eb1037fb6d3afbbfbc45573ed5dba1dc026dcbfe682c5ed0d"
+    },
+    {
+      "path": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j1-a1.capture-bundle.json",
+      "sha256": "9f3462896bac3ae4ea93fe69ffd2c1318f14c8f61dcca0bdbfdb2bee52db53b6"
+    },
+    {
+      "path": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j1-a1.p0.json",
+      "sha256": "58ebe6eb5faeddf9374691dd8fdfcb60580475c1df264037dad95ae929c047ea"
+    },
+    {
+      "path": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j1-a1.p0.png",
+      "sha256": "51d8f45ac0fad38ad2758723d7745a82c05c05ce8eebe3f213ed8c011bc2906b"
+    },
+    {
+      "path": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j2-a1.capture-bundle.json",
+      "sha256": "f77d5295ae0590437a875c5a7af54e96687706fe58f039ce1dbc1e18209524c8"
+    },
+    {
+      "path": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j2-a1.p0.json",
+      "sha256": "963588ec3dda9ff79f295ecf9ba112591a1af2a183fc948382450a581b7f2bfd"
+    },
+    {
+      "path": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j2-a1.p0.png",
+      "sha256": "da6144999364aa0de72ce86519df6e2ae469e81a3db5c4c490a8c306471ca4ff"
+    },
+    {
+      "path": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j3-a1.capture-bundle.json",
+      "sha256": "f9df2cb18707fb6143fa3ae5e8746a5bd7eccb5bc1197a347b8a05d46a460705"
+    },
+    {
+      "path": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j3-a1.p0.json",
+      "sha256": "5889ef1cfdfd51d0382aff4137849593e985263490ffaaddc50684d472aec8f1"
+    },
+    {
+      "path": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j3-a1.p0.png",
+      "sha256": "baa815bf0570565edbcd49366219d6d8f36cd6660c05c47b2871fe37e0588055"
+    },
+    {
+      "path": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j4-a1.capture-bundle.json",
+      "sha256": "51481ff28351f27b8aab5b3b7c550a82367a0bd1571f62260b9bcab77a53d401"
+    },
+    {
+      "path": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j4-a1.p0.json",
+      "sha256": "7b5e7556fe0f3d2c5a961247b0d85febb29361d85d1c58d6b2fb492b17819b02"
+    },
+    {
+      "path": "dx12/pre-gi-g0.e5cb6531518184449c7a57d16bf3fd5f-j4-a1.p0.png",
+      "sha256": "eef28e59bfd774d1bb9e071acc377b317220272d58789f5cf502ab3834a18da8"
+    },
+    {
+      "path": "vulkan/environment.json",
+      "sha256": "fee34ed255afa7a792a3c7e0e442680469afaa7716f8a8dcbd4bdae0e8199d93"
+    },
+    {
+      "path": "vulkan/output.txt",
+      "sha256": "d24fc1e2847bcf9123a9fc2ec82bc406dbcbbdff3ec23402b3ab23491007a69f"
+    },
+    {
+      "path": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j1-a1.capture-bundle.json",
+      "sha256": "15039cc5f0c41294ce2c85f4e916b0f172b0ae01a52ebfb8c2dd37bd009f9d3b"
+    },
+    {
+      "path": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j1-a1.p0.json",
+      "sha256": "be221ef6c87e8366cb55b5ad43950a86791f6dd361acfd311ca1357e2e1e6de6"
+    },
+    {
+      "path": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j1-a1.p0.png",
+      "sha256": "488ad5c65b57f51f8c0d2e3a2038f9a5d602915c6074a4a4f428dec1a318ca95"
+    },
+    {
+      "path": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j2-a1.capture-bundle.json",
+      "sha256": "9cfc0ae91701fd30b57ae07b79f1218644f5cfecb0c80df79450b0022aba3ab7"
+    },
+    {
+      "path": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j2-a1.p0.json",
+      "sha256": "0cabf0547ff60bdb37c70b70b39593a353c72605983aedc15a924e7b15c8763f"
+    },
+    {
+      "path": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j2-a1.p0.png",
+      "sha256": "04f0a9ecf57fce202f338dea6f373686175a00be130e178ce92e197a35d003b2"
+    },
+    {
+      "path": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j3-a1.capture-bundle.json",
+      "sha256": "5de49fe0d097a36322e30bececbb0fcd3c946dcc5b437bcff52ac64f88ce813b"
+    },
+    {
+      "path": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j3-a1.p0.json",
+      "sha256": "1038945df1903dd706989194cd702194fc9933ed17e42a05d3efb3ee32912711"
+    },
+    {
+      "path": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j3-a1.p0.png",
+      "sha256": "509c3bd44c0e0770edb5b41d06764415c7c204b3ac271c1c6f8a010affb5bbce"
+    },
+    {
+      "path": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j4-a1.capture-bundle.json",
+      "sha256": "dd9962c90cd9f84c3f2b2595f6b72a926d827a1d08b8b0513a96d202c7ac4ebd"
+    },
+    {
+      "path": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j4-a1.p0.json",
+      "sha256": "99369d001997f04b98d542528d9ef3612d6d58344b67238079b3fb4a03ed0761"
+    },
+    {
+      "path": "vulkan/pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j4-a1.p0.png",
+      "sha256": "5e0da61b740c6f1874934df756f62e5f1e55b953be90518ef0d6aa092239a4cd"
+    }
+  ],
+  "limitations": [
+    "NVIDIA RTX 3060 / driver 577.19 only; RTX 5080 GI qualification deferred.",
+    "PIX-enabled DX12 cold-state startup stalled on a graphics back-buffer fence; no-PIX build with standard validation passed.",
+    "No GI shaders, field, receiver reference or performance acceptance is supplied.",
+    "Fixture and Coastal receiver masks require G2 overlay/convergence certification."
+  ]
+}

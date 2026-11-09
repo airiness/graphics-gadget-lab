@@ -1,0 +1,194 @@
+#pragma once
+#include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabRuntime/Graphics/Asset/TextureAssetViews.h"
+#include "GGLabRuntime/Graphics/RenderGraph/RGResource.h"
+#include "GGLabRuntime/Graphics/RHI/RHIResource.h"
+
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+namespace gglab
+{
+	class AssetManager;
+	class RHIDevice;
+	class RenderGraph;
+	class RenderSamplerAccess;
+	class World;
+
+	struct RaySceneCapacity
+	{
+		uint32_t m_MaxGeometries = 4096;
+		uint32_t m_MaxInstances = 4096;
+		uint32_t m_MaxMaterials = 1024;
+		uint64_t m_MaxVertexBytes = 128ull * 1024 * 1024;
+		uint64_t m_MaxIndexBytes = 64ull * 1024 * 1024;
+	};
+
+	struct RaySceneGeometryGPU
+	{
+		uint32_t m_VertexBaseInBytes = 0;
+		uint32_t m_IndexBaseInBytes = 0;
+		uint32_t m_TriangleCount = 0;
+		uint32_t m_VertexCount = 0;
+	};
+
+	struct RaySceneInstanceGPU
+	{
+		uint32_t m_GeometryIndex = UINT32_MAX;
+		uint32_t m_MaterialIndex = 0;
+		// Bit zero is the opaque ray mask. Excluded BLEND entries have no TLAS record.
+		uint32_t m_Flags = 0;
+		uint32_t m_Reserved = 0;
+	};
+	static_assert(sizeof(RaySceneGeometryGPU) == 16);
+	static_assert(sizeof(RaySceneInstanceGPU) == 16);
+
+	enum class RaySceneStatus : uint8_t
+	{
+		NotReady,
+		Prepared,
+		Unavailable,
+		UnsupportedGeometry,
+		CapacityExceeded,
+		InvalidSource,
+		AllocationFailed,
+	};
+
+	// PrimaryReceiver additionally tracks normal, coat and anisotropy texture
+	// identity/residency for diagnostics that consume the production receiver.
+	enum class RaySceneMaterialInputs : uint8_t
+	{
+		ReducedDiffuse,
+		PrimaryReceiver,
+	};
+
+	struct RaySceneMaterialTexture
+	{
+		uint32_t m_MaterialIndex = 0;
+		// 0 base colour, 1 MR, 2 normal, 3 coat, 4 coat roughness, 5 coat normal,
+		// 6 anisotropy. SelectedMip is UINT32_MAX for implicit primary-only sampling.
+		uint32_t m_Slot = 0;
+		TextureContentRef m_Content{};
+		RHITextureHandle m_Resource{};
+		uint32_t m_SrvIndex = 0;
+		RHIFormat m_Format = RHIFormat::Unknown;
+		uint32_t m_Width = 0;
+		uint32_t m_Height = 0;
+		uint32_t m_MipLevels = 0;
+		uint32_t m_SelectedMip = 0;
+		SourceDigest m_SourceDigest{};
+		ArtifactContentDigest m_ArtifactContentDigest{};
+	};
+
+	enum class RaySceneMemoryKind : uint8_t
+	{
+		Geometry,
+		Tables,
+		Upload,
+		BottomLevel,
+		TopLevel,
+	};
+
+	struct RaySceneMemoryResource
+	{
+		RaySceneMemoryKind m_Kind = RaySceneMemoryKind::Geometry;
+		bool m_Active = false;
+		uint64_t m_LogicalBytes = 0;
+		RHIAllocationFacts m_Allocation;
+	};
+
+	// Owner-thread snapshot. Weak observations do not prolong GPU resource lifetime.
+	// Native allocation identities are process-local and must be remapped for export.
+	struct RaySceneMemorySnapshot
+	{
+		uint32_t m_LiveSnapshots = 0;
+		std::vector<RaySceneMemoryResource> m_Resources;
+	};
+
+	struct RayScenePreparationStatistics
+	{
+		uint64_t m_Calls = 0;
+		uint64_t m_Replacements = 0;
+		double m_TotalMilliseconds = 0;
+		double m_LastMilliseconds = 0;
+		double m_LastGatherMilliseconds = 0;
+		double m_LastPlanMilliseconds = 0;
+		double m_LastAllocationMilliseconds = 0;
+		double m_LastReplacementMilliseconds = 0;
+		double m_ReplacementGatherMilliseconds = 0;
+		double m_ReplacementPlanMilliseconds = 0;
+		double m_ReplacementAllocationMilliseconds = 0;
+	};
+
+	struct RaySceneDiagnostics
+	{
+		RaySceneStatus m_Status = RaySceneStatus::NotReady;
+		std::string m_Reason;
+		uint64_t m_Revision = 0;
+		uint64_t m_GeometryRevision = 0;
+		uint64_t m_BottomLevelBuildCount = 0;
+		uint64_t m_TopLevelBuildCount = 0;
+		uint64_t m_GeometryCopyBytes = 0;
+		uint32_t m_GeometryCount = 0;
+		uint32_t m_InstanceCount = 0;
+		uint32_t m_OpaqueInstanceCount = 0;
+		uint32_t m_ExcludedBlendCount = 0;
+		uint32_t m_MaterialCount = 0;
+		uint64_t m_VertexBytes = 0;
+		uint64_t m_IndexBytes = 0;
+		// Conservative all-eligible-instance world bounds, independent of camera culling.
+		// Environment-miss consumers must reject an incomplete proof or a shorter ray.
+		float m_BoundsDiagonal = 0.0f;
+		bool m_HasCompleteBounds = false;
+		std::vector<RaySceneMaterialTexture> m_MaterialTextures;
+		bool m_TracksPrimaryMaterials = false;
+		RayScenePreparationStatistics m_Preparation;
+	};
+
+	// Graph-local imports. Declare all traversed BLAS reads as well as the TLAS read.
+	// Retain m_Lifetime with the query encoder's RetainForSubmission before recording use.
+	// Pools and tables finish in StructuredRead; acceleration structures in QueryRead.
+	struct RaySceneGraphResources
+	{
+		uint32_t m_GeometryCount = 0;
+		uint32_t m_InstanceCount = 0;
+		uint32_t m_MaterialCount = 0;
+		RGAccelerationStructureId m_TopLevel;
+		std::vector<RGAccelerationStructureId> m_BottomLevels;
+		RGBufferId m_Vertices;
+		RGBufferId m_Indices;
+		RGBufferId m_Geometries;
+		RGBufferId m_Instances;
+		RGBufferId m_Materials;
+		std::shared_ptr<void> m_Lifetime;
+	};
+
+	// Owner-thread service, with one instance per World/session. Preparation observes
+	// the entire World, never a view's culled draws. Keep source asset interests through
+	// recording; copied geometry survives raster residency. Only ray consumers invoke it.
+	// Geometry layouts are immutable. Material replacements share unchanged BLAS/TLAS;
+	// transforms replace the TLAS. Snapshots retain reduced-material texture interests
+	// through their query/build submission leases, including off-camera surfaces.
+	class RayScene final
+	{
+	public:
+		explicit RayScene(RaySceneCapacity capacity = {},
+			RaySceneMaterialInputs materialInputs = RaySceneMaterialInputs::ReducedDiffuse,
+			bool trackReplacementMemory = false) noexcept;
+		~RayScene();
+		GGLAB_DELETE_COPYABLE_MOVABLE(RayScene);
+		[[nodiscard]] RaySceneStatus Prepare(const World& world, AssetManager& assets,
+			RHIDevice& device, const RenderSamplerAccess& samplers) noexcept;
+		[[nodiscard]] RaySceneGraphResources AddBuildPasses(RenderGraph& graph) noexcept;
+		[[nodiscard]] const RaySceneDiagnostics& GetDiagnostics() const noexcept;
+		[[nodiscard]] RaySceneMemorySnapshot GetMemorySnapshot() const noexcept;
+		// Historical CPU facts only; never retains replaced GPU resources.
+		[[nodiscard]] const RaySceneMemorySnapshot& GetReplacementMemorySnapshot() const noexcept;
+
+	private:
+		struct State;
+		std::unique_ptr<State> m_State;
+	};
+}

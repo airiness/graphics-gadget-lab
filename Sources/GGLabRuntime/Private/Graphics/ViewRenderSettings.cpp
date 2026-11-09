@@ -48,6 +48,7 @@ namespace gglab
 		gtao = ApplyGTAOSettingsPatch({}, gtao);
 
 		return {
+			.m_GIProbes = ResolveGIProbeVisualizationSettings(profile.m_GIProbes),
 			.m_TemporalAA = temporalAA,
 			.m_Exposure = ResolveManualExposureSettings(
 				camera.GetManualEV100(), camera.GetExposureCompensationEV(),

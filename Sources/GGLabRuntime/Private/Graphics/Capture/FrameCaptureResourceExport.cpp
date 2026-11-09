@@ -67,6 +67,121 @@ namespace gglab
 					.m_Space = "display view",
 					.m_Description = "Ambient visibility; one is unoccluded." };
 			}
+			if (name == "RayScene.SunVisibility")
+			{
+				return ResourceExportSemantics{ .m_Role = "ray-scene.sun-visibility",
+					.m_Units = "R/G visibility [0,1]; B receiver state; A metres",
+					.m_Space = "render view, jittered opaque raster samples",
+					.m_Description = "R: binary RT sun visibility. G: production CSM filtering/bias/blend/fade. B: 1 matched opaque receiver, 0 background, -1 unmatched raster depth. A: first accepted blocker distance, -1 on miss; not nearest-hit distance. Ray origins use triangle-face ULP offsets; sun rays stop at 1000 m." };
+			}
+			if (name == "GI.Reference.Irradiance" || name == "GI.Reference.LambertRadiance" ||
+				name == "GI.Reference.SunIrradiance" || name == "GI.Reference.EnvironmentIrradiance")
+			{
+				return ResourceExportSemantics{
+					.m_Role = name == "GI.Reference.LambertRadiance" ? "gi.reference.lambert-radiance" : "gi.reference.irradiance",
+					.m_Units = "scene-referred linear RGB, unexposed",
+					.m_Space = "Native unjittered render view before temporal integration",
+					.m_Description = "Stateless one-bounce reference. SunIrradiance RGB and EnvironmentIrradiance RGB sum to Irradiance RGB. Sun alpha: atmosphere attenuation bound (0/1); environment alpha: actual cubemap LOD, -1 for direct constant input (background 0). Irradiance excludes receiver albedo and direct receiver sun. LambertRadiance is reduced diffuse albedo * E / pi, not full Forward material or Final. Irradiance alpha: 0 background, 1 valid, -1 unsupported receiver, -2 unmatched/invalid receiver, -3 invalid secondary sample; never drop invalid pixels from metrics." };
+			}
+			if (name.starts_with("GI.Reference.ReceiverCache.") ||
+				name.starts_with("GI.SpecularVisibility.ReceiverCache."))
+			{
+				return ResourceExportSemantics{ .m_Role = "gi.primary-receiver-cache",
+					.m_Units = "metres / unit normal / snapshot-local uint IDs",
+					.m_Space = "Native unjittered observation",
+					.m_Description = "PositionError: world XYZ and geometric origin error. FaceMatch: oriented face XYZ and primary match kind (1 centre, 2 envelope, 6 raster; 3 invalid, 4 different surface, 5 miss). Instance/Primitive: exact uint IDs. Zero marks background or unprocessed pixels. A partially prepared cache is not a complete receiver product; consult receiver preparation progress. Logical storage is 40 bytes/pixel, excluding native alignment and replacement overlap." };
+			}
+			if (name == "GI.Field.Readiness")
+			{
+				return ResourceExportSemantics{ .m_Role = "gi-field-readiness", .m_Units = "relative change / scene-referred lux / uint bits",
+					.m_Space = "field refresh epoch", .m_Description = "v1 float4 records: header (positive irradiance floor, previous Active-probe upper median E luminance, Active count, span=4); then two records per X-fastest/Z/Y probe: four recent per-update texel/channel maxima; (mean E luminance, four-update mean change, Active flag, uint update count reinterpreted as float bits). Includes normalized distance-mean change after hard reset. Observed stationarity is not reference convergence or temporal RMS." };
+			}
+			if (name == "GI.Field.Feedback")
+			{
+				return ResourceExportSemantics{ .m_Role = "gi-field-feedback", .m_Units = "uint counts and update indices",
+					.m_Space = "full-volume field update",
+					.m_Description = "v1: two uint4 records per X-fastest/Z/Y probe. First: Valid, LowConfidence, NoValidSupport, OutsideCoverage surface-hit counts. Second: initializing, incompatible, consumed age (0 or 1), one-based update. Bootstrap uses zero higher-bounce energy. Later queries consume the previous full update, regardless of readiness; unsupported hits never use an IBL fallback. Incompatible queries invalidate the update." };
+			}
+			if (name == "GI.ProbeUpdate.UpdateStatus" || name == "GI.Field.UpdateStatus")
+			{
+				return ResourceExportSemantics{ .m_Role = "gi-update-status", .m_Units = "integer error and indices",
+					.m_Space = "field generation",
+					.m_Description = "First numerical error: 0 none, 1 invalid ray, 2 invalid history, 3 invalid blend. Probe, zero-based update and ray/interior-texel indices follow. No-error indices are UINT32_MAX. Nonzero status invalidates the whole field until safe replacement; raw diagnostics remain available." };
+			}
+			if (name == "GI.ProbeUpdate.Rays" || name == "GI.Field.Rays")
+			{
+				return ResourceExportSemantics{ .m_Role = name.starts_with("GI.Field.") ? "gi-field" : "gi-probe-update", .m_Units = "scene-linear radiance / metres / fractions as described",
+					.m_Space = "probe grid", .m_Description = "Float4 per probe/ray: reduced outgoing scene-linear radiance RGB and hit distance in metres. Miss distance is t_max; single-sided backface is -0.2*t with zero radiance. Invalid samples remain non-finite." };
+			}
+			if (name == "GI.ProbeUpdate.Irradiance" || name == "GI.Field.Irradiance")
+			{
+				return ResourceExportSemantics{ .m_Role = name.starts_with("GI.Field.") ? "gi-field" : "gi-probe-update", .m_Units = "scene-linear radiance / metres / fractions as described",
+					.m_Space = "probe grid", .m_Description = "RGB: cosine-weighted radiance ratio M; incident E=pi*M. A: initialized texel marker. FP32 octahedral interiors with one-texel seam borders; tile dimensions follow the active profile. Raw atlas storage does not establish field quality or convergence." };
+			}
+			if (name == "GI.ProbeUpdate.Distance" || name == "GI.Field.Distance")
+			{
+				return ResourceExportSemantics{ .m_Role = name.starts_with("GI.Field.") ? "gi-field" : "gi-probe-update", .m_Units = "scene-linear radiance / metres / fractions as described",
+					.m_Space = "probe grid", .m_Description = "RG: weighted mean and mean-square of min(abs(hit distance), 1.5*length(spacing)). FP32 octahedral 14x14 interiors and one-texel seam borders; cosine-power-50 weights." };
+			}
+			if (name == "GI.Field.Classification")
+			{
+				return ResourceExportSemantics{ .m_Role = "gi-field", .m_Units = "classification enum",
+					.m_Space = "probe grid", .m_Description = "R32Uint: low bits 0 unclassified, 1 Active, 2 Inactive. Texel zero bit 31 mirrors sticky whole-field numerical failure and prevents same-submission GPU sampling. Static preparation uses 32 fixed rays; more than 25 percent single-sided backface hits makes a probe Inactive. Inactive probes never contribute to receiver queries." };
+			}
+			if (name == "GI.Field.ReceiverIrradiance")
+			{
+				return ResourceExportSemantics{ .m_Role = "gi-field-query", .m_Units = "scene-referred RGB irradiance",
+					.m_Space = "opaque raster receiver", .m_Description = "RGB: normalized field E=pi*M before coverage blending or material response, without pre-exposure. A: 1 compatible opaque receiver, 0 background, -1 invalid field. NoValidSupport and OutsideCoverage return zero field irradiance." };
+			}
+			if (name == "GI.Field.ReceiverQuery")
+			{
+				return ResourceExportSemantics{ .m_Role = "gi-field-query", .m_Units = "weight / coverage / support enum",
+					.m_Space = "opaque raster receiver", .m_Description = "RGBA: raw cage weight sum, smooth volume-face coverage, support (1 Valid, 2 LowConfidence, 3 NoValidSupport, 4 OutsideCoverage), compatible opaque marker. Marker -1 with support 0 is a field contract failure, not a support state. Confidence never scales irradiance. Background is all zero; static full updates have no aged contributing probes." };
+			}
+			if (name == "GI.Field.ReceiverList")
+			{
+				return ResourceExportSemantics{ .m_Role = "gi-field-query", .m_Units = "metres / unit normal / scene-referred RGB irradiance / query enums",
+					.m_Space = "listed world-space receivers", .m_Description = "One column per listed sample. Rows 0-2: world position (A 1), shading normal and vertex normal used by the query. Then three rows per viewer v: viewer position (A v); normalized field E=pi*M RGB with compatible marker A (1, or -1 invalid field); raw cage weight sum, smooth coverage, support (1 Valid, 2 LowConfidence, 3 NoValidSupport, 4 OutsideCoverage) and the marker. Each viewer applies the raster lookup's view bias from its own position; nothing else differs between viewers." };
+			}
+			if (name == "GI.ProbeUpdate.State" || name == "GI.Field.State")
+			{
+				return ResourceExportSemantics{ .m_Role = name.starts_with("GI.Field.") ? "gi-field" : "gi-probe-update", .m_Units = "scene-linear radiance / metres / fractions as described",
+					.m_Space = "probe grid", .m_Description = "RGBA: miss, front/two-sided surface, single-sided backface and invalid fractions over every declared ray. Zero marks an unupdated probe; invalid rays are never dropped from a denominator. The separately labelled traversal-only control reports unclassified committed hits in G and unsigned distance, with zero radiance; it does not evaluate material sidedness." };
+			}
+			constexpr std::array giRecords
+			{
+				std::pair{ "GI.SpecularVisibility.Visibility", "RGB: base, coat and Rec709-luminance layer-weighted continuous GGX environment visibility. A: 0 background/pending, 1 valid calculated estimate, 2 all lobes inactive, -1 unsupported/unmatched primary, -2 invalid sampling. GPU completion is not numerical qualification. Not radiance, reflection transport, specular GI or production S1." },
+				std::pair{ "GI.SpecularVisibility.Base", "RGBA: base numerator, denominator, below-face count and invalid count, each divided by full submitted samples. Normalize per pixel before ROI area means; do not divide ROI sums." },
+				std::pair{ "GI.SpecularVisibility.Coat", "RGBA: coat numerator, denominator, below-face count and invalid count, each divided by full submitted samples. Inactive lobes have zero sums, not a failed denominator." },
+				std::pair{ "GI.SpecularVisibility.Weights", "RGB: base directional specular albedo times squared coat transmission. A: coat factor times coat directional albedo. Constant-white-environment scalar composite; excludes material AO and arbitrary environment radiance." },
+				std::pair{ "GI.SpecularVisibility.Position", "RGB: committed primary world position in metres. A: snapshot instance index, not raster material index; use receiver coverage and Visibility alpha for validity." },
+				std::pair{ "GI.SpecularVisibility.Diagnostics", "R: primary primitive index, or failure -1 unsupported, -2 nonfinite position, -3 invalid ray hit, -4 face mismatch, -5 bounded primary miss, -6 illegal material input. G: active lobe bits (base=1, coat=2). B: complete-sweep sample count. A: invalid sampling flag. Background zero. Partial sweeps retain the preceding complete estimate." },
+				std::pair{ "GI.SpecularVisibility.F0", "RGB: full primary F0 reconstructed from IOR, raster base color and metallic. A: effective IOR (zero denotes infinite-IOR F0=1). Never inferred from diffuse energy." },
+				std::pair{ "GI.SpecularVisibility.LayerEnergy", "RGBA: coat factor, coat directional albedo, base NoV and coat NoV. Uses the ready published BRDF LUT bound to this observation." },
+				std::pair{ "GI.Reference.Position", "RGB: reconstructed committed-triangle world position in metres. A: 1 matched primary receiver, 0 otherwise." },
+				std::pair{ "GI.Reference.Identity", "R/G: primary snapshot instance and primitive indices; B: oriented geometric normal Y; A: 1 centre-ray match, 2 bounded subpixel match, 3 paired raster-interpolant local match. Every kind requires matching raster face/plane and native triangles. -1 without receiver." },
+				std::pair{ "GI.Reference.Diagnostics", "RGBA: miss, surface hit, single-sided backface hit and invalid secondary fractions, divided by requested sample count. Below-face directions contribute zero and stay in the denominator." },
+				std::pair{ "GI.Receiver.FaceNormal", "RGB: world triangle face normal oriented toward vertex normal. A: 0 background, 1 opaque, 2 MASK; BLEND excluded." },
+				std::pair{ "GI.Receiver.Position", "RGB: world position interpolated by the paired coverage vertex shader. A: 0 background, 1 opaque, 2 MASK. Supplemental primary matching data; canonical position still uses paired opaque depth." },
+				std::pair{ "GI.Receiver.VertexNormal", "RGB: interpolated world vertex normal after double-sided flip. A: raster front face +1, back face -1; background 0." },
+				std::pair{ "GI.Receiver.ShadingNormal", "RGB: production normal-mapped world shading normal. A: metallic [0,1]." },
+				std::pair{ "GI.Receiver.DiffuseWeight", "RGB: production directional diffuse weight [0,1]. A: clearcoat factor [0,1]." },
+				std::pair{ "GI.Receiver.BaseColor", "RGB: scene-linear production base color. A: frame raster material table index; not a ray-snapshot material index." },
+				std::pair{ "GI.Receiver.ReflectionRoughness", "RGB: production anisotropic IBL reflection direction in world space. A: effective base perceptual roughness." },
+				std::pair{ "GI.Receiver.ClearcoatNormalRoughness", "RGB: production world clearcoat normal. A: effective clearcoat perceptual roughness." },
+				std::pair{ "GI.Receiver.HitAlbedo", "RGB: reduced GI diffuse albedo at explicit <=64 texel mip, using raster UVs. A: 1 covered, 0 background." },
+				std::pair{ "RayScene.HitAlbedo", "RGB: reduced GI diffuse albedo from committed triangle UVs and snapshot material. A: 0 background, 1 hit, 2 single-sided backface, -1 unmatched, -2 invalid." },
+				std::pair{ "RayScene.HitNormal", "RGB: transformed, interpolated world vertex normal, flipped only for double-sided backfaces. A: native front face +1, back face -1; 0 without hit." },
+				std::pair{ "RayScene.HitIdentity", "RGBA: snapshot instance, primitive, material and geometry indices; -1 without hit. Exact float integers within current scene limits." },
+			};
+			for (const auto& [resource, description] : giRecords)
+			{
+				if (name == resource)
+				{
+					return ResourceExportSemantics{ .m_Role = "gi.surface-data", .m_Units = "scene-referred, unexposed; channel-specific",
+						.m_Space = "Native unjittered render view before temporal integration", .m_Description = description };
+				}
+			}
 			return std::nullopt;
 		}
 
@@ -170,6 +285,33 @@ namespace gglab
 				if (target.m_Address.m_Resource == "ForwardPlus.TileDepthRanges")
 				{
 					layout = ForwardPlusTileDepthRangeLayout;
+				}
+				if (target.m_Address.m_Resource == "GI.ProbeUpdate.Rays" ||
+					target.m_Address.m_Resource == "GI.Field.Rays")
+				{
+					static constexpr std::array fields{ GpuBufferFieldLayout{ "radianceDistance", 0, GpuBufferScalar::Float32, 4 } };
+					layout = { 16, fields };
+				}
+				if (target.m_Address.m_Resource == "GI.Field.Readiness")
+				{
+					static constexpr std::array fields{ GpuBufferFieldLayout{ "record", 0, GpuBufferScalar::Float32, 4 } };
+					layout = { 16, fields };
+				}
+				if (target.m_Address.m_Resource == "GI.Field.Feedback")
+				{
+					static constexpr std::array fields{ GpuBufferFieldLayout{ "record", 0, GpuBufferScalar::Uint32, 4 } };
+					layout = { 16, fields };
+				}
+				if (target.m_Address.m_Resource == "GI.ProbeUpdate.UpdateStatus" ||
+					target.m_Address.m_Resource == "GI.Field.UpdateStatus")
+				{
+					static constexpr std::array statusFields
+					{
+						GpuBufferFieldLayout{ "error", 0, GpuBufferScalar::Uint32, 1 },
+						GpuBufferFieldLayout{ "probe", 4, GpuBufferScalar::Uint32, 1 },
+						GpuBufferFieldLayout{ "update", 8, GpuBufferScalar::Uint32, 1 },
+						GpuBufferFieldLayout{ "element", 12, GpuBufferScalar::Uint32, 1 } };
+					layout = { 16, statusFields };
 				}
 				if (layout.m_Stride == stride && !layout.m_Fields.empty())
 				{

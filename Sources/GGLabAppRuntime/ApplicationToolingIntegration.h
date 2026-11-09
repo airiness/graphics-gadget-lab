@@ -6,6 +6,7 @@
 #include <optional>
 #include <cstdint>
 #include <span>
+#include <string_view>
 
 namespace gglab
 {
@@ -41,6 +42,10 @@ namespace gglab
 	struct ViewRenderProfile;
 	struct ViewControlSnapshot;
 	class ViewControlActionsBase;
+	class GIProbeInspectionControlBase;
+	class GIReceiverInspectionControlBase;
+	class GIProbePickingControlBase;
+	struct GIFieldSummary;
 
 	struct ApplicationToolingInputCapture
 	{
@@ -52,6 +57,7 @@ namespace gglab
 	// reused after Lab effects without borrowing the tooling integration.
 	struct ApplicationToolingFrameSettings
 	{
+		std::optional<GIProbeVisualizationSettings> m_GIProbes;
 		std::optional<TemporalAASettings> m_TemporalAA;
 		std::optional<GTAOSettings> m_GTAO;
 		std::optional<BloomSettings> m_Bloom;
@@ -64,6 +70,7 @@ namespace gglab
 	// Whole tooling blocks that replaced the authored profile's settings.
 	struct ApplicationToolingBlocks
 	{
+		bool m_GIProbes = false;
 		bool m_TemporalAA = false;
 		bool m_GTAO = false;
 		bool m_Bloom = false;
@@ -113,6 +120,13 @@ namespace gglab
 		// Owned CPU observation borrowed for Draw only; never a mutable control surface.
 		const ViewControlSnapshot* m_ViewControl = nullptr;
 		ViewControlActionsBase* m_ViewControlActions = nullptr;
+		const GIFieldSummary* m_GIFieldSummary = nullptr;
+		GIProbeInspectionControlBase* m_GIProbeInspection = nullptr;
+		GIReceiverInspectionControlBase* m_GIReceiverInspection = nullptr;
+		GIProbePickingControlBase* m_GIProbePicking = nullptr;
+		float m_DisplayDpiScale = 1;
+		bool m_AbsolutePointer = true;
+		std::string_view m_ContentId;
 	};
 
 	enum class ApplicationToolingFrameEndReason : uint8_t

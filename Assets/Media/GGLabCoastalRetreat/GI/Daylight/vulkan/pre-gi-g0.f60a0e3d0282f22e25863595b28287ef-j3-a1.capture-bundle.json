@@ -1,0 +1,640 @@
+{
+  "schema": "gglab.capture-bundle",
+  "schemaVersion": 3,
+  "bundleId": "f60a0e3d0282f22e25863595b28287ef-j3-a1",
+  "runIdentity": "f60a0e3d0282f22e25863595b28287ef",
+  "jobId": 3,
+  "attempt": 1,
+  "consistency": "same-frame",
+  "environment": {
+    "schemaVersion": 1,
+    "build": {
+      "source": "build-stamp",
+      "revision": "d2835a77eb4e2e39a3317f4244e9bfade15ae054",
+      "dirty": false,
+      "configuration": "Develop",
+      "compiler": "MSVC 19.51.36260",
+      "pixIntegration": false
+    },
+    "process": {
+      "runIdentity": "f60a0e3d0282f22e25863595b28287ef",
+      "startedAtUtc": "2026-10-27T16:43:22Z",
+      "os": "Windows 10.0.26100",
+      "host": "hidden"
+    },
+    "device": {
+      "backend": "vulkan",
+      "adapterName": "NVIDIA GeForce RTX 3060",
+      "vendorId": 4318,
+      "deviceId": 9476,
+      "subsystemId": null,
+      "revision": null,
+      "driverVersion": "577.19",
+      "driverVersionRaw": "0x9044c000",
+      "api": {
+        "apiVersion": "1.4.303"
+      },
+      "dedicatedVideoMemoryBytes": null,
+      "compatibilityIdentity": "vulkan:18b9c71a164e2c971590b88d840f7049:09fe01db1e4359f6b491c67c1a90a3ce:0040412f:9044c000"
+    },
+    "validation": {
+      "requested": "standard",
+      "effective": "standard"
+    }
+  },
+  "provenance": {
+    "backend": "vulkan",
+    "content": {
+      "demoId": "Demo.Playground.CoastalAtrium",
+      "labId": "",
+      "assetBundle": {
+        "id": "gglab.coastal-retreat",
+        "revision": "79092da0d167d3bd041de9ead925c45d9f5ed8083cb07f2c0f5351afb94467e9"
+      }
+    },
+    "sceneInputs": {
+      "schemaVersion": 1,
+      "exposure": {
+        "manualEV100": 15,
+        "compensationEV": 0,
+        "effectiveEV100": 15,
+        "scale": 2.5431314497836865e-05,
+        "preExposure": 2.5431314497836865e-05
+      },
+      "postProcess": {
+        "toneMapping": 0,
+        "bloomEnabled": false,
+        "bloomThreshold": 1,
+        "bloomSoftKnee": 0.5,
+        "bloomIntensity": 0.07999999821186066,
+        "bloomScatter": 0.699999988079071,
+        "bloomMaxLevels": 6
+      },
+      "environment": {
+        "intensity": 1,
+        "rotationRadians": 0,
+        "skybox": true,
+        "backgroundMode": 2,
+        "iblQuality": "Medium",
+        "activeIBLGeneration": 3,
+        "iblConfig": {
+          "environmentSize": 512,
+          "environmentFormat": 6,
+          "irradianceSize": 32,
+          "irradianceFormat": 6,
+          "irradianceSamples": 256,
+          "specularSize": 128,
+          "specularMipLevels": 5,
+          "specularFormat": 6,
+          "specularSamples": 512,
+          "specularMaxSampleLuminance": 1000,
+          "brdfLutSize": 256,
+          "brdfLutFormat": 4
+        }
+      },
+      "shadows": {
+        "enabled": true,
+        "pcf": true,
+        "mapSize": 2048,
+        "cascadeCount": 4,
+        "splitLambda": 0.6499999761581421,
+        "cascadeBlendFraction": 0.10000000149011612,
+        "distanceFadeFraction": 0.10000000149011612,
+        "fitMode": 1,
+        "texelSnapping": true,
+        "maxDistance": 80,
+        "casterExtrusion": 300,
+        "orthoPadding": 1,
+        "depthPadding": 200,
+        "receiverBiasTexels": 0.5,
+        "receiverSlopeBiasTexels": 0,
+        "receiverMaxSlope": 4
+      },
+      "sun": {
+        "photonDirection": [
+          -0.6840724945068359,
+          -0.39072588086128235,
+          0.6159367561340332
+        ],
+        "chromaticity": [
+          1,
+          1,
+          1
+        ],
+        "directIlluminance": [
+          120000,
+          120000,
+          120000
+        ],
+        "diskRadiance": [
+          1764247296,
+          1764247296,
+          1764247296
+        ],
+        "toaIlluminanceLux": 120000,
+        "angularRadiusRadians": 0.0046530477702617645,
+        "projectedSolidAngle": 6.801767449360341e-05
+      },
+      "atmosphere": {
+        "planetRadiusMeters": 6360000,
+        "heightMeters": 100000.0,
+        "planetCenterMeters": [
+          0,
+          -6360000,
+          0
+        ],
+        "worldUnitsToMeters": 1,
+        "rayleighScattering": [
+          5.802000032417709e-06,
+          1.3558000318880659e-05,
+          3.310000101919286e-05
+        ],
+        "rayleighScaleHeightMeters": 8000,
+        "mieScattering": 3.9960000322025735e-06,
+        "mieExtinction": 4.439999884198187e-06,
+        "mieScaleHeightMeters": 1200,
+        "mieAnisotropy": 0.800000011920929,
+        "absorption": [
+          6.500000040432496e-07,
+          1.8810000028679497e-06,
+          8.500000348021786e-08
+        ],
+        "absorptionCenterMeters": 25000,
+        "absorptionHalfWidthMeters": 15000,
+        "groundAlbedo": [
+          0.30000001192092896,
+          0.30000001192092896,
+          0.30000001192092896
+        ]
+      },
+      "localLightCount": 0,
+      "aerialPerspective": true
+    },
+    "frame": {
+      "serial": 404,
+      "index": 404
+    },
+    "camera": {
+      "name": "Main Camera",
+      "referenceView": "GI_InteriorExterior",
+      "position": [
+        -12,
+        4,
+        -2.9000000953674316
+      ],
+      "forward": [
+        0.9834312796592712,
+        -0.10536771267652512,
+        -0.1475146859884262
+      ],
+      "up": [
+        0.10420196503400803,
+        0.9944333434104919,
+        -0.015630293637514114
+      ],
+      "verticalFovDegrees": 50.229671478271484,
+      "nearPlane": 0.10000000149011612,
+      "farPlane": 150
+    },
+    "time": {
+      "fixedDeltaTime": 0.016666666666666666,
+      "totalTime": 3.949999999999991
+    },
+    "developmentTools": false,
+    "readiness": {
+      "ready": true,
+      "gates": [
+        {
+          "name": "shaders",
+          "state": "ready",
+          "detail": ""
+        },
+        {
+          "name": "content-transition",
+          "state": "ready",
+          "detail": ""
+        },
+        {
+          "name": "content",
+          "state": "ready",
+          "detail": ""
+        },
+        {
+          "name": "environment",
+          "state": "ready",
+          "detail": ""
+        },
+        {
+          "name": "ibl",
+          "state": "ready",
+          "detail": ""
+        },
+        {
+          "name": "asset-loads",
+          "state": "ready",
+          "detail": ""
+        },
+        {
+          "name": "asset-uploads",
+          "state": "ready",
+          "detail": ""
+        }
+      ]
+    },
+    "temporal": {
+      "requested": true,
+      "status": "active",
+      "disableReason": "none",
+      "consumers": [
+        {
+          "name": "temporal-aa",
+          "requested": true,
+          "status": "active",
+          "disableReason": "none",
+          "services": [
+            "projection-jitter",
+            "geometry-motion",
+            "frame-continuity",
+            "color-depth-history"
+          ]
+        },
+        {
+          "name": "reference",
+          "requested": false,
+          "status": "disabled",
+          "disableReason": "not-requested",
+          "services": []
+        },
+        {
+          "name": "temporal-gtao",
+          "requested": true,
+          "status": "active",
+          "disableReason": "none",
+          "services": [
+            "geometry-motion",
+            "frame-continuity"
+          ]
+        }
+      ],
+      "services": [
+        "projection-jitter",
+        "geometry-motion",
+        "frame-continuity",
+        "color-depth-history"
+      ],
+      "sessionIdentity": 8589934592,
+      "resetIdentity": 5,
+      "jitterIndex": 0,
+      "jitterSequenceLength": 8,
+      "jitterPixels": [
+        0,
+        -0.1666666716337204
+      ],
+      "settings": {
+        "maxHistoryFeedback": 0.9700000286102295,
+        "depthAbsoluteThreshold": 0.05000000074505806,
+        "depthRelativeThreshold": 0.019999999552965164,
+        "velocityWeightScale": 0.07500000298023224,
+        "luminanceWeightScale": 0,
+        "neighborhoodClampExpansion": 0,
+        "historyRelaxation": 1,
+        "historyAccumulation": "effective-samples",
+        "historyRectification": "minmax-clamp",
+        "varianceClipGamma": 1,
+        "historyFilter": "catmull-rom-clamped",
+        "currentFilter": "gaussian",
+        "motionSelection": "closest-depth",
+        "postTemporalView": "unjittered",
+        "resolutionPreset": "native",
+        "textureLodBiasOffset": -1
+      },
+      "gtao": {
+        "enabled": true,
+        "radius": 1,
+        "falloffStart": 0.8999999761581421,
+        "falloffEnd": 1,
+        "directionCount": 2,
+        "stepCount": 6,
+        "denoiseRadius": 3,
+        "temporalAccumulation": true,
+        "temporalMaxSamples": 8
+      },
+      "textureLodBias": -1,
+      "renderExtent": [
+        1280,
+        800
+      ],
+      "displayExtent": [
+        1280,
+        800
+      ],
+      "renderScale": 1
+    },
+    "sequence": null,
+    "parameters": {
+      "schemaVersion": 1,
+      "frameSerial": 404,
+      "revision": 3,
+      "contentId": "Demo.Playground.CoastalAtrium",
+      "available": true,
+      "values": [],
+      "lighting": {
+        "requested": {
+          "generation": 3,
+          "profileId": "coastal.daylight",
+          "profileHash": "b272c126037b4eb3c8bda22cd7456997a8b81742f620c651fd9d384fc13b228b",
+          "profileHashVersion": 2
+        },
+        "active": {
+          "generation": 3,
+          "profileId": "coastal.daylight",
+          "profileHash": "b272c126037b4eb3c8bda22cd7456997a8b81742f620c651fd9d384fc13b228b",
+          "profileHashVersion": 2
+        }
+      },
+      "receipts": []
+    },
+    "control": {
+      "schemaVersion": 1,
+      "hostViewControl": {
+        "runIdentity": "f60a0e3d0282f22e25863595b28287ef",
+        "contentIdentity": 8589934592,
+        "hostViewRevision": 1
+      },
+      "hostView": [
+        {
+          "id": "view.taa.enabled",
+          "type": "bool",
+          "value": true,
+          "source": "content",
+          "inheritedSource": "content",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.taa.max_history_feedback",
+          "type": "float",
+          "value": 0.9700000286102295,
+          "source": "content",
+          "inheritedSource": "content",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.taa.depth_absolute_threshold",
+          "type": "float",
+          "value": 0.05000000074505806,
+          "source": "content",
+          "inheritedSource": "content",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.taa.depth_relative_threshold",
+          "type": "float",
+          "value": 0.019999999552965164,
+          "source": "content",
+          "inheritedSource": "content",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.taa.velocity_weight_scale",
+          "type": "float",
+          "value": 0.07500000298023224,
+          "source": "content",
+          "inheritedSource": "content",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.taa.luminance_weight_scale",
+          "type": "float",
+          "value": 0.0,
+          "source": "content",
+          "inheritedSource": "content",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.taa.neighborhood_clamp_expansion",
+          "type": "float",
+          "value": 0.0,
+          "source": "content",
+          "inheritedSource": "content",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.taa.history_relaxation",
+          "type": "float",
+          "value": 1.0,
+          "source": "content",
+          "inheritedSource": "content",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.taa.variance_clip_gamma",
+          "type": "float",
+          "value": 1.0,
+          "source": "content",
+          "inheritedSource": "content",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.taa.texture_lod_bias_offset",
+          "type": "float",
+          "value": -1.0,
+          "source": "content",
+          "inheritedSource": "content",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.taa.history_accumulation",
+          "type": "enum",
+          "value": 1,
+          "source": "content",
+          "inheritedSource": "content",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.taa.history_rectification",
+          "type": "enum",
+          "value": 0,
+          "source": "content",
+          "inheritedSource": "content",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.taa.history_filter",
+          "type": "enum",
+          "value": 1,
+          "source": "content",
+          "inheritedSource": "content",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.taa.current_filter",
+          "type": "enum",
+          "value": 1,
+          "source": "content",
+          "inheritedSource": "content",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.taa.motion_selection",
+          "type": "enum",
+          "value": 1,
+          "source": "content",
+          "inheritedSource": "content",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.taa.post_temporal_view",
+          "type": "enum",
+          "value": 1,
+          "source": "content",
+          "inheritedSource": "content",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.taa.resolution_preset",
+          "type": "enum",
+          "value": 0,
+          "source": "content",
+          "inheritedSource": "content",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.gtao.enabled",
+          "type": "bool",
+          "value": true,
+          "source": "content",
+          "inheritedSource": "content",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.gtao.radius",
+          "type": "float",
+          "value": 1.0,
+          "source": "content",
+          "inheritedSource": "content",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.gtao.direction_count",
+          "type": "uint",
+          "value": 2,
+          "source": "content",
+          "inheritedSource": "content",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.gtao.step_count",
+          "type": "uint",
+          "value": 6,
+          "source": "content",
+          "inheritedSource": "content",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.gtao.temporal_max_samples",
+          "type": "uint",
+          "value": 8,
+          "source": "content",
+          "inheritedSource": "content",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.gtao.temporal_accumulation",
+          "type": "bool",
+          "value": true,
+          "source": "content",
+          "inheritedSource": "content",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.exposure.ev100",
+          "type": "float",
+          "value": 15.0,
+          "source": "camera",
+          "inheritedSource": "camera",
+          "hostOverride": {
+            "present": false
+          }
+        },
+        {
+          "id": "view.exposure.compensation",
+          "type": "float",
+          "value": 0.0,
+          "source": "camera",
+          "inheritedSource": "camera",
+          "hostOverride": {
+            "present": false
+          }
+        }
+      ],
+      "requiredFrameState": null
+    }
+  },
+  "submission": {
+    "fenceIndex": 3,
+    "fenceGeneration": 1,
+    "fenceValue": 404,
+    "adapterDriverIdentity": "vulkan:18b9c71a164e2c971590b88d840f7049:09fe01db1e4359f6b491c67c1a90a3ce:0040412f:9044c000"
+  },
+  "watch": null,
+  "products": [
+    {
+      "index": 0,
+      "source": "scene",
+      "diagnosticTap": null,
+      "schema": "gglab.frame-capture",
+      "schemaVersion": 1,
+      "metadata": "pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j3-a1.p0.json",
+      "files": [
+        "pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j3-a1.p0.png",
+        "pre-gi-g0.f60a0e3d0282f22e25863595b28287ef-j3-a1.p0.json"
+      ]
+    }
+  ]
+}
