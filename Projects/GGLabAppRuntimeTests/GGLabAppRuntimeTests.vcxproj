@@ -122,6 +122,25 @@
     <ClCompile Include="..\..\Tests\GGLabAppRuntime\NonFiniteWatchCoordinatorSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabAppRuntime\GGLabAppRuntimeLifecycleSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabAppRuntime\GpuFaultLifecycleSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabAppRuntime\CaptureBundlesSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabAppRuntime\CaptureInspectionSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabAppRuntime\CaptureJobsSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabAppRuntime\CaptureLifecycleIntegrationSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabAppRuntime\CaptureLightingRefreshSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabAppRuntime\CaptureMetadataSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabAppRuntime\CapturePublicationSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabAppRuntime\CaptureResourcesSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabAppRuntime\CaptureSelectionSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabAppRuntime\CaptureSequenceSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabAppRuntime\CaptureTimingSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabAppRuntime\ContentLifetimeIntegrationSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabAppRuntime\FrameSettlementIntegrationSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabAppRuntime\GpuTeardownIntegrationSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabAppRuntime\HostViewIntegrationSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabAppRuntime\LightingParameterIntegrationSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabAppRuntime\ParameterRequestIntegrationSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabAppRuntime\RuntimeIntegrationTestServices.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabAppRuntime\SequenceParameterIntegrationSelfTests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Tests\GGLabAppRuntime\ApplicationFrameworkSelfTests.h" />
@@ -130,6 +149,11 @@
     <ClInclude Include="..\..\Tests\GGLabAppRuntime\CapturePublicationTestFileSystem.h" />
     <ClInclude Include="..\..\Tests\GGLabAppRuntime\FrameCaptureCoordinatorSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabAppRuntime\NonFiniteWatchCoordinatorSelfTests.h" />
+    <ClInclude Include="..\..\Tests\GGLabAppRuntime\CaptureCoordinatorTestCases.h" />
+    <ClInclude Include="..\..\Tests\GGLabAppRuntime\CaptureTestServices.h" />
+    <ClInclude Include="..\..\Tests\GGLabAppRuntime\RuntimeIntegrationTestCases.h" />
+    <ClInclude Include="..\..\Tests\GGLabAppRuntime\RuntimeIntegrationTestServices.h" />
+    <ClInclude Include="..\..\Tests\GGLabAppRuntime\SequenceTestServices.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\GGLabAppRuntime\GGLabAppRuntime.vcxproj">

@@ -95,10 +95,34 @@ namespace
 #endif
 	};
 
+	// Keep focused selections out of all to avoid repeating aggregate coverage.
+	constexpr gglab::SelfTestSuiteDesc FocusedSuites[]
+	{
+		gglab::SelfTestSuiteDesc{ "rendering-bindings", &gglab::RunRenderingBindingsSelfTests },
+		gglab::SelfTestSuiteDesc{ "rendering-depth", &gglab::RunRenderingDepthSelfTests },
+		gglab::SelfTestSuiteDesc{ "rendering-graph", &gglab::RunRenderingGraphSelfTests },
+		gglab::SelfTestSuiteDesc{ "rendering-lighting", &gglab::RunRenderingLightingSelfTests },
+		gglab::SelfTestSuiteDesc{ "rendering-materials", &gglab::RunRenderingMaterialsSelfTests },
+		gglab::SelfTestSuiteDesc{ "rendering-previews", &gglab::RunRenderingPreviewsSelfTests },
+		gglab::SelfTestSuiteDesc{ "rendering-resources", &gglab::RunRenderingResourcesSelfTests },
+		gglab::SelfTestSuiteDesc{ "rendering-scene", &gglab::RunRenderingSceneSelfTests },
+		gglab::SelfTestSuiteDesc{ "rendering-services", &gglab::RunRenderingServicesSelfTests },
+		gglab::SelfTestSuiteDesc{ "rendering-shadows", &gglab::RunRenderingShadowsSelfTests },
+		gglab::SelfTestSuiteDesc{ "rendering-submission", &gglab::RunRenderingSubmissionSelfTests },
+		gglab::SelfTestSuiteDesc{ "rendering-temporal-aa", &gglab::RunRenderingTemporalAASelfTests },
+		gglab::SelfTestSuiteDesc{ "rendering-temporal-history", &gglab::RunRenderingTemporalHistorySelfTests },
+		gglab::SelfTestSuiteDesc{ "rendering-uploads", &gglab::RunRenderingUploadsSelfTests },
+	};
+
 	[[nodiscard]] const gglab::SelfTestSuiteDesc* FindSuite(std::string_view suiteId) noexcept
 	{
 		const auto iterator = std::ranges::find(RegisteredSuites, suiteId, &gglab::SelfTestSuiteDesc::m_Id);
-		return iterator != std::ranges::end(RegisteredSuites) ? &*iterator : nullptr;
+		if (iterator != std::ranges::end(RegisteredSuites))
+		{
+			return &*iterator;
+		}
+		const auto focused = std::ranges::find(FocusedSuites, suiteId, &gglab::SelfTestSuiteDesc::m_Id);
+		return focused != std::ranges::end(FocusedSuites) ? &*focused : nullptr;
 	}
 
 	[[nodiscard]] bool RunSelection(std::string_view selection) noexcept

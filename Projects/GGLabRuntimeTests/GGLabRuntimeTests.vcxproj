@@ -129,13 +129,25 @@
     <ClCompile Include="..\..\Tests\GGLabRuntime\GGLabRuntimeTestsMain.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\PublicationAccountingSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\RayQueryContractSelfTests.cpp" />
-    <ClCompile Include="..\..\Tests\GGLabRuntime\RenderingContractSelfTests.cpp">
-      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
-    </ClCompile>
+    <ClCompile Include="..\..\Tests\GGLabRuntime\RenderingContractSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\RGObjectArenaSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\RenderServicesViewSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\ShaderArtifactRuntimeSelfTests.cpp" />
     <ClCompile Include="..\..\Tests\GGLabRuntime\VulkanContractSelfTests.cpp" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\RenderingBindingsSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\RenderingDepthSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\RenderingGraphSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\RenderingLightingSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\RenderingMaterialsSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\RenderingPreviewsSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\RenderingResourcesSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\RenderingSceneSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\RenderingServicesSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\RenderingShadowsSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\RenderingSubmissionSelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\RenderingTemporalAASelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\RenderingTemporalHistorySelfTests.cpp" />
+    <ClCompile Include="..\..\Tests\GGLabRuntime\RenderingUploadsSelfTests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Tests\GGLabRuntime\ArtifactCacheSelfTests.h" />
@@ -157,6 +169,8 @@
     <ClInclude Include="..\..\Tests\GGLabRuntime\RenderServicesViewSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\ShaderArtifactRuntimeSelfTests.h" />
     <ClInclude Include="..\..\Tests\GGLabRuntime\VulkanContractSelfTests.h" Condition="'$(GGLAB_ENABLE_VULKAN)'!='0'" />
+    <ClInclude Include="..\..\Tests\GGLabRuntime\RenderingContractTestCases.h" />
+    <ClInclude Include="..\..\Tests\GGLabRuntime\RenderingTestServices.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\GGLabTestCore\GGLabTestCore.vcxproj">

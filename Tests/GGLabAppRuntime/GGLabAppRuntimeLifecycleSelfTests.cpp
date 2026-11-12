@@ -794,20 +794,35 @@ int main(int argumentCount, char* arguments[])
 		return 2;
 	}
 	gglab::ConsoleSelfTestReporter reporter;
-	if (selected == "frame-capture-metadata")
+	// Keep focused selections out of all to avoid repeating aggregate coverage.
+	const gglab::SelfTestSuiteDesc focusedSuites[]
 	{
-		return gglab::RunSelfTestSuite({ .m_Id = selected,
-			.m_Run = &gglab::RunFrameCaptureMetadataSelfTests }, reporter) ? 0 : 1;
-	}
-	if (selected == "gi-field-lighting-refresh")
+		{ "frame-capture-metadata", &gglab::RunFrameCaptureMetadataSelfTests },
+		{ "gi-field-lighting-refresh", &gglab::RunGIFieldLightingRefreshSelfTests },
+		{ "gi-probe-inspection", &gglab::RunGIProbeInspectionSelfTests },
+		{ "capture-bundles", &gglab::RunCaptureBundlesSelfTests },
+		{ "capture-inspection", &gglab::RunCaptureInspectionSelfTests },
+		{ "capture-jobs", &gglab::RunCaptureJobsSelfTests },
+		{ "capture-publication", &gglab::RunCapturePublicationSelfTests },
+		{ "capture-resources", &gglab::RunCaptureResourcesSelfTests },
+		{ "capture-selection", &gglab::RunCaptureSelectionSelfTests },
+		{ "capture-sequence", &gglab::RunCaptureSequenceSelfTests },
+		{ "capture-timing", &gglab::RunCaptureTimingSelfTests },
+		{ "capture-lifecycle-integration", &gglab::RunCaptureLifecycleIntegrationSelfTests },
+		{ "content-lifetime-integration", &gglab::RunContentLifetimeIntegrationSelfTests },
+		{ "host-view-integration", &gglab::RunHostViewIntegrationSelfTests },
+		{ "lighting-parameter-integration", &gglab::RunLightingParameterIntegrationSelfTests },
+		{ "parameter-request-integration", &gglab::RunParameterRequestIntegrationSelfTests },
+		{ "sequence-parameter-integration", &gglab::RunSequenceParameterIntegrationSelfTests },
+		{ "frame-settlement-integration", &gglab::RunFrameSettlementIntegrationSelfTests },
+		{ "gpu-teardown-integration", &gglab::RunGpuTeardownIntegrationSelfTests },
+	};
+	for (const auto& suite : focusedSuites)
 	{
-		return gglab::RunSelfTestSuite({ .m_Id = selected,
-			.m_Run = &gglab::RunGIFieldLightingRefreshSelfTests }, reporter) ? 0 : 1;
-	}
-	if (selected == "gi-probe-inspection")
-	{
-		return gglab::RunSelfTestSuite({ .m_Id = selected,
-			.m_Run = &gglab::RunGIProbeInspectionSelfTests }, reporter) ? 0 : 1;
+		if (selected == suite.m_Id)
+		{
+			return gglab::RunSelfTestSuite(suite, reporter) ? 0 : 1;
+		}
 	}
 	const gglab::SelfTestSuiteDesc suites[]
 	{
