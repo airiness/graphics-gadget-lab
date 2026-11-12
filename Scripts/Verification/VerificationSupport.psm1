@@ -23,20 +23,26 @@ function Write-VerificationJson {
 }
 
 function Get-VerificationSourceIdentity {
-    param([string]$Root, [string[]]$Paths)
+    param([string]$Root, [string[]]$Paths, [string[]]$AdditionalPaths,
+        [switch]$LowercaseHash, [string]$FailureMessage = 'Source enumeration failed.')
     # The caller owns the source scope; retain Git paths, ordinal order and hash case.
-    $names = @(& git -c "safe.directory=$($Root.Replace('\','/'))" -C $Root ls-files --cached --others --exclude-standard -- @Paths)
-    if ($LASTEXITCODE -ne 0) { throw 'Source enumeration failed.' }
+    [string[]]$names = @(& git -c "safe.directory=$($Root.Replace('\','/'))" -C $Root ls-files --cached --others --exclude-standard -- @Paths)
+    if ($LASTEXITCODE -ne 0) { throw $FailureMessage }
+    if ($AdditionalPaths) { $names += $AdditionalPaths }
     [Array]::Sort($names, [StringComparer]::Ordinal)
     return @($names | ForEach-Object {
-        [ordered]@{path=$_;sha256=(Get-FileHash -LiteralPath "$Root/$_" -Algorithm SHA256).Hash}
+        $hash = (Get-FileHash -LiteralPath "$Root/$_" -Algorithm SHA256).Hash
+        if ($LowercaseHash) { $hash = $hash.ToLowerInvariant() }
+        [ordered]@{path=$_;sha256=$hash}
     })
 }
 
 function Get-VerificationBinaryIdentity {
-    param([string]$Root, [string]$Configuration)
+    param([string]$Root, [string]$Configuration, [switch]$LowercaseHash)
     return @(@('GraphicsGadgetLab.exe','gglab-shaderc.exe','dxcompiler.dll','dxil.dll') | ForEach-Object {
-        [ordered]@{file=$_;sha256=(Get-FileHash -LiteralPath "$Root/Build/Output/x64/$Configuration/$_" -Algorithm SHA256).Hash}
+        $hash = (Get-FileHash -LiteralPath "$Root/Build/Output/x64/$Configuration/$_" -Algorithm SHA256).Hash
+        if ($LowercaseHash) { $hash = $hash.ToLowerInvariant() }
+        [ordered]@{file=$_;sha256=$hash}
     })
 }
 
@@ -48,10 +54,23 @@ function Assert-VerificationIdentity {
 
 function Invoke-VerificationPython {
     param([string]$Python, [string]$Script, [string[]]$Arguments, [string]$Receipt,
-        [string]$FailureMessage)
-    $lines = @(& $Python $Script @Arguments)
-    $code = $LASTEXITCODE
-    Write-VerificationJson $Receipt @{exitCode=$code;output=($lines -join "`n")}
+        [string]$FailureMessage, [string]$LogPath)
+    if ($LogPath) {
+        $previous = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = 'Continue'
+            $lines = @(& $Python $Script @Arguments 2>&1)
+            $code = $LASTEXITCODE
+        } finally { $ErrorActionPreference = $previous }
+        [IO.File]::WriteAllLines($LogPath, [string[]]$lines, (New-Object Text.UTF8Encoding($false)))
+    } elseif ($Receipt) {
+        $lines = @(& $Python $Script @Arguments)
+        $code = $LASTEXITCODE
+    } else {
+        & $Python $Script @Arguments
+        $code = $LASTEXITCODE
+    }
+    if ($Receipt) { Write-VerificationJson $Receipt @{exitCode=$code;output=($lines -join "`n")} }
     if ($code -ne 0) { throw "${FailureMessage}: $Script" }
 }
 

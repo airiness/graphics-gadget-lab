@@ -433,6 +433,16 @@ switch ($Command) {
     $pythonReceipt = Get-Content $pythonPath -Raw | ConvertFrom-Json
     Check ($leaked.Count -eq 0 -and $pythonReceipt.exitCode -eq 0 -and $pythonReceipt.output -ceq '' -and
         [IO.File]::ReadAllBytes($pythonPath)[0] -eq 123) 'python-retains-empty-output-and-utf8-without-bom'
+    [IO.File]::WriteAllText($pythonFixture, "@echo plain output" + [Environment]::NewLine + "@exit /b 0" + [Environment]::NewLine)
+    $plain = @(Invoke-VerificationPython -Python $pythonFixture -Script 'plain.py' -FailureMessage 'Fixture verification failed')
+    Check ($plain.Count -eq 1 -and $plain[0] -ceq 'plain output') 'python-without-receipt-preserves-stdout'
+    $pythonLog = Join-Path $output 'python.log'
+    [IO.File]::WriteAllText($pythonFixture, "@echo stdout" + [Environment]::NewLine +
+        "@echo stderr 1>&2" + [Environment]::NewLine + "@exit /b 7" + [Environment]::NewLine)
+    Reject { Invoke-VerificationPython -Python $pythonFixture -Script 'audit.py' -LogPath $pythonLog -FailureMessage 'Fixture audit failed' } 'Fixture audit failed' 'python-log-retains-native-failure'
+    $log = [IO.File]::ReadAllText($pythonLog)
+    Check ($log -match 'stdout' -and $log -match 'stderr' -and
+        $ErrorActionPreference -eq 'Stop' -and [IO.File]::ReadAllBytes($pythonLog)[0] -eq 115) 'python-log-merges-streams-without-bom-and-restores-error-policy'
     $stopPath = Join-Path $output 'stop.json'
     $null = Stop-VerificationSession normal -ReceiptPath $stopPath -RequireCleanExit
     Check ((Get-Content $stopPath -Raw | ConvertFrom-Json).exitCode -eq 0) 'clean-stop-receipt'
@@ -738,60 +748,13 @@ Export-ModuleMember -Function git, Invoke-VerificationSession
     $execution = Invoke-VerificationScript $runner @{ Suite='resource-export-schema'; Python=$badPython; OutputDirectory=(Join-Path $output 'failed-run') }
     $result = $execution.output | ConvertFrom-Json
     Check ($execution.exitCode -ne 0 -and -not $result.ok -and $result.suites[0].steps[0].exitCode -eq 7 -and (Test-Path (Join-Path $result.directory 'result.json'))) 'runner-retains-failure-and-log'
-    # Exercise the visibility runner's actual provenance/audit functions without a GPU.
-    & {
-        $tokens = $null; $parseErrors = $null
-        $visibilityScript = Join-Path $root 'Tests/Verification/TestGISpecularVisibility.ps1'
-        $ast = [Management.Automation.Language.Parser]::ParseFile(
-            $visibilityScript, [ref]$tokens, [ref]$parseErrors)
-        Check ($parseErrors.Count -eq 0) 'visibility-runner-parses'
-        foreach ($name in @('Get-VisibilitySourceIdentity','Get-VisibilityBinaryIdentity',
-            'Assert-VisibilityIdentity','Test-VisibilityArtifacts')) {
-            $definition = $ast.Find({ param($node)
-                $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name
-            }, $true)
-            . ([scriptblock]::Create($definition.Extent.Text))
-        }
-        $root = Join-Path $fixtureDirectory 'visibility-provenance'
-        $binaryRoot = Join-Path $root 'Build/Output/x64/Develop'
-        $null = New-Item -ItemType Directory -Path "$root/Sources", $binaryRoot -Force
-        $sourceNames = @('Sources/input.cpp')
-        function git { $global:LASTEXITCODE = 0; return $sourceNames }
-        [IO.File]::WriteAllText("$root/Sources/input.cpp", 'original')
-        $originalSource = Get-VisibilitySourceIdentity
-        Assert-VisibilityIdentity $originalSource (Get-VisibilitySourceIdentity) 'Source'
-        [IO.File]::WriteAllText("$root/Sources/input.cpp", 'modified')
-        Reject { Assert-VisibilityIdentity $originalSource (Get-VisibilitySourceIdentity) 'Source' } `
-            'Source inputs changed' 'visibility-rejects-source-mutation'
-        [IO.File]::WriteAllText("$root/Sources/input.cpp", 'original')
-        [IO.File]::WriteAllText("$root/Sources/added.cpp", 'new')
-        $sourceNames += 'Sources/added.cpp'
-        Reject { Assert-VisibilityIdentity $originalSource (Get-VisibilitySourceIdentity) 'Source' } `
-            'Source inputs changed' 'visibility-rejects-source-addition'
-        $sourceNames = @()
-        Reject { Assert-VisibilityIdentity $originalSource (Get-VisibilitySourceIdentity) 'Source' } `
-            'Source inputs changed' 'visibility-rejects-source-removal'
-        foreach ($file in @('GraphicsGadgetLab.exe','gglab-shaderc.exe','dxcompiler.dll','dxil.dll')) {
-            [IO.File]::WriteAllText((Join-Path $binaryRoot $file), 'original')
-        }
-        $originalBinaries = Get-VisibilityBinaryIdentity Develop
-        Assert-VisibilityIdentity $originalBinaries (Get-VisibilityBinaryIdentity Develop) 'Executable/compiler'
-        [IO.File]::WriteAllText("$binaryRoot/gglab-shaderc.exe", 'modified')
-        Reject { Assert-VisibilityIdentity $originalBinaries (Get-VisibilityBinaryIdentity Develop) 'Executable/compiler' } `
-            'Executable/compiler inputs changed' 'visibility-rejects-compiler-mutation'
-        $audits = [Collections.Generic.List[string]]::new()
-        $rejectAudit = ''
-        function Invoke-PythonCheck([string]$Script, [string[]]$Arguments, [string]$Receipt) {
-            $audits.Add([IO.Path]::GetFileName($Script))
-            if ($Script.EndsWith($rejectAudit) -and $rejectAudit) { throw 'Invalid captured artifact' }
-        }
-        Test-VisibilityArtifacts $root
-        Check ($audits.Count -eq 3 -and
-            @('ValidateCaptureBundles.py','ValidateResourceExports.py','ValidateRenderGraphExports.py' |
-                Where-Object { $_ -notin $audits }).Count -eq 0) 'visibility-audits-all-required-artifact-contracts'
-        $rejectAudit = 'ValidateResourceExports.py'
-        Reject { Test-VisibilityArtifacts $root } 'Invalid captured artifact' 'visibility-rejects-artifact-audit-failure'
+    $evidence = Invoke-VerificationScript "$PSScriptRoot/TestVerificationEvidence.ps1" @{
+        OutputDirectory=(Join-Path $output 'evidence-producers') }
+    $evidenceResult = $evidence.output | ConvertFrom-Json
+    if ($evidence.exitCode -ne 0 -or -not $evidenceResult.ok) {
+        throw "Evidence producer contracts failed: $($evidence.output) $($evidence.error)"
     }
+    Check $true 'migrated-evidence-producers-preserve-seals-receipts-and-failures'
     $result = @{ ok=$true; checks=$checks; directory=$output }
 } catch { $result = @{ ok=$false; checks=$checks; directory=$output; error=$_.Exception.Message } }
 Write-VerificationJson (Join-Path $output 'result.json') $result

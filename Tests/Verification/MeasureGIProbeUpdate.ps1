@@ -15,13 +15,12 @@ $root=Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Import-Module "$root/Scripts/Verification/VerificationSupport.psm1"
 if (-not $OutputDirectory -and -not $RunDirectory) {$OutputDirectory="$root/Build/Validation/GIProbeCost"}
 $output=New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory -RunId ([Guid]::NewGuid().ToString('N').Substring(0,8))
-function Identity {
-    # A typed array unwraps native-command PSObjects before appending managed strings.
-    [string[]]$names=@(& git -c "safe.directory=$($root.Replace('\','/'))" -C $root ls-files --cached --others --exclude-standard -- Sources Shaders Tests/Verification Scripts/Verification Schemas Projects PropertySheets)
-    if ($LASTEXITCODE -ne 0) {throw 'Source enumeration failed'}
-    $names+=@('Build/Output/x64/Release/GraphicsGadgetLab.exe','Build/Output/x64/Release/gglab-shaderc.exe','Build/Output/x64/Release/dxcompiler.dll','Build/Output/x64/Release/dxil.dll')
-    [Array]::Sort($names,[StringComparer]::Ordinal)
-    return @($names | ForEach-Object { [ordered]@{path=$_;sha256=(Get-FileHash -LiteralPath "$root/$_" -Algorithm SHA256).Hash} })
+function Get-ProbeCostIdentity {
+    Get-VerificationSourceIdentity $root `
+        @('Sources','Shaders','Tests/Verification','Scripts/Verification','Schemas','Projects','PropertySheets') `
+        -AdditionalPaths @('Build/Output/x64/Release/GraphicsGadgetLab.exe','Build/Output/x64/Release/gglab-shaderc.exe',
+            'Build/Output/x64/Release/dxcompiler.dll','Build/Output/x64/Release/dxil.dll') `
+        -FailureMessage 'Source enumeration failed'
 }
 function Inputs([string]$Session,[string]$Run,[hashtable]$Values) {
     $changes=@(foreach ($key in $Values.Keys) {
@@ -33,7 +32,7 @@ function Inputs([string]$Session,[string]$Run,[hashtable]$Values) {
 }
 $cases=@()
 try {
-    $identity=Identity
+    $identity=Get-ProbeCostIdentity
     Write-VerificationJson "$output/identity.json" $identity
     foreach ($backend in $Rhi) {
         $directory="$output/$backend"
@@ -97,8 +96,8 @@ try {
             }
         }
     }
-    & $Python "$PSScriptRoot/ValidateGIProbeCost.py" $output
-    if ($LASTEXITCODE -ne 0) {throw 'Timing qualification failed'}
+    Invoke-VerificationPython -Python $Python -Script "$PSScriptRoot/ValidateGIProbeCost.py" `
+        -Arguments @($output) -FailureMessage 'Timing qualification failed'
     foreach ($validator in @('ValidateCaptureBundles.py','ValidateParameterFrames.py','ValidateGpuTiming.py')) {
         $arguments=@($output)
         if ($validator -eq 'ValidateParameterFrames.py') {
@@ -107,20 +106,13 @@ try {
                 ForEach-Object {$_.FullName})
             if ($arguments.Count -ne $cases.Count) {throw 'Missing parameter-frame audit inputs'}
         }
-        $previous=$ErrorActionPreference
-        try {
-            $ErrorActionPreference='Continue'
-            $lines=@(& $Python "$root/Scripts/Verification/$validator" @arguments 2>&1)
-            $auditExit=$LASTEXITCODE
-        } finally {
-            $ErrorActionPreference=$previous
-        }
-        [IO.File]::WriteAllLines("$output/$validator.log",[string[]]$lines,[Text.UTF8Encoding]::new($false))
-        if ($auditExit -ne 0) {throw "Timing artifact audit failed: $validator (see $output/$validator.log)"}
+        Invoke-VerificationPython -Python $Python -Script "$root/Scripts/Verification/$validator" `
+            -Arguments $arguments -LogPath "$output/$validator.log" `
+            -FailureMessage "Timing artifact audit failed: $validator (see $output/$validator.log)"
     }
-    $final=Identity
+    $final=Get-ProbeCostIdentity
     Write-VerificationJson "$output/identity-final.json" $final
-    if ((ConvertTo-Json -InputObject @($identity) -Depth 4 -Compress) -cne (ConvertTo-Json -InputObject @($final) -Depth 4 -Compress)) {throw 'Source/product/compiler changed during timing'}
+    Assert-VerificationIdentity $identity $final 'Source/product/compiler changed during timing'
     Write-VerificationJson "$output/result.json" @{status='passed';observations=$cases.Count;productionFieldQualified=$false}
 } catch {
     Write-VerificationJson "$output/result.json" @{status='failed';error=[string]$_}

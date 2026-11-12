@@ -22,36 +22,7 @@ if (-not $OutputDirectory -and -not $RunDirectory) { $OutputDirectory = "$root/B
 $output = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory -RunId ([Guid]::NewGuid().ToString('N').Substring(0,8))
 $previous = $env:GGLAB_GI_VISIBILITY_FIXTURE_ROOT
 $env:GGLAB_GI_VISIBILITY_FIXTURE_ROOT = "$root/Build/Fixtures/GIVisibility"
-function Invoke-PythonCheck([string]$Script, [string[]]$Arguments, [string]$Receipt) {
-    $lines = @(& $Python $Script @Arguments)
-    $code = $LASTEXITCODE
-    Write-VerificationJson $Receipt @{exitCode=$code;output=($lines -join "`n")}
-    if ($code -ne 0) { throw "Visibility verification failed: $Script" }
-}
-function Get-VisibilitySourceIdentity {
-    $names = @(& git -c "safe.directory=$($root.Replace('\','/'))" -C $root ls-files --cached --others --exclude-standard -- Sources Shaders Tests/Verification Scripts/Verification Schemas Projects PropertySheets)
-    if ($LASTEXITCODE -ne 0) { throw 'Source enumeration failed.' }
-    [Array]::Sort($names, [StringComparer]::Ordinal)
-    return @($names | ForEach-Object {
-        [ordered]@{path=$_;sha256=(Get-FileHash -LiteralPath "$root/$_" -Algorithm SHA256).Hash.ToLowerInvariant()}
-    })
-}
-function Get-VisibilityBinaryIdentity([string]$Config) {
-    return @(@('GraphicsGadgetLab.exe','gglab-shaderc.exe','dxcompiler.dll','dxil.dll') | ForEach-Object {
-        [ordered]@{file=$_;sha256=(Get-FileHash -LiteralPath "$root/Build/Output/x64/$Config/$_" -Algorithm SHA256).Hash.ToLowerInvariant()}
-    })
-}
-function Assert-VisibilityIdentity([object[]]$Expected, [object[]]$Actual, [string]$Kind) {
-    if ((ConvertTo-Json -InputObject @($Expected) -Depth 4 -Compress) -cne
-        (ConvertTo-Json -InputObject @($Actual) -Depth 4 -Compress)) {
-        throw "$Kind inputs changed during visibility verification."
-    }
-}
-function Test-VisibilityArtifacts([string]$Directory) {
-    foreach ($validator in @('ValidateCaptureBundles.py','ValidateResourceExports.py','ValidateRenderGraphExports.py')) {
-        Invoke-PythonCheck "$root/Scripts/Verification/$validator" @($Directory) "$Directory/$validator.result.json"
-    }
-}
+$sourcePaths = @('Sources','Shaders','Tests/Verification','Scripts/Verification','Schemas','Projects','PropertySheets')
 function Set-Inputs([string]$Session, [string]$Run, [hashtable]$Values) {
     # Immediate bindings belong to the already active fixture, not a pending
     # RestartSession in the same batch. Activate it before material consumption.
@@ -86,13 +57,13 @@ function Copy-ShaderState([string]$Source, [string]$Target) {
     }
 }
 try {
-    Invoke-PythonCheck "$PSScriptRoot/ValidateGISpecularVisibility.py" @('--generate', $env:GGLAB_GI_VISIBILITY_FIXTURE_ROOT, '--self-test') "$output/oracle-self-test.json"
+    Invoke-VerificationPython $Python "$PSScriptRoot/ValidateGISpecularVisibility.py" @('--generate', $env:GGLAB_GI_VISIBILITY_FIXTURE_ROOT, '--self-test') "$output/oracle-self-test.json" 'Visibility verification failed'
     Copy-Item -LiteralPath "$env:GGLAB_GI_VISIBILITY_FIXTURE_ROOT/manifest.json" -Destination "$output/fixtures.json"
-    $identities = Get-VisibilitySourceIdentity
+    $identities = Get-VerificationSourceIdentity $root $sourcePaths -LowercaseHash
     Write-VerificationJson "$output/source-identity.json" $identities
     foreach ($config in $Configuration) {
         $null = New-Item -ItemType Directory -Path "$output/$config" -Force
-        $binaries = Get-VisibilityBinaryIdentity $config
+        $binaries = Get-VerificationBinaryIdentity $root $config -LowercaseHash
         Write-VerificationJson "$output/$config/binaries.json" $binaries
         $cases = @()
         foreach ($backend in $Rhi) {
@@ -236,15 +207,15 @@ try {
                 Write-VerificationJson "$output/$config/cases.json" @($cases)
             }
         }
-        Test-VisibilityArtifacts "$output/$config"
-        Invoke-PythonCheck "$PSScriptRoot/ValidateGISpecularVisibility.py" @('--root', "$output/$config") "$output/$config/oracle-result.json"
-        $finalBinaries = Get-VisibilityBinaryIdentity $config
+        Assert-VerificationArtifacts $root "$output/$config" $Python 'Visibility verification failed'
+        Invoke-VerificationPython $Python "$PSScriptRoot/ValidateGISpecularVisibility.py" @('--root', "$output/$config") "$output/$config/oracle-result.json" 'Visibility verification failed'
+        $finalBinaries = Get-VerificationBinaryIdentity $root $config -LowercaseHash
         Write-VerificationJson "$output/$config/binaries-final.json" $finalBinaries
-        Assert-VisibilityIdentity $binaries $finalBinaries 'Executable/compiler'
+        Assert-VerificationIdentity $binaries $finalBinaries 'Executable/compiler inputs changed during visibility verification.'
     }
-    $finalIdentities = Get-VisibilitySourceIdentity
+    $finalIdentities = Get-VerificationSourceIdentity $root $sourcePaths -LowercaseHash
     Write-VerificationJson "$output/source-identity-final.json" $finalIdentities
-    Assert-VisibilityIdentity $identities $finalIdentities 'Source'
+    Assert-VerificationIdentity $identities $finalIdentities 'Source inputs changed during visibility verification.'
     Write-VerificationJson "$output/result.json" @{status='passed';configuration=$Configuration;rhi=$Rhi;
         coastal=(-not $SkipCoastal);smoke=[bool]$Smoke;developmentTools=[bool]$WithDevTools;productionS1=$false}
     Write-Output (ConvertTo-Json -InputObject @{ok=$true;directory=$output} -Compress)

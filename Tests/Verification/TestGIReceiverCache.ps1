@@ -36,31 +36,13 @@ if ($Coastal) {
         @{id=$_;fixture=12;depth=1;view=$_;batch=7;tile=0}
     })
 }
-function Get-CacheSourceIdentity {
-    $names = @(& git -C $root ls-files --cached --others --exclude-standard -- Sources Shaders Projects PropertySheets Tests/Verification Scripts/Verification)
-    if ($LASTEXITCODE -ne 0) { throw 'Receiver-cache source enumeration failed.' }
-    [Array]::Sort($names, [StringComparer]::Ordinal)
-    return @($names | ForEach-Object {
-        [ordered]@{path=$_;sha256=(Get-FileHash -LiteralPath "$root/$_" -Algorithm SHA256).Hash}
-    })
-}
-function Get-CacheBinaryIdentity {
-    return @(@('GraphicsGadgetLab.exe','gglab-shaderc.exe','dxcompiler.dll','dxil.dll') | ForEach-Object {
-        [ordered]@{file=$_;sha256=(Get-FileHash "$root/Build/Output/x64/$Configuration/$_").Hash}
-    })
-}
-function Invoke-CachePython([string]$Script, [string[]]$Arguments, [string]$Receipt) {
-    $lines = @(& $Python $Script @Arguments)
-    $code = $LASTEXITCODE
-    Write-VerificationJson $Receipt @{exitCode=$code;output=($lines -join "`n")}
-    if ($code -ne 0) { throw "Receiver-cache validation failed: $Script" }
-}
+$sourcePaths = @('Sources','Shaders','Projects','PropertySheets','Tests/Verification','Scripts/Verification')
 $previousFixtures = $env:GGLAB_GI_VISIBILITY_FIXTURE_ROOT
 $env:GGLAB_GI_VISIBILITY_FIXTURE_ROOT = "$root/Build/Fixtures/GIVisibility"
 try {
-    Invoke-CachePython "$PSScriptRoot/ValidateGISpecularVisibility.py" @('--generate', $env:GGLAB_GI_VISIBILITY_FIXTURE_ROOT) "$output/fixtures.json"
-    $sources = Get-CacheSourceIdentity
-    $binaries = Get-CacheBinaryIdentity
+    Invoke-VerificationPython $Python "$PSScriptRoot/ValidateGISpecularVisibility.py" @('--generate', $env:GGLAB_GI_VISIBILITY_FIXTURE_ROOT) "$output/fixtures.json" 'Receiver-cache validation failed'
+    $sources = Get-VerificationSourceIdentity $root $sourcePaths -FailureMessage 'Receiver-cache source enumeration failed.'
+    $binaries = Get-VerificationBinaryIdentity $root $Configuration
     Write-VerificationJson "$output/source-identity.json" $sources
     Write-VerificationJson "$output/binaries.json" $binaries
     foreach ($backend in $Rhi) {
@@ -150,16 +132,13 @@ try {
     $arguments = @($output)
     if ($BaselineDirectory) { $arguments += @('--baseline', (Resolve-Path $BaselineDirectory).Path) }
     if ($RequireBaselineHistory) { $arguments += '--require-baseline-history' }
-    Invoke-CachePython "$PSScriptRoot/ValidateGIReceiverCache.py" $arguments "$output/arrays.json"
-    foreach ($validator in @('ValidateCaptureBundles.py','ValidateResourceExports.py','ValidateRenderGraphExports.py')) {
-        Invoke-CachePython "$root/Scripts/Verification/$validator" @($output) "$output/$validator.result.json"
-    }
-    if ((ConvertTo-Json -InputObject $sources -Compress) -cne
-        (ConvertTo-Json -InputObject @(Get-CacheSourceIdentity) -Compress) -or
-        (ConvertTo-Json -InputObject $binaries -Compress) -cne
-        (ConvertTo-Json -InputObject @(Get-CacheBinaryIdentity) -Compress)) {
-        throw 'Receiver-cache source or binary identities changed during verification.'
-    }
+    Invoke-VerificationPython $Python "$PSScriptRoot/ValidateGIReceiverCache.py" $arguments "$output/arrays.json" 'Receiver-cache validation failed'
+    Assert-VerificationArtifacts $root $output $Python 'Receiver-cache validation failed'
+    Assert-VerificationIdentity $sources @(Get-VerificationSourceIdentity $root $sourcePaths `
+        -FailureMessage 'Receiver-cache source enumeration failed.') `
+        'Receiver-cache source or binary identities changed during verification.'
+    Assert-VerificationIdentity $binaries @(Get-VerificationBinaryIdentity $root $Configuration) `
+        'Receiver-cache source or binary identities changed during verification.'
     $result = @{ok=$true;directory=$output;baseline=$BaselineDirectory;
         requireBaselineHistory=[bool]$RequireBaselineHistory;receiverQueryWork=$ReceiverQueryWork;
         coastal=[bool]$Coastal;environmentWarnings=$environmentWarnings}
