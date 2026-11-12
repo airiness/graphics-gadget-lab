@@ -1,8 +1,8 @@
 <#
 Hard-reset readiness distribution over trace seeds, with one same-seed repeat.
 
-The default hard reset grows real irradiance mass from its entry update. -RapidHardReset
-selects the experimental rapid hard reset that reweights every refresh update at 0.5.
+The default recipe grows real irradiance mass from its entry update. -FieldRecipe
+rapid-control selects the historical rapid hard reset that reweights at 0.5.
 -SteadyCalibration after-handoff (the default) measures steady change RMS in a second
 calibration run whose refresh ends at its calibrated Ready, as the trace runs' does;
 after-timeout measures it after the calibration run's timeout.
@@ -14,7 +14,7 @@ param(
     [string[]]$CaseId = @('sphere','plane','sealed','thin','sunroom','parallel','camera'),
     [uint32[]]$TraceSeed = @(61052,71052,81052),
     [uint32]$RepeatSeed = 61052,
-    [switch]$RapidHardReset,
+    [string]$FieldRecipe = 'default',
     [ValidateSet('after-timeout','after-handoff')][string]$SteadyCalibration = 'after-handoff',
     [string]$ShaderCacheDirectory,
     [string]$OutputDirectory,
@@ -27,6 +27,10 @@ Set-StrictMode -Version 3.0
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Import-Module "$root/Scripts/Verification/VerificationSupport.psm1"
 Import-Module "$PSScriptRoot/GIFieldReadinessCalibration.psm1"
+Import-Module "$PSScriptRoot/GIFieldExperimentRecipes.psm1"
+$experimentRecipe = Get-GIFieldExperimentRecipe $FieldRecipe -Use readiness
+$rapidHardReset = $experimentRecipe.rapidHardReset
+
 $Configuration = @($Configuration | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
 $Rhi = @($Rhi | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
 $CaseId = @($CaseId | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
@@ -70,7 +74,7 @@ function Get-CameraKey($Camera) {
 }
 function Set-Inputs($Session, $Run, [hashtable]$Values) {
     $changes = @($Values.Keys | Sort-Object | ForEach-Object {
-        $type = if ($_ -in @('fixture','environment','albedo','secondary_albedo','ev100','field_irradiance_width')) { 'enum' }
+        $type = if ($_ -in @('fixture','environment','albedo','secondary_albedo','ev100','field_irradiance_width','field_experiment_recipe')) { 'enum' }
             elseif ($Values[$_] -is [bool]) { 'bool' }
             elseif (Test-GIFieldSigmaInput $_) { 'float' }
             else { 'uint' }
@@ -87,10 +91,11 @@ try {
     $binaries = Get-VerificationBinaryIdentity $root $Configuration[0]
     Write-VerificationJson "$output/source-identity.json" $source
     Write-VerificationJson "$output/binaries.json" $binaries
+    Write-VerificationJson "$output/experiment-recipe.json" $experimentRecipe
     Write-VerificationJson "$output/cases.json" $cases
     Write-VerificationJson "$output/backends.json" $Rhi
     Write-VerificationJson "$output/runs.json" $runs
-    $hardReset = if ($RapidHardReset) { 'rapid' } else { 'progressive' }
+    $hardReset = if ($rapidHardReset) { 'rapid' } else { 'progressive' }
     Write-VerificationJson "$output/recipe.json" @{hardResetIntegration=$hardReset;steadyCalibration=$SteadyCalibration}
     foreach ($backend in $Rhi) {
         $session = 'gi-repeat-'+[Guid]::NewGuid().ToString('N').Substring(0,10)
@@ -121,8 +126,7 @@ try {
                 # uncalibrated minimum.
                 $inputs = Set-Inputs $session $run @{fixture=$case.fixture;environment=0;albedo=0;secondary_albedo=0;
                     ev100=10;field_enabled=$true;field_feedback=$false;field_sampling=$true;field_readiness=$true;
-                    field_progressive_sampling=$false;field_progressive_refresh=$false;
-                    field_rapid_hard_reset=[bool]$RapidHardReset;receiver_diagnostics=$true;
+                    field_experiment_recipe=[int]$experimentRecipe.value;receiver_diagnostics=$true;
                     field_irradiance_width=0;field_update_limit=0;field_readiness_trace=$true;probe_enabled=$true;
                     accumulate=$true;depth=1;batch_samples=64;seed=61051;field_refresh_noise=0.0;field_steady_noise=0.0}
                 Write-VerificationJson "$directory/calibration-effect.json" $inputs

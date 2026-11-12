@@ -32,6 +32,26 @@ REFRESH_SAMPLES = 30
 # Lab inputs for each reason's refresh and steady sigma.
 SIGMA_INPUTS = dict(hardReset=("field_refresh_noise", "field_steady_noise"),
                     lighting=("field_lighting_refresh_noise", "field_lighting_steady_noise"))
+EXPERIMENT_INPUT = "field_experiment_recipe"
+LEGACY_EXPERIMENT_INPUTS = ("field_rapid_hard_reset", "field_progressive_refresh", "field_progressive_sampling")
+
+
+def experiment_inputs(values):
+    """Project live recipes onto the logical inputs used by historical arithmetic oracles.
+
+    Frozen records stay unchanged. Old binaries keep their original flag semantics;
+    a live recipe and retired flags cannot jointly claim an input policy.
+    """
+    if EXPERIMENT_INPUT not in values:
+        return dict(values)
+    value = values[EXPERIMENT_INPUT]
+    require(type(value) is int and 0 <= value < 8, "Invalid GI field experiment recipe")
+    require(not any(key in values for key in LEGACY_EXPERIMENT_INPUTS),
+            "A GI field recipe cannot mix retired experiment inputs")
+    result = dict(values)
+    result.pop(EXPERIMENT_INPUT)
+    result.update(zip(LEGACY_EXPERIMENT_INPUTS, (bool(value & 1), bool(value & 2), bool(value & 4))))
+    return result
 
 
 def require(condition, message):
@@ -75,6 +95,8 @@ def parameter_policy(values, per_reason=True):
     Binaries with a schema 1 profile predate per-reason policy: one flag then selected
     both reasons' integration, and field_rapid_hard_reset did not exist.
     """
+    require(per_reason or EXPERIMENT_INPUT not in values, "A schema 1 binary has no experiment recipe input")
+    values = experiment_inputs(values)
     progressive = values.get("field_progressive_refresh", False)
     require(isinstance(progressive, bool), "Invalid progressive refresh input")
     if not per_reason:
@@ -232,6 +254,17 @@ def self_test():
     rejects(require_policy_matches, legacy, dict(field_progressive_refresh=True))
     rejects(parameter_policy, dict(field_rapid_hard_reset=1))
     rejects(parameter_policy, dict(field_rapid_hard_reset=False), False)
+
+    for value in range(8):
+        old = dict(zip(LEGACY_EXPERIMENT_INPUTS, (bool(value & 1), bool(value & 2), bool(value & 4))))
+        current_inputs = {EXPERIMENT_INPUT: value}
+        check(experiment_inputs(current_inputs) == old and parameter_policy(current_inputs) == parameter_policy(old),
+              "A named recipe preserves its historical sampling and per-reason integration")
+    for value in (-1, 8, True, 1.0, "default"):
+        rejects(experiment_inputs, {EXPERIMENT_INPUT: value})
+    for key in LEGACY_EXPERIMENT_INPUTS:
+        rejects(experiment_inputs, {EXPERIMENT_INPUT: 0, key: False})
+    rejects(parameter_policy, {EXPERIMENT_INPUT: 0}, False)
 
     calibration = dict(generation=4, refreshNoiseEstimate=0.31999, steadyNoiseEstimate=0.05,
                        refreshNoiseSamples=64, steadyNoiseSamples=64, activeBlocks=10, excludedBlocks=0)

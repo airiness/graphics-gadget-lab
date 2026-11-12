@@ -8,7 +8,7 @@ param(
     [string]$Python = 'python',
     [string]$ShaderCacheDirectory,
     [switch]$IntegrationDiagnostics,
-    [switch]$ProgressiveSampling,
+    [ValidateSet('default','progressive-sampling')][string]$FieldRecipe = 'default',
     [string]$HistoricalPoint,
     [string]$HistoricalRoot,
     [int]$TimeoutSeconds = 600
@@ -17,12 +17,15 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Import-Module "$root/Scripts/Verification/VerificationSupport.psm1"
+Import-Module "$PSScriptRoot/GIFieldExperimentRecipes.psm1"
+$experimentRecipe = Get-GIFieldExperimentRecipe $FieldRecipe
+$progressiveSampling = $experimentRecipe.progressiveSampling
 $Configuration = @($Configuration | ForEach-Object { $_ -split ',' })
 $Rhi = @($Rhi | ForEach-Object { $_ -split ',' })
 if ($Configuration.Count -ne 1 -or -not $Rhi.Count -or @($Rhi | Where-Object { $_ -notin @('dx12','vulkan') }).Count) {
     throw 'Probe inspection requires one configuration and explicit valid backends.'
 }
-if ($ProgressiveSampling -and (-not $IntegrationDiagnostics -or $HistoricalPoint -or $HistoricalRoot)) {
+if ($progressiveSampling -and (-not $IntegrationDiagnostics -or $HistoricalPoint -or $HistoricalRoot)) {
     throw 'Progressive sampling inspection requires integration diagnostics and excludes historical Fibonacci replay.'
 }
 if (-not $OutputDirectory -and -not $RunDirectory) { $OutputDirectory = "$root/Build/Validation/GIProbeInspection" }
@@ -38,7 +41,7 @@ function Set-Field($Session, $Run, $Fixture, [bool]$Readiness = $true, [uint32]$
         @{id='gi_reference.field_enabled';type='bool';value=$true},
         @{id='gi_reference.field_sampling';type='bool';value=$true},
         @{id='gi_reference.field_readiness';type='bool';value=$Readiness},
-        @{id='gi_reference.field_progressive_sampling';type='bool';value=[bool]$ProgressiveSampling},
+        @{id='gi_reference.field_experiment_recipe';type='enum';value=[int]$experimentRecipe.value},
         @{id='gi_reference.probe_enabled';type='bool';value=$true},
         @{id='gi_reference.seed';type='uint';value=$Seed}
     )
@@ -54,6 +57,7 @@ try {
     $binaries = Get-VerificationBinaryIdentity $root $Configuration[0]
     Write-VerificationJson "$output/source-identity.json" $source
     Write-VerificationJson "$output/binaries.json" $binaries
+    Write-VerificationJson "$output/experiment-recipe.json" $experimentRecipe
     Write-VerificationJson "$output/backends.json" $Rhi
     foreach ($backend in $Rhi) {
         $session = 'gi-inspect-'+[Guid]::NewGuid().ToString('N').Substring(0,10)
@@ -137,7 +141,7 @@ try {
                         throw 'Integration witness did not publish.'
                     }
                     $integrationCases.Add(@{directory=$directory;backend=$backend;seed=61052;replayUpdate=$replay;
-                        progressiveSampling=[bool]$ProgressiveSampling})
+                        progressiveSampling=[bool]$progressiveSampling})
                 }
             }
         } finally {

@@ -1,5 +1,6 @@
 #include "Application/Lab/Sessions/GIReferenceLabSession.h"
 #include "Application/Lab/Sessions/GIReferenceLabFixture.h"
+#include "Application/Lab/Sessions/GIFieldExperimentRecipe.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIObservationLimits.h"
 #include "Lab/LabParameter.h"
 #include "Application/Content/RuntimeAssetBundle.h"
@@ -54,13 +55,11 @@ namespace gglab
 		const LabParameterId ReceiverDiagnosticsId("gi_reference.receiver_diagnostics");
 		const LabParameterId FieldReadinessId("gi_reference.field_readiness");
 		const LabParameterId FieldFeedbackId("gi_reference.field_feedback");
-		const LabParameterId FieldProgressiveRefreshId("gi_reference.field_progressive_refresh");
-		const LabParameterId FieldProgressiveSamplingId("gi_reference.field_progressive_sampling");
+		const LabParameterId FieldExperimentRecipeId("gi_reference.field_experiment_recipe");
 		const LabParameterId FieldRefreshNoiseId("gi_reference.field_refresh_noise");
 		const LabParameterId FieldSteadyNoiseId("gi_reference.field_steady_noise");
 		const LabParameterId FieldLightingRefreshNoiseId("gi_reference.field_lighting_refresh_noise");
 		const LabParameterId FieldLightingSteadyNoiseId("gi_reference.field_lighting_steady_noise");
-		const LabParameterId FieldRapidHardResetId("gi_reference.field_rapid_hard_reset");
 		const LabParameterId FieldUpdateLimitId("gi_reference.field_update_limit");
 		const LabParameterId FieldReadinessTraceId("gi_reference.field_readiness_trace");
 		const LabParameterId ProbeEnabledId("gi_reference.probe_enabled");
@@ -422,18 +421,16 @@ namespace gglab
 		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldFeedbackId, .m_Name = "Previous-field diffuse feedback",
 			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
 			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = false }));
-		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldProgressiveRefreshId,
-			.m_Name = "Progressive lighting refresh (experimental)",
-			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
-			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = false }));
-		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldRapidHardResetId,
-			.m_Name = "Rapid hard-reset refresh (experimental)",
-			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
-			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = false }));
-		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldProgressiveSamplingId,
-			.m_Name = "Progressive directional sampling (experimental)",
-			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
-			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = false }));
+		LabParameterDesc fieldRecipe{ .m_Id = FieldExperimentRecipeId,
+			.m_Name = "Field experiment recipe", .m_Group = "GI field", .m_Type = LabParameterType::Enum,
+			.m_Impact = LabChangeImpact::RestartSession,
+			.m_DefaultValue = static_cast<int32_t>(GIFieldExperimentRecipe::Default) };
+		for (size_t index = 0; index < GIFieldExperimentRecipeNames.size(); ++index)
+		{
+			fieldRecipe.m_EnumItems.push_back({ static_cast<int32_t>(index),
+				std::string(GIFieldExperimentRecipeNames[index]) });
+		}
+		GGLAB_UNUSED(parameters.Add(std::move(fieldRecipe)));
 		GGLAB_UNUSED(parameters.Add({ .m_Id = FieldSamplingId, .m_Name = "Compose field diffuse irradiance",
 			.m_Group = "GI field", .m_Type = LabParameterType::Bool,
 			.m_Impact = LabChangeImpact::RestartSession, .m_DefaultValue = true }));
@@ -1093,14 +1090,12 @@ namespace gglab
 				GIFieldCreateInfo info{ .m_RayScene = m_RayScene };
 				info.m_EnableReceiverSampling = GetParameters().Get(FieldSamplingId, true);
 				info.m_EnableFeedback = GetParameters().Get(FieldFeedbackId, false);
-				info.m_ProgressiveSampling = GetParameters().Get(FieldProgressiveSamplingId, false);
+				const auto recipe = ResolveGIFieldExperimentRecipe(static_cast<GIFieldExperimentRecipe>(
+					GetParameters().Get(FieldExperimentRecipeId, int32_t(GIFieldExperimentRecipe::Default))));
+				info.m_ProgressiveSampling = recipe.m_ProgressiveSampling;
 				info.m_Readiness.m_Enabled = GetParameters().Get(FieldReadinessId, true);
-				info.m_Readiness.m_HardResetIntegration = GetParameters().Get(FieldRapidHardResetId, false) ?
-					GIFieldRefreshIntegration::Rapid :
-					GIFieldRefreshIntegration::Progressive;
-				info.m_Readiness.m_LightingIntegration = GetParameters().Get(FieldProgressiveRefreshId, false) ?
-					GIFieldRefreshIntegration::Progressive :
-					GIFieldRefreshIntegration::Rapid;
+				info.m_Readiness.m_HardResetIntegration = recipe.m_HardReset;
+				info.m_Readiness.m_LightingIntegration = recipe.m_Lighting;
 				info.m_Readiness.m_HardReset = {
 					.m_RefreshSigma = GetParameters().Get(FieldRefreshNoiseId, 0.0f),
 					.m_SteadySigma = GetParameters().Get(FieldSteadyNoiseId, 0.0f) };

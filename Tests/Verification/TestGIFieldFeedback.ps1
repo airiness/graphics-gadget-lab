@@ -4,9 +4,7 @@ param(
     [string[]]$Configuration = @('Develop'),
     [string[]]$Rhi = @('dx12','vulkan'),
     [string[]]$CaseId = @('plane','sealed','sunroom','unsupported','coverage','black'),
-    [switch]$ProgressiveRefresh,
-    [switch]$ProgressiveSampling,
-    [switch]$RapidFeedbackRefresh,
+    [string]$FieldRecipe = 'default',
     # Where the calibration measures steady change RMS; see GIFieldReadinessCalibration.psm1.
     [ValidateSet('after-timeout','after-handoff')][string]$SteadyCalibration = 'after-handoff',
     [string]$ShaderCacheDirectory,
@@ -21,6 +19,12 @@ Set-StrictMode -Version 3.0
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Import-Module "$root/Scripts/Verification/VerificationSupport.psm1"
 Import-Module "$PSScriptRoot/GIFieldReadinessCalibration.psm1"
+Import-Module "$PSScriptRoot/GIFieldExperimentRecipes.psm1"
+$experimentRecipe = Get-GIFieldExperimentRecipe $FieldRecipe -Use feedback
+$progressiveLighting = $experimentRecipe.progressiveRefresh
+$progressiveSampling = $experimentRecipe.progressiveSampling
+$rapidHardReset = $experimentRecipe.rapidHardReset
+
 $Configuration = @($Configuration | ForEach-Object { $_ -split ',' })
 $Rhi = @($Rhi | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
 $CaseId = @($CaseId | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
@@ -35,17 +39,11 @@ $cases = @(
 if ($Configuration.Count -ne 1 -or $Configuration[0] -notin @('Debug','Develop','Release') -or
     -not $Rhi.Count -or @($Rhi | Where-Object { $_ -notin @('dx12','vulkan') }).Count -or
     -not $CaseId.Count -or @($CaseId | Where-Object { $_ -notin $cases.id }).Count) { throw 'Invalid feedback configuration.' }
-if ($RapidFeedbackRefresh -and (-not $ProgressiveSampling -or $ProgressiveRefresh)) {
-    throw 'Rapid feedback refresh requires progressive sampling and excludes progressive refresh.'
-}
-if ($ProgressiveSampling -and -not ($ProgressiveRefresh -or $RapidFeedbackRefresh)) {
-    throw 'Progressive sampling feedback study requires explicit progressive or rapid feedback refresh.'
-}
 $cases = @($cases | Where-Object { $_.id -in $CaseId })
 foreach ($case in $cases) {
-    if ($ProgressiveRefresh) { $case.progressiveRefresh = $true }
-    if ($ProgressiveSampling) { $case.progressiveSampling = $true }
-    if ($RapidFeedbackRefresh) { $case.rapidFeedbackRefresh = $true }
+    if ($progressiveLighting) { $case.progressiveRefresh = $true }
+    if ($progressiveSampling) { $case.progressiveSampling = $true }
+    if ($rapidHardReset) { $case.rapidFeedbackRefresh = $true }
 }
 if (-not $OutputDirectory -and -not $RunDirectory) { $OutputDirectory = "$root/Build/Validation/GIFieldFeedback" }
 $output = New-VerificationRunDirectory -OutputDirectory $OutputDirectory -RunDirectory $RunDirectory `
@@ -56,7 +54,7 @@ function Source-Identity {
 }
 function Set-Inputs($Session, $Run, [hashtable]$Values) {
     $changes = @($Values.Keys | Sort-Object | ForEach-Object {
-        $type = if ($_ -in @('fixture','environment','albedo','secondary_albedo','ev100','field_irradiance_width')) { 'enum' }
+        $type = if ($_ -in @('fixture','environment','albedo','secondary_albedo','ev100','field_irradiance_width','field_experiment_recipe')) { 'enum' }
             elseif ($Values[$_] -is [bool]) { 'bool' }
             elseif (Test-GIFieldSigmaInput $_) { 'float' }
             else { 'uint' }
@@ -113,6 +111,7 @@ try {
     $binaries = Get-VerificationBinaryIdentity $root $Configuration[0]
     Write-VerificationJson "$output/source-identity.json" $source
     Write-VerificationJson "$output/binaries.json" $binaries
+    Write-VerificationJson "$output/experiment-recipe.json" $experimentRecipe
     Write-VerificationJson "$output/cases.json" $cases
     Write-VerificationJson "$output/backends.json" $Rhi
     Write-GIFieldCalibrationRecipe $output $SteadyCalibration
@@ -141,8 +140,7 @@ try {
                 Write-VerificationJson "$directory/case.json" $case
                 $off = Set-Inputs $session $run @{fixture=$case.fixture;environment=0;albedo=0;secondary_albedo=0;ev100=10;
                     field_enabled=$true;field_feedback=$false;field_sampling=$true;field_readiness=$true;
-                    field_progressive_refresh=[bool]$ProgressiveRefresh;field_progressive_sampling=[bool]$ProgressiveSampling;
-                    field_rapid_hard_reset=[bool]$RapidFeedbackRefresh;receiver_diagnostics=$true;field_irradiance_width=0;
+                    field_experiment_recipe=[int]$experimentRecipe.value;receiver_diagnostics=$true;field_irradiance_width=0;
                     probe_enabled=$true;accumulate=$true;depth=1;seed=61051;field_refresh_noise=0.0;field_steady_noise=0.0}
                 Write-VerificationJson "$directory/off-effect.json" $off
                 Observe $session $run $case "$directory/off" $false 512
@@ -223,8 +221,8 @@ try {
     Assert-VerificationIdentity $binaries (Get-VerificationBinaryIdentity $root $Configuration[0]) `
         'Feedback binaries changed during artifact/oracle validation.' -Depth 2
     Write-VerificationJson "$output/result.json" @{ok=$true;directory=$output;wholeG3Qualified=$false;
-        progressiveRefresh=[bool]$ProgressiveRefresh;progressiveSampling=[bool]$ProgressiveSampling;
-        rapidFeedbackRefresh=[bool]$RapidFeedbackRefresh}
+        progressiveRefresh=[bool]$progressiveLighting;progressiveSampling=[bool]$progressiveSampling;
+        rapidFeedbackRefresh=[bool]$rapidHardReset}
 } catch {
     Write-VerificationJson "$output/result.json" @{ok=$false;directory=$output;error=$_.Exception.Message;wholeG3Qualified=$false}
     throw

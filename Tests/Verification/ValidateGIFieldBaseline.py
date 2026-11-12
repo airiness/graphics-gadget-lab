@@ -84,7 +84,7 @@ def parameters(frame):
     result.update({p["id"].removeprefix("gi_reference."): p["value"]
                    for p in frame["parameters"]["values"]
                    if p["id"].startswith("gi_reference.")})
-    return result
+    return readiness_policy.experiment_inputs(result)
 
 
 def camera_inputs(frame):

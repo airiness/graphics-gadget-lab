@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "parameter": "gi_reference.field_experiment_recipe",
+  "recipes": [
+    {"id": "default", "value": 0, "name": "Default: progressive reset, rapid lighting"},
+    {"id": "rapid-control", "value": 1, "name": "Rapid reset and lighting (control)"},
+    {"id": "progressive-lighting", "value": 2, "name": "Progressive reset and lighting (experimental)"},
+    {"id": "rapid-reset-progressive-lighting", "value": 3, "name": "Rapid reset, progressive lighting (experimental)"},
+    {"id": "progressive-sampling", "value": 4, "name": "Default refresh, progressive directions (experimental)"},
+    {"id": "rapid-control-sampling", "value": 5, "name": "Rapid refresh, progressive directions (experimental)"},
+    {"id": "progressive-lighting-sampling", "value": 6, "name": "Progressive refresh and directions (experimental)"},
+    {"id": "rapid-reset-progressive-lighting-sampling", "value": 7, "name": "Rapid reset, progressive lighting and directions (experimental)"}
+  ]
+}

@@ -125,15 +125,13 @@ Baseline accuracy, chromaticity and temporal RMS are separate verdicts. Optional
 windows without replacing the primary Ready-plus-120 gate. Feedback-on accuracy
 requires a matching sample- and depth-qualified run supplied through
 `TestGIFieldFeedback.ps1 -ReferenceDirectory`; D=1 is insufficient.
-For the opt-in contiguous-sequence experiment, its static runner requires
-`-ProgressiveSampling` with explicit `-ProgressiveRefresh` or `-RapidFeedbackRefresh`.
-The latter is a separately admitted comparison using the existing fast refresh
-until Ready/Unconverged, not progressive history or a new product coefficient.
-It records the selected policies, reconstructs F1 hit directions accordingly and
-requires a source/binary-matched fresh F4 reference. Feedback toggles hard-reset the
-field, so `-RapidFeedbackRefresh` selects `field_rapid_hard_reset`; the default hard
-reset is already progressive. Without these switches the runner uses the default
-sampling and refresh policy. Feedback-off captures are settled toggle controls, not complete paired
+For the opt-in contiguous-sequence experiment, select
+`-FieldRecipe progressive-lighting-sampling` or `-FieldRecipe rapid-control-sampling`.
+The latter uses rapid hard-reset integration until Ready/Unconverged, while the
+former grows real irradiance history. The runner records the selected policies,
+reconstructs F1 hit directions accordingly and requires a source/binary-matched
+fresh F4 reference. `default` keeps progressive reset, rapid lighting and rotated
+Fibonacci directions. Feedback-off captures are settled toggle controls, not complete paired
 single-bounce baseline qualifications. Static and lighting-response qualification
 remain separate; neither admits combined-policy Final or attribution.
 
@@ -180,7 +178,7 @@ the status once the trace window is full and requires the pose to have held.
 
 The root's `recipe.json` declares the arm: `hardResetIntegration` and
 `steadyCalibration`. The defaults are the progressive hard reset and after-handoff
-calibration; `-RapidHardReset` selects the rapid hard reset. For after-handoff the
+calibration; `-FieldRecipe rapid-control` selects the rapid hard reset. For after-handoff the
 validator checks the second calibration field's inputs, fresh field and replayed
 trace, and reports its handoff. It also reports whether its refresh change measures
 equal the calibration run's. Roots from before per-reason policy declared one
@@ -294,12 +292,12 @@ the hard-reset calibration, holds steady Ready for the pre-event wait and then t
 the case's own step. Under after-handoff a third field repeats this step with the
 measured lighting refresh noise to measure lighting steady noise. The measured run
 adopts both reasons' calibration. The validator checks every calibration field and
-step. Without `-ProgressiveRefresh` it requires each lighting refresh update to
-integrate at the refresh hysteresis. `-RapidHardReset` is a control arm: the hard
-reset that builds the old endpoint integrates at the refresh hysteresis, and every
-case declares it.
+step. `-FieldRecipe` selects an explicit integration/sampling composition from
+[GIFieldExperimentRecipes.json](GIFieldExperimentRecipes.json). The default keeps
+progressive hard-reset integration, rapid lighting refresh and rotated Fibonacci
+directions. `rapid-control` restores rapid hard resets as well.
 
-For engineering attribution, use `-TransientAttribution -Tap gi -Feedback off` with
+For engineering attribution, use `-AttributionMode fixed -Tap gi -Feedback off` with
 small-step recipes. `-TraceSeed 61052,71052,81052` and
 `-PreEventSettleFrames 128,145` expand repeats; waits are minima, not update-phase
 locks. This mode exports paired atlas/ray/query data and cannot request references
@@ -309,29 +307,46 @@ analysis requires a fresh `--output`; raw inputs and failures remain preserved.
 Engineering completion, arithmetic contracts and response quality retain separate
 verdicts. Full F7, G3 and production qualification require their own gates.
 
-`-ProgressiveRefresh` selects the default-off `field_progressive_refresh` experiment
-for lighting refreshes: one fast entry update, followed by real irradiance-history
-growth at steady decay.
-The runner recalibrates noise and checks completed epoch coefficients; distance
-history and thresholds retain their existing rules. It supports seed/wait repeats
-without the historical fixed-filter attribution oracle. Passing this experiment
-does not adopt a production default or complete G3.
-`-ProgressiveSampling` additionally selects default-off `field_progressive_sampling`:
-contiguous 2D Sobol blocks mapped onto the sphere with fixed per-probe/seed rotations.
-It requires explicit progressive refresh and one selected feedback arm, except for
-the separately selected `-RapidFeedbackRefresh -Feedback on -Tap gi` comparison.
-Rapid feedback refresh excludes `-ProgressiveRefresh` and still requires explicit
-progressive sampling; unmarked sampling-without-refresh combinations reject.
-Both feedback-on studies admit GI-only response without either attribution mode;
-combined-policy Final remains excluded. The rapid-study metadata marker is not a
-new Lab parameter or GPU ABI. Actual refresh coefficients and submitted seed/wait
-inputs are checked. Existing coefficients, ray budget, response/reference gates
-and independent reference sampling stay unchanged.
-The sample index follows submitted global updates (modulo 2^32 rays), never a
-lighting epoch or CPU-completion snapshot. Sampling-policy mismatches reject joins.
-This is an experimental sequence, not production adoption or a variance certificate.
+Live Lab input `gi_reference.field_experiment_recipe` replaces the three switches
+`field_rapid_hard_reset`, `field_progressive_refresh` and `field_progressive_sampling`.
+All eight former combinations remain available; the default and numerical policies
+are unchanged. The replaced Lab IDs and runner switches reject rather than aliasing
+another recipe. Existing saved assignments must migrate to the enum.
 
-Pair progressive refresh with `-ProgressiveAttribution` for the bounded eight-payload engineering
+| `-FieldRecipe` | Enum | Hard reset / lighting refresh | Progressive directions |
+| --- | --- | --- | --- |
+| `default` | 0 | progressive / rapid | off |
+| `rapid-control` | 1 | rapid / rapid | off |
+| `progressive-lighting` | 2 | progressive / progressive | off |
+| `rapid-reset-progressive-lighting` | 3 | rapid / progressive | off |
+| `progressive-sampling` | 4 | progressive / rapid | on |
+| `rapid-control-sampling` | 5 | rapid / rapid | on |
+| `progressive-lighting-sampling` | 6 | progressive / progressive | on |
+| `rapid-reset-progressive-lighting-sampling` | 7 | rapid / progressive | on |
+
+For assignments from the replaced per-reason interface, the enum is
+`rapid_hard_reset + 2 * progressive_refresh + 4 * progressive_sampling` using
+0/1 switch values. Older schema-1 profiles retain their own historical interpretation
+in the read-only validators. Raw roots and failed verdicts are preserved.
+
+The light-step runner admits all recipes within its existing study scope.
+Progressive directions require one feedback arm; with rapid lighting they require
+feedback-on. Feedback-on progressive-direction studies remain GI-only, without
+attribution. Seed/wait selection and reference gates retain their existing rules.
+The feedback runner admits `default`, `progressive-lighting`,
+`rapid-control-sampling` and `progressive-lighting-sampling`; readiness repeat admits
+`default` and `rapid-control`; probe integration inspection admits `default` and
+`progressive-sampling` (the latter requires `-IntegrationDiagnostics`).
+
+`-FieldRecipe progressive-lighting` selects one fast lighting-entry update followed
+by real history growth at steady decay; `progressive-lighting-sampling` adds the
+Sobol directions. Noise calibration, epoch coefficients, distance policy, ray
+budget and response/reference gates retain their original semantics. A run writes
+`experiment-recipe.json`; existing receipt flags are derived compatibility fields
+for the historical arithmetic oracles. The sample index still follows submitted
+global updates, not a lighting epoch or CPU-completion snapshot.
+
+Pair progressive lighting with `-AttributionMode progressive` for the bounded eight-payload engineering
 exports. This mode derives each Trace/Blend coefficient from the actual GPU epoch
 update, retains arithmetic/response failures, and excludes independent references,
 feedback-on and Final. History/current-sample splits are labeled derived inversions.
@@ -339,6 +354,12 @@ Use `-AttributionStartFrame 1` only with this explicit mode to include pre-event
 rays when matching an earlier GPU sampling phase. The default starts at frame 29;
 all modes stop the continuous export window at 80 and also observe frame 359.
 Frame 0 retains its image slot. Earlier exports do not lock the sampling phase.
+
+`gi-field-experiment-recipes-contracts` tests acquisition admission without launching
+a process. Develop GPU suite `gi-field-experiment-recipes` checks the Lab descriptor,
+all eight applied profiles, atomic rejection of retired inputs, and same-frame
+image/graph/resource publication on both backends. It does not qualify GI quality
+or retire any unresolved comparison.
 
 [CompareGIFieldTransient.py](CompareGIFieldTransient.py) joins an uninstrumented
 progressive case to compatible attribution replays by exact GPU update and trace

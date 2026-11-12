@@ -421,6 +421,7 @@
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CoastalRaySceneLabSession.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\GIReferenceLabSession.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\GIReferenceLabFixture.h" />
+    <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\GIFieldExperimentRecipe.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Validation\CoastalRaySceneOracle.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Validation\GIProbeDepthConformance.h" />
     <ClInclude Include="..\..\Sources\WinAppHost\Application\Lab\Sessions\CoordinateConformanceLabSession.h" />

@@ -12,13 +12,8 @@ param(
     [string[]]$Feedback = @('off','on'),
     [string[]]$Step = @('increase'),
     [switch]$QualifyReferences,
-    [switch]$TransientAttribution,
-    [switch]$ProgressiveRefresh,
-    [switch]$ProgressiveSampling,
-    [switch]$RapidFeedbackRefresh,
-    # Control arm: the old endpoint's hard reset integrates at the refresh hysteresis.
-    [switch]$RapidHardReset,
-    [switch]$ProgressiveAttribution,
+    [string]$FieldRecipe = 'default',
+    [ValidateSet('none','fixed','progressive')][string]$AttributionMode = 'none',
     # Where each reason's steady change RMS is calibrated; see GIFieldReadinessCalibration.psm1.
     [ValidateSet('after-timeout','after-handoff')][string]$SteadyCalibration = 'after-handoff',
     [ValidateRange(1,29)][int]$AttributionStartFrame = 29,
@@ -40,6 +35,15 @@ Set-StrictMode -Version 3.0
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Import-Module "$root/Scripts/Verification/VerificationSupport.psm1"
 Import-Module "$PSScriptRoot/GIFieldReadinessCalibration.psm1"
+Import-Module "$PSScriptRoot/GIFieldExperimentRecipes.psm1"
+$experimentRecipe = Get-GIFieldExperimentRecipe $FieldRecipe -Use light-step
+$progressiveLighting = $experimentRecipe.progressiveRefresh
+$progressiveSampling = $experimentRecipe.progressiveSampling
+$rapidHardReset = $experimentRecipe.rapidHardReset
+$samplingWithRapidLighting = $progressiveSampling -and -not $progressiveLighting
+$fixedAttribution = $AttributionMode -eq 'fixed'
+$progressiveAttribution = $AttributionMode -eq 'progressive'
+
 $Configuration = @($Configuration | ForEach-Object { $_ -split ',' })
 $Rhi = @($Rhi | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
 $Tap = @($Tap | ForEach-Object { $_ -split ',' } | Select-Object -Unique)
@@ -67,26 +71,23 @@ if ($Configuration.Count -ne 1 -or $Configuration[0] -notin @('Debug','Develop',
     throw 'Invalid light-step configuration.'
 }
 if ($QualifyReferences -and 'gi' -notin $Tap) { throw 'Independent reference qualification requires a GI-only arm.' }
-if ($RapidFeedbackRefresh -and (-not $ProgressiveSampling -or $ProgressiveRefresh -or
-    $Feedback.Count -ne 1 -or $Feedback[0] -cne 'on')) {
-    throw 'Rapid feedback refresh requires progressive sampling, feedback-on only and no progressive refresh.'
+if ($progressiveSampling -and $Feedback.Count -ne 1) {
+    throw 'Progressive-direction recipes require one selected feedback arm.'
 }
-if ($ProgressiveSampling -and ((-not $ProgressiveRefresh -and -not $RapidFeedbackRefresh) -or $Feedback.Count -ne 1)) {
-    throw 'Progressive sampling requires explicit progressive or rapid feedback refresh and one selected feedback arm.'
+if ($samplingWithRapidLighting -and $Feedback[0] -cne 'on') {
+    throw 'Progressive directions with rapid lighting require the feedback-on study.'
 }
-if ($ProgressiveSampling -and $Feedback[0] -ceq 'on' -and
-    ($Tap.Count -ne 1 -or $Tap[0] -cne 'gi' -or $TransientAttribution -or $ProgressiveAttribution)) {
-    throw 'Progressive sampling feedback-on requires GI-only response without attribution.'
+if ($progressiveSampling -and $Feedback[0] -ceq 'on' -and
+    ($Tap.Count -ne 1 -or $Tap[0] -cne 'gi' -or $AttributionMode -ne 'none')) {
+    throw 'Progressive-direction feedback-on studies require GI-only response without attribution.'
 }
-$attribution = $TransientAttribution -or $ProgressiveAttribution
-if ($AttributionStartFrame -ne 29 -and -not $ProgressiveAttribution) {
-    throw 'Earlier attribution exports require explicit ProgressiveAttribution mode.'
+$attribution = $fixedAttribution -or $progressiveAttribution
+if ($AttributionStartFrame -ne 29 -and -not $progressiveAttribution) {
+    throw 'Earlier attribution exports require AttributionMode progressive.'
 }
-if ($ProgressiveAttribution -and (-not $ProgressiveRefresh -or $TransientAttribution)) {
-    throw 'Progressive attribution requires ProgressiveRefresh and excludes historical attribution.'
-}
-if ($TransientAttribution) {
-    if ($ProgressiveRefresh) { throw 'The historical attribution oracle requires the unchanged fixed refresh filter.' }
+if (($progressiveAttribution -and -not $progressiveLighting) -or
+    ($fixedAttribution -and $progressiveLighting)) {
+    throw 'Attribution mode must match the recipe lighting integration: fixed for rapid, progressive for progressive.'
 }
 if ($attribution) {
     if ($QualifyReferences -or $Tap.Count -ne 1 -or $Tap[0] -cne 'gi' -or
@@ -99,11 +100,11 @@ if ($attribution) {
         @($PreEventSettleFrames | Select-Object -Unique).Count -ne $PreEventSettleFrames.Count) {
         throw 'Attribution requires small steps, GI-only, feedback-off, distinct trace seeds (not calibration seed 61051), and 128..512 settling frames; no reference qualification.'
     }
-} elseif (-not ($ProgressiveRefresh -or $RapidFeedbackRefresh) -and ($TraceSeed.Count -ne 1 -or $TraceSeed[0] -ne 61052 -or
+} elseif (-not ($progressiveLighting -or $samplingWithRapidLighting) -and ($TraceSeed.Count -ne 1 -or $TraceSeed[0] -ne 61052 -or
           $PreEventSettleFrames.Count -ne 1 -or $PreEventSettleFrames[0] -ne 128)) {
     throw 'Seed/settling variations require explicit transient attribution mode.'
 }
-if (($ProgressiveRefresh -or $RapidFeedbackRefresh) -and (-not $TraceSeed.Count -or -not $PreEventSettleFrames.Count -or
+if (($progressiveLighting -or $samplingWithRapidLighting) -and (-not $TraceSeed.Count -or -not $PreEventSettleFrames.Count -or
     @($TraceSeed | Where-Object { $_ -eq 61051 }).Count -or
     @($PreEventSettleFrames | Where-Object { $_ -lt 128 -or $_ -gt 512 }).Count -or
     @($TraceSeed | Select-Object -Unique).Count -ne $TraceSeed.Count -or
@@ -118,7 +119,7 @@ function Source-Identity {
 }
 function Set-Inputs($Values) {
     $changes = @($Values.Keys | Sort-Object | ForEach-Object {
-        $type = if ($_ -in @('fixture','environment','albedo','secondary_albedo','ev100','sun_step_lux','field_irradiance_width')) { 'enum' }
+        $type = if ($_ -in @('fixture','environment','albedo','secondary_albedo','ev100','sun_step_lux','field_irradiance_width','field_experiment_recipe')) { 'enum' }
             elseif ($Values[$_] -is [bool]) { 'bool' }
             elseif (Test-GIFieldSigmaInput $_) { 'float' }
             else { 'uint' }
@@ -152,6 +153,7 @@ try {
     $binaries = Get-VerificationBinaryIdentity $root $Configuration[0]
     Write-VerificationJson "$output/source-identity.json" $source
     Write-VerificationJson "$output/binaries.json" $binaries
+    Write-VerificationJson "$output/experiment-recipe.json" $experimentRecipe
     Write-GIFieldCalibrationRecipe $output $SteadyCalibration
     if ($QualifyReferences) {
         foreach ($feedbackMode in $Feedback) {
@@ -203,27 +205,27 @@ try {
                 $stepId = $recipe.id
                 foreach ($tapMode in $Tap) {
                     $caseName = "$stepId-$feedbackMode-$tapMode"
-                    if ($attribution -or $ProgressiveRefresh -or $RapidFeedbackRefresh) { $caseName += "-s$($arm.seed)-p$($arm.settle)" }
+                    if ($attribution -or $progressiveLighting -or $samplingWithRapidLighting) { $caseName += "-s$($arm.seed)-p$($arm.settle)" }
                     $directory = "$output/$backend/$caseName"
                     $null = New-Item -ItemType Directory -Path $directory -Force
                     $case = @{backend=$backend;configuration=$Configuration[0];feedback=($feedbackMode -eq 'on');tap=$tapMode;
                         fixture=4;environment=3;view='F4_Floor';frameCount=360;eventFrame=30;
                         step=$stepId;oldLux=$recipe.oldLux;newLux=$recipe.newLux;
                         directory="$backend/$caseName"}
-                    if ($ProgressiveRefresh -or $RapidFeedbackRefresh) {
-                        $case.progressiveRefresh = [bool]$ProgressiveRefresh
+                    if ($progressiveLighting -or $samplingWithRapidLighting) {
+                        $case.progressiveRefresh = [bool]$progressiveLighting
                         $case.traceSeed = $arm.seed
                         $case.preEventSettleFrames = $arm.settle
                     }
-                    if ($ProgressiveSampling) { $case.progressiveSampling = $true }
-                    if ($RapidFeedbackRefresh) { $case.rapidFeedbackRefresh = $true }
-                    if ($RapidHardReset) { $case.rapidHardReset = $true }
-                    if ($TransientAttribution) {
+                    if ($progressiveSampling) { $case.progressiveSampling = $true }
+                    if ($samplingWithRapidLighting) { $case.rapidFeedbackRefresh = $true }
+                    if ($rapidHardReset) { $case.rapidHardReset = $true }
+                    if ($fixedAttribution) {
                         $case.transientAttribution = $true
                         $case.traceSeed = $arm.seed
                         $case.preEventSettleFrames = $arm.settle
                     }
-                    if ($ProgressiveAttribution) {
+                    if ($progressiveAttribution) {
                         $case.progressiveAttribution = $true
                         if ($AttributionStartFrame -ne 29) { $case.attributionStartFrame = $AttributionStartFrame }
                     }
@@ -234,9 +236,7 @@ try {
                     Write-VerificationJson "$directory/inputs.json" (Set-Inputs (@{fixture=4;environment=3;
                         lighting_step_experiment=$true;albedo=0;secondary_albedo=0;ev100=10;field_enabled=$true;
                         field_feedback=$case.feedback;field_sampling=$true;field_readiness=$true;
-                        field_progressive_refresh=[bool]$ProgressiveRefresh;
-                        field_progressive_sampling=[bool]$ProgressiveSampling;
-                        field_rapid_hard_reset=[bool]$RapidHardReset;
+                        field_experiment_recipe=[int]$experimentRecipe.value;
                         receiver_diagnostics=$true;field_irradiance_width=0;probe_enabled=$true;accumulate=$true;
                         seed=61051} + (Get-GIFieldUncalibratedInputs hardReset) + (Get-GIFieldUncalibratedInputs lighting)))
                     $noise = Wait-VerificationCondition -Poll { Get-Status } `
@@ -365,9 +365,9 @@ try {
         observedResponseTargetsPassed=$validation.observedResponseTargetsPassed;engineeringOnly=[bool]$attribution;
         responseQualityQualified=$validation.responseQualityQualified;referenceStatus=$validation.referenceStatus;
         referenceCorrelatedReadinessQualified=$validation.referenceCorrelatedReadinessQualified;
-        wholeG3Qualified=$false;progressiveRefresh=[bool]$ProgressiveRefresh;steadyCalibration=$SteadyCalibration;
-        progressiveSampling=[bool]$ProgressiveSampling;rapidFeedbackRefresh=[bool]$RapidFeedbackRefresh;
-        rapidHardReset=[bool]$RapidHardReset;directory=$output}
+        wholeG3Qualified=$false;progressiveRefresh=[bool]$progressiveLighting;steadyCalibration=$SteadyCalibration;
+        progressiveSampling=[bool]$progressiveSampling;rapidFeedbackRefresh=[bool]$samplingWithRapidLighting;
+        rapidHardReset=[bool]$rapidHardReset;directory=$output}
 } catch { $result = @{ok=$false;status='failed';experimentOnly=$true;responseQualityQualified=$false;
     wholeG3Qualified=$false;directory=$output;error=$_.Exception.Message} }
 Write-VerificationJson "$output/result.json" $result

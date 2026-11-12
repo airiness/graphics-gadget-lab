@@ -58,7 +58,7 @@ function Source-Identity {
 function Set-Inputs([string]$Session, [string]$Run, [hashtable]$Values) {
     $changes = @($Values.Keys | ForEach-Object {
         $value = $Values[$_]
-        $type = if ($_ -in @('fixture','ev100','albedo','environment','field_irradiance_width')) { 'enum' }
+        $type = if ($_ -in @('fixture','ev100','albedo','environment','field_irradiance_width','field_experiment_recipe')) { 'enum' }
             elseif ($value -is [bool]) { 'bool' } elseif ($value -is [single] -or $value -is [double]) { 'float' } else { 'uint' }
         @{id="gi_reference.$_";type=$type;value=$value}
     })
@@ -125,7 +125,7 @@ try {
                     # Every run restarts a new field from identical inputs; only the pose differs.
                     $effect = Set-Inputs $session $run @{fixture=4;ev100=10;albedo=0;samples=64;seed=$seed;
                         field_enabled=$true;field_readiness=($arm -eq 'on');field_feedback=$false;
-                        field_progressive_sampling=$false;field_progressive_refresh=$false;field_sampling=$true;
+                        field_experiment_recipe=0;field_sampling=$true;
                         receiver_diagnostics=$true;probe_enabled=$true;field_irradiance_width=0;
                         field_update_limit=$UpdateLimit;field_refresh_noise=[float]$RefreshNoise;
                         field_steady_noise=[float]$SteadyNoise}
