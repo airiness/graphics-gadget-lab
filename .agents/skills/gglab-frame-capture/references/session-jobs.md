@@ -1,4 +1,4 @@
-# Session capture jobs and artifacts (protocol v4)
+# Session capture jobs and artifacts
 
 Requests/responses carry an unsigned transport correlation `id`; responses carry
 `ok`. Parameter control uses separate

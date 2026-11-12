@@ -4,7 +4,7 @@ Starts, queries, captures from and stops GraphicsGadgetLab control sessions.
 
 .DESCRIPTION
 A session is a GraphicsGadgetLab process started with --session <id>. It serves
-the session control protocol (version 4) on \\.\pipe\gglab-session-<id>: one
+the session control protocol (version 5) on \\.\pipe\gglab-session-<id>: one
 JSON request line per connection, answered by one JSON response line.
 
 Every command prints one JSON object on stdout and exits 0 when the command
@@ -81,10 +81,9 @@ Commands:
            -ReferenceSamples <n> renders every frame as a supersampled reference
            of n jittered samples with Temporal AA inactive and time held;
            -ReferenceTextureLodBias <b> adds b to its material texture LOD.
-           -TemporalAA "name=value,..." evaluates Temporal AA overrides, such as
-           neighborhoodClampExpansion=1 or historyFilter=bilinear, on every frame.
-           -GTAO "name=value,..." evaluates GTAO overrides, such as temporal=true or
-           temporalMaxSamples=16, on every frame. -GpuTiming records
+           -Parameters/-ParametersFile takes a JSON object of Host view assignments,
+           using discovered view.* IDs on every frame without changing Host overrides.
+           Reference sequences reject these parameters. -GpuTiming records
            per-scope GPU times of the sequence frames.
   sequence-cancel
            Cancel the active sequence.
@@ -209,8 +208,8 @@ param(
     [ValidateRange(0, 4096)]
     [int]$ReferenceSamples = 0,
     [double]$ReferenceTextureLodBias = 0,
-    [string]$TemporalAA,
-    [string]$GTAO,
+    [string]$Parameters,
+    [string]$ParametersFile,
     [switch]$GpuTiming,
 
     [int]$TimeoutSeconds = 300
@@ -219,7 +218,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 3.0
 
-$ProtocolVersion = 4
+$ProtocolVersion = 5
 # Commands the session checks against expectedRunIdentity; status and parameters report the run.
 $RunCheckedCommands = @('set', 'parameter-result', 'capture', 'graph', 'export', 'watch', 'result',
     'capture-cancel', 'sequence', 'sequence-cancel', 'select-gi-probe', 'stop')
@@ -474,27 +473,6 @@ function ConvertTo-FrameList([string]$Text) {
         }
     }
     return ,$frames
-}
-
-function ConvertTo-SettingOverrides([string]$Text, [string]$Owner) {
-    $overrides = @{}
-    foreach ($part in @($Text -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })) {
-        if ($part -notmatch '^([A-Za-z]+)=([-+.0-9A-Za-z]+)$') {
-            Fail "$Owner override '$part' is not name=value."
-        }
-        $number = 0.0
-        if ($Matches[2] -eq 'true' -or $Matches[2] -eq 'false') {
-            $overrides[$Matches[1]] = $Matches[2] -eq 'true'
-        }
-        elseif ([double]::TryParse($Matches[2], [Globalization.NumberStyles]::Float,
-                [Globalization.CultureInfo]::InvariantCulture, [ref]$number)) {
-            $overrides[$Matches[1]] = $number
-        }
-        else {
-            $overrides[$Matches[1]] = $Matches[2]
-        }
-    }
-    return $overrides
 }
 
 function Read-JsonArray([string]$Text, [string]$File, [string]$Name) {
@@ -858,8 +836,7 @@ switch ($Command) {
         if ($Events -or $EventsFile) { $request['events'] = (Read-JsonArray $Events $EventsFile 'Events') }
         if ($Exports -or $ExportsFile) { $request['exports'] = (Read-JsonArray $Exports $ExportsFile 'Exports') }
         if ($ReferenceTextureLodBias -ne 0) { $request['referenceTextureLodBias'] = $ReferenceTextureLodBias }
-        if ($TemporalAA) { $request['temporalAA'] = (ConvertTo-SettingOverrides $TemporalAA 'Temporal AA') }
-        if ($GTAO) { $request['gtao'] = (ConvertTo-SettingOverrides $GTAO 'GTAO') }
+        if ($Parameters -or $ParametersFile) { $request['parameters'] = (Read-JsonObject $Parameters $ParametersFile 'Parameters') }
         if ($GpuTiming) { $request['gpuTiming'] = $true }
         if ($Label) { $request['label'] = $Label }
         if ($Note) { $request['note'] = $Note }

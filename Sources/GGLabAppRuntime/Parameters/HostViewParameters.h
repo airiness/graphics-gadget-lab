@@ -2,6 +2,7 @@
 #include "Lab/LabParameter.h"
 #include "ApplicationToolingIntegration.h"
 #include "GGLabRuntime/Graphics/ViewRenderSettings.h"
+#include "GGLabRuntime/Graphics/ViewRenderSettingsPatch.h"
 
 #include <cstdint>
 #include <optional>
@@ -12,9 +13,12 @@
 
 namespace gglab
 {
-	struct ViewRenderSettingsPatch;
-	[[nodiscard]] bool HasHostViewParameterPatch(const LabParameterId& id,
-		const ViewRenderSettingsPatch& patch) noexcept;
+	// Frame-local assignments share Host IDs, ranges and integer resolution with events.
+	// Validation touches only the request values, never persistent Host override state.
+	[[nodiscard]] bool ResolveHostViewParameterAssignments(
+		std::span<LabParameterValue> values, std::string& error) noexcept;
+	[[nodiscard]] ViewRenderSettingsPatch MakeHostViewParameterPatch(
+		std::span<const LabParameterValue> values) noexcept;
 	// Defaults are inherited from the active content's resolved display view.
 	[[nodiscard]] LabParameterSet DescribeHostViewParameters(
 		const ResolvedViewRenderSettings& settings) noexcept;

@@ -1,13 +1,12 @@
 #pragma once
 #include "Capture/FrameCaptureCoordinator.h"
 #include "Capture/CaptureWriter.h"
+#include "Lab/LabParameter.h"
 #include "Parameters/ParameterBatch.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabRuntime/Graphics/Pipeline/GIFieldObservation.h"
-#include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
-#include "GGLabRuntime/Graphics/ViewRenderSettingsPatch.h"
 #include "GGLabRuntime/Graphics/PostProcess/PostProcessDebug.h"
 #include "GGLabRuntime/Graphics/Profiling/GpuProfileFrameSnapshot.h"
 #include "GGLabRuntime/Graphics/RenderGraph/RGObservation.h"
@@ -25,38 +24,6 @@
 
 namespace gglab
 {
-	// Display-view Temporal AA settings a sequence evaluates instead of the content's.
-	// Unset fields keep the content's resolved values.
-	using FrameSequenceTemporalAAOverrides = TemporalAASettingsPatch;
-
-	// Returns the settings with every set override applied and resolved to the
-	// settings' valid ranges.
-	[[nodiscard]] TemporalAASettings ApplyFrameSequenceTemporalAAOverrides(
-		const FrameSequenceTemporalAAOverrides& overrides,
-		TemporalAASettings settings) noexcept;
-
-	struct FrameSequenceGTAOOverrides
-	{
-		// True evaluates the same sequence with GTAO accumulated over submitted frames.
-		std::optional<bool> m_TemporalAccumulation;
-		std::optional<uint32_t> m_TemporalMaxSamples;
-		std::optional<uint32_t> m_DirectionCount;
-		std::optional<uint32_t> m_StepCount;
-
-		[[nodiscard]] bool IsEmpty() const noexcept
-		{
-			return !m_TemporalAccumulation && !m_TemporalMaxSamples && !m_DirectionCount &&
-				!m_StepCount;
-		}
-	};
-
-	[[nodiscard]] GTAOSettingsPatch ToGTAOSettingsPatch(
-		const FrameSequenceGTAOOverrides& overrides) noexcept;
-	// Returns the GTAO settings with every set override applied and resolved to the
-	// settings' valid ranges.
-	[[nodiscard]] GTAOSettings ApplyFrameSequenceGTAOOverrides(
-		const FrameSequenceGTAOOverrides& overrides, GTAOSettings settings) noexcept;
-
 	struct FrameSequenceResourceExport
 	{
 		uint32_t m_Frame = 0;
@@ -65,6 +32,7 @@ namespace gglab
 	};
 
 	inline constexpr size_t FrameSequenceMaxParameterEvents = 128;
+	inline constexpr size_t FrameSequenceMaxParameters = 128;
 
 	struct FrameSequenceParameterEvent
 	{
@@ -108,12 +76,10 @@ namespace gglab
 		uint32_t m_ReferenceSamples = 0;
 		// Material texture LOD bias of every reference sample; only valid for a reference.
 		float m_ReferenceTextureLodBias = 0.0f;
-		// Applied to every sequence frame. Frame 0 resets temporal history, so the run
-		// evaluates one configuration from its first frame. Not valid for a reference.
-		FrameSequenceTemporalAAOverrides m_TemporalAAOverrides;
-		// Applied to every sequence frame like the Temporal AA overrides; not valid for a
-		// reference.
-		FrameSequenceGTAOOverrides m_GTAOOverrides;
+		// Validated Host view assignments applied only to sequence frames after Host overrides.
+		// Frame 0 resets history; completion, cancellation and failure leave Host intent intact.
+		// Reference sequences reject these assignments, as they own their sampling settings.
+		std::vector<LabParameterValue> m_Parameters;
 		// Records the GPU timing of sequence frames while the sequence runs.
 		bool m_GpuTiming = false;
 		// AppRuntime enables this for every production sequence; direct contract tests
@@ -257,8 +223,7 @@ namespace gglab
 		uint32_t m_Frame = 0;
 		// Set for every sample of a reference sequence.
 		std::optional<TemporalReferenceSample> m_ReferenceSample;
-		FrameSequenceTemporalAAOverrides m_TemporalAAOverrides;
-		FrameSequenceGTAOOverrides m_GTAOOverrides;
+		std::vector<LabParameterValue> m_Parameters;
 	};
 
 	// Drives one camera-path sequence at a time. Frame 0 starts once every readiness

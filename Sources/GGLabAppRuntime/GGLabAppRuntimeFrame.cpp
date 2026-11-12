@@ -575,8 +575,6 @@ namespace gglab
 		// A running sequence poses the main camera after content updates and capture
 		// views, so the path alone determines this frame's camera.
 		std::optional<TemporalReferenceSample> referenceSample;
-		std::optional<FrameSequenceTemporalAAOverrides> sequenceTemporalAAOverrides;
-		std::optional<FrameSequenceGTAOOverrides> sequenceGTAOOverrides;
 		if (sequencePose)
 		{
 			const std::optional<CameraPathPose> pose = cameraRig.ApplyCameraPathFrame(
@@ -589,8 +587,6 @@ namespace gglab
 				demo->OnCameraPathFrameApplied(*path, sequencePose->m_Frame);
 			}
 			referenceSample = sequencePose->m_ReferenceSample;
-			sequenceTemporalAAOverrides = sequencePose->m_TemporalAAOverrides;
-			sequenceGTAOOverrides = sequencePose->m_GTAOOverrides;
 		}
 		const CameraRig::EffectiveDisplayView effectiveDisplayView =
 			cameraRig.ResolveEffectiveDisplayView();
@@ -625,20 +621,11 @@ namespace gglab
 			framePatch.m_TemporalAA.m_Enabled = false;
 			framePatch.m_Lighting.m_GTAO.m_TemporalAccumulation = false;
 		}
-		else
+		else if (sequencePose && !sequencePose->m_Parameters.empty())
 		{
-			if (sequenceTemporalAAOverrides)
-			{
-				displayViewSettings.m_TemporalAA = ApplyFrameSequenceTemporalAAOverrides(
-					*sequenceTemporalAAOverrides, displayViewSettings.m_TemporalAA);
-				framePatch.m_TemporalAA = *sequenceTemporalAAOverrides;
-			}
-			if (sequenceGTAOOverrides)
-			{
-				displayViewSettings.m_Lighting.m_GTAO = ApplyFrameSequenceGTAOOverrides(
-					*sequenceGTAOOverrides, displayViewSettings.m_Lighting.m_GTAO);
-				framePatch.m_Lighting.m_GTAO = ToGTAOSettingsPatch(*sequenceGTAOOverrides);
-			}
+			framePatch = MakeHostViewParameterPatch(sequencePose->m_Parameters);
+			ApplyViewRenderSettingsPatch(framePatch, displayViewSettings,
+				effectiveViewRenderProfile.m_EnableScenePreExposure);
 		}
 		const uint64_t temporalSessionIdentity = m_ActiveContentIdentity;
 		RenderPipelineBase& renderPipeline = demo->GetRenderPipeline();

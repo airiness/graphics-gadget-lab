@@ -1,4 +1,4 @@
-# Session parameters (protocol v4)
+# Session parameters
 
 Use `parameters` to discover ready active content and each descriptor's supported
 operations. `set` assigns Host or Lab values; `host-view-overrides` sets exact Host

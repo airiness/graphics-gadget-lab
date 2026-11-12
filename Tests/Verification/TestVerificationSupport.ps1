@@ -154,12 +154,12 @@ try {
             }, $true)
             . ([scriptblock]::Create($definition.Extent.Text))
         }
-        $Session = 'client-contract'; $ProtocolVersion = 4; $KeepResult = $false
+        $Session = 'client-contract'; $ProtocolVersion = 5; $KeepResult = $false
         $state = @{ calls=0; timeout=0; fail=$true; status='completed' }
         function Invoke-SessionRequest([string]$Id, [hashtable]$Request, [int]$ResponseTimeoutSeconds) {
             $state.calls++; $state.timeout = $ResponseTimeoutSeconds
             if ($state.fail) { throw 'lost transport response' }
-            return [pscustomobject]@{ protocol=4;ok=$true;jobId=$Request.jobId;status=$state.status
+            return [pscustomobject]@{ protocol=5;ok=$true;jobId=$Request.jobId;status=$state.status
                 consumed=($Request.consume -and $state.status -ne 'pending') }
         }
         $admission = [pscustomobject]@{ok=$true;jobId=17}
@@ -189,13 +189,13 @@ try {
             }, $true)
             . ([scriptblock]::Create($definition.Extent.Text))
         }
-        $Session = 'parameter-contract'; $ProtocolVersion = 4; $KeepResult = $false; $WaitConsumed = $false
+        $Session = 'parameter-contract'; $ProtocolVersion = 5; $KeepResult = $false; $WaitConsumed = $false
         $state = @{ calls=0; fail=$true; terminal=$false; revision=$null; items=@(); consumed=$false }
         function Invoke-SessionRequest([string]$Id, [hashtable]$Request, [int]$ResponseTimeoutSeconds) {
             $state.calls++
             if ($state.fail) { throw 'lost parameter query' }
             $state.consumed = $Request.consume -and $state.terminal
-            return [pscustomobject]@{ protocol=4;ok=$true;batchId=$Request.batchId;consumed=$state.consumed
+            return [pscustomobject]@{ protocol=5;ok=$true;batchId=$Request.batchId;consumed=$state.consumed
                 batch=[pscustomobject]@{ terminal=$state.terminal;revision=$state.revision;items=$state.items } }
         }
         $admission = [pscustomobject]@{ok=$true;batchId=23}
@@ -237,13 +237,13 @@ try {
                     $request = $reader.ReadLine() | ConvertFrom-Json
                     $requests += $request
                     $response = if ($index -eq 0) {
-                        @{ protocol=4; id=$request.id; ok=$true; admission='Accepted'; reason='None'; jobId=1; batchId=1
+                        @{ protocol=5; id=$request.id; ok=$true; admission='Accepted'; reason='None'; jobId=1; batchId=1
                             consumed=$false; batch=@{ batchId=1; terminal=$false; revision=$null; items=@() } }
                     } elseif ($request.PSObject.Properties['expectedRunIdentity']) {
-                        @{ protocol=4; id=$request.id; ok=$false; errorCode='ExpectedRunChanged'
+                        @{ protocol=5; id=$request.id; ok=$false; errorCode='ExpectedRunChanged'
                             runIdentity='ffffffffffffffffffffffffffffffff' }
                     } else {
-                        @{ protocol=4; id=$request.id; ok=$true; jobId=1; batchId=1; status='completed'; consumed=$request.consume
+                        @{ protocol=5; id=$request.id; ok=$true; jobId=1; batchId=1; status='completed'; consumed=$request.consume
                             batch=@{ batchId=1; terminal=$true; revision=9; items=@() } }
                     }
                     $writer = New-Object IO.StreamWriter($pipe, $encoding, 4096, $true)
@@ -499,6 +499,7 @@ $pythonIdentity = if ($Python) { & $Python --version } else { '' }
         'gi-reference-materials' = 'TestGIReferenceMaterials.ps1'
         'coastal-ray-scene' = 'TestCoastalRayScene.ps1'
         'lighting-profiles' = 'TestLightingProfiles.ps1'
+        'sequence-view-parameters' = 'TestSequenceViewParameters.ps1'
         'sequence-parameter-events' = 'TestSequenceParameterEvents.ps1'
         'sequence-deferred-events' = 'TestDeferredSequenceEvents.ps1'
         'lab-sun-parameters' = 'TestLabSunParameters.ps1'

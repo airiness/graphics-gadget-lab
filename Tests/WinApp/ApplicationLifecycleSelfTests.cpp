@@ -170,7 +170,7 @@ namespace gglab
 				return {};
 			}
 			const std::string request = std::format(
-				R"({{"protocol":4,"id":1,"command":"{}"{}}})", command,
+				R"({{"protocol":5,"id":1,"command":"{}"{}}})", command,
 				command == "capture-cancel" || command == "result" ? ",\"jobId\":1" : "") + '\n';
 			DWORD bytes = 0;
 			std::string response;

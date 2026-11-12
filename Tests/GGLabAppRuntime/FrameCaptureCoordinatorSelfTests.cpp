@@ -9,6 +9,7 @@
 #include "Capture/ResourceExportWriter.h"
 #include "Capture/FrameSequenceCoordinator.h"
 #include "Capture/NonFiniteWatchCoordinator.h"
+#include "Parameters/HostViewParameters.h"
 #include "GGLabRuntime/Graphics/CameraPath.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureControlBase.h"
@@ -2685,10 +2686,8 @@ namespace gglab
 				}
 				const std::optional<FrameSequencePoseRequest> pose = m_Sequence.PrepareFrame(m_Capture.GetLastFrameState(), m_Paths);
 				m_LastSample = pose ? pose->m_ReferenceSample : std::nullopt;
-				m_LastTemporalAAOverrides = pose ?
-					std::optional(pose->m_TemporalAAOverrides) :
-					std::nullopt;
-				m_LastGTAOOverrides = pose ? std::optional(pose->m_GTAOOverrides) : std::nullopt;
+				m_LastViewPatch = pose ?
+					std::optional(MakeHostViewParameterPatch(pose->m_Parameters)) : std::nullopt;
 				if (pose)
 				{
 					const std::optional<CameraPathPose> applied = EvaluateCameraPath(m_Paths.front(), pose->m_Frame);
@@ -2786,8 +2785,7 @@ namespace gglab
 			bool m_Deferred = false;
 			bool m_CollectJobs = true;
 			std::optional<TemporalReferenceSample> m_LastSample;
-			std::optional<FrameSequenceTemporalAAOverrides> m_LastTemporalAAOverrides;
-			std::optional<FrameSequenceGTAOOverrides> m_LastGTAOOverrides;
+			std::optional<ViewRenderSettingsPatch> m_LastViewPatch;
 			std::vector<CaptureProductResult> m_Results;
 			std::vector<CaptureJobResult> m_JobResults;
 			std::function<void()> m_BeforeBeginFrame;
@@ -3659,12 +3657,78 @@ namespace gglab
 		{
 			TemporaryDirectory directory("frame-sequence-evaluation");
 			{
+				const std::vector<std::vector<LabParameterValue>> rejected
+				{
+					{ { LabParameterId("gtao.radius"), 1.0f } },
+					{ { LabParameterId("view.taa.enabled"), 1u } },
+					{ { LabParameterId("view.gtao.temporal_max_samples"), 2.5f } },
+					{ { LabParameterId("view.gtao.temporal_max_samples"), -1 } },
+					{ { LabParameterId("view.gtao.temporal_max_samples"), 0u } },
+					{ { LabParameterId("view.taa.history_filter"), 7u } },
+					{ { LabParameterId("view.gtao.radius"), std::numeric_limits<float>::quiet_NaN() } },
+					{ { LabParameterId("view.taa.enabled"), true },
+						{ LabParameterId("view.taa.enabled"), false } },
+				};
+				SequenceHarness harness(directory.GetPath());
+				std::string error;
+				for (const auto& values : rejected)
+				{
+					context.Check(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test",
+						.m_Parameters = values }, error) == 0 && !error.empty() && !harness.m_Sequence.IsActive(),
+						"Invalid sequence assignments reject atomically against the shared Host descriptors");
+				}
+				context.Check(harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test",
+					.m_Parameters = std::vector<LabParameterValue>(FrameSequenceMaxParameters + 1,
+						{ LabParameterId("view.taa.enabled"), true }) }, error) == 0 && !error.empty(),
+					"Sequence assignments have a bounded admission budget");
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				FrameSequenceRequest request{
+					.m_CameraPathId = "SEQ_Test",
+					.m_Parameters = {
+						{ LabParameterId("view.taa.enabled"), true },
+						{ LabParameterId("view.gtao.radius"), 2u },
+						{ LabParameterId("view.gtao.temporal_max_samples"), 8 },
+						{ LabParameterId("view.taa.history_filter"), 0u } },
+				};
+				std::string error;
+				const auto id = harness.m_Sequence.Start(request, error);
+				request.m_Parameters.front().m_Value = false;
+				harness.Frame();
+				harness.Frame();
+				context.Check(id != 0 && harness.m_LastViewPatch &&
+					harness.m_LastViewPatch->m_TemporalAA.m_Enabled == true &&
+					harness.m_LastViewPatch->m_TemporalAA.m_HistoryFilter == TemporalAAHistoryFilter::Bilinear &&
+					harness.m_LastViewPatch->m_Lighting.m_GTAO.m_Radius == 2.0f &&
+					harness.m_LastViewPatch->m_Lighting.m_GTAO.m_TemporalMaxSamples == 8u,
+					"Sequence owns a normalized assignment snapshot with the same integer resolution as events");
+				const auto cancelled = harness.m_Sequence.Cancel();
+				harness.Frame();
+				context.Check(cancelled == FrameSequenceCancelVerdict::Cancelled && !harness.m_LastViewPatch,
+					"Cancellation removes the frame-local sequence assignments");
+			}
+			{
+				SequenceHarness harness(directory.GetPath());
+				std::string error;
+				const auto id = harness.m_Sequence.Start({ .m_CameraPathId = "SEQ_Test",
+					.m_Parameters = { { LabParameterId("view.taa.enabled"), true } } }, error);
+				harness.Frame();
+				harness.Frame();
+				harness.m_Ready = false;
+				harness.Frame();
+				const bool failed = harness.m_Sequence.GetStatus()->m_State == FrameSequenceState::Failed;
+				harness.Frame();
+				context.Check(id != 0 && failed && !harness.m_LastViewPatch,
+					"A readiness failure removes the frame-local sequence assignments on the next frame");
+			}
+			{
 				GTAOSettings content;
 				content.m_Power = 2.0f;
 				content.m_DenoiseRadius = 4;
-				const auto patched = ApplyFrameSequenceGTAOOverrides({
-					.m_TemporalAccumulation = false, .m_TemporalMaxSamples = 0,
-					.m_DirectionCount = 999, .m_StepCount = 0 }, content);
+				const auto patched = ApplyGTAOSettingsPatch({
+					.m_DirectionCount = 999, .m_StepCount = 0,
+					.m_TemporalAccumulation = false, .m_TemporalMaxSamples = 0 }, content);
 				context.Check(!patched.m_TemporalAccumulation && patched.m_TemporalMaxSamples == 1 &&
 					patched.m_DirectionCount == GTAOMaxDirectionCount && patched.m_StepCount == 1 &&
 					patched.m_Power == 2.0f && patched.m_DenoiseRadius == 4 &&
@@ -3675,7 +3739,7 @@ namespace gglab
 				TemporalAASettings content{};
 				content.m_Enabled = true;
 				content.m_DepthAbsoluteThreshold = 0.25f;
-				const TemporalAASettings overridden = ApplyFrameSequenceTemporalAAOverrides({
+				const TemporalAASettings overridden = ApplyTemporalAASettingsPatch({
 					.m_Enabled = false,
 					.m_MaxHistoryFeedback = 0.9f,
 					.m_NeighborhoodClampExpansion = 4.0f,
@@ -3724,7 +3788,7 @@ namespace gglab
 					content.m_HistoryRectification == TemporalAAHistoryRectification::MinMaxClamp &&
 					ResolveTemporalAASettings(invalidFilter).m_HistoryRectification == TemporalAAHistoryRectification::MinMaxClamp &&
 					ResolveTemporalAASettings(invalidFilter).m_VarianceClipGamma == TemporalAADefaultVarianceClipGamma &&
-					ApplyFrameSequenceTemporalAAOverrides({}, content) == ResolveTemporalAASettings(content),
+					ApplyTemporalAASettingsPatch({}, content) == ResolveTemporalAASettings(content),
 					"Sequence Temporal AA overrides replace only set fields and stay within the "
 					"settings ranges");
 			}
@@ -3742,26 +3806,28 @@ namespace gglab
 				const uint64_t reference = harness.m_Sequence.Start({
 					.m_CameraPathId = "SEQ_Test",
 					.m_ReferenceSamples = 2,
-					.m_TemporalAAOverrides = { .m_MaxHistoryFeedback = 0.9f },
+					.m_Parameters = { { LabParameterId("view.taa.max_history_feedback"), 0.9f } },
 					}, referenceError);
 				std::string error;
 				const uint64_t id = harness.m_Sequence.Start({
 					.m_CameraPathId = "SEQ_Test",
-					.m_TemporalAAOverrides = { .m_NeighborhoodClampExpansion = 0.5f },
+					.m_Parameters = { { LabParameterId("view.taa.neighborhood_clamp_expansion"), 0.5f } },
 					}, error);
 				harness.Frame();
 				bool everyFrameOverridden = true;
 				while (harness.m_Sequence.IsActive())
 				{
 					everyFrameOverridden &= harness.Frame().has_value() &&
-						harness.m_LastTemporalAAOverrides &&
-						harness.m_LastTemporalAAOverrides->m_NeighborhoodClampExpansion == 0.5f &&
-						!harness.m_LastTemporalAAOverrides->m_MaxHistoryFeedback;
+						harness.m_LastViewPatch &&
+						harness.m_LastViewPatch->m_TemporalAA.m_NeighborhoodClampExpansion == 0.5f &&
+						!harness.m_LastViewPatch->m_TemporalAA.m_MaxHistoryFeedback;
 				}
 				context.Check(reference == 0 && !referenceError.empty() && id != 0 &&
 					everyFrameOverridden && !harness.m_Sequence.GetStatus()->m_GpuTiming,
 					"Every sequence frame carries the requested Temporal AA overrides; a reference "
 					"rejects them");
+				harness.Frame();
+				context.Check(!harness.m_LastViewPatch, "Completion removes the frame-local sequence assignments");
 			}
 			{
 				SequenceHarness harness(directory.GetPath());
@@ -3769,7 +3835,7 @@ namespace gglab
 				const uint64_t referenceWithOverrides = harness.m_Sequence.Start({
 					.m_CameraPathId = "SEQ_Test",
 					.m_ReferenceSamples = 2,
-					.m_GTAOOverrides = { .m_TemporalAccumulation = true },
+					.m_Parameters = { { LabParameterId("view.gtao.temporal_accumulation"), true } },
 					}, overrideError);
 				std::string tapError;
 				const uint64_t referenceWithOtherTap = harness.m_Sequence.Start({
@@ -3793,7 +3859,9 @@ namespace gglab
 					referenceWithOtherTap == 0 && !tapError.empty() && visibilityReference != 0 &&
 					harness.m_LastSample &&
 					harness.m_LastSample->m_Signal == TemporalReferenceSignal::AmbientOcclusion &&
-					harness.m_LastGTAOOverrides && harness.m_LastGTAOOverrides->IsEmpty(),
+					harness.m_LastViewPatch &&
+					!harness.m_LastViewPatch->m_Lighting.m_GTAO.m_TemporalAccumulation &&
+					!harness.m_LastViewPatch->m_Lighting.m_GTAO.m_TemporalMaxSamples,
 					"A reference averages GTAO visibility for the gtao-final-ao tap, rejects other "
 					"taps and takes no GTAO overrides");
 			}
@@ -3802,22 +3870,23 @@ namespace gglab
 				std::string error;
 				const uint64_t id = harness.m_Sequence.Start({
 					.m_CameraPathId = "SEQ_Test",
-					.m_GTAOOverrides = { .m_TemporalAccumulation = true, .m_TemporalMaxSamples = 8u },
+					.m_Parameters = { { LabParameterId("view.gtao.temporal_accumulation"), true },
+						{ LabParameterId("view.gtao.temporal_max_samples"), 8u } },
 					}, error);
 				harness.Frame();
 				bool everyFrameOverridden = true;
 				while (harness.m_Sequence.IsActive())
 				{
 					everyFrameOverridden &= harness.Frame().has_value() &&
-						harness.m_LastGTAOOverrides &&
-						harness.m_LastGTAOOverrides->m_TemporalAccumulation == true &&
-						harness.m_LastGTAOOverrides->m_TemporalMaxSamples == 8u;
+						harness.m_LastViewPatch &&
+						harness.m_LastViewPatch->m_Lighting.m_GTAO.m_TemporalAccumulation == true &&
+						harness.m_LastViewPatch->m_Lighting.m_GTAO.m_TemporalMaxSamples == 8u;
 				}
-				const GTAOSettings overridden = ApplyFrameSequenceGTAOOverrides(
+				const GTAOSettings overridden = ApplyGTAOSettingsPatch(
 					{ .m_TemporalAccumulation = true, .m_TemporalMaxSamples = 999u }, GTAOSettings{});
 				context.Check(id != 0 && everyFrameOverridden && overridden.m_TemporalAccumulation &&
 					overridden.m_TemporalMaxSamples == GTAOMaxTemporalSamples &&
-					ApplyFrameSequenceGTAOOverrides({}, GTAOSettings{}).m_TemporalMaxSamples == GTAOSettings{}.m_TemporalMaxSamples,
+					ApplyGTAOSettingsPatch({}, GTAOSettings{}).m_TemporalMaxSamples == GTAOSettings{}.m_TemporalMaxSamples,
 					"Every sequence frame carries the requested GTAO overrides, resolved to the "
 					"settings' ranges");
 			}

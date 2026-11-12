@@ -91,6 +91,34 @@ namespace gglab
 			}, lhs);
 	}
 
+	LabValue ResolveLabParameterAssignment(const LabParameterDesc& desc, const LabValue& value) noexcept
+	{
+		if (const auto* number = std::get_if<uint32_t>(&value))
+		{
+			if (desc.m_Type == LabParameterType::Float)
+			{
+				return static_cast<float>(*number);
+			}
+			if ((desc.m_Type == LabParameterType::Int || desc.m_Type == LabParameterType::Enum) &&
+				*number <= INT32_MAX)
+			{
+				return static_cast<int32_t>(*number);
+			}
+		}
+		else if (const auto* signedNumber = std::get_if<int32_t>(&value))
+		{
+			if (desc.m_Type == LabParameterType::Float)
+			{
+				return static_cast<float>(*signedNumber);
+			}
+			if (desc.m_Type == LabParameterType::UInt && *signedNumber >= 0)
+			{
+				return static_cast<uint32_t>(*signedNumber);
+			}
+		}
+		return value;
+	}
+
 	bool LabParameterSet::Add(LabParameterDesc desc) noexcept
 	{
 		if (!desc.m_Id.IsValid() || desc.m_Name.empty() || Find(desc.m_Id) ||

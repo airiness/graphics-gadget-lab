@@ -207,27 +207,6 @@ namespace gglab
 		}
 	}
 
-	GTAOSettingsPatch ToGTAOSettingsPatch(const FrameSequenceGTAOOverrides& overrides) noexcept
-	{
-		return { .m_DirectionCount = overrides.m_DirectionCount,
-			.m_StepCount = overrides.m_StepCount,
-			.m_TemporalAccumulation = overrides.m_TemporalAccumulation,
-			.m_TemporalMaxSamples = overrides.m_TemporalMaxSamples };
-	}
-
-	GTAOSettings ApplyFrameSequenceGTAOOverrides(
-		const FrameSequenceGTAOOverrides& overrides, GTAOSettings settings) noexcept
-	{
-		return ApplyGTAOSettingsPatch(ToGTAOSettingsPatch(overrides), settings);
-	}
-
-	TemporalAASettings ApplyFrameSequenceTemporalAAOverrides(
-		const FrameSequenceTemporalAAOverrides& overrides,
-		TemporalAASettings settings) noexcept
-	{
-		return ApplyTemporalAASettingsPatch(overrides, settings);
-	}
-
 	FrameSequenceTimingSummary SummarizeFrameSequenceTiming(
 		std::span<const double> milliseconds)
 	{
@@ -375,16 +354,18 @@ namespace gglab
 			outError = "A reference texture LOD bias requires reference samples.";
 			return 0;
 		}
-		if (request.m_ReferenceSamples > 0 && !request.m_TemporalAAOverrides.IsEmpty())
+		if (request.m_ReferenceSamples > 0 && !request.m_Parameters.empty())
 		{
-			outError = "A reference renders without Temporal AA, so it takes no Temporal AA "
-				"overrides.";
+			outError = "A reference owns its sampling settings and takes no sequence view parameters.";
 			return 0;
 		}
-		if (request.m_ReferenceSamples > 0 && !request.m_GTAOOverrides.IsEmpty())
+		if (request.m_Parameters.size() > FrameSequenceMaxParameters)
 		{
-			outError = "A reference averages GTAO over its own samples, so it takes no GTAO "
-				"overrides.";
+			outError = "A sequence supports at most 128 Host view parameters.";
+			return 0;
+		}
+		if (!ResolveHostViewParameterAssignments(request.m_Parameters, outError))
+		{
 			return 0;
 		}
 		if (request.m_Events.size() > FrameSequenceMaxParameterEvents ||
@@ -394,14 +375,6 @@ namespace gglab
 			return 0;
 		}
 		std::ranges::sort(request.m_Events, {}, &FrameSequenceParameterEvent::m_Frame);
-		ViewRenderSettingsPatch legacy;
-		legacy.m_TemporalAA = request.m_TemporalAAOverrides;
-		legacy.m_Lighting.m_GTAO = {
-			.m_DirectionCount = request.m_GTAOOverrides.m_DirectionCount,
-			.m_StepCount = request.m_GTAOOverrides.m_StepCount,
-			.m_TemporalAccumulation = request.m_GTAOOverrides.m_TemporalAccumulation,
-			.m_TemporalMaxSamples = request.m_GTAOOverrides.m_TemporalMaxSamples,
-		};
 		size_t eventItems = 0;
 		for (size_t i = 0; i < request.m_Events.size(); ++i)
 		{
@@ -421,9 +394,10 @@ namespace gglab
 			}
 			for (const auto& value : event.m_Values)
 			{
-				if (HasHostViewParameterPatch(value.m_Id, legacy))
+				if (std::ranges::find(request.m_Parameters, value.m_Id,
+					&LabParameterValue::m_Id) != request.m_Parameters.end())
 				{
-					outError = "An event parameter overlaps a legacy sequence override.";
+					outError = "An event parameter overlaps a sequence view parameter.";
 					return 0;
 				}
 			}
@@ -751,8 +725,7 @@ namespace gglab
 						TemporalReferenceSignal::AmbientOcclusion :
 						TemporalReferenceSignal::SceneColor,
 				}),
-			.m_TemporalAAOverrides = m_Request.m_TemporalAAOverrides,
-			.m_GTAOOverrides = m_Request.m_GTAOOverrides,
+			.m_Parameters = m_Request.m_Parameters,
 		};
 	}
 

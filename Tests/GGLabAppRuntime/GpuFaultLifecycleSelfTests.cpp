@@ -3941,9 +3941,9 @@ namespace gglab
 			}
 			FrameSequenceRequest conflict{ .m_CameraPathId = "SEQ_Events",
 				.m_Events = { event(0, LabParameterId("view.taa.enabled"), false) } };
-			conflict.m_TemporalAAOverrides.m_Enabled = true;
+			conflict.m_Parameters = { { LabParameterId("view.taa.enabled"), true } };
 			checks.Check(runtime.StartFrameSequence(conflict, error) == 0,
-				"Legacy overrides cannot silently mask an event on the same field");
+				"Sequence view parameters cannot silently mask an event on the same ID");
 			checks.Check(runtime.StartFrameSequence({ .m_CameraPathId = "SEQ_Events",
 				.m_Events = { event(0, exposure, baseline), event(0, radius, 2.0f) } }, error) == 0,
 				"One sequence frame has one atomic event batch");

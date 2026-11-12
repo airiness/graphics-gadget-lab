@@ -59,8 +59,8 @@ An active-state NoChange starts no publication or readiness allowance.
 The complete plan is descriptor-validated after readiness, before frame 0: a bad
 later event prevents every earlier mutation. Duplicate frames reject; one frame
 has one atomic batch. Limits are 128 events, 128 items/event, 1024 items total,
-and one Deferred lighting item/event. Host assignments overlapping the same legacy
-TAA/GTAO override field reject; unrelated legacy overrides remain usable.
+and one Deferred lighting item/event. An event cannot assign an ID also present
+in the frame-local sequence `parameters`; unrelated IDs remain usable.
 
 Deferred transitions retain every sequence frame. Only this sequence owner's
 applied outstanding receipt matching Runtime's current lighting request generation
@@ -145,28 +145,30 @@ disabling temporal AA/GTAO, averaging jittered HDR samples, then post-processing
 Transparent geometry participates. `-ReferenceTextureLodBias` defaults to 0;
 `-0.5 * log2(n)` selects a subpixel texture footprint for n samples. Compare n
 and 2n for convergence. References accept scene color or `gtao-final-ao`, and
-reject Temporal AA/GTAO overrides and parameter events.
+reject sequence view parameters and parameter events.
 
 Every path frame costs n renders even if only one image is requested. Cancel
 after the needed images only when complete-range evidence is unnecessary;
 cancellation does not produce a completed parameter/timing range. Metadata records
 `sequence.referenceSamples` and reference jitter/sample state.
 
-## Temporal AA and GTAO evaluation
+## Frame-local view parameters
 
-`-TemporalAA 'name=value,...'` and `-GTAO 'name=value,...'` set overrides from frame 0.
-Omitted values inherit content settings. Use the
-[control parser](../../../../Sources/WinAppHost/Application/Control/ApplicationControlProtocol.cpp)
-for names/ranges and saved metadata for effective values:
+`-Parameters`/`-ParametersFile` accept a JSON object of Host `view.*` assignments.
+Use `parameters` to discover IDs, types, ranges and numeric enum choices. Values
+apply only to sequence frames after Host overrides, leaving Host intent unchanged.
+Omitted values inherit the effective view settings.
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File $session sequence -Session atrium `
     -CameraPath SEQ_StaticRailings -CaptureFrames 95 `
-    -TemporalAA 'neighborhoodClampExpansion=1,historyFilter=bilinear' -Label static-clamp
+    -Parameters '{"view.taa.neighborhood_clamp_expansion":1,"view.taa.history_filter":0}' `
+    -Label static-clamp
 ```
 
-For GTAO, `temporal=true,temporalMaxSamples=16` is one useful comparison. Match
-content, camera and frame state between production and reference replays.
+For GTAO, `{"view.gtao.temporal_accumulation":true,"view.gtao.temporal_max_samples":16}`
+is one useful comparison. Match content, camera and frame state between production
+and reference replays.
 
 ## GPU timing and PIX
 

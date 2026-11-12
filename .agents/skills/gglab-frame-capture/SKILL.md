@@ -8,7 +8,7 @@ description: Collect and inspect gglab rendering evidence in the background. Use
 Use hidden capture/session controls from the repository root on Windows with a
 supported GPU. Script options belong to
 [GGLabSession.ps1](../../../Scripts/Verification/GGLabSession.ps1); use the script
-and executable from the same revision (control protocol v4).
+and executable from the same revision.
 
 ## Choose the workflow
 

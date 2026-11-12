@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <format>
 #include <initializer_list>
 #include <type_traits>
 #include <utility>
@@ -230,17 +231,30 @@ namespace gglab
 		return found != bindings.end() ? std::optional(found->m_Read(settings)) : std::nullopt;
 	}
 
-	bool HasHostViewParameterPatch(const LabParameterId& id,
-		const ViewRenderSettingsPatch& patch) noexcept
+	bool ResolveHostViewParameterAssignments(
+		std::span<LabParameterValue> values, std::string& error) noexcept
 	{
-		const auto& bindings = Bindings();
-		const auto found = std::ranges::find_if(bindings,
-			[&](const auto& binding) { return binding.m_Desc.m_Id == id; });
-		return found != bindings.end() && found->m_IsSet(patch);
+		error.clear();
+		if (values.empty())
+		{
+			return true;
+		}
+		auto schema = DescribeHostViewParameters({});
+		for (auto& value : values)
+		{
+			const auto* parameter = schema.Find(value.m_Id);
+			if (!parameter)
+			{
+				error = std::format("Unknown Host view parameter '{}'.", value.m_Id.GetName());
+				return false;
+			}
+			value.m_Value = ResolveLabParameterAssignment(parameter->m_Desc, value.m_Value);
+		}
+		return schema.ApplyBatch(values, error).has_value();
 	}
 
-	void ApplyHostViewParameters(std::span<const LabParameterValue> values,
-		ResolvedViewRenderSettings& settings, bool enablePreExposure) noexcept
+	ViewRenderSettingsPatch MakeHostViewParameterPatch(
+		std::span<const LabParameterValue> values) noexcept
 	{
 		ViewRenderSettingsPatch patch;
 		for (const auto& value : values)
@@ -255,7 +269,13 @@ namespace gglab
 				binding->m_Write(patch, value.m_Value);
 			}
 		}
-		ApplyViewRenderSettingsPatch(patch, settings, enablePreExposure);
+		return patch;
+	}
+
+	void ApplyHostViewParameters(std::span<const LabParameterValue> values,
+		ResolvedViewRenderSettings& settings, bool enablePreExposure) noexcept
+	{
+		ApplyViewRenderSettingsPatch(MakeHostViewParameterPatch(values), settings, enablePreExposure);
 	}
 
 	std::string_view GetHostViewValueSourceName(HostViewValueSource source) noexcept
@@ -297,7 +317,7 @@ namespace gglab
 		std::span<const LabParameterValue> overrides, const HostViewFramePatches& patches)
 	{
 		GGLAB_ASSERT_MSG(!patches.m_Sequence || !patches.m_ForcedReference,
-			"Reference sampling replaces legacy sequence patches in a frame.");
+			"Reference sampling and sequence view parameters are mutually exclusive.");
 		std::vector<HostViewProjectionEntry> result;
 		result.reserve(Bindings().size());
 		for (const auto& binding : Bindings())

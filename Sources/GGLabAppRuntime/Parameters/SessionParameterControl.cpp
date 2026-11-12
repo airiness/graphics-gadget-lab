@@ -321,31 +321,7 @@ namespace gglab
 					domains.emplace_back(domain);
 				}
 			}
-			// Untyped integer assignments resolve against their owning descriptor. Resolve only
-			// integer representations; booleans, arrays and fractional integers stay strict.
-			if (const auto* number = std::get_if<uint32_t>(&value.m_Value))
-			{
-				if (parameter->m_Desc.m_Type == LabParameterType::Float)
-				{
-					value.m_Value = static_cast<float>(*number);
-				}
-				else if ((parameter->m_Desc.m_Type == LabParameterType::Int ||
-					parameter->m_Desc.m_Type == LabParameterType::Enum) && *number <= INT32_MAX)
-				{
-					value.m_Value = static_cast<int32_t>(*number);
-				}
-			}
-			else if (const auto* signedNumber = std::get_if<int32_t>(&value.m_Value))
-			{
-				if (parameter->m_Desc.m_Type == LabParameterType::Float)
-				{
-					value.m_Value = static_cast<float>(*signedNumber);
-				}
-				else if (parameter->m_Desc.m_Type == LabParameterType::UInt && *signedNumber >= 0)
-				{
-					value.m_Value = static_cast<uint32_t>(*signedNumber);
-				}
-			}
+			value.m_Value = ResolveLabParameterAssignment(parameter->m_Desc, value.m_Value);
 		}
 		if (!ValidateParameterBatch(values, error))
 		{

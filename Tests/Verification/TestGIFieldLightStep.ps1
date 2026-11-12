@@ -309,7 +309,7 @@ try {
                     $events = @(@{frame=30;set=@{'gi_reference.sun_step_lux'=$case.newLux};expectEffects=@('lighting')})
                     $sequence = Invoke-VerificationSession sequence $session @{ExpectedRunIdentity=$run;
                         CameraPath='GI_LightStep_F4_Floor';CaptureFrames=$(if ($attribution) { '0' } else { '0,29,359' });
-                        TemporalAA="enabled=$($tapMode -eq 'final')";Events=(ConvertTo-Json -InputObject $events -Depth 8 -Compress);
+                        Parameters=(ConvertTo-Json -Compress @{'view.taa.enabled'=($tapMode -eq 'final')});Events=(ConvertTo-Json -InputObject $events -Depth 8 -Compress);
                         ExportsFile="$directory/exports.json";OutputDirectory="$directory/samples";
                         TimeoutSeconds=$TimeoutSeconds;Label='light-step'}
                     Write-VerificationJson "$directory/sequence.json" $sequence

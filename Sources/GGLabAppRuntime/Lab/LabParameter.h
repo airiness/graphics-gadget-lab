@@ -113,6 +113,10 @@ namespace gglab
 	// Rebuild impact always takes precedence over a descriptor's effect default.
 	[[nodiscard]] ParameterEffectClass GetParameterEffectClass(const LabParameterDesc& desc) noexcept;
 	[[nodiscard]] bool LabValuesEqual(const LabValue& lhs, const LabValue& rhs) noexcept;
+	// Untyped assignments resolve integer representations against the descriptor;
+	// booleans and fractional integers retain their types for strict validation.
+	[[nodiscard]] LabValue ResolveLabParameterAssignment(
+		const LabParameterDesc& desc, const LabValue& value) noexcept;
 
 	struct LabParameterBatchResult
 	{

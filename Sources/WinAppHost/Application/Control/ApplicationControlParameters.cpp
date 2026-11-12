@@ -251,7 +251,7 @@ namespace gglab
 		if (!assignments.is_object() || assignments.empty() ||
 			assignments.size() > ApplicationControlMaxParameterItems)
 		{
-			return "Event 'set' must be an object with 1-128 parameter assignments.";
+			return "Parameter assignments must be an object with 1-128 items.";
 		}
 		Json changes = Json::array();
 		for (const auto& [id, value] : assignments.items())

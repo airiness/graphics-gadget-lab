@@ -1,10 +1,10 @@
 #include "Application/Control/ApplicationControlProtocol.h"
 #include "Capture/CaptureBundle.h"
 #include "Capture/FrameCaptureMetadata.h"
+#include "Parameters/HostViewParameters.h"
 #include "GGLabRuntime/Graphics/Capture/FrameCaptureTypes.h"
 #include "GGLabRuntime/Graphics/LightingProfile.h"
 #include "ShaderArtifactRuntime/NonFiniteCounterABI.h"
-#include "GGLabRuntime/Graphics/Pipeline/GTAOTypes.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalAA.h"
 #include "GGLabRuntime/Graphics/Pipeline/TemporalReference.h"
 
@@ -313,229 +313,6 @@ namespace gglab
 			if (!outDirectory.is_absolute())
 			{
 				return "Field 'outputDirectory' must be an absolute directory.";
-			}
-			return {};
-		}
-
-		// Parses the GTAO overrides of a sequence; returns an error text. Values outside a
-		// setting's range are rejected instead of clamped.
-		[[nodiscard]] std::string ParseGTAOOverrides(
-			const Json& value, FrameSequenceGTAOOverrides& outOverrides)
-		{
-			if (!value.is_object())
-			{
-				return "Field 'gtao' must be an object.";
-			}
-			for (const auto& [key, fieldValue] : value.items())
-			{
-				if (key == "temporal")
-				{
-					if (!fieldValue.is_boolean())
-					{
-						return "GTAO override 'temporal' must be a boolean.";
-					}
-					outOverrides.m_TemporalAccumulation = fieldValue.get<bool>();
-					continue;
-				}
-				struct CountField
-				{
-					std::string_view m_Name;
-					std::optional<uint32_t> FrameSequenceGTAOOverrides::* m_Member;
-					uint32_t m_Max;
-				};
-				constexpr std::array<CountField, 3> countFields
-				{ {
-					{ "temporalMaxSamples", &FrameSequenceGTAOOverrides::m_TemporalMaxSamples, GTAOMaxTemporalSamples },
-					{ "directionCount", &FrameSequenceGTAOOverrides::m_DirectionCount, GTAOMaxDirectionCount },
-					{ "stepCount", &FrameSequenceGTAOOverrides::m_StepCount, GTAOMaxStepCount },
-				} };
-				const auto countField = std::ranges::find(countFields, key, &CountField::m_Name);
-				if (countField != countFields.end())
-				{
-					const double count = fieldValue.is_number() ? fieldValue.get<double>() : 0.0;
-					if (!fieldValue.is_number() || count != std::floor(count) || count < 1.0 ||
-						count > static_cast<double>(countField->m_Max))
-					{
-						return std::format("GTAO override '{}' must be an integer in [1, {}].",
-							countField->m_Name, countField->m_Max);
-					}
-					outOverrides.*(countField->m_Member) = static_cast<uint32_t>(count);
-					continue;
-				}
-				return std::format("Unknown GTAO override '{}'.", key);
-			}
-			return {};
-		}
-
-		// Parses the Temporal AA overrides of a sequence; returns an error text. Values
-		// outside a setting's range are rejected instead of clamped, so a run records
-		// exactly the configuration it was asked to evaluate.
-		[[nodiscard]] std::string ParseTemporalAAOverrides(
-			const Json& value, FrameSequenceTemporalAAOverrides& outOverrides)
-		{
-			if (!value.is_object())
-			{
-				return "Field 'temporalAA' must be an object.";
-			}
-			struct OverrideField
-			{
-				std::string_view m_Name;
-				std::optional<float> FrameSequenceTemporalAAOverrides::* m_Member;
-				float m_Min;
-				float m_Max;
-			};
-			constexpr std::array<OverrideField, 9> fields
-			{ {
-				{ "maxHistoryFeedback", &FrameSequenceTemporalAAOverrides::m_MaxHistoryFeedback, 0.0f, TemporalAAMaxHistoryFeedbackCeiling },
-				{ "depthAbsoluteThreshold", &FrameSequenceTemporalAAOverrides::m_DepthAbsoluteThreshold, 0.0f, TemporalAAMaxDepthThreshold },
-				{ "depthRelativeThreshold", &FrameSequenceTemporalAAOverrides::m_DepthRelativeThreshold, 0.0f, TemporalAAMaxDepthThreshold },
-				{ "velocityWeightScale", &FrameSequenceTemporalAAOverrides::m_VelocityWeightScale, 0.0f, TemporalAAMaxVelocityWeightScale },
-				{ "luminanceWeightScale", &FrameSequenceTemporalAAOverrides::m_LuminanceWeightScale, 0.0f, TemporalAAMaxLuminanceWeightScale },
-				{ "neighborhoodClampExpansion", &FrameSequenceTemporalAAOverrides::m_NeighborhoodClampExpansion, 0.0f, TemporalAAMaxNeighborhoodClampExpansion },
-				{ "textureLodBiasOffset", &FrameSequenceTemporalAAOverrides::m_TextureLodBiasOffset, TemporalAAMinTextureLodBiasOffset, TemporalAAMaxTextureLodBiasOffset },
-				{ "varianceClipGamma", &FrameSequenceTemporalAAOverrides::m_VarianceClipGamma, TemporalAAMinVarianceClipGamma, TemporalAAMaxVarianceClipGamma },
-				{ "historyRelaxation", &FrameSequenceTemporalAAOverrides::m_HistoryRelaxation, 0.0f, TemporalAAMaxHistoryRelaxation },
-			} };
-			for (const auto& [key, fieldValue] : value.items())
-			{
-				if (key == "enabled")
-				{
-					if (!fieldValue.is_boolean())
-					{
-						return "Temporal AA override 'enabled' must be a boolean.";
-					}
-					outOverrides.m_Enabled = fieldValue.get<bool>();
-					continue;
-				}
-				if (key == "historyFilter")
-				{
-					const std::string name =
-						fieldValue.is_string() ? fieldValue.get<std::string>() : "";
-					constexpr std::array filters{ TemporalAAHistoryFilter::Bilinear,
-						TemporalAAHistoryFilter::CatmullRomClamped };
-					const auto filter = std::ranges::find(
-						filters, name, &GetTemporalAAHistoryFilterName);
-					if (filter == filters.end())
-					{
-						return "Temporal AA override 'historyFilter' must be 'bilinear' or "
-							"'catmull-rom-clamped'.";
-					}
-					outOverrides.m_HistoryFilter = *filter;
-					continue;
-				}
-				if (key == "currentFilter")
-				{
-					const std::string name =
-						fieldValue.is_string() ? fieldValue.get<std::string>() : "";
-					constexpr std::array filters{ TemporalAACurrentFilter::Point,
-						TemporalAACurrentFilter::Gaussian };
-					const auto filter = std::ranges::find(
-						filters, name, &GetTemporalAACurrentFilterName);
-					if (filter == filters.end())
-					{
-						return "Temporal AA override 'currentFilter' must be 'point' or "
-							"'gaussian'.";
-					}
-					outOverrides.m_CurrentFilter = *filter;
-					continue;
-				}
-				if (key == "motionSelection")
-				{
-					const std::string name =
-						fieldValue.is_string() ? fieldValue.get<std::string>() : "";
-					constexpr std::array selections{ TemporalAAMotionSelection::Center,
-						TemporalAAMotionSelection::ClosestDepth };
-					const auto selection = std::ranges::find(
-						selections, name, &GetTemporalAAMotionSelectionName);
-					if (selection == selections.end())
-					{
-						return "Temporal AA override 'motionSelection' must be 'center' or "
-							"'closest-depth'.";
-					}
-					outOverrides.m_MotionSelection = *selection;
-					continue;
-				}
-				if (key == "postTemporalView")
-				{
-					const std::string name =
-						fieldValue.is_string() ? fieldValue.get<std::string>() : "";
-					constexpr std::array views{ TemporalAAPostTemporalView::Jittered,
-						TemporalAAPostTemporalView::Unjittered };
-					const auto view =
-						std::ranges::find(views, name, &GetTemporalAAPostTemporalViewName);
-					if (view == views.end())
-					{
-						return "Temporal AA override 'postTemporalView' must be 'jittered' or "
-							"'unjittered'.";
-					}
-					outOverrides.m_PostTemporalView = *view;
-					continue;
-				}
-				if (key == "historyAccumulation")
-				{
-					const std::string name =
-						fieldValue.is_string() ? fieldValue.get<std::string>() : "";
-					constexpr std::array accumulations{
-						TemporalAAHistoryAccumulation::CompatibilityAge,
-						TemporalAAHistoryAccumulation::EffectiveSamples };
-					const auto accumulation = std::ranges::find(
-						accumulations, name, &GetTemporalAAHistoryAccumulationName);
-					if (accumulation == accumulations.end())
-					{
-						return "Temporal AA override 'historyAccumulation' must be "
-							"'compatibility-age' or 'effective-samples'.";
-					}
-					outOverrides.m_HistoryAccumulation = *accumulation;
-					continue;
-				}
-				if (key == "historyRectification")
-				{
-					const std::string name =
-						fieldValue.is_string() ? fieldValue.get<std::string>() : "";
-					constexpr std::array rectifications{
-						TemporalAAHistoryRectification::MinMaxClamp,
-						TemporalAAHistoryRectification::VarianceClip,
-						TemporalAAHistoryRectification::BoundedVarianceClip };
-					const auto rectification = std::ranges::find(
-						rectifications, name, &GetTemporalAAHistoryRectificationName);
-					if (rectification == rectifications.end())
-					{
-						return "Temporal AA override 'historyRectification' must be "
-							"'minmax-clamp', 'variance-clip' or 'bounded-variance-clip'.";
-					}
-					outOverrides.m_HistoryRectification = *rectification;
-					continue;
-				}
-				if (key == "resolutionPreset")
-				{
-					const std::string name =
-						fieldValue.is_string() ? fieldValue.get<std::string>() : "";
-					constexpr std::array presets{ TemporalAAResolutionPreset::Native,
-						TemporalAAResolutionPreset::Quality };
-					const auto preset =
-						std::ranges::find(presets, name, &GetTemporalAAResolutionPresetName);
-					if (preset == presets.end())
-					{
-						return "Temporal AA override 'resolutionPreset' must be 'native' or "
-							"'quality'.";
-					}
-					outOverrides.m_ResolutionPreset = *preset;
-					continue;
-				}
-				const auto field = std::ranges::find(fields, key, &OverrideField::m_Name);
-				if (field == fields.end())
-				{
-					return std::format("Unknown Temporal AA override '{}'.", key);
-				}
-				const double number = fieldValue.is_number() ? fieldValue.get<double>() : 0.0;
-				if (!fieldValue.is_number() || !std::isfinite(number) ||
-					number < static_cast<double>(field->m_Min) ||
-					number > static_cast<double>(field->m_Max))
-				{
-					return std::format("Temporal AA override '{}' must be a number from {} to {}.",
-						key, field->m_Min, field->m_Max);
-				}
-				outOverrides.*(field->m_Member) = static_cast<float>(number);
 			}
 			return {};
 		}
@@ -1006,19 +783,15 @@ namespace gglab
 						return error;
 					}
 				}
-				else if (key == "temporalAA")
+				else if (key == "parameters")
 				{
-					if (std::string error =
-						ParseTemporalAAOverrides(value, sequence.m_TemporalAAOverrides);
+					if (auto error = ParseApplicationControlParameterAssignments(value, sequence.m_Parameters);
 						!error.empty())
 					{
 						return error;
 					}
-				}
-				else if (key == "gtao")
-				{
-					if (std::string error = ParseGTAOOverrides(value, sequence.m_GTAOOverrides);
-						!error.empty())
+					std::string error;
+					if (!ResolveHostViewParameterAssignments(sequence.m_Parameters, error))
 					{
 						return error;
 					}
@@ -2236,6 +2009,12 @@ namespace gglab
 					"valuesRevision", "worldRevision", "environmentRevision" } } } },
 			{ "sequenceCaptureJobs", true },
 			{ "sequenceImmediateEvents", true },
+			{ "sequenceViewParameters", {
+				{ "field", "parameters" },
+				{ "maxItems", FrameSequenceMaxParameters },
+				{ "source", "sequence" },
+				{ "persistent", false },
+				{ "referenceSampling", false } } },
 			{ "sequenceDeferredEvents", true },
 			{ "sequenceGIFieldRefresh", true },
 			{ "parameterFrameProvenance", true },

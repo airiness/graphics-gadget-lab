@@ -105,7 +105,7 @@ try {
                             @{ frame = 179; targets = @(@{ resource = 'DisplayView.SceneColor' }, @{ resource = 'TAA.ResolvedSceneColor' }); graph = $true }
                         ) | ConvertTo-Json -Compress -Depth 8
                         $sequence = Invoke-VerificationSession sequence $sessionId @{ CameraPath = 'SEQ_TemporalAALab_MovingObject';
-                            CaptureFrames = '0,1,179'; TemporalAA = "enabled=true,resolutionPreset=$preset";
+                            CaptureFrames = '0,1,179'; Parameters = (ConvertTo-Json -Compress @{'view.taa.enabled'=$true;'view.taa.resolution_preset'=$(if ($preset -eq 'quality') {1} else {0})});
                             Exports = $exports; OutputDirectory = $armDirectory; Label = "taa-$preset"; TimeoutSeconds = $TimeoutSeconds }
                         Write-VerificationJson -Depth 24 (Join-Path $armDirectory "$preset-sequence.json") $sequence
                         if ($sequence.sequence.state -ne 'completed' -or $sequence.sequence.submittedFrames -ne 180 -or
@@ -130,7 +130,7 @@ try {
                         foreach ($temporalAO in @($true, $false)) {
                             $mode = if ($temporalAO) { 'temporal' } else { 'spatial' }
                             $transition = Invoke-VerificationSession sequence $sessionId @{ CameraPath = 'SEQ_TemporalAALab_LightChange';
-                                CaptureFrames = '179'; TemporalAA = 'enabled=false'; GTAO = "temporal=$($temporalAO.ToString().ToLowerInvariant())";
+                                CaptureFrames = '179'; Parameters = (ConvertTo-Json -Compress @{'view.taa.enabled'=$false;'view.gtao.temporal_accumulation'=$temporalAO});
                                 NoWait = $true; OutputDirectory = (Join-Path $armDirectory 'Transitions'); Label = "taa-off-$mode" }
                             Write-VerificationJson -Depth 24 (Join-Path $armDirectory "taa-off-$mode-sequence.json") $transition
                             $claims = if ($temporalAO) { @('Passed', 'Passed', 'NotApplicable', 'Passed') }

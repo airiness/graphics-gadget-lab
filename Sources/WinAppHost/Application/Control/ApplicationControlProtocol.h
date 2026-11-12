@@ -21,7 +21,7 @@ namespace gglab
 	// Version of the session control protocol: one UTF-8 JSON request line per
 	// connection answered by one JSON response line. Increment it for every
 	// change that renames, removes or reinterprets a field or command.
-	inline constexpr uint32_t ApplicationControlProtocolVersion = 4;
+	inline constexpr uint32_t ApplicationControlProtocolVersion = 5;
 
 	enum class ApplicationControlCommand : uint8_t
 	{

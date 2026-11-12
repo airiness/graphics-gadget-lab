@@ -309,9 +309,12 @@ namespace gglab
 					const auto found = std::ranges::find(projection, LabParameterId(id), &HostViewProjectionEntry::m_Id);
 					return found != projection.end() ? &*found : nullptr;
 				};
-			ViewRenderSettingsPatch sequence;
-			sequence.m_TemporalAA.m_MaxHistoryFeedback = 0.3f;
-			sequence.m_Lighting.m_GTAO.m_StepCount = 3u;
+			const std::array sequenceValues
+			{
+				LabParameterValue{ LabParameterId("view.taa.max_history_feedback"), 0.3f },
+				LabParameterValue{ LabParameterId("view.gtao.step_count"), 3u },
+			};
+			const auto sequence = MakeHostViewParameterPatch(sequenceValues);
 			const auto projection = DescribeHostViewProjection(view, { .m_TemporalAA = true }, overrides,
 				{ .m_Sequence = &sequence });
 			const auto* feedback = find(projection, "view.taa.max_history_feedback");
@@ -335,7 +338,7 @@ namespace gglab
 			context.Check(feedback->m_Source == HostViewValueSource::Sequence &&
 				feedback->m_InheritedSource == HostViewValueSource::Tooling && feedback->m_Override &&
 				steps->m_Source == HostViewValueSource::Sequence && !steps->m_Override,
-				"A legacy sequence patch is attributed after Host overrides, whatever the stored values");
+				"Sequence view parameters are attributed after Host overrides, whatever the stored values");
 
 			ViewRenderSettingsPatch reference;
 			reference.m_TemporalAA.m_Enabled = false;
