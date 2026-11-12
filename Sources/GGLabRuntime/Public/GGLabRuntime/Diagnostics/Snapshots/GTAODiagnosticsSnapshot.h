@@ -45,8 +45,6 @@ namespace gglab
 
 		bool m_Available = false;
 		bool m_OverrideActive = false;
-		bool m_CoreResourcesAllocated = false;
-		bool m_DiagnosticResourcesAllocated = false;
 		bool m_UsesFinalAOFormatFallback = false;
 		bool m_GpuProfilerEnabled = false;
 		bool m_GpuTimingAvailable = false;

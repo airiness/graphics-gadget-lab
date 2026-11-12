@@ -24,8 +24,6 @@ namespace gglab
 					  "Imports and publishes the persistent runtime textures used by the IBL passes.",
 				  .m_Category = RenderPassCategory::IBL,
 				  .m_Type = RenderPassType::Mixed,
-				  .m_EnableGpuMarker = false,
-				  .m_EnableProfiling = false,
 				})
 		{
 		}

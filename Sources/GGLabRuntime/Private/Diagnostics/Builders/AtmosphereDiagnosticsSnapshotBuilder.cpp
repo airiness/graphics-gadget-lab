@@ -17,7 +17,6 @@ namespace gglab
 		const auto* environment = renderer.GetEnvironmentLightingSystemService();
 		if (environment)
 		{
-			snapshot.m_PhysicalSkyRequested = environment->GetRequestedPhysicalSky().has_value();
 			snapshot.m_PhysicalSkyActive = environment->GetActivePhysicalSky().has_value();
 			if (const auto& active = environment->GetActivePhysicalSky())
 			{

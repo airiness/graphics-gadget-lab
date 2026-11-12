@@ -80,11 +80,6 @@ namespace napa::voxel
 		return m_OriginalStateSealed;
 	}
 
-	void VoxelWorld::SealOriginalState() noexcept
-	{
-		m_OriginalStateSealed = true;
-	}
-
 	const VoxelChunk* VoxelWorld::FindChunk(ChunkCoord chunk) const noexcept
 	{
 		const auto iterator = m_Chunks.find(chunk);

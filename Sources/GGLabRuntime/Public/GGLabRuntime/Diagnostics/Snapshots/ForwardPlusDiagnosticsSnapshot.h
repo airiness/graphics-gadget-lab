@@ -25,8 +25,6 @@ namespace gglab
 	{
 		ForwardPlusFrameStatus m_Status = ForwardPlusFrameStatus::NoOpaqueDraws;
 		ForwardPlusTileGrid m_TileGrid{};
-		uint64_t m_ReadbackFrameSerial = 0;
-		uint64_t m_ReadbackGeneration = 0;
 
 		uint32_t m_DirectionalLightCount = 0;
 		uint32_t m_LocalLightCount = 0;

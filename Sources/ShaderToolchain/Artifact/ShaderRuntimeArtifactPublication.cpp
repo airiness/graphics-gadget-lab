@@ -138,7 +138,7 @@ namespace gglab
 			const PublicationTransactionResult transaction = ExecutePublicationTransaction(
 				files,
 				{
-					.m_Commit = PublicationCommit::ExclusiveRename,
+					.m_Commit = PublicationCommit::PlainRename,
 					.m_ContinueWhenPrimaryPresent = true,
 					.m_MaxAttempts = 2,
 					.m_RemoveDestinationsOnFailedObservation = true,
@@ -226,7 +226,7 @@ namespace gglab
 			const PublicationTransactionResult transaction = ExecutePublicationTransaction(
 				files,
 				{
-					.m_Commit = PublicationCommit::ExclusiveRename,
+					.m_Commit = PublicationCommit::PlainRename,
 					.m_MaxAttempts = 2,
 					.m_RemoveDestinationsOnFailedObservation = true,
 					.m_ObservationAttempts = 64,

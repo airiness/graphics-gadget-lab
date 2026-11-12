@@ -32,7 +32,7 @@ namespace
 			static_cast<unsigned>(contract.m_RestoreContractVersion),
 			static_cast<unsigned>(contract.m_IsoValue));
 
-		context.Check(contract.m_CoreApiVersion == 29, "Core API version is 29");
+		context.Check(contract.m_CoreApiVersion == 30, "Core API version is 30");
 		context.Check(
 			contract.m_VoxelHashSchemaVersion == 1,
 			"Voxel hash schema version is 1");

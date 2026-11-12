@@ -367,16 +367,13 @@ namespace gglab
 				ImGui::TextDisabled("No RenderPass usage was registered for this pipeline.");
 				return;
 			}
-			if (ImGui::BeginTable("PipelineRenderPassUsages", 7,
+			if (ImGui::BeginTable("PipelineRenderPassUsages", 4,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable))
 			{
 				ImGui::TableSetupColumn("Stable Type");
 				ImGui::TableSetupColumn("Display Name");
 				ImGui::TableSetupColumn("Category");
 				ImGui::TableSetupColumn("Type");
-				ImGui::TableSetupColumn("DevelopGUI");
-				ImGui::TableSetupColumn("GPU Marker");
-				ImGui::TableSetupColumn("Profiling");
 				ImGui::TableHeadersRow();
 				for (const auto& pass : pipeline.m_RenderPasses)
 				{
@@ -397,12 +394,6 @@ namespace gglab
 					ImGui::TextUnformatted(category.c_str());
 					ImGui::TableSetColumnIndex(3);
 					ImGui::TextUnformatted(type.c_str());
-					ImGui::TableSetColumnIndex(4);
-					ImGui::TextUnformatted(pass.m_ShowInDevelopGui ? "Yes" : "No");
-					ImGui::TableSetColumnIndex(5);
-					ImGui::TextUnformatted(pass.m_EnableGpuMarker ? "On" : "Off");
-					ImGui::TableSetColumnIndex(6);
-					ImGui::TextUnformatted(pass.m_EnableProfiling ? "On" : "Off");
 				}
 				ImGui::EndTable();
 			}

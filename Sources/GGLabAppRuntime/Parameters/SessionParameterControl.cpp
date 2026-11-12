@@ -756,21 +756,6 @@ namespace gglab
 		return result;
 	}
 
-	void SessionParameterControl::FinishParameterBatch(uint64_t id, ParameterBatchOwner owner) noexcept
-	{
-		if (!m_MutatingParameterBatch)
-		{
-			for (auto& batch : m_ParameterBatches)
-			{
-				if (batch->m_Status.m_BatchId == id && batch->m_Owner == owner)
-				{
-					EndParameterBatch(*batch, false, "The owner ended before parameter consumption.");
-					return;
-				}
-			}
-		}
-	}
-
 	void SessionParameterControl::FinishParameterBatches(ParameterBatchOwner owner) noexcept
 	{
 		if (!m_MutatingParameterBatch)

@@ -34,9 +34,5 @@ namespace gglab
 
 		RenderPassCategory m_Category = RenderPassCategory::Unknown;
 		RenderPassType m_Type = RenderPassType::Graphics;
-
-		bool m_ShowInDevelopGui = true;
-		bool m_EnableGpuMarker = true;
-		bool m_EnableProfiling = true;
 	};
 }

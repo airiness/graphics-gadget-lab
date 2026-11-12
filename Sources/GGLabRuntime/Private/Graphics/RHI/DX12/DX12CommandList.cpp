@@ -36,7 +36,6 @@ namespace gglab
 
 	void DX12CommandList::End() noexcept
 	{
-		// TODO: should flush resource barrier here
 		FlushBarriers();
 
 		GGLAB_HR(m_D3D12GraphicsCommandList->Close());
@@ -62,7 +61,6 @@ namespace gglab
 
 	void DX12CommandList::SetPipelineState(const DX12PipelineState& pipelineState) const noexcept
 	{
-		// TODO: for RayTracing change into ID3D12GraphicsCommandList::SetPipelineState1(...).
 		m_D3D12GraphicsCommandList->SetPipelineState(pipelineState.Get());
 	}
 
@@ -144,13 +142,6 @@ namespace gglab
 
 		m_D3D12GraphicsCommandList->OMSetRenderTargets(
 			rtCount, rtHandles.data(), FALSE, dsHandlePtr);
-	}
-
-	void DX12CommandList::SetRenderTarget(const DX12DescriptorView& rtDsescriptor,
-		const DX12DescriptorView& dsDescriptor) const noexcept
-	{
-		DX12DescriptorView rtDescriptors[] = { rtDsescriptor };
-		SetRenderTargets(rtDescriptors, dsDescriptor);
 	}
 
 	void DX12CommandList::SetVertexBuffers(

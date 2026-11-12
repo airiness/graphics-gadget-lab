@@ -44,7 +44,6 @@ namespace napa::voxel
 		[[nodiscard]] std::uint64_t GetWorldVoxelRevision() const noexcept;
 		[[nodiscard]] std::uint64_t GetSurfaceStateRevision() const noexcept;
 		[[nodiscard]] bool IsOriginalStateSealed() const noexcept;
-		void SealOriginalState() noexcept;
 
 		[[nodiscard]] const VoxelChunk* FindChunk(ChunkCoord chunk) const noexcept;
 		[[nodiscard]] ValidationResult EnsureChunkAllocated(ChunkCoord chunk, bool& allocated);

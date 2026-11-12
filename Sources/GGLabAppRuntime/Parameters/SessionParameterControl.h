@@ -77,7 +77,6 @@ namespace gglab
 		// A live source proves coverage for this owner's applied, outstanding effects only.
 		[[nodiscard]] bool CoversReadinessGate(ParameterBatchOwner owner,
 			const FrameCaptureGate& gate) const noexcept;
-		void FinishParameterBatch(uint64_t id, ParameterBatchOwner owner = {}) noexcept;
 		void FinishParameterBatches(ParameterBatchOwner owner) noexcept;
 		// Copies caller-owned intent. The caller verifies the run for guarded requests;
 		// Session rechecks the applicable Host/domain stamp at admission and safe commit.

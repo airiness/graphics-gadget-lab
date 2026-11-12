@@ -22,8 +22,7 @@ namespace gglab
 		void Hold() noexcept;
 
 		// A fixed step makes every Update advance delta and total time by exactly
-		// that many seconds, independent of wall-clock frame pacing. The FPS
-		// estimate keeps measuring wall-clock time.
+		// that many seconds, independent of wall-clock frame pacing.
 		void SetFixedDeltaTime(std::optional<double> seconds) noexcept;
 		[[nodiscard]] std::optional<double> GetFixedDeltaTime() const noexcept
 		{
@@ -32,7 +31,6 @@ namespace gglab
 
 		double GetDeltaTime() const noexcept { return m_DeltaTime; }
 		double GetTotalTime() const noexcept { return m_TotalTime; }
-		double GetFps() const noexcept { return m_Fps; }
 		uint64_t GetFrameCount() const noexcept { return m_FrameCount; }
 
 	private:
@@ -42,10 +40,6 @@ namespace gglab
 		double m_DeltaTime = 0.0;
 		double m_TotalTime = 0.0;
 		std::optional<double> m_FixedDeltaTime;
-
-		double m_Fps = 0.0;
-		double m_FpsTimer = 0.0;
-		uint64_t m_FpsCounter = 0;
 
 		uint64_t m_FrameCount = 0;
 	};

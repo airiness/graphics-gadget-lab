@@ -243,9 +243,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\FreeListSpanAllocator.cpp">
       <Filter>Private\Core\Allocator</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\RingSpanAllocator.cpp">
-      <Filter>Private\Core\Allocator</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Backends\DirectXBoundsBackend.cpp">
       <Filter>Private\Core\Math\Backends</Filter>
     </ClCompile>
@@ -828,9 +825,6 @@
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.cpp">
       <Filter>Private\Graphics\RHI\DX12\Descriptor</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorRingAllocator.cpp">
-      <Filter>Private\Graphics\RHI\DX12\Descriptor</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorTypes.cpp">
       <Filter>Private\Graphics\RHI\DX12\Descriptor</Filter>
     </ClCompile>
@@ -1092,9 +1086,6 @@
       <Filter>Private\Core\Allocator</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\FreeListSpanAllocator.h">
-      <Filter>Private\Core\Allocator</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Core\Allocator\RingSpanAllocator.h">
       <Filter>Private\Core\Allocator</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Core\Math\Backends\DirectXMathInterop.h">
@@ -1611,9 +1602,6 @@
       <Filter>Private\Graphics\RHI\DX12\Descriptor</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorManager.h">
-      <Filter>Private\Graphics\RHI\DX12\Descriptor</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorRingAllocator.h">
       <Filter>Private\Graphics\RHI\DX12\Descriptor</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Sources\GGLabRuntime\Private\Graphics\RHI\DX12\Descriptor\DX12DescriptorTypes.h">

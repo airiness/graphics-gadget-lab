@@ -57,8 +57,6 @@ namespace gglab
 		void SetRenderTargets(std::span<DX12DescriptorView> rtDescriptors) const noexcept;
 		void SetRenderTargets(std::span<DX12DescriptorView> rtDescriptors,
 			const DX12DescriptorView& dsDescriptor) const noexcept;
-		void SetRenderTarget(const DX12DescriptorView& rtDsescriptor,
-			const DX12DescriptorView& dsDescriptor = {}) const noexcept;
 		void SetVertexBuffers(uint32_t startSlot,
 			std::span<D3D12_VERTEX_BUFFER_VIEW> vertexBufferViews) const noexcept;
 		void SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& indexBufferView) const noexcept;

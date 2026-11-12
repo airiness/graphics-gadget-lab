@@ -19,11 +19,9 @@ namespace gglab
 
 	enum class PublicationCommit : uint8_t
 	{
-		// Plain std::filesystem::rename. The name records the original
-		// exclusive-create intent, but the C++ filesystem contract replaces an
-		// existing non-directory destination, so concurrent producers converge
-		// through post-commit observation instead of a create guarantee.
-		ExclusiveRename,
+		// std::filesystem::rename may replace an existing non-directory destination;
+		// concurrent producers converge through post-commit observation.
+		PlainRename,
 		// MoveFileExW with MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH.
 		ReplaceExisting,
 	};
@@ -50,7 +48,7 @@ namespace gglab
 
 	struct PublicationTransactionConfig
 	{
-		PublicationCommit m_Commit = PublicationCommit::ExclusiveRename;
+		PublicationCommit m_Commit = PublicationCommit::PlainRename;
 		// Remove an orphaned primary destination (same path, no commit marker)
 		// and retry its rename exactly once.
 		bool m_RecoverOrphanedPrimary = false;

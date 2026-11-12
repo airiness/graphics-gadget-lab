@@ -40,20 +40,6 @@ float2 Hammersley(uint i, uint N)
 	return float2((float)(i) / (float)(N), RadicalInverseVdC(i));
 }
 
-// Returns a cosine-weighted direction on the positive-Z tangent-space hemisphere.
-float3 CosineSampleHemisphere(float2 Xi)
-{
-	float sinTheta = sqrt(Xi.y);
-	float cosTheta = sqrt(1.0 - Xi.y);
-
-	float phi = TWO_PI * Xi.x;
-	float sinPhi;
-	float cosPhi;
-	sincos(phi, sinPhi, cosPhi);
-
-	return float3(cosPhi * sinTheta, sinPhi * sinTheta, cosTheta);
-}
-
 // Builds an orthonormal basis around normalWS and transforms a tangent-space direction to world space.
 // normalWS is expected to be normalized.
 float3 TangentToWorld(float3 directionTS, float3 normalWS)

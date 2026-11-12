@@ -163,8 +163,6 @@ namespace gglab
 		}
 
 		snapshot.m_GridReadbackAvailable = true;
-		snapshot.m_ReadbackFrameSerial = grid->m_FrameSerial;
-		snapshot.m_ReadbackGeneration = grid->m_RequestGeneration;
 		const ForwardPlusGridMetrics metrics = BuildForwardPlusGridMetrics(
 			grid->m_TileGrid, grid->m_Headers, grid->m_DepthRanges);
 		if (!metrics.m_IsValid)

@@ -31,22 +31,11 @@ namespace gglab
 		m_LastTime = currentTime;
 
 		m_FrameCount++;
-
-		m_FpsTimer += wallDeltaTime;
-		if (m_FpsTimer >= 1.0)
-		{
-			m_Fps = m_FpsCounter / m_FpsTimer;
-
-			m_FpsTimer = 0.0;
-			m_FpsCounter = 0;
-		}
 	}
 
 	void Time::Hold() noexcept
 	{
-		const auto currentTime = std::chrono::high_resolution_clock::now();
-		m_FpsTimer += std::chrono::duration<double>(currentTime - m_LastTime).count();
-		m_LastTime = currentTime;
+		m_LastTime = std::chrono::high_resolution_clock::now();
 		m_DeltaTime = 0.0;
 		m_FrameCount++;
 	}

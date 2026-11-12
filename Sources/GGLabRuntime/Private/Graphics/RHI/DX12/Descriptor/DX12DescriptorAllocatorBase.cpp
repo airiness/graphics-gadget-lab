@@ -99,8 +99,6 @@ namespace gglab
 			(delta % m_IncrementSize) == 0, "GlobalIndexFromGpuHandle: unaligned handle.");
 
 		const uint32_t global = static_cast<uint32_t>(delta / m_IncrementSize);
-		GGLAB_ASSERT_MSG(global >= m_Range.m_Begin && global < m_Range.End(),
-			"GlobalIndexFromGpuHandle: not in range.");
 		GGLAB_ASSERT_MSG(
 			ContainsGlobalIndex(global), "GlobalIndexFromGpuHandle: not in allocator range.");
 

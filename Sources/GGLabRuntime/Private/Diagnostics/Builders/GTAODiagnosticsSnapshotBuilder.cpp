@@ -78,11 +78,6 @@ namespace gglab
 			snapshot.m_AOOnlyLightingContribution.m_LogicalBytes;
 		snapshot.m_TotalLogicalBytes =
 			snapshot.m_CoreLogicalBytes + snapshot.m_DiagnosticLogicalBytes;
-		snapshot.m_CoreResourcesAllocated = resources->IsComplete();
-		snapshot.m_DiagnosticResourcesAllocated =
-			snapshot.m_ReconstructedNormal.m_Available ||
-			snapshot.m_SelectedSurfaceOffset.m_Available ||
-			snapshot.m_AOOnlyLightingContribution.m_Available;
 		snapshot.m_UsesFinalAOFormatFallback =
 			snapshot.m_RequestedSettings.m_FinalAOFormatPreference ==
 			GTAOFinalAOFormatPreference::PreferR8Unorm &&

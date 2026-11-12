@@ -933,7 +933,7 @@ namespace gglab
 			const PublicationTransactionResult transaction = ExecutePublicationTransaction(
 				files,
 				{
-					.m_Commit = PublicationCommit::ExclusiveRename,
+					.m_Commit = PublicationCommit::PlainRename,
 					.m_RecoverOrphanedPrimary = true,
 					.m_MaxAttempts = 1,
 					.m_ObservationAttempts = 64,

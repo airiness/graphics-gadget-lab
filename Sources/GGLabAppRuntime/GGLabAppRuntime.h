@@ -214,15 +214,6 @@ namespace gglab
 			CheckOwnerThread();
 			return CanAcceptSessionCommands() ? m_RenderServicesView : RenderServicesView{};
 		}
-		[[nodiscard]] AssetManager* GetAssetManager() const noexcept
-		{
-			return m_AssetManager.get();
-		}
-		[[nodiscard]] EnvironmentAssetController* GetEnvironmentAssetController()
-			const noexcept
-		{
-			return m_EnvironmentAssetController.get();
-		}
 		[[nodiscard]] TaskSystem* GetTaskSystem() const noexcept { return m_TaskSystem.get(); }
 		[[nodiscard]] ApplicationInput* GetInput() const noexcept { return m_Input; }
 		[[nodiscard]] ShaderManager* GetShaderManager() const noexcept
@@ -232,10 +223,6 @@ namespace gglab
 		[[nodiscard]] DemoManager* GetDemoManager() const noexcept
 		{
 			return m_DemoManager.get();
-		}
-		[[nodiscard]] DebugDrawService* GetDebugDrawService() const noexcept
-		{
-			return m_DebugDrawService.get();
 		}
 		// Non-owning; null before runtime services are composed. They outlive
 		// Shutdown so hosts can inspect final capture state. Hosts submit and consume

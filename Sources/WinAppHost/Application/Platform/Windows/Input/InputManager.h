@@ -8,7 +8,6 @@ namespace gglab
 {
 	class Keyboard;
 	class Mouse;
-	// class GamePad; // todo: GamePad
 	class InputManager final
 	{
 	public:

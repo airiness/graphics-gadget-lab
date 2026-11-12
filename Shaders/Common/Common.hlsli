@@ -61,16 +61,6 @@ float3 LinearToSRGB(float3 c)
 	return lerp(lower, higher, t);
 }
 
-// sRGB to Linear Conversion
-float3 SRGBToLinear(float3 c)
-{
-	c = max(c, 6.10352e-5.xxx);
-	const float3 t = step(0.04045.xxx, c);
-	const float3 lower = c * (1.0 / 12.92);
-	const float3 higher = pow((c * (1.0 / 1.055) + 0.0521327), 2.4);
-	return lerp(lower, higher, t);
-}
-
 float3 SafeNormalize(float3 v, float3 fallback)
 {
 	float len2 = dot(v, v);

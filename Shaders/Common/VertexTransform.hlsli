@@ -8,11 +8,6 @@ uint GetObjectDataIndex(uint objectOffset)
 	return g_Scene.ObjectBaseIndex + objectOffset;
 }
 
-uint GetCurrentObjectDataIndex()
-{
-	return GetObjectDataIndex(g_Draw.ObjectOffset);
-}
-
 uint GetViewDataIndex(uint viewOffset)
 {
 	return g_Scene.ViewBaseIndex + viewOffset;

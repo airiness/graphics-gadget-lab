@@ -24,7 +24,6 @@ namespace gglab
 		uint64_t m_ActiveWorldLightingGeneration = 0;
 		uint64_t m_RequestedWorldLightingGeneration = 0;
 		bool m_PhysicalSkyActive = false;
-		bool m_PhysicalSkyRequested = false;
 		std::optional<ResolvedWorldSun> m_ActiveSun;
 		float m_ReferenceObserverAltitudeMeters = 1.0f;
 		float m_ObserverMinAltitudeMeters = 0.0f;
