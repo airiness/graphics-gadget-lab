@@ -109,19 +109,54 @@ namespace gglab
 			m_Measurement.reset();
 		}
 		[[nodiscard]] const GIFieldReadinessSnapshot& GetSnapshot() const noexcept { return m_Snapshot; }
-		[[nodiscard]] std::shared_ptr<const GIFieldReadinessMeasurement> GetMeasurement() const noexcept { return m_Measurement; }
-		bool Observe(uint64_t update, float floor, std::span<const GIFieldProbeChange> probes, float hysteresis = 0.5f, bool refresh = true) noexcept
+		[[nodiscard]] std::shared_ptr<const GIFieldReadinessMeasurement> GetMeasurement() const noexcept
+		{
+			return m_Measurement;
+		}
+
+		bool Observe(uint64_t update, float floor, std::span<const GIFieldProbeChange> probes,
+			float hysteresis = 0.5f, bool refresh = true) noexcept
 		{
 			if (!m_Settings.m_Enabled || update <= m_Snapshot.m_CompletedUpdates)
 			{
 				return false;
 			}
-			if (update != m_Snapshot.m_CompletedUpdates + 1 || !std::isfinite(floor) || floor < gi_shader::GIFieldReadinessAbsoluteFloor ||
-				probes.size() != uint64_t(m_Counts[0]) * m_Counts[1] * m_Counts[2])
+			if (!ValidateObservation(update, floor, probes.size()))
+			{
+				return false;
+			}
+
+			// Consume the completed epoch prefix in order. Phase changes clear quiet holds
+			// before block decisions; noise remains diagnostic. Publish measurements and
+			// trace records only after all probes validate and readiness has transitioned.
+			BeginObservation(update, floor, hysteresis, refresh);
+			auto measurement = CreateMeasurement(probes.size(), refresh);
+			if (!MeasureBlocks(probes, *measurement))
+			{
+				return false;
+			}
+			MeasureNoise(probes, refresh);
+			UpdateReadiness(measurement->m_WarmingUpdates);
+			PublishMeasurement(std::move(measurement));
+			return true;
+		}
+
+	private:
+		[[nodiscard]] bool ValidateObservation(uint64_t update, float floor,
+			size_t probeCount) noexcept
+		{
+			if (update != m_Snapshot.m_CompletedUpdates + 1 || !std::isfinite(floor) ||
+				floor < gi_shader::GIFieldReadinessAbsoluteFloor ||
+				probeCount != uint64_t(m_Counts[0]) * m_Counts[1] * m_Counts[2])
 			{
 				m_Snapshot.m_Failed = true;
 				return false;
 			}
+			return true;
+		}
+
+		void BeginObservation(uint64_t update, float floor, float hysteresis, bool refresh) noexcept
+		{
 			if (m_HasMode && refresh != m_RefreshMode)
 			{
 				std::fill(m_QuietUpdates.begin(), m_QuietUpdates.end(), 0);
@@ -133,13 +168,19 @@ namespace gglab
 			m_Snapshot.m_Hysteresis = hysteresis;
 			const auto& calibration = GetGIFieldReadinessCalibration(m_Settings, m_Reason);
 			m_Snapshot.m_NoiseSigma = refresh ? calibration.m_RefreshSigma : calibration.m_SteadySigma;
-			m_Snapshot.m_Threshold = std::max(gi_shader::GIFieldReadinessMinimumThreshold, 3 * m_Snapshot.m_NoiseSigma);
+			m_Snapshot.m_Threshold = std::max(gi_shader::GIFieldReadinessMinimumThreshold,
+				3 * m_Snapshot.m_NoiseSigma);
 			m_Snapshot.m_CompletedUpdates = update;
 			m_Snapshot.m_IrradianceFloor = floor;
 			m_Snapshot.m_ActiveBlocks = 0;
 			m_Snapshot.m_ExcludedBlocks = 0;
 			m_Snapshot.m_QuietBlocks = 0;
 			m_Snapshot.m_MaximumChange = 0;
+		}
+
+		[[nodiscard]] std::shared_ptr<GIFieldReadinessMeasurement> CreateMeasurement(
+			size_t probeCount, bool refresh) const noexcept
+		{
 			const bool lighting = m_Reason == GIFieldRefreshReason::Lighting;
 			const uint32_t warming = lighting ? gi_shader::GIFieldReadinessChangeSpan :
 				std::max(gi_shader::GIFieldReadinessMinimumWarmUpdates,
@@ -152,8 +193,17 @@ namespace gglab
 			measurement->m_RequiredQuietUpdates = gi_shader::GIFieldReadinessQuietUpdates;
 			measurement->m_RefreshMode = refresh;
 			measurement->m_IncludesDistance = !lighting;
-			measurement->m_Probes.resize(probes.size());
+			measurement->m_Probes.resize(probeCount);
 			measurement->m_Blocks.resize(m_QuietUpdates.size());
+			return measurement;
+		}
+
+		[[nodiscard]] bool MeasureBlocks(std::span<const GIFieldProbeChange> probes,
+			GIFieldReadinessMeasurement& measurement) noexcept
+		{
+			const uint64_t update = m_Snapshot.m_CompletedUpdates;
+			const uint32_t warming = measurement.m_WarmingUpdates;
+			const uint32_t width = measurement.m_BlockWidth;
 			uint32_t block = 0;
 			for (uint32_t y = 0; y < m_Counts[1]; y += width)
 			{
@@ -162,7 +212,7 @@ namespace gglab
 					for (uint32_t x = 0; x < m_Counts[0]; x += width, ++block)
 					{
 						std::array<float, 64> changes{};
-						auto& explanation = measurement->m_Blocks[block];
+						auto& explanation = measurement.m_Blocks[block];
 						size_t active = 0;
 						for (uint32_t py = y; py < std::min(y + width, m_Counts[1]); ++py)
 						{
@@ -182,7 +232,7 @@ namespace gglab
 									{
 										changes[active++] = probe.m_Change;
 									}
-									measurement->m_Probes[px + m_Counts[0] * (pz + m_Counts[2] * py)] =
+									measurement.m_Probes[px + m_Counts[0] * (pz + m_Counts[2] * py)] =
 										{ probe.m_Change, probe.m_Active != 0 };
 								}
 							}
@@ -204,7 +254,9 @@ namespace gglab
 						const bool thresholdQuiet = changes[percentile] <= m_Snapshot.m_Threshold &&
 							maximum <= 3 * m_Snapshot.m_Threshold;
 						const bool quiet = update >= warming && thresholdQuiet;
-						m_QuietUpdates[block] = quiet ? std::min(m_QuietUpdates[block] + 1, gi_shader::GIFieldReadinessQuietUpdates) : 0;
+						m_QuietUpdates[block] = quiet ?
+							std::min(m_QuietUpdates[block] + 1, gi_shader::GIFieldReadinessQuietUpdates) :
+							0;
 						m_Snapshot.m_QuietBlocks += m_QuietUpdates[block] >= gi_shader::GIFieldReadinessQuietUpdates ? 1 : 0;
 						explanation.m_CurrentQuiet = thresholdQuiet;
 						explanation.m_QuietUpdates = m_QuietUpdates[block];
@@ -216,10 +268,16 @@ namespace gglab
 					}
 				}
 			}
+			return true;
+		}
+
+		void MeasureNoise(std::span<const GIFieldProbeChange> probes, bool refresh) noexcept
+		{
 			// Report a bounded frozen-input noise experiment; never feed its result back
 			// into this owner's thresholds. A separate profile must explicitly adopt it.
 			const size_t mode = refresh ? 0 : 1;
-			if (m_ModeUpdates >= gi_shader::GIFieldReadinessMinimumWarmUpdates && m_NoiseSamples[mode] < gi_shader::GIFieldReadinessNoiseSamples)
+			if (m_ModeUpdates >= gi_shader::GIFieldReadinessMinimumWarmUpdates &&
+				m_NoiseSamples[mode] < gi_shader::GIFieldReadinessNoiseSamples)
 			{
 				++m_NoiseSamples[mode];
 				double maximum = 0;
@@ -244,6 +302,12 @@ namespace gglab
 					m_Snapshot.m_SteadyNoiseSamples = m_NoiseSamples[mode];
 				}
 			}
+		}
+
+		void UpdateReadiness(uint32_t warming) noexcept
+		{
+			const uint64_t update = m_Snapshot.m_CompletedUpdates;
+			const bool lighting = m_Reason == GIFieldRefreshReason::Lighting;
 			const bool ready = (m_Snapshot.m_ActiveBlocks == 0 || update >= warming) &&
 				m_Snapshot.m_QuietBlocks == m_Snapshot.m_ActiveBlocks;
 			if (ready)
@@ -258,10 +322,19 @@ namespace gglab
 			else
 			{
 				m_Snapshot.m_ReadyUpdate = 0;
-				m_Snapshot.m_State = update >= gi_shader::GIFieldReadinessTimeoutUpdates ? GIFieldReadinessState::Unconverged :
-					update < warming && !lighting ? GIFieldReadinessState::Warming : GIFieldReadinessState::Settling;
+				m_Snapshot.m_State = update >= gi_shader::GIFieldReadinessTimeoutUpdates ?
+					GIFieldReadinessState::Unconverged :
+					update < warming && !lighting ?
+						GIFieldReadinessState::Warming :
+						GIFieldReadinessState::Settling;
 				m_Snapshot.m_Refreshing = m_Snapshot.m_Refreshing && update < gi_shader::GIFieldReadinessTimeoutUpdates;
 			}
+		}
+
+		void PublishMeasurement(std::shared_ptr<GIFieldReadinessMeasurement> measurement) noexcept
+		{
+			const uint64_t update = m_Snapshot.m_CompletedUpdates;
+			const bool refresh = measurement->m_RefreshMode;
 			measurement->m_Readiness = m_Snapshot;
 			if (m_Trace && update <= GIFieldReadinessTraceUpdates)
 			{
@@ -271,10 +344,8 @@ namespace gglab
 			}
 			measurement->m_Trace = m_TraceTail;
 			m_Measurement = std::move(measurement);
-			return true;
 		}
 
-	private:
 		std::array<uint32_t, 3> m_Counts{};
 		GIFieldReadinessSettings m_Settings;
 		GIFieldReadinessSnapshot m_Snapshot;

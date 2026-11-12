@@ -1118,6 +1118,24 @@ namespace gglab
 				readyTrace.size() == 63,
 				"A lighting refresh starts a new trace epoch without changing retained histories");
 
+			const auto beforeFailure = traced.GetMeasurement();
+			context.Check(!traced.Observe(1, 0, {}) && !traced.GetSnapshot().m_Failed &&
+				traced.GetMeasurement() == beforeFailure,
+				"A duplicate readiness poll ignores its payload and preserves the published measurement");
+			auto invalidChanges = changes;
+			for (auto& probe : invalidChanges)
+			{
+				probe.m_Updates = 2;
+			}
+			// Fail in the last edge block after earlier blocks have recorded their decisions.
+			invalidChanges.back().m_Active = 0;
+			invalidChanges.back().m_Luminance = -1;
+			context.Check(!traced.Observe(2, 0.001f, invalidChanges, 0.97f, false) &&
+				traced.GetSnapshot().m_Failed && traced.GetMeasurement() == beforeFailure &&
+				beforeFailure->m_Readiness.m_CompletedUpdates == 1 && beforeFailure->m_RefreshMode &&
+				traceUpdates(traced.GetMeasurement()) == std::vector<uint64_t>{ 1 },
+				"A rejected excluded probe cannot publish partial block decisions or a new phase trace");
+
 			GIFieldReadinessSnapshot openRefresh{ .m_Enabled = true, .m_Refreshing = true, .m_CompletedUpdates = 3 };
 			GIFieldReadinessSnapshot closedRefresh = openRefresh;
 			closedRefresh.m_Refreshing = false;
