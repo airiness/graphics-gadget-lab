@@ -1,4 +1,5 @@
 #include "GGLabRuntime/Graphics/RenderHost.h"
+#include "Diagnostics/DiagnosticsRuntime.h"
 #include "GGLabRuntime/Graphics/Asset/AssetUploadScheduling.h"
 #include "Graphics/Pipeline/PipelineCache.h"
 #include "Graphics/Renderer.h"
@@ -56,6 +57,10 @@ namespace gglab
 			renderer->GetGISpecularVisibilityObservation();
 		instance.m_Composition = renderer.get();
 		instance.m_ServiceView = renderer->PublishRenderServices(instance.m_CompositionBindings);
+		if (createInfo.m_Diagnostics)
+		{
+			instance.m_Diagnostics = CreateDiagnosticsSession(*renderer, *createInfo.m_Diagnostics);
+		}
 		instance.m_Host = std::move(renderer);
 		return instance;
 	}

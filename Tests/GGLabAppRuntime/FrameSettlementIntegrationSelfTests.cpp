@@ -742,8 +742,8 @@ namespace gglab::runtime_test
 				.m_ShaderManager = &manager, .m_TaskSystem = &tasks,
 				.m_IblDerivedDataCacheDirectory = root / "direct-ibl",
 				.m_Width = 32, .m_Height = 32 });
-			checks.Check(instance.m_Host && instance.m_ServiceView.IsValid(),
-				"The production host factory publishes a retained service view");
+			checks.Check(instance.m_Host && instance.m_ServiceView.IsValid() && !instance.m_Diagnostics,
+				"The production host factory publishes services without opting into diagnostics");
 			if (instance.m_Host)
 			{
 				instance.m_Host->Finalize();

@@ -27,6 +27,7 @@
 #include "LoadingProgress.h"
 #include "GGLabRuntime/Core/Time.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <iterator>
 #include <optional>
@@ -282,6 +283,13 @@ namespace gglab
 			return FailServiceInitialization(preloadResult);
 		}
 
+		std::optional<DiagnosticsSessionCreateInfo> diagnostics;
+		if (m_Config.HasCapability(AppRuntimeCapability::DevelopmentTools))
+		{
+			diagnostics = DiagnosticsSessionCreateInfo{
+				.m_RegisterLabSnapshotProvider = std::ranges::any_of(m_ContentRegistration.m_Demos,
+					&ApplicationDemoRegistration::m_ProvidesLabRuntime) };
+		}
 		RenderHostInstance renderHostInstance = CreateRenderHost(RenderHostCreateInfo{
 			.m_RHIContextFactory = createInfo.m_RHIContextFactory,
 			.m_ShaderManager = m_ShaderManager.get(),
@@ -292,6 +300,7 @@ namespace gglab
 			.m_AdapterSelector = m_Config.m_AdapterSelector,
 			.m_EnableDebugValidation = m_Config.m_RequestRuntimeValidation,
 			.m_EnableGpuBasedValidation = m_Config.m_RequestGpuBasedValidation,
+			.m_Diagnostics = diagnostics,
 		});
 		if (!renderHostInstance.m_Host)
 		{
@@ -300,6 +309,7 @@ namespace gglab
 				AppRuntimeServiceInitializeResult::RendererInitializationFailed);
 		}
 		m_RenderHost = std::move(renderHostInstance.m_Host);
+		m_Diagnostics = std::move(renderHostInstance.m_Diagnostics);
 		m_RenderServiceBindings = renderHostInstance.m_CompositionBindings;
 		m_RenderServicesView = renderHostInstance.m_ServiceView;
 		m_RenderComposition = renderHostInstance.m_Composition;
@@ -428,11 +438,6 @@ namespace gglab
 		}
 		m_DemoManager->RequestActiveDemo(*startupDemoIndex);
 		SynchronizeContentBinding();
-		if (m_Config.HasCapability(AppRuntimeCapability::DevelopmentTools))
-		{
-			m_Diagnostics = CreateDiagnosticsSession(*m_RenderHost, {
-				.m_RegisterLabSnapshotProvider = m_LabHostDemoIndex.has_value() });
-		}
 
 		GGLAB_LOG_INFO("Startup configuration: demo='{}', lab='{}', mouse_mode='{}'.",
 			m_Config.m_StartupDemoId,

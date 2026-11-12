@@ -1,6 +1,7 @@
 #pragma once
 #include "GGLabRuntime/Graphics/DirectionalShadowFramePlan.h"
 #include "GGLabFoundation/Base/CoreMacros.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsSession.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingControlBase.h"
 #include "GGLabRuntime/Graphics/EnvironmentLightingViewBase.h"
 #include "GGLabRuntime/Graphics/IBLCacheControlBase.h"
@@ -257,6 +258,9 @@ namespace gglab
 		std::optional<std::string> m_AdapterSelector;
 		bool m_EnableDebugValidation = false;
 		bool m_EnableGpuBasedValidation = false;
+		// Optional diagnostics are composed with the concrete renderer. The returned
+		// session borrows the host and must be released before host Finalize.
+		std::optional<DiagnosticsSessionCreateInfo> m_Diagnostics;
 
 		[[nodiscard]] bool HasRequiredRuntimePaths() const noexcept
 		{
@@ -268,10 +272,18 @@ namespace gglab
 	// borrowers with m_CompositionBindings and releases them before host Finalize.
 	struct RenderHostInstance
 	{
+		RenderHostInstance() noexcept = default;
+		GGLAB_DELETE_COPYABLE(RenderHostInstance);
+		RenderHostInstance(RenderHostInstance&&) noexcept = default;
+		// Replacing a live result could release its host before the diagnostics borrower.
+		RenderHostInstance& operator=(RenderHostInstance&&) = delete;
+
 		std::unique_ptr<RenderHost> m_Host;
 		RenderServicesView m_ServiceView;
 		RenderServices m_CompositionBindings;
 		RenderCompositionAccess* m_Composition = nullptr;
+		// Declared after the host so an unconsumed instance releases the session first.
+		std::unique_ptr<DiagnosticsSession> m_Diagnostics;
 	};
 
 	// Creates and initializes the Runtime render host and its explicit service

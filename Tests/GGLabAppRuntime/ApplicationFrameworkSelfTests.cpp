@@ -5,9 +5,11 @@
 #include "Lab/LabParameter.h"
 #include "Lab/LabSessionBase.h"
 #include "GGLabTestCore/SelfTest.h"
+#include "GGLabRuntime/Diagnostics/DiagnosticsSession.h"
 #include "GGLabRuntime/Graphics/RenderHost.h"
 
 #include <exception>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -21,6 +23,9 @@ namespace gglab
 		class StubRenderHost final : public RenderHost
 		{
 		public:
+			explicit StubRenderHost(bool& alive) noexcept : m_Alive(alive) { m_Alive = true; }
+			~StubRenderHost() override { m_Alive = false; }
+
 			void CheckServiceLifecycleAccess() const noexcept override {}
 			void RevokeRenderServices() noexcept override {}
 			[[nodiscard]] bool IsInitialized() const noexcept override { return false; }
@@ -102,6 +107,10 @@ namespace gglab
 			{
 				return nullptr;
 			}
+			[[nodiscard]] ShadowPreviewControlBase* GetShadowPreviewControl() const noexcept override
+			{
+				return nullptr;
+			}
 			[[nodiscard]] GpuProfilingViewBase* GetGpuProfilingView() const noexcept override
 			{
 				return nullptr;
@@ -117,10 +126,45 @@ namespace gglab
 
 		private:
 			void AbortFrame(uint64_t) noexcept override {}
+			bool& m_Alive;
 			TemporalFrameTransaction m_Transaction{};
 			TemporalAACapabilityStatus m_Capabilities{};
 			GTAOCapabilityStatus m_GTAOCapabilities{};
 		};
+
+		class BorrowedDiagnosticsSession final : public DiagnosticsSession
+		{
+		public:
+			BorrowedDiagnosticsSession(const bool& hostAlive, bool& releasedWithLiveHost) noexcept :
+				m_HostAlive(hostAlive), m_ReleasedWithLiveHost(releasedWithLiveHost) {}
+			~BorrowedDiagnosticsSession() override { m_ReleasedWithLiveHost = m_HostAlive; }
+			DiagnosticsView* GetView() noexcept override { return nullptr; }
+			DiagnosticsControl* GetControl() noexcept override { return nullptr; }
+			void BeginFrame(const DiagnosticsFrameContext&) noexcept override {}
+			void EndFrame() noexcept override {}
+
+		private:
+			const bool& m_HostAlive;
+			bool& m_ReleasedWithLiveHost;
+		};
+
+		void RunRenderHostInstanceLifetimeSelfTests(SelfTestContext& context) noexcept
+		{
+			bool hostAlive = false;
+			bool releasedWithLiveHost = false;
+			{
+				RenderHostInstance instance;
+				instance.m_Host = std::make_unique<StubRenderHost>(hostAlive);
+				instance.m_Diagnostics =
+					std::make_unique<BorrowedDiagnosticsSession>(hostAlive, releasedWithLiveHost);
+				RenderHostInstance moved(std::move(instance));
+				context.Check(!instance.m_Host && !instance.m_Diagnostics && moved.m_Host &&
+					moved.m_Diagnostics && hostAlive && !releasedWithLiveHost,
+					"Moving a host composition transfers its diagnostics without releasing either owner");
+			}
+			context.Check(!hostAlive && releasedWithLiveHost,
+				"An unconsumed composition releases diagnostics before destroying its borrowed host");
+		}
 
 		std::unique_ptr<DemoBase> CreateNullDemo(const DemoCreateInfo&, const LabStartupSelection&, std::span<const LabRegistration>) noexcept
 		{
@@ -271,6 +315,7 @@ namespace gglab
 
 	void RunApplicationFrameworkSelfTests(SelfTestContext& context) noexcept
 	{
+		RunRenderHostInstanceLifetimeSelfTests(context);
 		RunDemoTransitionSynchronizationSelfTests(context);
 		RunLabParameterParseSelfTests(context);
 

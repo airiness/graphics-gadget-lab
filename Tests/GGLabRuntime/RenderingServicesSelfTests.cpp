@@ -344,11 +344,13 @@ namespace gglab::rendering_test
 		context.Check(!moved.IsValid() && !assigned.IsReady() && assigned.IsUnavailable(),
 			"assigning a frame handle transfers the abort obligation");
 
-		const RenderHostInstance missingFactory = CreateRenderHost({});
+		const RenderHostInstance missingFactory = CreateRenderHost({
+			.m_Diagnostics = DiagnosticsSessionCreateInfo{} });
 		context.Check(!missingFactory.m_Host &&
+			!missingFactory.m_Diagnostics &&
 			!missingFactory.m_CompositionBindings.m_PipelineResolver &&
 			!missingFactory.m_CompositionBindings.m_Presentation,
-			"render host factory rejects a missing host context factory");
+			"render host factory rejects missing context factories before composing diagnostics");
 		RenderHostCreateInfo missingPaths{};
 		missingPaths.m_RHIContextFactory = reinterpret_cast<const RHIContextFactoryBase*>(1);
 		const RenderHostInstance missingPathsInstance = CreateRenderHost(missingPaths);

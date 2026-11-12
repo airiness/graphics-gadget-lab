@@ -5,7 +5,6 @@
 #include "GGLabRuntime/Graphics/RenderQueue.h"
 #include "GGLabRuntime/Graphics/RenderView.h"
 
-#include <memory>
 #include <span>
 
 namespace gglab
@@ -68,10 +67,4 @@ namespace gglab
 		virtual void BeginFrame(const DiagnosticsFrameContext& context) noexcept = 0;
 		virtual void EndFrame() noexcept = 0;
 	};
-
-	// Creates the diagnostics engine, the built-in Runtime providers and the
-	// active backend provider set. Returns null when no initialized RHI
-	// context is available.
-	[[nodiscard]] std::unique_ptr<DiagnosticsSession> CreateDiagnosticsSession(
-		RenderHost& host, DiagnosticsSessionCreateInfo createInfo = {}) noexcept;
 }

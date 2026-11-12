@@ -12,6 +12,8 @@
 
 namespace gglab
 {
+	class Renderer;
+
 	class DiagnosticsRuntime final :
 		public DiagnosticsView,
 		public DiagnosticsControl,
@@ -62,4 +64,8 @@ namespace gglab
 		uint64_t m_FrameIndex = 0;
 		bool m_FrameOpen = false;
 	};
+
+	// Composition-only factory; its providers borrow the initialized renderer.
+	[[nodiscard]] std::unique_ptr<DiagnosticsSession> CreateDiagnosticsSession(
+		Renderer& renderer, DiagnosticsSessionCreateInfo createInfo) noexcept;
 }

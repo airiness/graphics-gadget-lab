@@ -157,10 +157,9 @@ namespace gglab
 	}
 
 	std::unique_ptr<DiagnosticsSession> CreateDiagnosticsSession(
-		RenderHost& host, DiagnosticsSessionCreateInfo createInfo) noexcept
+		Renderer& renderer, DiagnosticsSessionCreateInfo createInfo) noexcept
 	{
-		Renderer& renderer = static_cast<Renderer&>(host);
-		RHIContext* context = host.GetRHIContext();
+		RHIContext* context = renderer.GetRHIContext();
 		GGLAB_ASSERT_MSG(context,
 			"Diagnostics session creation requires an initialized RHI context.");
 		if (!context)
