@@ -173,7 +173,6 @@ namespace gglab
 			ShaderProgramBuildRecord{ &GISpecularVisibilityCompute, L"Passes/PassGISpecularVisibility.hlsl", L"CSMain" },
 			ShaderProgramBuildRecord{ &GIProbeInitializeCompute, L"Passes/PassGIProbeUpdate.hlsl", L"Initialize" },
 			ShaderProgramBuildRecord{ &GIProbeTraceCompute, L"Passes/PassGIProbeUpdate.hlsl", L"Trace" },
-			ShaderProgramBuildRecord{ &GIProbeBlendDirectCompute, L"Passes/PassGIProbeUpdate.hlsl", L"BlendDirect" },
 			ShaderProgramBuildRecord{ &GIProbeBlendSharedCompute, L"Passes/PassGIProbeUpdate.hlsl", L"BlendShared" },
 			ShaderProgramBuildRecord{ &GIProbeBordersCompute, L"Passes/PassGIProbeUpdate.hlsl", L"Borders" },
 			ShaderProgramBuildRecord{ &GIProbeClassifyCompute, L"Passes/PassGIProbeUpdate.hlsl", L"Classify" },

@@ -60,16 +60,25 @@ try {
                 $warmup=Invoke-VerificationSession capture $session @{ExpectedRunIdentity=$run;Timing='after-ready';
                     SettleFrames=1;OutputDirectory="$directory/warmup";TimeoutSeconds=$TimeoutSeconds}
                 if ($warmup.publication -ne 'Published') { throw 'Probe content warmup failed.' }
+                $before = Invoke-VerificationSession parameters $session @{ExpectedRunIdentity=$run}
+                $retired = @(@{id='gi_reference.probe_updates';type='uint';value=2},
+                    @{id='gi_reference.probe_shared_blend';type='bool';value=$false})
+                $rejected = Invoke-VerificationSession set $session @{ExpectedRunIdentity=$run;
+                    Changes=(ConvertTo-Json -InputObject $retired -Compress)} -AllowFailure
+                $after = Invoke-VerificationSession parameters $session @{ExpectedRunIdentity=$run}
+                if ($rejected.ok -or 'gi_reference.probe_shared_blend' -in $after.parameters.id -or
+                    $after.revision -ne $before.revision -or
+                    @($after.parameters | Where-Object id -CEQ 'gi_reference.probe_updates')[0].current -ne 1) {
+                    throw 'Retired Direct blend input did not reject atomically.'
+                }
                 $matrix=@()
                 $rayCounts=if ($Smoke) { @(256) } else { @(64,128,192,256) }
                 foreach ($fixture in @(14,16)) {
                     foreach ($rays in $rayCounts) {
-                        foreach ($shared in @($false,$true)) {
-                            foreach ($schedule in @(@{divisor=1;updates=1;refresh=0},@{divisor=4;updates=1;refresh=0},
-                                @{divisor=4;updates=4;refresh=0},@{divisor=4;updates=6;refresh=5})) {
-                                $matrix+=@{fixture=$fixture;rays=$rays;shared=$shared;divisor=$schedule.divisor;
-                                    updates=$schedule.updates;refresh=$schedule.refresh}
-                            }
+                        foreach ($schedule in @(@{divisor=1;updates=1;refresh=0},@{divisor=4;updates=1;refresh=0},
+                            @{divisor=4;updates=4;refresh=0},@{divisor=4;updates=6;refresh=5})) {
+                            $matrix+=@{fixture=$fixture;rays=$rays;shared=$true;divisor=$schedule.divisor;
+                                updates=$schedule.updates;refresh=$schedule.refresh}
                         }
                     }
                 }
@@ -81,10 +90,8 @@ try {
                 if (-not $SkipCoastal) {
                     $coastalRays=if ($Smoke) { @(256) } else { @(128,192,256) }
                     foreach ($rays in $coastalRays) {
-                        foreach ($shared in @($false,$true)) {
-                            foreach ($divisor in @(1,4)) {
-                                $matrix+=@{fixture=15;rays=$rays;shared=$shared;divisor=$divisor;updates=$divisor;refresh=0}
-                            }
+                        foreach ($divisor in @(1,4)) {
+                            $matrix+=@{fixture=15;rays=$rays;shared=$true;divisor=$divisor;updates=$divisor;refresh=0}
                         }
                     }
                 }
@@ -101,7 +108,7 @@ try {
                     $path="$output/$($case.directory)"
                     New-Item -ItemType Directory -Path $path -Force | Out-Null
                     $effect=Set-Inputs $session $run @{fixture=$case.fixture;probe_rays=$case.rays;probe_divisor=$case.divisor;
-                        probe_updates=$case.updates;probe_refresh_period=$case.refresh;probe_shared_blend=$case.shared;
+                        probe_updates=$case.updates;probe_refresh_period=$case.refresh;
                         probe_rotate=$case.rotate;probe_traversal_only=$false;probe_enabled=$true;ev100=15}
                     Write-VerificationJson "$path/effect.json" $effect
                     $products=@(@{kind='resource';targets=@('Rays','Irradiance','Distance','State' | ForEach-Object {@{resource="GI.ProbeUpdate.$_"}})},@{kind='graph'}) | ConvertTo-Json -Depth 8 -Compress

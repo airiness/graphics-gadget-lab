@@ -119,6 +119,8 @@ try {
     $source = Source-Identity
     $binaries = Binary-Identity
     Write-VerificationJson "$output/source-identity.json" $source
+    $modes = @('shared','field','field-feedback')
+    Write-VerificationJson "$output/matrix.json" @{schemaVersion=1;modes=$modes}
     Write-VerificationJson "$output/binaries.json" $binaries
     foreach ($backend in $Rhi) {
         $directory = "$output/$backend"
@@ -136,7 +138,7 @@ try {
             $null = Wait-VerificationCondition -Poll {
                 Invoke-VerificationSession status $session @{ExpectedRunIdentity=$run}
             } -Until { param($r) $r.frame -and $r.frame.ready } -TimeoutSeconds $TimeoutSeconds
-            foreach ($mode in @('direct','shared','field','field-feedback')) {
+            foreach ($mode in $modes) {
                 $isField = $mode.StartsWith('field')
                 $prefix = if ($isField) { 'GI.Field' } else { 'GI.ProbeUpdate' }
                 foreach ($case in $cases) {
@@ -146,7 +148,7 @@ try {
                     $null = Invoke-VerificationSession watch $session @{WatchOff=$true}
                     $fixture = if ($isField) { 16 } else { 14 }
                     Set-Inputs @{fixture=$fixture;probe_enabled=$false;field_enabled=$isField;field_feedback=($mode -eq 'field-feedback');field_readiness=$false;field_sampling=$false;
-                        probe_shared_blend=($mode -ne 'direct');probe_updates=0;probe_rays=256;ev100=15}
+                        probe_updates=0;probe_rays=256;ev100=15}
                     if ($case.error -eq 2) {
                         if ($isField) {
                             # The tiny cage is inside the cube. Seed finite, nonzero irradiance history
@@ -203,7 +205,7 @@ try {
         (ConvertTo-Json -InputObject @($finalSource) -Depth 4 -Compress) -or
         (ConvertTo-Json -InputObject @($binaries) -Compress) -cne
         (ConvertTo-Json -InputObject @($finalBinaries) -Compress)) { throw 'Sources or binaries changed during GI injection verification.' }
-    Write-VerificationJson "$output/result.json" @{status='passed';cases=($Rhi.Count*4*$cases.Count);backends=$Rhi;productionRejections=(2*$Rhi.Count)}
+    Write-VerificationJson "$output/result.json" @{status='passed';cases=($Rhi.Count*$modes.Count*$cases.Count);backends=$Rhi;productionRejections=(2*$Rhi.Count)}
 } catch {
     Write-VerificationJson "$output/result.json" @{status='failed';error=[string]$_}
     [Console]::Out.WriteLine((@{ok=$false;directory=$output;error=[string]$_} | ConvertTo-Json -Compress))

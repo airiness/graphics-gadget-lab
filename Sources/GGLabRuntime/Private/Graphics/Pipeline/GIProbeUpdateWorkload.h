@@ -26,7 +26,7 @@ namespace gglab
 	class GIProbeUpdateWorkload final
 	{
 	public:
-		static constexpr size_t ProgramCount = 8;
+		static constexpr size_t ProgramCount = 7;
 		GIProbeUpdateWorkload(std::shared_ptr<RayScene> scene, GIProbeUpdateProfile profile,
 			bool field = false, GIFieldReadinessSettings readiness = {}, bool feedback = false,
 			bool progressiveSampling = false, bool readinessTrace = false) noexcept;

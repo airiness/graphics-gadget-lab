@@ -169,8 +169,6 @@ namespace gglab::shader_programs
 		"gglab.shader.gi-probe-update", "compute.initialize", ShaderStage::Compute };
 	inline const ShaderProgramRef GIProbeTraceCompute{
 		"gglab.shader.gi-probe-update", "compute.trace", ShaderStage::Compute };
-	inline const ShaderProgramRef GIProbeBlendDirectCompute{
-		"gglab.shader.gi-probe-update", "compute.blend-direct", ShaderStage::Compute };
 	inline const ShaderProgramRef GIProbeBlendSharedCompute{
 		"gglab.shader.gi-probe-update", "compute.blend-shared", ShaderStage::Compute };
 	inline const ShaderProgramRef GIProbeBordersCompute{

@@ -1907,7 +1907,7 @@ namespace gglab
 			"Coordinate conformance selection contributes seven stable shader demands");
 		checkSelectedDemand("gglab.lab.ray_query", 54,
 			"Ray-query selection contributes query, preview and pipeline-identity artifacts without changing raster startup demand");
-		checkSelectedDemand("gglab.lab.gi_reference", 73,
+		checkSelectedDemand("gglab.lab.gi_reference", 72,
 			"GI diagnostics include probe picking, integration inspection and the receiver list alongside receiver/reference shaders");
 		for (const auto& lab : desktop.m_Labs)
 		{
@@ -1917,6 +1917,14 @@ namespace gglab
 				context.Check(unique.AddRange(lab.m_ShaderPrograms) &&
 					unique.GetPrograms().size() == lab.m_ShaderPrograms.size(),
 					"GI diagnostics declare each optional shader demand once before set deduplication");
+				context.Check(std::ranges::find(lab.m_ShaderPrograms, shader_programs::GIProbeBlendSharedCompute) !=
+					lab.m_ShaderPrograms.end() && std::ranges::none_of(lab.m_ShaderPrograms,
+						[](const ShaderProgramRef& program)
+						{
+							return program.m_ProgramId == "gglab.shader.gi-probe-update" &&
+								program.m_VariantId == "compute.blend-direct";
+						}),
+					"GI diagnostics demand Shared integration without the retired Direct control");
 				context.Check(std::ranges::find(lab.m_ShaderPrograms, shader_programs::GIProbePickingPixel) !=
 					lab.m_ShaderPrograms.end(),
 					"GI diagnostics explicitly demand the asynchronous probe-picking pixel program");

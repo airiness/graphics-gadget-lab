@@ -49,14 +49,14 @@ try {
             $matrix=@(@{kind='off';rays=256;divisor=1;shared=$true})
             foreach ($rays in $(if ($Smoke) {@(256)} else {@(128,192,256)})) {
                 foreach ($divisor in @(1,4)) {
-                    foreach ($shared in @($false,$true)) {$matrix+=@{kind='probe';rays=$rays;divisor=$divisor;shared=$shared}}
+                    $matrix+=@{kind='probe';rays=$rays;divisor=$divisor;shared=$true}
                 }
             }
             foreach ($divisor in @(1,4)) {$matrix+=@{kind='traversal';rays=256;divisor=$divisor;shared=$true}}
             $matrix+=@{kind='reference';rays=256;divisor=1;shared=$true}
             if (-not $Smoke) {
                 foreach ($divisor in @(1,4)) {
-                    foreach ($shared in @($true,$false)) {$matrix+=@{kind='probe';rays=256;divisor=$divisor;shared=$shared;repeat=1}}
+                    $matrix+=@{kind='probe';rays=256;divisor=$divisor;shared=$true;repeat=1}
                 }
             }
             $matrix+=@{kind='off';rays=256;divisor=1;shared=$true;repeat=1}
@@ -66,7 +66,7 @@ try {
                 New-Item -ItemType Directory -Path $path -Force | Out-Null
                 $values=@{fixture=$(if ($entry.kind -eq 'reference') {12} else {15});probe_enabled=($entry.kind -ne 'off');
                     probe_allocation_diagnostics=$false;probe_rays=$entry.rays;probe_divisor=$entry.divisor;probe_updates=0;
-                    probe_refresh_period=0;probe_shared_blend=$entry.shared;probe_rotate=$false;
+                    probe_refresh_period=0;probe_rotate=$false;
                     probe_traversal_only=($entry.kind -eq 'traversal');ev100=15;samples=1;batch_samples=1;depth=1;tile_pixels=8388608;accumulate=$false;
                     # Stateless matching repeats each frame: explicitly admit its complete
                     # 1920x1080 primary-search bound, separately from sampling work.

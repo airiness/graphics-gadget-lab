@@ -67,7 +67,6 @@ namespace gglab
 		const LabParameterId ProbeDivisorId("gi_reference.probe_divisor");
 		const LabParameterId ProbeUpdatesId("gi_reference.probe_updates");
 		const LabParameterId ProbeRefreshId("gi_reference.probe_refresh_period");
-		const LabParameterId ProbeSharedId("gi_reference.probe_shared_blend");
 		const LabParameterId ProbeTraversalId("gi_reference.probe_traversal_only");
 		const LabParameterId ProbeRotateId("gi_reference.probe_rotate");
 		const LabParameterId ProbeDiagnosticsId("gi_reference.probe_allocation_diagnostics");
@@ -381,8 +380,8 @@ namespace gglab
 				.m_Type = LabParameterType::UInt, .m_Impact = LabChangeImpact::RestartSession,
 				.m_DefaultValue = value, .m_MinValue = LabValue(uint32_t(0)), .m_MaxValue = LabValue(maximum) }));
 		}
-		for (const auto& [id, name, value] : std::array<std::tuple<LabParameterId, const char*, bool>, 5>{ {
-			{ ProbeEnabledId, "Probe experiment enabled", true }, { ProbeSharedId, "Shared-memory blend", true },
+		for (const auto& [id, name, value] : std::array<std::tuple<LabParameterId, const char*, bool>, 4>{ {
+			{ ProbeEnabledId, "Probe experiment enabled", true },
 			{ ProbeTraversalId, "Traversal-only control", false }, { ProbeRotateId, "Rotate probe directions", true },
 			{ ProbeDiagnosticsId, "Detailed allocation diagnostics", true } } })
 		{
@@ -1195,7 +1194,6 @@ namespace gglab
 			profile.m_UpdateDivisor = GetParameters().Get(ProbeDivisorId, uint32_t(1));
 			profile.m_MaximumUpdates = GetParameters().Get(ProbeUpdatesId, uint32_t(1));
 			profile.m_RefreshPeriod = GetParameters().Get(ProbeRefreshId, uint32_t(0));
-			profile.m_SharedBlend = GetParameters().Get(ProbeSharedId, true);
 			profile.m_TraversalOnly = GetParameters().Get(ProbeTraversalId, false);
 			profile.m_RotateDirections = GetParameters().Get(ProbeRotateId, true);
 			profile.m_Seed = GetParameters().Get(SeedId, GIObservationLimits::DefaultSeed);

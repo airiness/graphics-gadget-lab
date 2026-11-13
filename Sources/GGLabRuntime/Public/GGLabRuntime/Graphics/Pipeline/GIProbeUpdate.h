@@ -46,7 +46,6 @@ namespace gglab
 		// Zero continuously records updates for quiet timing; bounded runs stop exactly.
 		uint32_t m_MaximumUpdates = 1;
 		uint32_t m_Seed = GIObservationLimits::DefaultSeed;
-		bool m_SharedBlend = true;
 		bool m_ConstantEnvironment = false;
 		bool m_TraverseScene = true;
 		// A separate traversal-only control; its difference is not an isolated shade timer.

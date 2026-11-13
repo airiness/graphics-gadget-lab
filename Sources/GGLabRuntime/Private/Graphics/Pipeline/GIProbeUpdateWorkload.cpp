@@ -37,7 +37,6 @@ namespace gglab
 		{
 			Initialize,
 			TraceShade,
-			BlendDirect,
 			BlendShared,
 			Borders,
 			Classify,
@@ -54,7 +53,7 @@ namespace gglab
 		};
 		constexpr std::array FieldSurfaces{ "GI.Field.Irradiance", "GI.Field.Distance", "GI.Field.State", "GI.Field.Classification" };
 		constexpr std::array FieldPasses{ "GI.Field.Initialize", "GI.Field.TraceShade",
-			"GI.Field.BlendDirect", "GI.Field.BlendShared", "GI.Field.Borders", "GI.Field.Classify",
+			"GI.Field.BlendShared", "GI.Field.Borders", "GI.Field.Classify",
 			"GI.Field.ReadinessFloor", "GI.Field.IntegrationInspection.Prepare" };
 		struct SurfaceInfo
 		{
@@ -100,7 +99,7 @@ namespace gglab
 		constexpr std::array ProgramRefs
 		{
 			&shader_programs::GIProbeInitializeCompute, &shader_programs::GIProbeTraceCompute,
-			&shader_programs::GIProbeBlendDirectCompute, &shader_programs::GIProbeBlendSharedCompute,
+			&shader_programs::GIProbeBlendSharedCompute,
 			&shader_programs::GIProbeBordersCompute, &shader_programs::GIProbeClassifyCompute,
 			&shader_programs::GIFieldReadinessFloorCompute, &shader_programs::GIProbeIntegrationInspectionCompute
 		};
@@ -109,8 +108,6 @@ namespace gglab
 			RenderPassInfo{ .m_TypeName = "GI.ProbeUpdate.Initialize", .m_DisplayName = "Initialize probe workload",
 				.m_CategoryName = "Global Illumination", .m_Category = RenderPassCategory::Debug, .m_Type = RenderPassType::Compute },
 			RenderPassInfo{ .m_TypeName = "GI.ProbeUpdate.TraceShade", .m_DisplayName = "Probe traversal and reduced hit lighting",
-				.m_CategoryName = "Global Illumination", .m_Category = RenderPassCategory::Debug, .m_Type = RenderPassType::Compute },
-			RenderPassInfo{ .m_TypeName = "GI.ProbeUpdate.BlendDirect", .m_DisplayName = "Direct ray atlas integration",
 				.m_CategoryName = "Global Illumination", .m_Category = RenderPassCategory::Debug, .m_Type = RenderPassType::Compute },
 			RenderPassInfo{ .m_TypeName = "GI.ProbeUpdate.BlendShared", .m_DisplayName = "Shared ray atlas integration",
 				.m_CategoryName = "Global Illumination", .m_Category = RenderPassCategory::Debug, .m_Type = RenderPassType::Compute },
@@ -950,8 +947,7 @@ namespace gglab
 		if (record)
 		{
 			const std::array stages{ ProbeStage::Initialize, ProbeStage::Classify, ProbeStage::ReadinessFloor,
-				ProbeStage::IntegrationInspection, ProbeStage::TraceShade,
-				profile.m_SharedBlend ? ProbeStage::BlendShared : ProbeStage::BlendDirect, ProbeStage::Borders };
+				ProbeStage::IntegrationInspection, ProbeStage::TraceShade, ProbeStage::BlendShared, ProbeStage::Borders };
 			for (const auto stage : stages)
 			{
 				const auto stageIndex = static_cast<size_t>(stage);
@@ -964,7 +960,7 @@ namespace gglab
 				{
 					continue;
 				}
-				const bool blending = stage == ProbeStage::BlendDirect || stage == ProbeStage::BlendShared;
+				const bool blending = stage == ProbeStage::BlendShared;
 				if (stage == ProbeStage::Initialize && initialized)
 				{
 					continue;

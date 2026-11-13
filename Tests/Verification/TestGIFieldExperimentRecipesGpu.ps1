@@ -54,7 +54,7 @@ try {
             $descriptor = @($parameters.parameters | Where-Object id -CEQ $catalog.parameter)
             if ($descriptor.Count -ne 1 -or $descriptor[0].type -cne 'enum' -or $descriptor[0].default -ne 0 -or
                 $descriptor[0].impact -cne 'RestartSession' -or $descriptor[0].enumItems.Count -ne 8 -or
-                @($parameters.parameters | Where-Object source -CEQ 'lab').Count -ne 45) { throw 'Unexpected Lab recipe descriptor.' }
+                @($parameters.parameters | Where-Object source -CEQ 'lab').Count -ne 44) { throw 'Unexpected Lab recipe descriptor.' }
             foreach ($recipe in $catalog.recipes) {
                 $item = @($descriptor[0].enumItems | Where-Object value -EQ $recipe.value)
                 if ($item.Count -ne 1 -or $item[0].name -cne $recipe.name) { throw 'Lab and script recipe catalogs disagree.' }
@@ -76,7 +76,8 @@ try {
                 }
             }
             foreach ($recipe in $catalog.recipes) {
-                $caseDirectory = "$directory/$($recipe.id)"
+                # Leave room for atomic-publication staging names on Windows.
+                $caseDirectory = "$directory/recipe-$($recipe.value)"
                 $null = New-Item -ItemType Directory -Path $caseDirectory -Force
                 $changes = @(@{id=$catalog.parameter;type='enum';value=[int]$recipe.value},
                     @{id='gi_reference.fixture';type='enum';value=4},
@@ -109,8 +110,8 @@ try {
                     View='F4_Floor';Timing='next-frame';SettleFrames=4;
                     Products=(ConvertTo-Json -InputObject $products -Depth 6 -Compress);
                     OutputDirectory="$caseDirectory/capture";TimeoutSeconds=$TimeoutSeconds;Label=$recipe.id}
-                if ($capture.status -ne 'completed' -or $capture.publication -ne 'Published') { throw 'Recipe capture did not publish.' }
                 Write-VerificationJson "$caseDirectory/capture.json" $capture
+                if ($capture.status -ne 'completed' -or $capture.publication -ne 'Published') { throw 'Recipe capture did not publish.' }
                 $frozen = @($capture.products[0].metadata.parameters.values | Where-Object id -CEQ $catalog.parameter)
                 # Frozen parameter snapshots omit default-valued assignments.
                 $frozenValue = if ($frozen.Count) { $frozen[0].value } else { $descriptor[0].default }

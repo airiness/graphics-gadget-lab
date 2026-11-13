@@ -54,9 +54,19 @@ def query_snapshot(directory, expected_status):
 
 
 def validate(root, backends):
+    # Frozen cohorts without a matrix retain their original Direct coverage.
+    modes = ('direct', 'shared', 'field', 'field-feedback')
+    if (root / 'matrix.json').exists():
+        modes = ('shared', 'field', 'field-feedback')
+        matrix = load(root / 'matrix.json')
+        require(isinstance(matrix, dict) and type(matrix.get('schemaVersion')) is int and
+                matrix == dict(schemaVersion=1, modes=list(modes)),
+                'Invalid Shared-only injection matrix')
     count = 0
     for backend in backends:
-        for mode in ('direct', 'shared', 'field', 'field-feedback'):
+        require('direct' in modes or not (root / backend / 'direct').exists(),
+                'Shared-only acquisition contains retired Direct evidence')
+        for mode in modes:
             for directory in sorted((root / backend / mode).iterdir()):
                 case = load(directory / 'case.json')
                 field = mode.startswith('field')
@@ -95,7 +105,7 @@ def validate(root, backends):
                     query_snapshot(directory / 'query-frozen', frozen_status)
                     query_snapshot(directory / 'query-replaced', clean_status)
                 count += 1
-    require(count == len(backends) * 20, 'Injection matrix is incomplete')
+    require(count == len(backends) * len(modes) * 5, 'Injection matrix is incomplete')
     return dict(status='passed', cases=count, backends=backends)
 
 

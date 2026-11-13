@@ -633,7 +633,7 @@ void InspectIntegrationInputs(uint probe, uint thread)
 		}
 	}
 }
-float4 IntegrateTexel(uint probe, uint texel, bool useShared)
+float4 IntegrateTexel(uint probe, uint texel)
 {
 	const bool irradiance = texel < IrradianceInteriorTexels();
 	const uint side = irradiance ? IrradianceInteriorWidth : GIProbeDistanceInteriorWidth;
@@ -644,7 +644,7 @@ float4 IntegrateTexel(uint probe, uint texel, bool useShared)
 	float sum = 0.0;
 	for (uint ray = 0; ray < RaysPerProbe; ++ray)
 	{
-		const float4 value = useShared ? SharedRays[ray] : ProbeRayInput[probe * RaysPerProbe + ray];
+		const float4 value = SharedRays[ray];
 		const float signedCosine = dot(direction, SharedDirections[ray]);
 		const float cosine = max(signedCosine, 0.0);
 		const float weight = irradiance ? cosine : pow(cosine, ProbeDistanceWeightExponent);
@@ -732,27 +732,6 @@ float2 StoreTexel(uint probe, uint texel, float4 value)
 	return 0.0.xx;
 }
 [numthreads(GIProbeGroupThreads, 1, 1)]
-void BlendDirect(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
-{
-	// Trace and blend publish a sticky GPU verdict before any later consumer.
-	if (IsUpdateBlocked(thread, true))
-	{
-		return;
-	}
-	const uint probe = FirstProbe + group.x;
-	for (uint ray = thread; ray < RaysPerProbe; ray += GIProbeGroupThreads)
-	{
-		SharedDirections[ray] = ProbeDirection(probe, ray);
-	}
-	GroupMemoryBarrierWithGroupSync();
-	InspectIntegrationInputs(probe, thread);
-	for (uint texel = thread; texel < IrradianceInteriorTexels() + GIProbeDistanceInteriorTexels;
-		texel += GIProbeGroupThreads)
-	{
-		StoreTexel(probe, texel, IntegrateTexel(probe, texel, false));
-	}
-}
-[numthreads(GIProbeGroupThreads, 1, 1)]
 void BlendShared(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 {
 	// Trace and blend publish a sticky GPU verdict before any later consumer.
@@ -772,7 +751,7 @@ void BlendShared(uint3 group : SV_GroupID, uint thread : SV_GroupIndex)
 	for (uint texel = thread; texel < IrradianceInteriorTexels() + GIProbeDistanceInteriorTexels;
 		texel += GIProbeGroupThreads)
 	{
-		const float2 measurement = StoreTexel(probe, texel, IntegrateTexel(probe, texel, true));
+		const float2 measurement = StoreTexel(probe, texel, IntegrateTexel(probe, texel));
 		measure.x = max(measure.x, measurement.x);
 		measure.y += measurement.y;
 	}

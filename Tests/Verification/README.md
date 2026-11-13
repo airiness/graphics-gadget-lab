@@ -393,7 +393,7 @@ isolated state for warm-start checks; those runs do not qualify cold startup.
 
 | Entry point | Measurement |
 | --- | --- |
-| [MeasureGIProbeUpdate.ps1](MeasureGIProbeUpdate.ps1) | Experimental update-chain cost and allocation facts |
+| [MeasureGIProbeUpdate.ps1](MeasureGIProbeUpdate.ps1) | Shared update-chain cost and allocation facts |
 | [MeasureGIProbeViewer.ps1](MeasureGIProbeViewer.ps1) | Viewer on/off costs, budgets, depth modes and selected highlights |
 
 Both require Release with `GGLAB_ENABLE_PIX=0`, validation/DevTools off and no
@@ -405,6 +405,10 @@ frames. GPU totals join sample indices before aggregation. CPU build/record time
 excludes slot acquisition, content Update, EndFrame/Present and readback tails.
 Allocation facts are not resident memory. Require final `result.json` alongside
 `validation.json` and `report.md`; reports can precede failed final audits.
+
+Probe-update acquisition uses Shared only; `gi_reference.probe_shared_blend` is
+retired. Historical Direct records remain readable. Traversal-only controls,
+partial schedules and periodic refresh remain available.
 
 ## Results and artifacts
 
